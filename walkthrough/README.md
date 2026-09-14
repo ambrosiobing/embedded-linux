@@ -24,6 +24,7 @@ the stage of the project changes.
 | 09 | [Lifecycle](09-lifecycle.md) | Prototype, test, pre-production, production, field, maintenance, and what changes at each |
 | 10 | [Generalising](10-generalising.md) | Other boards, other peripherals, and where all twenty projects sit |
 | | [Decisions](DECISIONS.md) | A log of choices, each with the alternative that was rejected and why |
+| | [Journal](../projects/01-yocto-image/JOURNAL.md) | What actually happened while building Project 1, in order, including the false starts |
 
 ## The through-line
 
@@ -55,6 +56,8 @@ state machine passes its tests; the image builds from source in 194 minutes
 over 5095 tasks; and every option in the kernel fragment reached the built
 `.config`.
 
-Not yet: no board has booted, the SDK has not been generated, and four X11
-packages in the manifest are still unjustified. Where a document describes
-something unproven, it says so.
+Every package in the 95-package image can be justified, after tracing four
+X11 libraries to a dbus feature and removing it.
+
+Not yet: no board has booted, and the SDK has not been generated. Where a
+document describes something unproven, it says so.

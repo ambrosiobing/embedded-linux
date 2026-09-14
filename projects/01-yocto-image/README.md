@@ -43,6 +43,10 @@ on purpose, so that the pair covers both major build systems.
 Wiring, serial console and the first commands on the board are in
 [docs/BRINGUP.md](docs/BRINGUP.md).
 
+[JOURNAL.md](JOURNAL.md) records what actually happened while building
+this, in order, including the things that were wrong first and why each
+decision was taken over its alternative.
+
 ## What is in the image, and why
 
 | Package | Why it is there |
@@ -140,11 +144,12 @@ are worth changing together.
 |---|---|
 | Tasks | 5095, all succeeded, none reused from a previous run |
 | Wall clock | 194 min |
-| Image | 49 MB compressed (`.wic.bz2`) |
+| Image | 49 MB compressed, 48 MB after the dbus fix |
 | Kernel | 6.6.63, Raspberry Pi fork, via meta-raspberrypi |
-| Packages in the image | 99 |
+| Packages in the image | 99, then 95 after the dbus fix |
 | Warnings | 36, all of one class: a primary download URL was unreachable and the mirror served it instead |
-| Warm rebuild | 21 s, 5091 of 5095 tasks reused, sstate 100% match |
+| Warm rebuild, no change | 21 s, 5091 of 5095 tasks reused, sstate 100% match |
+| Rebuild after one recipe changed | 2 min 31 s, sstate 84% match, 25 tasks missed |
 
 ### The commits this was built from
 
@@ -202,13 +207,10 @@ four-package saving, where the bbappend rebuilds one recipe. Project 13
 wants graphics, but it wants Wayland, so the distro feature is not being
 kept for its benefit either.
 
-**Not yet verified.** The fix is written; confirm it with a rebuild and a
-fresh manifest:
-
-```sh
-./go build && ./go packages | wc -l
-```
-Expect 95 rather than 99, with no `libx` entries.
+**Verified.** The rebuild took 2 min 31 s, dropped 38 build tasks that no
+longer needed to exist, removed 23 now-unreachable sstate objects, and
+produced a 48 MB image with **95 packages** and no `libx` entries. The
+criterion that every package can be justified is met for all 95.
 
 ### Still open
 
