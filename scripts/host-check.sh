@@ -24,10 +24,14 @@ step() {
 	printf '\n--- %s\n' "$1"
 }
 
-# Every shell file in the repository. common.sh is included: it is sourced
-# rather than run, but it still has to parse.
-BENCH_SH="go scripts/*.sh tests/*.sh \
-meta-bench/recipes-bench/bench-status/files/bench-state"
+# Every shell file, found rather than listed, so a new one cannot quietly
+# escape the check. Two sources, because common.sh is sourced and has no
+# shebang, while bench-state and bench-wifi-setup have a shebang and no
+# extension. Markdown is excluded: the docs quote shebangs inside examples.
+BENCH_SH=$( {
+	grep -rl --exclude-dir=.git --exclude=*.md "^#!/bin/sh" .
+	find . -path ./.git -prune -o -name "*.sh" -print
+} | sed "s|^[.]/||" | sort -u)
 
 step "static layer checks"
 python3 scripts/lint.py || fail=1

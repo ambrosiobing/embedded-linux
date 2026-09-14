@@ -29,14 +29,16 @@ jobs:
         run: python3 scripts/lint.py
 
       - name: Shell scripts
-        # SC1090 and SC1091 are the sourced common.sh, whose path is built at
-        # run time and cannot be followed statically.
+        # Found rather than listed, so a new script cannot quietly escape the
+        # check. SC1090 and SC1091 are the sourced common.sh, whose path is
+        # built at run time and cannot be followed statically.
         run: |
-          shellcheck -s sh -e SC1090,SC1091 \
-            go \
-            scripts/*.sh \
-            tests/*.sh \
-            meta-bench/recipes-bench/bench-status/files/bench-state
+          files=$( {
+            grep -rl --exclude-dir=.git --exclude=*.md "^#!/bin/sh" .
+            find . -path ./.git -prune -o -name "*.sh" -print
+          } | sed "s|^[.]/||" | sort -u)
+          echo "checking:"; echo "$files"
+          shellcheck -s sh -e SC1090,SC1091 $files
 
       - name: Compile the daemon
         # Not the cross build, but the same source and stricter warnings than
