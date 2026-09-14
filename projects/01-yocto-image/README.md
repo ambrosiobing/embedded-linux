@@ -58,6 +58,7 @@ decision was taken over its alternative.
 | `bench-provision` | Bench site policy: the German console keymap, the `wlan0` network file, and the first-boot step that reads WiFi credentials from the boot partition |
 | `wpa-supplicant`, via `bench-provision` | Joins the wireless network. This bench has no wired network within reach |
 | `linux-firmware-rpidistro-bcm43455` | The Pi 4 radio does not initialise without it. Proprietary and binary-redistributable, so its licence must be accepted explicitly |
+| `kernel-module-brcmfmac` | The radio driver. `core-image-minimal` installs no kernel modules, so firmware alone gives a device that never probes |
 
 Those choices pull in eight more, all of them the wireless stack. They were
 traced with `buildhistory`, which records the package list after every build

@@ -22,8 +22,15 @@ IMAGE_INSTALL:append = " \
     i2c-tools \
     bench-provision \
     linux-firmware-rpidistro-bcm43455 \
+    kernel-module-brcmfmac \
     bench-status \
 "
+
+# core-image-minimal installs no kernel modules at all, so the radio driver
+# has to be named. Firmware without a driver is a radio that never probes:
+# /lib/firmware/brcm was full and dmesg had no brcmfmac line anywhere.
+# Yocto resolves module dependencies from the modules' own metadata, so this
+# pulls brcmutil, cfg80211 and mac80211 with it.
 
 # The Pi 4 radio firmware is proprietary and binary-redistributable, so
 # Yocto refuses to build it until the licence is accepted explicitly.

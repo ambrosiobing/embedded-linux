@@ -512,6 +512,53 @@ which is to name the version.
 
 ---
 
+## 19. Firmware without a driver
+
+**What happened.** The WiFi image booted, and `networkctl` listed no `wlan0`
+at all. Not down, not unconfigured: absent.
+
+**What was done.** Two commands, rather than a theory.
+
+`ls /lib/firmware/brcm` was full of `brcmfmac43455-sdio.*` files, including
+the `raspberrypi,4-model-b` variants. The firmware package had installed
+exactly what it promised.
+
+`dmesg | grep -i brcm` returned `brcm-pcie`, `brcmstb-i2c` and
+`irq_brcmstb_l2`, and no `brcmfmac` line anywhere. The driver had never
+probed.
+
+`find /lib/modules -name "brcmfmac*"` returned nothing, which settled it.
+
+**What it actually was.** `core-image-minimal` installs no kernel modules.
+The manifest had been saying so the whole time: the only two present were
+`kernel-module-ipv6` and `kernel-module-sch-fq-codel`, both dragged in by
+something else. The Raspberry Pi kernel builds `brcmfmac` as a module, so
+the image had the firmware, the supplicant, the netlink libraries and the
+network configuration, and nothing at all to drive the radio.
+
+**The fix** is one line, `kernel-module-brcmfmac` in `IMAGE_INSTALL`. Yocto
+splits the kernel into per-module packages and resolves their dependencies
+from the modules' own metadata, so that one pulls `brcmutil`, `cfg80211` and
+`mac80211` behind it.
+
+**Why that and not the alternative.** `kernel-modules` installs every module
+the kernel built, which is tens of megabytes and would quietly end the
+"every package can be justified" criterion. Naming the one driver keeps the
+image explicable.
+
+**The mistake was mine and it has a shape.** I added a firmware package and
+a userspace daemon and never asked whether the kernel side existed, because
+"the Pi has WiFi" and "the kernel supports WiFi" felt like they implied "the
+image can use WiFi". They do not. An image contains exactly what was asked
+for, which is the whole point of building one, and that cuts both ways.
+
+The tell was in the manifest from the first build: 95 packages and only two
+kernel modules. It was read several times, including while justifying every
+package in it, and the absence was never noticed. Absences are harder to see
+than mistakes.
+
+---
+
 ## Still open
 
 - `kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine`, `keymaps`,
