@@ -15,6 +15,71 @@ because breaking it costs hours rather than minutes.
 before any long command starts, and refuses rather than letting the build
 fail three hours in.
 
+## Host packages
+
+`./go setup` installs these. The first table is the Yocto Project's own host
+requirement list; the second is what this repository's checks add. Nothing is
+installed that nothing uses, which is the same rule the image itself follows.
+
+The list is filtered against `apt-cache policy` at install time, so a package
+that a newer release has dropped is skipped with a note rather than failing
+the whole run. That is how `liblz4-tool` is handled: it became `lz4` after
+24.04, both names are in the list, and whichever one the release still has is
+the one that gets installed.
+
+### Required by the Yocto Project
+
+| Package | Why it is needed |
+|---|---|
+| `gawk` | BitBake and the kernel's kconfig scripts use GNU awk extensions that `mawk` does not have |
+| `wget` | Fetcher for recipes whose `SRC_URI` is an http or https tarball |
+| `git` | Fetcher for git `SRC_URI` entries, and how kas clones poky and the other layers |
+| `diffstat` | The patch tooling summarises what each patch touched when applying `SRC_URI` patches |
+| `unzip` | Unpacks `.zip` sources |
+| `texinfo` | Provides `makeinfo`, which the native binutils and gcc builds need for their documentation |
+| `gcc` | The host compiler. BitBake builds a native toolchain with it before it can cross-compile anything |
+| `build-essential` | `make`, the C library headers and the rest of the native build chain |
+| `chrpath` | Rewrites `RPATH` in binaries so native tools and the SDK still work after being relocated |
+| `socat` | Connects sockets and pseudo-terminals for `devshell` and the image test harness |
+| `cpio` | Builds and unpacks initramfs archives |
+| `python3` | BitBake is written in Python |
+| `python3-pip` | Installs Python tools that the distribution does not package |
+| `python3-pexpect` | Drives interactive processes, used by `runqemu` and the image tests |
+| `xz-utils` | `.tar.xz` sources, and xz-compressed images |
+| `debianutils` | Provides `which`, which many recipe configure scripts call |
+| `iputils-ping` | BitBake's sanity check confirms network access before starting a long fetch |
+| `python3-git` | GitPython. `buildhistory` commits into its own git repository, and this build sets `BUILDHISTORY_COMMIT = "1"` |
+| `python3-jinja2` | Template engine used by the recipe and image tooling, including `wic` |
+| `python3-subunit` | Streams test results for `oe-selftest` and ptest runs |
+| `zstd` | The default compression for sstate artefacts, so every cache hit passes through it |
+| `lz4` | Compresses kernel images and initramfs. Was `liblz4-tool` before 24.04 |
+| `file` | Identifies binary types during package QA |
+| `locales` | Provides `locale-gen`. BitBake requires a UTF-8 locale and refuses to start without one |
+| `libacl1` | Access-control-list handling when the rootfs is assembled by a non-root user |
+
+### Added by this repository
+
+| Package | Why it is needed |
+|---|---|
+| `bmap-tools` | `./go flash` writes the image using its block map, which skips the empty blocks |
+| `libgpiod-dev` | `./go check` compiles `bench-status.c` against the host libgpiod. On 24.04 and later that is v2, the same API the target uses, so a mistake in the GPIO calls surfaces in seconds rather than two hours into a build |
+| `gpiod` | `gpiodetect` and `gpioset` on the host. Not needed for the build itself, but it is the same toolset used for bring-up on the board, and having it here makes the instructions in the project docs testable |
+| `shellcheck` | `./go check` and CI lint every shell script in the repository |
+| `python3-yaml` | `scripts/lint.py` parses the kas files to check they are still valid |
+| `pipx` | Installs kas into its own environment. Current Debian and Ubuntu mark the system Python externally managed, so a plain `pip install` is refused |
+
+### kas
+
+kas is not in the table because it is not always an apt package:
+
+```sh
+sudo apt-get install -y kas || pipx install kas
+```
+
+`./go setup` tries apt first, then pipx, then pip. After a pipx install, kas
+lands in `~/.local/bin`, so `pipx ensurepath` and a new shell may be needed
+before the command is found.
+
 ## Under WSL2
 
 Clone into the Linux file system, not onto a Windows mount:

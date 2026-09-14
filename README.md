@@ -90,7 +90,10 @@ will do exactly that for `PREEMPT_RT`.
 
 The build host needs a case-sensitive file system and about 60 GB. The
 scripts check both and refuse to start otherwise, because finding out three
-hours into a build is expensive. See [docs/BUILD-HOST.md](docs/BUILD-HOST.md).
+hours into a build is expensive.
+
+[docs/BUILD-HOST.md](docs/BUILD-HOST.md) covers the host in full, including a
+table of every package `./go setup` installs and why each one is needed.
 
 ## What is tested without hardware
 
