@@ -51,6 +51,13 @@ run
 check "LF input works" \
 	"$(sed -n 's/.*ssid="\(.*\)"/\1/p' "$WORK/out.conf")" "Plain"
 
+# Notepad writes a UTF-8 byte order mark by default, which would otherwise
+# hide the first key. Three bytes, written in octal so this file stays ASCII.
+printf '\357\273\277SSID=BomNet\r\nPSK=f00d\r\n' >"$WORK/in.conf"
+run
+check "a byte order mark is tolerated" \
+	"$(sed -n 's/.*ssid="\(.*\)"/\1/p' "$WORK/out.conf")" "BomNet"
+
 # The file is a secret and must not be world readable. Windows filesystems
 # carry only the executable bit, so probe whether chmod means anything here
 # rather than reporting a failure that is really the filesystem. Same idea

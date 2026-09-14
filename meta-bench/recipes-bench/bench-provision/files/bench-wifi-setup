@@ -39,6 +39,11 @@ psk=
 
 # Ignore comments, blank lines and anything that is not one of the two keys.
 while IFS='=' read -r key value; do
+	# Keep only the characters a key can legitimately contain. This drops
+	# a UTF-8 byte order mark, which Notepad writes by default and which
+	# would otherwise make the first key unrecognisable, and any stray
+	# carriage return.
+	key=$(printf '%s' "$key" | tr -cd 'A-Za-z0-9_')
 	case $key in
 	SSID) ssid=$value ;;
 	PSK) psk=$value ;;
