@@ -17,6 +17,21 @@ resistor. The loose 330 Ohm resistors in the inventory are therefore not
 needed here. Check the board anyway: if there is no small resistor next to
 the LED, put 330 Ohm in series with `S1` before connecting anything.
 
+## Wiring the LEDs (optional, currently deferred)
+
+The bench LED modules are Joy-IT LinkerKit LK-LED10, which need a LinkerKit
+baseboard and a 2.0 mm LK-Cable. Standard 2.54 mm jumper wires do not mate
+with that socket, so this section describes what to do once one of the two
+options in the project README is in hand. Nothing else in the project
+depends on it.
+
+With three bare LEDs and 330 Ohm resistors, the wiring is simply GPIO17,
+GPIO27 and GPIO22 through a resistor to each anode, cathodes to a ground
+rail, ground rail to pin 9. That is active high and needs no configuration
+change.
+
+The table below is for the four-pin modules.
+
 ## Wiring
 
 | Signal | Pi header pin | BCM line | Module pin |

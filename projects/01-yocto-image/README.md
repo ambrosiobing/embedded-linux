@@ -111,20 +111,61 @@ that was actually built, including lines that ask for an option to stay off.
 
 ## Verification
 
-| Criterion | Check |
-|---|---|
-| Boots to a login prompt in under 15 s | `docs/evidence/boot-console.log`, from the kernel timestamps |
-| `systemctl --failed` empty, green LED within 5 s | On the board, see [docs/BRINGUP.md](docs/BRINGUP.md) |
-| Stopping sshd turns the red LED on | `systemctl stop sshd.socket`, then `bench-state show` |
-| Every package in the image can be justified | `./go packages` against the table above |
-| The kernel fragment reached the kernel | `./go kconfig` |
-| A second clean build gives the same package list | `./go reproduce` |
-| The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board |
+| Criterion | Check | Status |
+|---|---|---|
+| The image builds from source | `./go build` | met, 194 min, 5095 tasks |
+| The board boots to a login prompt | On the console | met |
+| `systemctl --failed` is empty | On the board | met, 0 units |
+| The daemon runs and owns its GPIO lines | `systemctl status bench-status`, `gpioinfo` | met, lines 17/22/27 held |
+| The state machine reports correctly | `bench-state show` | met, `ok` |
+| A stopped unit is reported as failed | `systemctl stop sshd.socket`, then `bench-state show` | to do |
+| Every package in the image can be justified | `./go packages` against the table above | met, all 95 |
+| The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options |
+| A second clean build gives the same package list | `./go reproduce` | running |
+| The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | to do |
+| Boots to a login prompt in under 15 s | Console log timestamps | not measured |
 
 `./go reproduce` tests a narrow claim and states it precisely: a clean build
 from the same commit produces the same package list. It does not claim
 bit-identical images. Timestamps and build paths still differ, which is what
 `buildhistory` is for.
+
+## Deferred: the LED indication
+
+The book's Project 1 drives three LEDs from the status daemon. That is
+deferred, and the reason is worth recording rather than hiding.
+
+The bench LEDs are Joy-IT LinkerKit LK-LED10 modules. They have a 2.0 mm
+socket and, in the manufacturer's own words, require "a Linker Kit baseboard
+as well as an Linker Kit connecting cable". Standard 2.54 mm jumper wires
+cannot mate with that socket, so the modules were never electrically
+connected and no polarity or wiring test could have succeeded.
+
+**Nothing in the software was changed or removed.** `bench-status` runs,
+requests lines 17, 22 and 27 through libgpiod v2, holds them for as long as
+it is running, and sets their values once a second from the state file. That
+much is verified on the board by `gpioinfo`:
+
+```
+line  17: "GPIO17"  output consumer="bench-status"
+line  22: "GPIO22"  output consumer="bench-status"
+line  27: "GPIO27"  output consumer="bench-status"
+```
+
+What is **not** verified is that those output values reach the pins as
+voltages. That needs either an LED or a meter, and it is the single
+unverified link in the chain.
+
+To close it, either fit three bare LEDs with 330 Ohm series resistors from
+GPIO17, GPIO27 and GPIO22 to ground, which is what the book originally
+specified and which is unambiguously active high, or buy an LK-Cable and use
+the modules as the manufacturer intends. Grove 4-pin cables are the same
+2.0 mm pitch and fit.
+
+The polarity and line-offset configuration in `/etc/bench/leds.conf` stays.
+It costs one small file and one libgpiod call, it is the correct design for
+a module whose wiring is not known in advance, and it means neither option
+above needs a rebuild.
 
 ## Build times
 
@@ -240,6 +281,10 @@ each for a reason worth keeping:
 4. **`bench-state` and its units are part of the recipe.** The book's
    acceptance criteria require a state file and an `OnFailure` drop-in, but
    its repository layout does not include them. They are here, with a test.
+
+5. **The LED indication is deferred.** The bench LED modules cannot be
+   connected with the cables available, so the daemon drives its lines and
+   nothing is attached to them. See the section above.
 
 One smaller thing: `S = "${WORKDIR}"` is correct on scarthgap and becomes
 `S = "${UNPACKDIR}"` on walnascar and later. It is the only line in the layer
