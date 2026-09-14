@@ -1,0 +1,20 @@
+[Unit]
+Description=Bench status LEDs
+Documentation=https://github.com/ambrosiobing/meta-bench
+After=local-fs.target systemd-tmpfiles-setup.service
+Wants=bench-state.timer
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bench-status
+Restart=on-failure
+RestartSec=2s
+
+# The daemon needs the GPIO character device and nothing else.
+DeviceAllow=char-gpiochip rw
+ProtectHome=yes
+ProtectSystem=strict
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

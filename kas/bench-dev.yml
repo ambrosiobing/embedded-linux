@@ -1,0 +1,10 @@
+# The debugging variant: gdbserver, perf and the debug tooling, built from
+# the same layer so that the production image stays lean.
+#
+#   kas build kas/bench-dev.yml
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+target: bench-image-dev

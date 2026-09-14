@@ -1,0 +1,10 @@
+# Same layer, other board. Projects 5, 6 and 19 use the identical rootfs
+# on a Raspberry Pi 3, so only the machine changes.
+#
+#   kas build kas/bench-rpi3.yml
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+machine: raspberrypi3-64

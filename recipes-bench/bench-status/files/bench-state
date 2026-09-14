@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# bench-state - write the one word that bench-status(8) turns into a colour.
+#
+#   bench-state poll          derive the state from systemd and write it
+#   bench-state set <state>   force ok, starting or failed
+#   bench-state show          print the current state
+#
+# Two writers, one file, and they agree: the timer polls every few seconds,
+# and the OnFailure drop-in latches "failed" immediately so that the red LED
+# does not wait for the next tick. The next poll reaches the same verdict
+# because the unit that triggered OnFailure is no longer active.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+STATE_DIR=${BENCH_STATE_DIR:-/run/bench}
+STATE_FILE=$STATE_DIR/state
+WATCH_FILE=${BENCH_WATCH_FILE:-/etc/bench/watch.conf}
+
+usage() {
+	echo "usage: bench-state [poll | set <ok|starting|failed> | show]" >&2
+	exit 2
+}
+
+write_state() {
+	case $1 in
+	ok | starting | failed) ;;
+	*)
+		echo "bench-state: unknown state '$1'" >&2
+		exit 2
+		;;
+	esac
+
+	mkdir -p "$STATE_DIR"
+	# Write then rename, so a reader never sees a half-written word.
+	printf '%s\n' "$1" >"$STATE_FILE.new"
+	mv -f "$STATE_FILE.new" "$STATE_FILE"
+}
+
+watched_units() {
+	[ -r "$WATCH_FILE" ] || return 0
+	sed -e 's/#.*//' -e 's/[[:space:]]\{1,\}/ /g' -e 's/^ //' -e 's/ $//' \
+		-e '/^$/d' "$WATCH_FILE"
+}
+
+poll() {
+	system=$(systemctl is-system-running 2>/dev/null || true)
+
+	case $system in
+	initializing | starting)
+		write_state starting
+		return
+		;;
+	degraded | maintenance | stopping)
+		write_state failed
+		return
+		;;
+	esac
+
+	for unit in $(watched_units); do
+		if ! systemctl is-active --quiet "$unit"; then
+			write_state failed
+			return
+		fi
+	done
+
+	write_state ok
+}
+
+case ${1:-poll} in
+poll)
+	poll
+	;;
+set)
+	[ $# -eq 2 ] || usage
+	write_state "$2"
+	;;
+show)
+	cat "$STATE_FILE" 2>/dev/null || echo starting
+	;;
+*)
+	usage
+	;;
+esac

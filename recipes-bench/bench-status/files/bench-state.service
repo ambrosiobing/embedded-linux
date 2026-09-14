@@ -1,0 +1,7 @@
+[Unit]
+Description=Derive the bench state from systemd
+Documentation=https://github.com/ambrosiobing/meta-bench
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bench-state poll

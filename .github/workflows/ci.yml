@@ -1,0 +1,76 @@
+# What a hosted runner can honestly check about a Yocto layer.
+#
+# It cannot build the image: that needs 60 GB and three hours, and the
+# stretch goal moves that to a self-hosted runner with a shared sstate
+# mirror. What it can do is compile the application for real, run the static
+# layer checks and exercise the state machine. Those are the things that
+# actually break while a layer is being edited.
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install checkers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck python3-yaml libgpiod-dev
+
+      - name: Static layer checks
+        run: python3 scripts/lint.py
+
+      - name: Shell scripts
+        # SC1090 and SC1091 are the sourced common.sh, whose path is built at
+        # run time and cannot be followed statically.
+        run: |
+          shellcheck -s sh -e SC1090,SC1091 \
+            go \
+            scripts/*.sh \
+            tests/*.sh \
+            recipes-bench/bench-status/files/bench-state
+
+      - name: Compile the daemon
+        # Not the cross build, but the same source and stricter warnings than
+        # the recipe uses: a toolchain upgrade should fail here, where it can
+        # be fixed, rather than in someone's image build.
+        # libgpiod on Ubuntu 24.04 is v2, which is the API this targets.
+        run: |
+          gcc -Wall -Wextra -Werror -O2 \
+            $(pkg-config --cflags libgpiod) \
+            recipes-bench/bench-status/files/bench-status.c \
+            -o /tmp/bench-status $(pkg-config --libs libgpiod)
+
+      - name: Daemon starts and reports no GPIO chip on a runner
+        # There is no gpiochip on a hosted runner, so a clean exit code 1 is
+        # the correct outcome and proves the binary links and runs.
+        run: |
+          if timeout 5 /tmp/bench-status; then
+            echo "unexpected: the runner has a usable GPIO chip"
+            exit 1
+          fi
+
+      - name: Compile the SDK example
+        run: make -C sdk/hello-gpiod
+
+      - name: State machine
+        run: sh tests/bench-state-test.sh
+
+  image:
+    # Opt in: the build needs a self-hosted runner with the sstate mirror.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, yocto]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build bench-image
+        run: ./go build
+      - name: Kernel fragment reached the .config
+        run: ./go kconfig
+      - name: Package list
+        run: ./go packages

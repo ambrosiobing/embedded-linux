@@ -1,0 +1,57 @@
+# The single place where versions live.
+#
+#   kas build kas/bench-rpi4.yml
+#
+# Moving to the next LTS means changing the branch names below and nothing
+# else. Before tagging a release, replace each branch with the commit hash
+# that was actually built (kas dump --lock writes those for you).
+header:
+  version: 14
+
+machine: raspberrypi4-64
+distro: poky
+target: bench-image
+
+repos:
+  # No url and no path: this is the repository that contains this file.
+  # Its root is added as a layer, which is what meta-bench is.
+  meta-bench:
+
+  poky:
+    url: https://git.yoctoproject.org/poky
+    branch: scarthgap
+    layers:
+      meta:
+      meta-poky:
+
+  meta-openembedded:
+    url: https://git.openembedded.org/meta-openembedded
+    branch: scarthgap
+    layers:
+      meta-oe:
+
+  meta-raspberrypi:
+    url: https://git.yoctoproject.org/meta-raspberrypi
+    branch: scarthgap
+
+local_conf_header:
+  bench: |
+    INIT_MANAGER = "systemd"
+    ENABLE_UART = "1"
+    IMAGE_FSTYPES = "wic.bz2 wic.bmap"
+    INHERIT += "rm_work buildhistory"
+    BUILDHISTORY_COMMIT = "1"
+
+    # rm_work reclaims the disk but deletes the sources you want to
+    # read when something is wrong. Keep the two that get debugged.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-status"
+
+  # Keep the caches outside the build tree so that deleting build/ costs
+  # minutes rather than hours. scripts/build.sh exports both variables.
+  cache: |
+    DL_DIR ?= "${TOPDIR}/../downloads"
+    SSTATE_DIR ?= "${TOPDIR}/../sstate-cache"
+
+  parallel: |
+    BB_NUMBER_THREADS ?= "8"
+    PARALLEL_MAKE ?= "-j 8"

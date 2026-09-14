@@ -1,0 +1,6 @@
+[Unit]
+Description=Latch the bench state to failed after %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bench-state set failed
