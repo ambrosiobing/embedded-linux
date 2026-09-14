@@ -123,7 +123,7 @@ that was actually built, including lines that ask for an option to stay off.
 | The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options |
 | A second clean build gives the same package list | `./go reproduce` | running |
 | The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | to do |
-| Boots to a login prompt in under 15 s | Console log timestamps | not measured |
+| Boots to a login prompt in under 15 s | `systemd-analyze` on the board | not measured |
 
 `./go reproduce` tests a narrow claim and states it precisely: a clean build
 from the same commit produces the same package list. It does not claim
@@ -285,6 +285,11 @@ each for a reason worth keeping:
 5. **The LED indication is deferred.** The bench LED modules cannot be
    connected with the cables available, so the daemon drives its lines and
    nothing is attached to them. See the section above.
+6. **The serial console is not used.** The console for this project is the
+   7 inch DSI panel, with SSH for everything else. `ENABLE_UART` stays set
+   and the kernel still prints to `serial0`, so the capability is in the
+   image; it is simply not the instrument here. Project 2 makes it
+   mandatory, because a NanoPi NEO Air has no other console at all.
 
 One smaller thing: `S = "${WORKDIR}"` is correct on scarthgap and becomes
 `S = "${UNPACKDIR}"` on walnascar and later. It is the only line in the layer

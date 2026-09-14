@@ -83,7 +83,20 @@ journalctl -u bench-status -n 3
 The daemon prints its configuration on the first line, so the journal is the
 fastest way to confirm which lines and which polarity it actually used.
 
-## Serial console
+## Serial console (not used in this project)
+
+The console here is the 7 inch DSI panel, with SSH for everything else, so
+nothing in this section is needed for Project 1. It is kept because the
+capability is in the image, and because Project 2 cannot proceed without it:
+a NanoPi NEO Air has no HDMI and no DSI, so serial is its only console, and
+interrupting U-Boot requires it.
+
+One hardware note before then. The Renkforce cable on this bench uses a
+PL2303HXA, which the current Prolific Windows driver refuses to drive and
+which dropped its USB connection twice during bring-up. Linux handles it
+through `usbipd` and the `pl2303` driver, but a CP2102 or a genuine FTDI
+FT232 costs a few euros and behaves. Worth having before Project 2.
+
 
 ```sh
 picocom -b 115200 /dev/ttyUSB0        # or: screen /dev/ttyUSB0 115200

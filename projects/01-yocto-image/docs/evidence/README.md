@@ -5,7 +5,7 @@ actually run; nothing in this folder should be written from expectation.
 
 | File | How to produce it |
 |---|---|
-| `boot-console.log` | `picocom -b 115200 --logfile projects/01-yocto-image/docs/evidence/boot-console.log /dev/ttyUSB0`, then power the board on. Text, not a screenshot, so that the timings can be read and quoted. |
+| `boot-timing.txt` | `systemd-analyze && systemd-analyze blame \| head -20 && dmesg \| head -40` on the board. Settles the 15 second criterion without needing a serial capture |
 | `packages.txt` | `./go packages > projects/01-yocto-image/docs/evidence/packages.txt` |
 | `kconfig-check.txt` | `./go kconfig > projects/01-yocto-image/docs/evidence/kconfig-check.txt` |
 | `reproduce.txt` | `./go reproduce > projects/01-yocto-image/docs/evidence/reproduce.txt`, the diff of the two buildhistory package lists |

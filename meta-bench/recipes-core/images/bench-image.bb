@@ -20,6 +20,7 @@ IMAGE_INSTALL:append = " \
     libgpiod \
     libgpiod-tools \
     i2c-tools \
+    bench-provision \
     bench-status \
 "
 
