@@ -33,11 +33,15 @@ jobs:
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
         # the library is built here rather than taken from the runner image.
+        # Pinned to the 2.1 line, which is what the target image carries, and
+        # taken from kernel.org because the GitHub mirror lacks those tags.
+        #
         # Same discipline the kas file applies to every Yocto layer: name the
-        # version, do not inherit whatever happens to be lying around. It also
-        # makes this check independent of GitHub changing its images.
+        # version rather than inherit whatever happens to be lying around. It
+        # also makes this check independent of GitHub changing its images,
+        # which is how thirteen runs came to fail.
         run: |
-          git clone --depth 1 --branch v2.1 https://github.com/brgl/libgpiod /tmp/libgpiod
+          git clone --depth 1 --branch v2.1.3 https://git.kernel.org/pub/scm/libs/libgpiod/libgpiod.git /tmp/libgpiod
           cd /tmp/libgpiod
           ./autogen.sh --enable-tools=no --prefix=/usr/local
           make -j"$(nproc)"
