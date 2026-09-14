@@ -83,7 +83,7 @@ To capture the boot log as text rather than a screenshot, which is what the
 portfolio evidence asks for:
 
 ```sh
-picocom -b 115200 --logfile docs/evidence/boot-console.log /dev/ttyUSB0
+picocom -b 115200 --logfile projects/01-yocto-image/docs/evidence/boot-console.log /dev/ttyUSB0
 ```
 
 ## First checks on the board

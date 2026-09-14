@@ -4,14 +4,14 @@
 #
 # A fragment that is silently ignored is the classic Yocto trap: the build
 # succeeds, the option is absent, and the driver fails on the board a week
-# later. This compares every line of recipes-kernel/linux/files/bench.cfg
+# later. This compares every line of meta-bench/recipes-kernel/linux/files/bench.cfg
 # against the .config that was actually built.
 #
 # SPDX-License-Identifier: MIT
 
 . "$(dirname "$0")/common.sh"
 
-fragment=$REPO_DIR/recipes-kernel/linux/files/bench.cfg
+fragment=$REPO_DIR/meta-bench/recipes-kernel/linux/files/bench.cfg
 [ -f "$fragment" ] || die "no fragment at $fragment"
 
 config=$(find "$KAS_BUILD_DIR/tmp/work" -path '*linux-raspberrypi*' \

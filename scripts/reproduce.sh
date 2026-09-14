@@ -30,8 +30,8 @@ mkdir -p "$second_work"
 
 git -C "$REPO_DIR" worktree list >/dev/null 2>&1 ||
 	die "$REPO_DIR is not a git repository."
-git clone --quiet --shared "$REPO_DIR" "$second_work/meta-bench"
-git -C "$second_work/meta-bench" checkout --quiet "$ref"
+git clone --quiet --shared "$REPO_DIR" "$second_work/repo"
+git -C "$second_work/repo" checkout --quiet "$ref"
 
 (
 	KAS_WORK_DIR=$second_work
@@ -41,7 +41,7 @@ git -C "$second_work/meta-bench" checkout --quiet "$ref"
 	SSTATE_DIR=$second_work/sstate-cache
 	DL_DIR=$BENCH_WORK/downloads
 	export SSTATE_DIR DL_DIR
-	kas build "$second_work/meta-bench/kas/bench-rpi4.yml"
+	kas build "$second_work/repo/kas/bench-rpi4.yml"
 )
 
 a=$(find "$first" -name installed-package-names.txt | sort | head -1)

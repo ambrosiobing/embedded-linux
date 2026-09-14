@@ -139,7 +139,7 @@ def check_kas() -> None:
 
 
 def check_layer_conf() -> None:
-    path = ROOT / "conf" / "layer.conf"
+    path = ROOT / "meta-bench" / "conf" / "layer.conf"
     body = text(path)
     collection = re.search(r'BBFILE_COLLECTIONS\s*\+=\s*"([^"]+)"', body)
     if not collection:

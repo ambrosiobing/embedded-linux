@@ -13,9 +13,13 @@ distro: poky
 target: bench-image
 
 repos:
-  # No url and no path: this is the repository that contains this file.
-  # Its root is added as a layer, which is what meta-bench is.
-  meta-bench:
+  # No url: this is the repository that contains this file. Its root is
+  # not a layer, it is a monorepo holding twenty projects, so the layer
+  # inside it is named explicitly. A later project that needs a second
+  # layer of its own adds it to this same list.
+  bench:
+    layers:
+      meta-bench:
 
   poky:
     url: https://git.yoctoproject.org/poky

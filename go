@@ -1,5 +1,5 @@
 #!/bin/sh
-# meta-bench - one entry point, so nothing long ever has to be typed.
+# embedded-linux-bench - one entry point for all twenty projects.
 #
 #   ./go              show this list
 #   ./go setup        install the host packages and check the build directory
@@ -14,6 +14,7 @@
 #   ./go reproduce    build the same commit again and diff the package lists
 #   ./go packages     the image package list, for the README table
 #   ./go lint         static checks that need no Yocto host
+#   ./go projects     list the projects and where each one lives
 #   ./go shell        a BitBake shell inside the kas environment
 #   ./go clean        delete the build tree, keep the caches
 #
@@ -33,6 +34,14 @@ kconfig)    exec sh ./scripts/check-kernel-config.sh ;;
 reproduce)  shift; exec sh ./scripts/reproduce.sh "$@" ;;
 packages)   exec sh ./scripts/packages.sh ;;
 lint)       exec python3 ./scripts/lint.py ;;
+projects)
+	for d in projects/*/; do
+		[ -d "$d" ] || continue
+		title=$(head -1 "$d/README.md" 2>/dev/null | sed 's/^# //')
+		printf '  %-22s %s
+' "${d%/}" "$title"
+	done
+	;;
 shell)
 	KAS_WORK_DIR=${BENCH_WORK:-$HOME/bench}
 	KAS_BUILD_DIR=$KAS_WORK_DIR/build
@@ -49,6 +58,6 @@ clean)
 	esac
 	;;
 *)
-	sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
 	;;
 esac

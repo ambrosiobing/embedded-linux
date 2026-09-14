@@ -19,4 +19,4 @@ sdk/hello-gpiod/hello-gpiod
 *.swp
 .DS_Store
 
-# Evidence is committed on purpose, so nothing under docs/evidence is here.
+# Evidence is committed on purpose, so nothing under projects/*/docs is here.

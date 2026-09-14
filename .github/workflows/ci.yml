@@ -34,7 +34,7 @@ jobs:
             go \
             scripts/*.sh \
             tests/*.sh \
-            recipes-bench/bench-status/files/bench-state
+            meta-bench/recipes-bench/bench-status/files/bench-state
 
       - name: Compile the daemon
         # Not the cross build, but the same source and stricter warnings than
@@ -44,7 +44,7 @@ jobs:
         run: |
           gcc -Wall -Wextra -Werror -O2 \
             $(pkg-config --cflags libgpiod) \
-            recipes-bench/bench-status/files/bench-status.c \
+            meta-bench/recipes-bench/bench-status/files/bench-status.c \
             -o /tmp/bench-status $(pkg-config --libs libgpiod)
 
       - name: Daemon starts and reports no GPIO chip on a runner

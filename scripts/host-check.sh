@@ -25,7 +25,7 @@ python3 scripts/lint.py || fail=1
 step "shell files parse"
 # Always available, unlike shellcheck, and it catches the one thing
 # that matters most after a copy between machines.
-BENCH_SH="go scripts/*.sh tests/*.sh recipes-bench/bench-status/files/bench-state"
+BENCH_SH="go scripts/*.sh tests/*.sh meta-bench/recipes-bench/bench-status/files/bench-state"
 for f in $BENCH_SH; do
 	if sh -n "$f"; then
 		echo "ok   $f"
@@ -39,7 +39,7 @@ step "shell scripts"
 if command -v shellcheck >/dev/null 2>&1; then
 	shellcheck -s sh -e SC1090,SC1091 \
 		go scripts/*.sh tests/*.sh \
-		recipes-bench/bench-status/files/bench-state || fail=1
+		meta-bench/recipes-bench/bench-status/files/bench-state || fail=1
 else
 	echo "shellcheck absent, skipped (scripts/host-setup.sh installs it)"
 fi
@@ -60,7 +60,7 @@ if pkg-config --exists libgpiod; then
 	# Stricter than the recipe on purpose: a warning should surface here.
 	if gcc -Wall -Wextra -Werror -O2 \
 		$(pkg-config --cflags libgpiod) \
-		recipes-bench/bench-status/files/bench-status.c \
+		meta-bench/recipes-bench/bench-status/files/bench-status.c \
 		-o "$out" $(pkg-config --libs libgpiod); then
 		echo "compiled clean"
 		# No GPIO chip on most hosts, so exit 1 is the correct outcome.
