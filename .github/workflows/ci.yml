@@ -26,7 +26,23 @@ jobs:
           sudo apt-get update
           # pkg-config is used by the compile steps below. The runner
           # image usually has it, and "usually" is not a dependency.
-          sudo apt-get install -y shellcheck python3-yaml libgpiod-dev pkg-config build-essential
+          # No libgpiod-dev here on purpose: Ubuntu LTS packages v1, and
+          # the daemon targets v2. It is built from a pinned tag below.
+          sudo apt-get install -y shellcheck python3-yaml pkg-config build-essential autoconf autoconf-archive automake libtool
+
+      - name: Build libgpiod v2 from a pinned tag
+        # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
+        # the library is built here rather than taken from the runner image.
+        # Same discipline the kas file applies to every Yocto layer: name the
+        # version, do not inherit whatever happens to be lying around. It also
+        # makes this check independent of GitHub changing its images.
+        run: |
+          git clone --depth 1 --branch v2.1 https://github.com/brgl/libgpiod /tmp/libgpiod
+          cd /tmp/libgpiod
+          ./autogen.sh --enable-tools=no --prefix=/usr/local
+          make -j"$(nproc)"
+          sudo make install
+          sudo ldconfig
 
       - name: Static layer checks
         run: python3 scripts/lint.py
