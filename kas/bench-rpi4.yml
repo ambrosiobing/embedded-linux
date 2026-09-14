@@ -42,6 +42,20 @@ local_conf_header:
   bench: |
     INIT_MANAGER = "systemd"
     ENABLE_UART = "1"
+
+    # Two consoles, not one. meta-raspberrypi makes CMDLINE_CONSOLE
+    # conditional on ENABLE_UART and picks serial OR tty1, so with the
+    # UART enabled the kernel says nothing on HDMI. A bench board whose
+    # only console is a serial cable is undebuggable the day that cable
+    # fails, which is exactly how this line came to be written.
+    CMDLINE_CONSOLE = "console=serial0,115200 console=tty1"
+
+    # The bench console is the official 7 inch DSI panel. Under the KMS
+    # driver that panel needs its overlay named explicitly; without it
+    # the backlight comes on and nothing is ever drawn, which is
+    # indistinguishable from a board that did not boot. Remove this line
+    # if the panel is not attached.
+    RPI_EXTRA_CONFIG = "dtoverlay=vc4-kms-dsi-7inch"
     IMAGE_FSTYPES = "wic.bz2 wic.bmap"
     INHERIT += "rm_work buildhistory"
     BUILDHISTORY_COMMIT = "1"

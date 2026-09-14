@@ -350,6 +350,70 @@ previous `0 min`.
 
 ---
 
+## 16. Four hours on a board that was working
+
+**What happened.** The first flashed card appeared not to boot. The serial
+console showed nothing, the touchscreen showed a grey backlight, and the
+green activity LED flickered briefly and stopped. Every symptom pointed at a
+board that read the card and then failed.
+
+**What was done.** Four edits were made directly to the card, since
+`config.txt` and `cmdline.txt` are on a FAT partition and need no rebuild:
+`uart_2ndstage=1` to make the firmware narrate, `arm_64bit=1` on the theory
+that the firmware was looking for the wrong kernel filename,
+`dtoverlay=vc4-kms-dsi-7inch` for the panel, and `console=tty1` so the kernel
+would print somewhere other than the serial port. The next boot reached a
+login prompt on the touchscreen.
+
+**What it actually was.** The board had been booting correctly since the
+first flash. Two independent faults hid it:
+
+1. The serial wiring never worked. A loopback test, done far too late,
+   proved the cable good up to its own connector, so the break was between
+   the connector and the header.
+2. `grep -rn arm_64bit ~/bench/meta-raspberrypi/` returns nothing. The BSP
+   never sets it, because the firmware defaults to 64-bit on a BCM2711. That
+   edit changed nothing at all.
+
+So of the four edits, only the console pair mattered, and they did not fix
+the boot. They fixed the ability to watch it.
+
+**The tell that was missed.** `uart_2ndstage=1` makes the *firmware* log over
+the UART, before any kernel exists. It produced nothing. Firmware logging is
+independent of the kernel, the device tree and the rootfs, so silence there
+could only mean the wire. That was known roughly three hours before it was
+acted on.
+
+**Why the LEDs never lit either.** They are Joy-IT LinkerKit LK-LED10
+modules, which have a 2.0 mm socket and require a LinkerKit baseboard and
+cable. The jumper wires in use are 2.54 mm Dupont. They cannot mate. Every
+polarity test was driving pins into open air. The datasheet says a baseboard
+and cable are required, in one line, and nobody read it until the end.
+
+**What changed in the layer.** An image whose only console is a serial port
+is undebuggable the day that serial port fails, which is what happened. The
+kas file now sets both consoles and names the panel overlay, so a freshly
+flashed card reaches a visible login prompt with no hand edits:
+
+```
+CMDLINE_CONSOLE = "console=serial0,115200 console=tty1"
+RPI_EXTRA_CONFIG = "dtoverlay=vc4-kms-dsi-7inch"
+```
+
+**Why that and not the alternative.** The alternative was to keep the
+single serial console and treat this as a wiring accident. It is not an
+accident: a bench board is going to lose its console cable again, and the
+cost of a second console is one line of configuration against hours of
+indistinguishable symptoms.
+
+**The lesson, which is the reason this entry exists.** When the instrument
+and the subject are both silent, suspect the instrument. Validate the
+instrument before trusting its readings. The loopback test takes ten seconds
+and belongs *before* the first power-on, not after four hours of debugging a
+board that was already printing a login prompt into a disconnected wire.
+
+---
+
 ## Still open
 
 - `kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine`, `keymaps`,
@@ -357,7 +421,7 @@ previous `0 min`.
   from `packagegroup-core-boot`, so trimming them means overriding a
   packagegroup, which is a larger change than a `PACKAGECONFIG` and has not
   been attempted yet.
-- No board has booted. The SDK has not been generated.
+- The SDK has not been generated.
 - `./go reproduce` has not been run.
 
 ---

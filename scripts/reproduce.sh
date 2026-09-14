@@ -24,7 +24,15 @@ first=$KAS_BUILD_DIR/buildhistory
 [ -d "$first" ] || die "no buildhistory from the first build. Run ./go build."
 
 second_work=$BENCH_WORK/reproduce
+
+# The second build gets its own build tree and its own sstate cache, so
+# it needs as much room as the first one did. Checking here turns an
+# out-of-disk failure at hour two into a refusal at second one.
+require_disk_gb "$BENCH_WORK" 60
+
 note "second build in $second_work (ref $ref)"
+note "this is a full rebuild with a separate sstate cache, about as long"
+note "as the first build. Only the download directory is shared."
 rm -rf "$second_work"
 mkdir -p "$second_work"
 
