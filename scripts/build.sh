@@ -19,6 +19,7 @@ kasfile=$REPO_DIR/kas/$config.yml
 [ -f "$kasfile" ] || die "no such configuration: kas/$config.yml"
 
 require_tool kas
+require_no_running_build
 require_case_sensitive "$BENCH_WORK"
 require_disk_gb "$BENCH_WORK" 60
 

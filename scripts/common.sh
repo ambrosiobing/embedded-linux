@@ -55,6 +55,18 @@ require_disk_gb() {
 		die "$dir has ${have} GB free, the build needs ${want} GB."
 }
 
+# BitBake keeps one memory-resident server per build directory, so a second
+# run does not run alongside the first: it waits on the handshake and prints
+# "Retrying server connection" every thirty seconds, forever, with no hint
+# that another build is the reason.
+require_no_running_build() {
+	if pgrep -f 'bitbake/bin/bitbake' >/dev/null 2>&1; then
+		die "another BitBake run already owns this build directory.
+       BitBake allows one at a time per build dir. Let the first finish, or
+       stop it, then run this again."
+	fi
+}
+
 require_tool() {
 	command -v "$1" >/dev/null 2>&1 ||
 		die "$1 is not installed. Run scripts/host-setup.sh."
