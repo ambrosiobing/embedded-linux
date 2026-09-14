@@ -16,6 +16,7 @@ Exit status is non-zero if anything failed, so CI can use it directly.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -160,6 +161,42 @@ def check_line_length() -> None:
                 fail(path, f"line {number}: longer than 88 columns")
 
 
+def check_exec_bits() -> None:
+    """A script with a shebang must be recorded executable in the index.
+
+    Git on Windows defaults to core.filemode=false, so a chmod on that side
+    never reaches the commit and the file arrives on Linux as 644. The
+    symptom is "Permission denied" after a clone, a long way from the cause,
+    so the mode is checked here rather than trusted.
+    """
+    try:
+        listing = subprocess.run(
+            ["git", "ls-files", "--stage"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("note: not a git checkout, executable bits not checked")
+        return
+
+    for entry in listing.splitlines():
+        fields = entry.split(maxsplit=3)
+        if len(fields) < 4:
+            continue
+        mode, name = fields[0], fields[3].strip()
+        path = ROOT / name
+        if not path.is_file():
+            continue
+        try:
+            with open(path, "rb") as handle:
+                shebang = handle.read(2) == b"#!"
+        except OSError:
+            continue
+        if shebang and mode != "100755":
+            fail(path, f"has a shebang but is committed as {mode}, not 100755")
+        if not shebang and mode == "100755":
+            fail(path, "is committed executable but has no shebang")
+
+
 def main() -> int:
     for check in (
         check_ascii,
@@ -170,6 +207,7 @@ def main() -> int:
         check_kas,
         check_layer_conf,
         check_line_length,
+        check_exec_bits,
     ):
         check()
 
