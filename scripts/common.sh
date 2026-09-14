@@ -3,7 +3,9 @@
 
 set -eu
 
-REPO_DIR=$(cd "$(dirname "$0")/.." && pwd)
+# Used by the scripts that source this file, which shellcheck cannot see.
+# shellcheck disable=SC2034
+REPO_DIR=$(cd "$(dirname "$0")/.." && pwd) || exit 1
 
 # Everything BitBake writes goes here: the cloned layers, the build tree and
 # the two caches. Keep it on a native Linux file system.

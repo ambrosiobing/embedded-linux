@@ -25,7 +25,9 @@ The list is filtered against `apt-cache policy` at install time, so a package
 that a newer release has dropped is skipped with a note rather than failing
 the whole run. That is how `liblz4-tool` is handled: it became `lz4` after
 24.04, both names are in the list, and whichever one the release still has is
-the one that gets installed.
+the one that gets installed. `pkg-config` and `pkgconf` are the same
+arrangement. After the install the script checks that each pair left a working
+binary behind, because a silently missing tool is worse than a failed install.
 
 ### Required by the Yocto Project
 
@@ -66,6 +68,7 @@ the one that gets installed.
 | `gpiod` | `gpiodetect` and `gpioset` on the host. Not needed for the build itself, but it is the same toolset used for bring-up on the board, and having it here makes the instructions in the project docs testable |
 | `shellcheck` | `./go check` and CI lint every shell script in the repository |
 | `python3-yaml` | `scripts/lint.py` parses the kas files to check they are still valid |
+| `pkg-config` | Resolves the compiler and linker flags for libgpiod. Without it the compile step in `./go check` cannot run at all, and nothing else in the host list pulls it in. Newer releases are migrating the name to `pkgconf`, so both are in the list and whichever one exists is installed |
 | `pipx` | Installs kas into its own environment. Current Debian and Ubuntu mark the system Python externally managed, so a plain `pip install` is refused |
 
 ### kas

@@ -27,11 +27,12 @@ chrpath socat cpio python3 python3-pip python3-pexpect
 xz-utils debianutils iputils-ping python3-git python3-jinja2
 python3-subunit zstd lz4 liblz4-tool file locales libacl1
 bmap-tools libgpiod-dev gpiod shellcheck python3-yaml pipx
+pkg-config pkgconf
 "
 
 # Packages that have no candidate on this release and are not worth a
 # warning, because another name in the list covers the same tool.
-ALTERNATIVES="lz4 liblz4-tool"
+ALTERNATIVES="lz4 liblz4-tool pkg-config pkgconf"
 
 installable() {
 	candidate=$(apt-cache policy "$1" 2>/dev/null |
@@ -66,10 +67,11 @@ install_packages() {
 		fi
 	done
 
-	# One of the two lz4 names has to have landed.
-	if ! command -v lz4 >/dev/null 2>&1; then
-		note "warning: no lz4 binary; some Yocto tasks need it"
-	fi
+	# Each either/or pair above has to leave a working binary behind.
+	for tool in lz4 pkg-config; do
+		command -v "$tool" >/dev/null 2>&1 ||
+			note "warning: no $tool binary after the install"
+	done
 }
 
 install_kas() {
