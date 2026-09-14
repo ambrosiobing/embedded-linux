@@ -114,6 +114,46 @@ portfolio evidence asks for:
 picocom -b 115200 --logfile projects/01-yocto-image/docs/evidence/boot-console.log /dev/ttyUSB0
 ```
 
+## WiFi
+
+This bench has no wired network in reach, so the image joins a wireless one.
+The image carries the capability; the card carries the credentials, and the
+repository never sees a password.
+
+On the laptop, turn the passphrase into the hash the supplicant actually
+wants:
+
+```sh
+wpa_passphrase "YourNetwork" "yourpassword"
+```
+
+Copy the `psk=` value from its output. Then, after flashing, open the card's
+FAT boot partition from any machine and create **`wifi.conf`** with two
+lines:
+
+```
+SSID=YourNetwork
+PSK=a1b2c3d4e5f6...
+```
+
+Notepad is fine. The setup script strips the CRLF line endings that Windows
+leaves behind, which is covered by a test.
+
+At boot, `bench-wifi-setup.service` reads that file, writes
+`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` with mode 600, and starts
+the supplicant. A card without `wifi.conf` boots normally with no failed
+units, so an image with no credentials is not a broken image.
+
+To check it on the board:
+
+```sh
+networkctl
+ip a
+```
+
+`wlan0` should reach `routable` with an address. Then SSH in from the laptop
+as `root` with no password, and the console keyboard stops mattering.
+
 ## First checks on the board
 
 ```sh

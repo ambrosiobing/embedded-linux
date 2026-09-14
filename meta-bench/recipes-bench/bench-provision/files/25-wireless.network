@@ -1,0 +1,11 @@
+# DHCP on the radio, with a worse route metric than wired so that a cable,
+# when there is one, wins.
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+
+[DHCP]
+RouteMetric=20
+ClientIdentifier=mac

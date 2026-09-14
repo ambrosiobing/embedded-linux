@@ -55,6 +55,9 @@ decision was taken over its alternative.
 | `i2c-tools` | `i2cdetect` is the first command run against any new sensor board |
 | `bench-status` | This project's own application: the status LEDs and the state machine behind them |
 | `openssh-sshd`, via `ssh-server-openssh` | How later projects copy SDK-built binaries onto the board |
+| `bench-provision` | Bench site policy: the German console keymap, the `wlan0` network file, and the first-boot step that reads WiFi credentials from the boot partition |
+| `wpa-supplicant`, via `bench-provision` | Joins the wireless network. This bench has no wired network within reach |
+| `linux-firmware-rpidistro-bcm43455` | The Pi 4 radio does not initialise without it. Proprietary and binary-redistributable, so its licence must be accepted explicitly |
 
 Everything else comes from `core-image-minimal`. `./go packages` prints the
 manifest, so this table is checked against the build rather than remembered.

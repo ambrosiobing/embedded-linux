@@ -21,8 +21,15 @@ IMAGE_INSTALL:append = " \
     libgpiod-tools \
     i2c-tools \
     bench-provision \
+    linux-firmware-rpidistro-bcm43455 \
     bench-status \
 "
+
+# The Pi 4 radio firmware is proprietary and binary-redistributable, so
+# Yocto refuses to build it until the licence is accepted explicitly.
+# That acceptance lives in the kas file next to the other policy,
+# because it is a decision about this bench and not a property of the
+# image.
 
 # Enough room for the SDK-built binaries of the later projects.
 IMAGE_ROOTFS_EXTRA_SPACE = "131072"

@@ -56,6 +56,12 @@ local_conf_header:
     # indistinguishable from a board that did not boot. Remove this line
     # if the panel is not attached.
     RPI_EXTRA_CONFIG = "dtoverlay=vc4-kms-dsi-7inch"
+
+    # The Pi 4 radio firmware is proprietary. Yocto refuses to build a
+    # recipe carrying LICENSE_FLAGS until that flag is named here, so
+    # that shipping a non-open binary is a decision somebody made rather
+    # than an accident. Accepting it is the decision, recorded here.
+    LICENSE_FLAGS_ACCEPTED = "synaptics-killswitch"
     IMAGE_FSTYPES = "wic.bz2 wic.bmap"
     INHERIT += "rm_work buildhistory"
     BUILDHISTORY_COMMIT = "1"

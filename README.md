@@ -108,6 +108,30 @@ hours into a build is expensive.
 [docs/BUILD-HOST.md](docs/BUILD-HOST.md) covers the host in full, including a
 table of every package `./go setup` installs and why each one is needed.
 
+## What this image assumes about the bench
+
+These are choices about one workshop, not defaults anyone should inherit
+silently. Each is one line, and each says where to change it.
+
+| Assumption | Why | Where it is set |
+|---|---|---|
+| The console is the official 7 inch DSI panel | This bench has no micro-HDMI adapter and its USB/TTL cable is obsolete | `RPI_EXTRA_CONFIG` and `CMDLINE_CONSOLE` in `kas/bench-rpi4.yml` |
+| The console keymap is German | The boards are used with a German keyboard, and a US map makes a shell unusable | `vconsole.conf` in `meta-bench/recipes-bench/bench-provision/files/` |
+| Networking is wireless | There is no wired network within reach of the bench | `bench-provision`, plus the firmware named in `bench-image.bb` |
+| The Pi 4 radio firmware is proprietary | The radio does not initialise without it | `LICENSE_FLAGS_ACCEPTED` in `kas/bench-rpi4.yml` |
+| Root has no password | `debug-tweaks`, right for an isolated bench and wrong for anything else | `IMAGE_FEATURES` in `bench-image.bb` |
+
+**Wired networking needs no changes at all.** The image already runs DHCP on
+`eth*` and an SSH server, so a board with a cable gets an address and accepts
+`ssh root@...` out of the box. The wireless support exists because this
+bench has no cable, not because it is better.
+
+**WiFi credentials are never in this repository.** The image carries the
+capability to join a network; the card carries the identity. A first-boot
+service reads `SSID` and `PSK` from `wifi.conf` on the FAT boot partition,
+which you write after flashing with any text editor. See
+[the bring-up notes](projects/01-yocto-image/docs/BRINGUP.md).
+
 ## What is tested without hardware
 
 Most of a Yocto project cannot be tested on a laptop, but the parts that
@@ -117,6 +141,7 @@ usually break can be:
 |---|---|---|
 | Static layer checks | `./go lint` | Files in `SRC_URI` that are missing, units in `SYSTEMD_SERVICE` that are never installed, layer.conf completeness, ASCII and line length |
 | State machine | `sh tests/bench-state-test.sh` | The status logic, against a fake `systemctl` |
+| WiFi provisioning | `sh tests/bench-wifi-setup-test.sh` | Credentials parsed from a file written on Windows, including CRLF endings, missing fields and file permissions |
 | Host compile | `./go check` | The application built with `-Werror` against the host libgpiod v2, the same API the target uses |
 
 CI runs all three on every push. It does not build the image: that needs a

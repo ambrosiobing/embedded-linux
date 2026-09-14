@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# bench-wifi-setup - configure wlan0 from credentials left on the boot
+# partition.
+#
+# The image carries the capability to join a network. The card carries the
+# credentials. /boot is the FAT partition of the same card, so the file can
+# be written from any machine after flashing, with any text editor, and the
+# repository never sees a password.
+#
+# /boot/wifi.conf holds two lines:
+#
+#   SSID=YourNetwork
+#   PSK=a1b2c3...          64 hex characters from wpa_passphrase, unquoted
+#
+# Generate the hash on a machine that has wpa_supplicant:
+#
+#   wpa_passphrase "YourNetwork" "yourpassword"
+#
+# and copy the psk= value. A plain passphrase also works if you wrap it in
+# double quotes in the file, but the hash is what the supplicant wants and
+# it keeps the reusable password off the card.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+SRC=${BENCH_WIFI_SOURCE:-/boot/wifi.conf}
+DST=${BENCH_WIFI_TARGET:-/etc/wpa_supplicant/wpa_supplicant-wlan0.conf}
+COUNTRY=${BENCH_WIFI_COUNTRY:-DE}
+
+if [ ! -r "$SRC" ]; then
+	echo "bench-wifi-setup: no $SRC, leaving wlan0 unconfigured"
+	exit 0
+fi
+
+ssid=
+psk=
+
+# Ignore comments, blank lines and anything that is not one of the two keys.
+while IFS='=' read -r key value; do
+	case $key in
+	SSID) ssid=$value ;;
+	PSK) psk=$value ;;
+	esac
+done <"$SRC"
+
+# Strip a trailing carriage return, because this file is usually written on
+# Windows and Notepad leaves CRLF endings behind.
+ssid=$(printf '%s' "$ssid" | tr -d '\r')
+psk=$(printf '%s' "$psk" | tr -d '\r')
+
+if [ -z "$ssid" ]; then
+	echo "bench-wifi-setup: $SRC has no SSID= line" >&2
+	exit 1
+fi
+
+if [ -z "$psk" ]; then
+	echo "bench-wifi-setup: $SRC has no PSK= line" >&2
+	exit 1
+fi
+
+mkdir -p "$(dirname "$DST")"
+
+umask 077
+{
+	printf 'ctrl_interface=/run/wpa_supplicant\n'
+	printf 'update_config=1\n'
+	printf 'country=%s\n' "$COUNTRY"
+	printf 'network={\n'
+	printf '    ssid="%s"\n' "$ssid"
+	printf '    psk=%s\n' "$psk"
+	printf '}\n'
+} >"$DST.new"
+
+mv -f "$DST.new" "$DST"
+chmod 600 "$DST"
+
+echo "bench-wifi-setup: configured wlan0 for $ssid"

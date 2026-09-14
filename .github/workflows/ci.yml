@@ -59,8 +59,13 @@ jobs:
       - name: Compile the SDK example
         run: make -C sdk/hello-gpiod
 
-      - name: State machine
-        run: sh tests/bench-state-test.sh
+      - name: Tests
+        # Every test in tests/, so adding one is enough to have CI run it.
+        run: |
+          for t in tests/*.sh; do
+            echo "== $t"
+            sh "$t" || exit 1
+          done
 
   image:
     # Opt in: the build needs a self-hosted runner with the sstate mirror.

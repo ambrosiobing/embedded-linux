@@ -1,0 +1,14 @@
+[Unit]
+Description=Configure wlan0 from the boot partition
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+ConditionPathExists=/boot/wifi.conf
+Before=wpa_supplicant@wlan0.service
+Wants=wpa_supplicant@wlan0.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/bench-wifi-setup
+
+[Install]
+WantedBy=multi-user.target

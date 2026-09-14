@@ -56,8 +56,11 @@ else
 	echo "shellcheck absent, skipped (scripts/host-setup.sh installs it)"
 fi
 
-step "state machine"
-sh tests/bench-state-test.sh || fail=1
+# Every test in tests/, so adding one is enough to have it run.
+for t in tests/*.sh; do
+	step "test: $(basename "$t")"
+	sh "$t" || fail=1
+done
 
 step "compile the daemon against host libgpiod"
 if ! command -v pkg-config >/dev/null 2>&1; then
