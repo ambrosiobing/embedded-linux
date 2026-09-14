@@ -467,6 +467,51 @@ on the other side of a virtual disk.
 
 ---
 
+## 18. Thirteen red runs nobody read
+
+**What happened.** CI failed on every push from the very first one. Thirteen
+consecutive red runs over two days, each sending an email, while the work
+carried on and the workflow was repeatedly described as the thing that would
+catch mistakes.
+
+**Three causes, found in sequence.**
+
+1. `SC2015` in `scripts/reproduce.sh`, an *info*-level style note about
+   `A && B || C`. shellcheck exits non-zero on any finding, so one note
+   failed the job.
+2. The shellcheck invocation named its files by hand, and
+   `bench-wifi-setup` never joined the list. A script written that evening
+   had never been checked by anything.
+3. The real one: GitHub's `ubuntu-latest` ships **libgpiod 1.6.3**. The
+   daemon targets v2. Forty lines of implicit-declaration errors, with gcc
+   helpfully suggesting v1 names like `gpiod_line_iter_new`. Ubuntu did not
+   package v2 until 24.10, so no LTS runner image has it.
+
+**What was done.** An explicit `if` for the style note. Both the CI step and
+`./go check` now *find* shell files rather than listing them, by shebang and
+by extension, so a new script cannot escape. And libgpiod is built in CI
+from tag `v2.1.3` taken from kernel.org, which is the series the target
+image carries.
+
+**Why that and not the alternative.** Two easier options were rejected.
+Lowering shellcheck's severity so `info` findings do not fail would mean
+re-reading and re-dismissing the same list forever. Skipping the compile
+when v2 is absent would be a gate that passes by not checking, which is the
+same fault as the skipped `pkg-config` compile in entry 7.
+
+**A guess that cost a round trip.** The first attempt pinned tag `v2.1` on
+the GitHub mirror. It does not exist there: the mirror carries only recent
+tags. One `git ls-remote --tags` would have said so, and that is the third
+time in this project that guessing cost more than asking.
+
+**The lesson.** A check nobody reads is not a check. CI was correct from run
+one and said so thirteen times. And the CI environment is a dependency like
+any other: `ubuntu-latest` is a moving target in exactly the way a git
+branch is, and the fix was the same as everywhere else in this repository,
+which is to name the version.
+
+---
+
 ## Still open
 
 - `kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine`, `keymaps`,

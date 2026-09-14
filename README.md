@@ -144,7 +144,10 @@ usually break can be:
 | WiFi provisioning | `sh tests/bench-wifi-setup-test.sh` | Credentials parsed from a file written on Windows, including CRLF endings, missing fields and file permissions |
 | Host compile | `./go check` | The application built with `-Werror` against the host libgpiod v2, the same API the target uses |
 
-CI runs all three on every push. It does not build the image: that needs a
+CI runs all of these on every push, on a pinned `ubuntu-24.04` runner
+with libgpiod v2 built from a named tag, because no Ubuntu LTS image
+packages v2 and an unpinned runner is a moving dependency like any
+other. It does not build the image: that needs a
 self-hosted runner with a shared sstate mirror, which is an opt-in job.
 
 ## Licence
