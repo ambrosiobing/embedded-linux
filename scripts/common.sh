@@ -67,6 +67,24 @@ require_no_running_build() {
 	fi
 }
 
+# Under WSL the guest filesystem reports the virtual disk maximum, not what
+# Windows can actually supply. The VHDX grows on demand out of the host
+# drive, so a build can exhaust Windows while the guest still claims
+# hundreds of free gigabytes. Not hypothetical: it filled a 254 GB system
+# drive to zero here and took the filesystem read-only in the middle of an
+# SDK build.
+require_host_disk_gb() {
+	want=$1
+	[ -d /mnt/c ] || return 0
+	have=$(df -BG --output=avail /mnt/c 2>/dev/null | tail -1 | tr -dc "0-9")
+	[ -n "${have:-}" ] || return 0
+	if [ "$have" -lt "$want" ]; then
+		die "the Windows drive behind WSL has ${have} GB free and this needs
+       ${want} GB there. The guest will report far more, because the virtual
+       disk grows on demand out of exactly this space."
+	fi
+}
+
 require_tool() {
 	command -v "$1" >/dev/null 2>&1 ||
 		die "$1 is not installed. Run scripts/host-setup.sh."

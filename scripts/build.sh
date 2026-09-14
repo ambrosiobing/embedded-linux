@@ -20,6 +20,7 @@ kasfile=$REPO_DIR/kas/$config.yml
 
 require_tool kas
 require_no_running_build
+require_host_disk_gb 25
 require_case_sensitive "$BENCH_WORK"
 require_disk_gb "$BENCH_WORK" 60
 

@@ -18,6 +18,7 @@
 
 ref=${1:-HEAD}
 require_tool kas
+require_host_disk_gb 60
 require_tool git
 
 first=$KAS_BUILD_DIR/buildhistory

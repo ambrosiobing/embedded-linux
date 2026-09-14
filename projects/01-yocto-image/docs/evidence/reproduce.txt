@@ -1,0 +1,59 @@
+Reproducibility check, Project 01
+=================================
+
+The claim being tested, stated narrowly on purpose:
+
+    A clean build from the same commit produces the same package list.
+
+It does NOT claim bit-identical images. Timestamps, build paths and build
+IDs still differ. Full binary reproducibility is a separate and larger
+piece of work.
+
+Method
+------
+
+    ./go reproduce
+
+The second build is a fresh clone into its own directory with its own
+sstate cache, so it genuinely rebuilds rather than restoring cached
+artefacts. Only the download directory is shared, to avoid fetching 10 GB
+of source a second time.
+
+Environment
+-----------
+
+Commit      dadd5ad  "dbus: drop x11 autolaunch, which pulled four X11
+                      packages into a headless image"
+Layers      poky              77d1feb3  (scarthgap)
+            meta-openembedded b5874ea0  (scarthgap)
+            meta-raspberrypi  6ca1f750  (scarthgap)
+Host        WSL2, Ubuntu 26.04, 8 cores, 15 GiB
+Machine     raspberrypi4-64
+Distro      poky 5.0.20, BitBake 2.8.1
+
+Result
+------
+
+    $ wc -l .../build/buildhistory/.../installed-package-names.txt \
+            .../reproduce/build/buildhistory/.../installed-package-names.txt
+      95 /home/bing/bench/build/.../installed-package-names.txt
+      95 /home/bing/bench/reproduce/build/.../installed-package-names.txt
+
+    $ diff -u first second
+    (no output)
+
+Two independent builds of the same commit, in separate trees with separate
+shared-state caches, produced identical package lists of 95 packages.
+
+PASS
+
+Note
+----
+
+One difference between the two build environments was visible in the
+BitBake header and is worth recording rather than hiding: the first build
+reported NATIVELSBSTRING "universal", the second "ubuntu-26.04". That is
+uninative being in play for one and not the other, which affects how native
+build tools are linked on the host. It changes nothing about the target
+packages, which is what this check compares, but it is a real difference
+between the two runs.

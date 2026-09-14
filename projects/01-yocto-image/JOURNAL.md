@@ -414,6 +414,59 @@ board that was already printing a login prompt into a disconnected wire.
 
 ---
 
+## 17. Reproducible, and a full disk
+
+**What happened.** `./go reproduce` built the tagged commit a second time in
+its own tree with its own sstate cache. Both builds produced exactly 95
+packages and `diff` reported nothing. The narrow claim holds, with evidence
+in `docs/evidence/reproduce.txt`.
+
+Then the SDK build died in a way that had nothing to do with Yocto:
+
+```
+OSError(30, 'Read-only file system')
+[Errno 5] Input/output error
+Bus error
+```
+
+**What it actually was.** The Windows drive behind WSL had reached **zero
+bytes free**. The virtual disk grows on demand out of host space, so when
+Windows ran out, the guest could not allocate blocks, and ext4 did what
+`errors=remount-ro` says it should: it went read-only mid-build.
+
+Three full builds had accumulated: the original, the reproduce run with its
+own tree and cache, and the SDK. 63.6 GB of virtual disk against a system
+drive that was already nearly full for unrelated reasons.
+
+**What was done.** `powercfg /h off` freed the hibernation file and bought
+enough headroom to restart WSL. The reproduce result was captured *before*
+deleting anything, because the tree about to be reclaimed held the only copy
+of the evidence. Then the second build tree and `build/tmp` went, and the
+virtual disk was compacted so the space returned to Windows.
+
+**Why the guard did not fire.** `require_disk_gb` checks the directory it is
+given, which under WSL reports the virtual disk's maximum size. It said 919
+GB free while Windows had none. The check was not wrong so much as looking
+at the wrong number.
+
+`require_host_disk_gb` now checks `/mnt/c` as well when it exists, because
+that is where the space actually comes from. `./go build` and `./go sdk`
+want 25 GB there, `./go reproduce` wants 60 GB, since it needs a second full
+tree.
+
+**Why that and not the alternative.** The alternative was to treat it as a
+one-off and remember to watch the host drive. Nobody remembers. The guard is
+four lines and turns an exhausted disk into a refusal at second one rather
+than a corrupted build tree at hour two, which is the same reasoning as the
+case-sensitivity probe and the missing-tool check.
+
+**The lesson.** A measurement can be precise and still be of the wrong
+thing. The guest filesystem answered the question it was asked, honestly,
+and the answer was useless, because under WSL the number that matters lives
+on the other side of a virtual disk.
+
+---
+
 ## Still open
 
 - `kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine`, `keymaps`,
@@ -422,7 +475,6 @@ board that was already printing a login prompt into a disconnected wire.
   packagegroup, which is a larger change than a `PACKAGECONFIG` and has not
   been attempted yet.
 - The SDK has not been generated.
-- `./go reproduce` has not been run.
 
 ---
 

@@ -15,6 +15,7 @@
 
 require_tool kas
 require_no_running_build
+require_host_disk_gb 25
 
 sdk_installer() {
 	find "$KAS_BUILD_DIR/tmp/deploy/sdk" -name '*.sh' -type f 2>/dev/null |
