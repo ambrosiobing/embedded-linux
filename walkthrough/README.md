@@ -48,8 +48,13 @@ build step, everything survives a diff, and `grep` finds it all.
 ## A note on what is proven
 
 These documents distinguish between what has been verified and what has
-not, because that distinction is the whole point of the exercise. At the
-time of writing, the application compiles clean against libgpiod v2 and its
-state machine passes its tests, while the image has not yet been built and
-no board has booted. Where a document describes something unproven, it says
-so.
+not, because that distinction is the whole point of the exercise.
+
+Verified so far: the application compiles clean against libgpiod v2 and its
+state machine passes its tests; the image builds from source in 194 minutes
+over 5095 tasks; and every option in the kernel fragment reached the built
+`.config`.
+
+Not yet: no board has booted, the SDK has not been generated, and four X11
+packages in the manifest are still unjustified. Where a document describes
+something unproven, it says so.

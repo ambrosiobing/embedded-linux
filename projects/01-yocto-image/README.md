@@ -124,12 +124,47 @@ bit-identical images. Timestamps and build paths still differ, which is what
 
 ## Build times
 
-Filled in from this bench after the first two runs. Left empty rather than
-quoting numbers from another machine.
+Measured on this bench. The empty cells are not yet run.
 
 | Host | Cores | RAM | First build | Rebuild, warm sstate | SDK |
 |---|---|---|---|---|---|
-| | | | | | |
+| WSL2 Ubuntu 26.04 | 8 | 15 GiB | 194 min | | |
+
+`BB_NUMBER_THREADS` and `PARALLEL_MAKE` are both 8 in the kas file, which
+matches this host exactly. On a machine with a different core count, both
+are worth changing together.
+
+## What the first build produced
+
+| | |
+|---|---|
+| Tasks | 5095, all succeeded, none reused from a previous run |
+| Wall clock | 194 min |
+| Image | 49 MB compressed (`.wic.bz2`) |
+| Kernel | 6.6.63, Raspberry Pi fork, via meta-raspberrypi |
+| Packages in the image | 99 |
+| Warnings | 36, all of one class: a primary download URL was unreachable and the mirror served it instead |
+
+`./go kconfig` confirms all thirteen fragment options reached the built
+`.config`, including `CONFIG_GPIO_CDEV_V1` being absent rather than merely
+unrequested.
+
+## Open: four packages not yet justified
+
+The manifest contains `libx11-6`, `libxau6`, `libxcb1` and `libxdmcp6` in an
+image with no display and no X server. The acceptance criterion above says
+every package must be justifiable, so these are an open item rather than a
+passing result. `buildhistory` recorded the runtime dependency graph, so the
+cause is recoverable rather than a guess:
+
+```sh
+grep -i libx11 ~/bench/build/buildhistory/images/raspberrypi4-64/glibc/bench-image/depends.dot
+```
+
+Two lesser candidates: the `kbd` and `keymaps` group, which a board reached
+over serial and SSH does not need, and `update-rc.d` with
+`update-alternatives-opkg`, which are package-management machinery on an
+image that has no package manager.
 
 ## Where this differs from the book
 
