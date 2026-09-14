@@ -30,6 +30,11 @@ start=$(date +%s)
 kas build "$kasfile"
 end=$(date +%s)
 
-note "build took $(( (end - start) / 60 )) min"
+elapsed=$(( end - start ))
+if [ "$elapsed" -lt 60 ]; then
+	note "build took ${elapsed} s"
+else
+	note "build took $(( elapsed / 60 )) min $(( elapsed % 60 )) s"
+fi
 note "images in $KAS_BUILD_DIR/tmp/deploy/images/"
 ls -lh "$KAS_BUILD_DIR"/tmp/deploy/images/*/*.wic.bz2 2>/dev/null || true

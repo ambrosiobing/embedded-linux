@@ -128,7 +128,7 @@ Measured on this bench. The empty cells are not yet run.
 
 | Host | Cores | RAM | First build | Rebuild, warm sstate | SDK |
 |---|---|---|---|---|---|
-| WSL2 Ubuntu 26.04 | 8 | 15 GiB | 194 min | | |
+| WSL2 Ubuntu 26.04 | 8 | 15 GiB | 194 min | 21 s | |
 
 `BB_NUMBER_THREADS` and `PARALLEL_MAKE` are both 8 in the kas file, which
 matches this host exactly. On a machine with a different core count, both
@@ -144,27 +144,80 @@ are worth changing together.
 | Kernel | 6.6.63, Raspberry Pi fork, via meta-raspberrypi |
 | Packages in the image | 99 |
 | Warnings | 36, all of one class: a primary download URL was unreachable and the mirror served it instead |
+| Warm rebuild | 21 s, 5091 of 5095 tasks reused, sstate 100% match |
+
+### The commits this was built from
+
+kas prints them at the start of every build, which is what makes a build
+reportable rather than merely repeatable.
+
+| Layer | Commit |
+|---|---|
+| poky (scarthgap) | `77d1feb37e280733684ae8a9449fb031d5d7ff40` |
+| meta-openembedded (scarthgap) | `b5874ea07d69919d9b40d59f2c2f0bbd24bc3259` |
+| meta-raspberrypi (scarthgap) | `6ca1f75017cc5d5acdb8bb05634c4bc01fa049fd` |
+| meta-bench (main) | `2432871cf5eabd268530461fd5763b47e4ba0bca` |
+
+BitBake 2.8.1, poky 5.0.20, tune `aarch64 crc cortexa72`.
+
+Before tagging a release these replace the branch names in the kas file,
+which is what `kas dump --lock` writes.
 
 `./go kconfig` confirms all thirteen fragment options reached the built
 `.config`, including `CONFIG_GPIO_CDEV_V1` being absent rather than merely
 unrequested.
 
-## Open: four packages not yet justified
+## The four X11 packages, and what pulled them in
 
-The manifest contains `libx11-6`, `libxau6`, `libxcb1` and `libxdmcp6` in an
-image with no display and no X server. The acceptance criterion above says
-every package must be justifiable, so these are an open item rather than a
-passing result. `buildhistory` recorded the runtime dependency graph, so the
-cause is recoverable rather than a guess:
+The first manifest contained `libx11-6`, `libxau6`, `libxcb1` and
+`libxdmcp6` in an image with no display. The acceptance criterion is that
+every package can be justified, and these could not be, so they were traced
+rather than tolerated.
+
+The package metadata answers it directly:
 
 ```sh
-grep -i libx11 ~/bench/build/buildhistory/images/raspberrypi4-64/glibc/bench-image/depends.dot
+grep -H '^RDEPENDS' ~/bench/build/tmp/pkgdata/raspberrypi4-64/runtime/* | grep libx11
+```
+```
+runtime/dbus:RDEPENDS:dbus: dbus-common dbus-tools dbus-lib expat glibc
+                            libsystemd libx11
 ```
 
-Two lesser candidates: the `kbd` and `keymaps` group, which a board reached
-over serial and SSH does not need, and `update-rc.d` with
-`update-alternatives-opkg`, which are package-management machinery on an
-image that has no package manager.
+dbus, not openssh as first guessed. The poky distro carries `x11` in
+`DISTRO_FEATURES`, so dbus is built with X11 autolaunch: the feature that
+starts a session bus by talking to an X display. A headless board can never
+use it, and it costs four packages.
+
+`meta-bench/recipes-core/dbus/dbus_%.bbappend` removes it:
+
+```
+PACKAGECONFIG:remove = "x11"
+```
+
+Removing `x11` from `DISTRO_FEATURES` instead would also work and is
+arguably more correct for a headless image. It was not chosen because it
+invalidates shared-state signatures across the whole build for a
+four-package saving, where the bbappend rebuilds one recipe. Project 13
+wants graphics, but it wants Wayland, so the distro feature is not being
+kept for its benefit either.
+
+**Not yet verified.** The fix is written; confirm it with a rebuild and a
+fresh manifest:
+
+```sh
+./go build && ./go packages | wc -l
+```
+Expect 95 rather than 99, with no `libx` entries.
+
+### Still open
+
+`kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine` and `keymaps`
+are console keymaps, which a board reached over serial and SSH does not
+need. `update-rc.d` and `update-alternatives-opkg` are package-management
+machinery on an image with no package manager. Both come from
+`packagegroup-core-boot`, so trimming them means overriding that rather than
+a `PACKAGECONFIG`, which is a larger change than it looks.
 
 ## Where this differs from the book
 
