@@ -59,6 +59,30 @@ decision was taken over its alternative.
 | `wpa-supplicant`, via `bench-provision` | Joins the wireless network. This bench has no wired network within reach |
 | `linux-firmware-rpidistro-bcm43455` | The Pi 4 radio does not initialise without it. Proprietary and binary-redistributable, so its licence must be accepted explicitly |
 
+Those choices pull in eight more, all of them the wireless stack. They were
+traced with `buildhistory`, which records the package list after every build
+and commits it, so "what appeared and why" is a `git diff` rather than a
+guess:
+
+```sh
+git -C ~/bench/build/buildhistory diff build-minus-2 build-minus-1     -- '*/installed-package-names.txt'
+```
+
+| Package | Why it is there |
+|---|---|
+| `libnl-3-200`, `libnl-genl-3-200`, `libnl-route-3-200` | Netlink. wpa-supplicant talks to the kernel's `nl80211` interface over it |
+| `libssl3` | WPA2 and WPA3 crypto. `libcrypto3` was already present via openssh; this is the TLS layer above it |
+| `linux-firmware-rpidistro-license` | The proprietary licence text, shipped alongside the binary it covers. Exactly where a licence should be |
+| `linux-firmware-rpidistro-module-conf` | modprobe configuration for the `brcmfmac` driver |
+| `wpa-supplicant-cli` | `wpa_cli`. On a headless board it is how you ask why an association failed |
+| `wpa-supplicant-passphrase` | `wpa_passphrase`, to regenerate a PSK hash on the board rather than on the laptop |
+| `wpa-supplicant-plugins` | Plugin loader, recommended by wpa-supplicant |
+
+The last three are conveniences rather than requirements, pulled in as
+recommendations. They are kept because this is a bench image where debugging
+WiFi from the board itself is worth a few kilobytes. On an image that had to
+be lean, `BAD_RECOMMENDATIONS` in the image recipe removes them.
+
 Everything else comes from `core-image-minimal`. `./go packages` prints the
 manifest, so this table is checked against the build rather than remembered.
 
@@ -122,7 +146,7 @@ that was actually built, including lines that ask for an option to stay off.
 | The daemon runs and owns its GPIO lines | `systemctl status bench-status`, `gpioinfo` | met, lines 17/22/27 held |
 | The state machine reports correctly | `bench-state show` | met, `ok` |
 | A stopped unit is reported as failed | `systemctl stop sshd.socket`, then `bench-state show` | to do |
-| Every package in the image can be justified | `./go packages` against the table above | met, all 95 |
+| Every package in the image can be justified | `./go packages` against the table above | met, all 107 |
 | The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options |
 | A second clean build gives the same package list | `./go reproduce` | met, 95 and 95, identical ([evidence](docs/evidence/reproduce.txt)) |
 | The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | to do |
@@ -190,7 +214,7 @@ are worth changing together.
 | Wall clock | 194 min |
 | Image | 49 MB compressed, 48 MB after the dbus fix |
 | Kernel | 6.6.63, Raspberry Pi fork, via meta-raspberrypi |
-| Packages in the image | 99, then 95 after the dbus fix |
+| Packages in the image | 99, then 95 after the dbus fix, then 107 with WiFi and the keymap |
 | Warnings | 36, all of one class: a primary download URL was unreachable and the mirror served it instead |
 | Warm rebuild, no change | 21 s, 5091 of 5095 tasks reused, sstate 100% match |
 | Rebuild after one recipe changed | 2 min 31 s, sstate 84% match, 25 tasks missed |
