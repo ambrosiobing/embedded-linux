@@ -14,7 +14,10 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    # Pinned, not "latest". The daemon needs libgpiod v2 headers, and
+    # ubuntu-latest moved without telling anyone: it carried v1, so every
+    # run failed with forty lines of implicit-declaration errors.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -44,12 +47,18 @@ jobs:
         # Not the cross build, but the same source and stricter warnings than
         # the recipe uses: a toolchain upgrade should fail here, where it can
         # be fixed, rather than in someone's image build.
-        # libgpiod on Ubuntu 24.04 is v2, which is the API this targets.
         run: |
-          gcc -Wall -Wextra -Werror -O2 \
-            $(pkg-config --cflags libgpiod) \
-            meta-bench/recipes-bench/bench-status/files/bench-status.c \
-            -o /tmp/bench-status $(pkg-config --libs libgpiod)
+          version=$(pkg-config --modversion libgpiod)
+          echo "libgpiod $version"
+          case "$version" in
+          2.*) ;;
+          *)
+            echo "This runner has libgpiod v$version; the daemon targets v2."
+            echo "Pin runs-on to an image whose libgpiod-dev is 2.x."
+            exit 1
+            ;;
+          esac
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-status/files/bench-status.c -o /tmp/bench-status $(pkg-config --libs libgpiod)
 
       - name: Daemon starts and reports no GPIO chip on a runner
         # There is no gpiochip on a hosted runner, so a clean exit code 1 is
