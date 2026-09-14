@@ -21,7 +21,9 @@ jobs:
       - name: Install checkers
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck python3-yaml libgpiod-dev
+          # pkg-config is used by the compile steps below. The runner
+          # image usually has it, and "usually" is not a dependency.
+          sudo apt-get install -y shellcheck python3-yaml libgpiod-dev pkg-config build-essential
 
       - name: Static layer checks
         run: python3 scripts/lint.py

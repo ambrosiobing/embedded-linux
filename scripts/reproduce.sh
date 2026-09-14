@@ -55,7 +55,9 @@ git -C "$second_work/repo" checkout --quiet "$ref"
 a=$(find "$first" -name installed-package-names.txt | sort | head -1)
 b=$(find "$second_work/build/buildhistory" -name installed-package-names.txt |
 	sort | head -1)
-[ -n "$a" ] && [ -n "$b" ] || die "no installed-package-names.txt to compare."
+if [ -z "$a" ] || [ -z "$b" ]; then
+	die "no installed-package-names.txt to compare."
+fi
 
 note "diffing $a against $b"
 if diff -u "$a" "$b"; then
