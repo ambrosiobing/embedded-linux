@@ -197,6 +197,48 @@ def check_exec_bits() -> None:
             fail(path, "is committed executable but has no shebang")
 
 
+def markdown_link_targets(text: str) -> list[str]:
+    """Link targets, found without a regex so the pattern stays readable."""
+    out: list[str] = []
+    index = 0
+    while True:
+        open_paren = text.find("](", index)
+        if open_paren < 0:
+            return out
+        close = text.find(")", open_paren + 2)
+        if close < 0:
+            return out
+        out.append(text[open_paren + 2:close])
+        index = close + 1
+
+
+def check_markdown() -> None:
+    """Relative links must resolve, and code fences must balance.
+
+    Twenty projects of documentation will rot their own cross-references
+    unless something checks them, and a broken link in a portfolio repository
+    is read as carelessness rather than as drift.
+    """
+    fence = "```"
+    for path in ROOT.rglob("*.md"):
+        if ".git" in path.parts:
+            continue
+        content = text(path)
+
+        count = content.count(fence)
+        if count % 2:
+            fail(path, f"odd number of code fences ({count})")
+
+        for target in markdown_link_targets(content):
+            if target.startswith(("http://", "https://", "#", "mailto:")):
+                continue
+            anchor = target.split("#")[0]
+            if not anchor:
+                continue
+            if not (path.parent / anchor).exists():
+                fail(path, f"broken link: {target}")
+
+
 def main() -> int:
     for check in (
         check_ascii,
@@ -208,6 +250,7 @@ def main() -> int:
         check_layer_conf,
         check_line_length,
         check_exec_bits,
+        check_markdown,
     ):
         check()
 

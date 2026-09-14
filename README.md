@@ -15,6 +15,19 @@ cross-compiles their code against the exact sysroot on the target.
 ./go build           # bench-image for the Raspberry Pi 4
 ```
 
+## Why it is built this way
+
+[walkthrough/](walkthrough) explains the reasoning end to end: what
+embedded Linux is and what these projects are for, why Yocto rather than
+Buildroot, what BitBake does during those three hours, how a layer is put
+together, why the status daemon is two programs, what each check proves and
+what it cannot, and where every piece belongs across a product lifecycle
+from first bring-up to a version still being patched years later. It ends
+with a decision log, each entry naming the alternative that was rejected.
+
+It is written so that it applies to the other nineteen projects, not only
+to this one.
+
 ## Why one repository
 
 The twenty projects are not independent. Project 5 writes a kernel driver
