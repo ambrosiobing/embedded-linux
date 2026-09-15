@@ -150,7 +150,7 @@ that was actually built, including lines that ask for an option to stay off.
 | The state machine reports correctly | `bench-state show` | met, `ok` |
 | A stopped unit is reported as failed | `systemctl stop sshd.socket`, then `bench-state show` | met, `ok` then `failed` on the board |
 | Every package in the image can be justified | `./go packages` against the table above | met, all 107 |
-| The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options |
+| The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options; 15 after adding IKCONFIG |
 | A second clean build gives the same package list | `./go reproduce` | met, 95 and 95, identical ([evidence](docs/evidence/reproduce.txt)) |
 | The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | to do |
 | Boots to a login prompt in under 15 s | `systemd-analyze` on the board | not measured |
