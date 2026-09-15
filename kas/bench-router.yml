@@ -51,7 +51,20 @@ local_conf_header:
     # NetworkManager's crypto backend. nss is its default and costs about
     # 15 MB in the rootfs; gnutls does the same job for this image, which
     # needs crypto only for WPA key handling on the access point.
-    PACKAGECONFIG:remove:pn-networkmanager = "nss"
+    # And no Bluetooth. poky carries "bluetooth" in DISTRO_FEATURES,
+    # which switches on NetworkManager's bluez5 PACKAGECONFIG, which
+    # builds the Bluetooth device plugin, which recommends BlueZ. The
+    # first boot of the fixed image showed the result:
+    #
+    #   hciuart.service loaded failed failed Configure Bluetooth Modems
+    #
+    # hciuart attaches a Bluetooth controller to a UART, and on this
+    # board that UART is the console. A gateway has no use for a
+    # Bluetooth modem, and a failed unit at every boot trains whoever
+    # reads "systemctl --failed" to ignore it.
+    # One assignment, not two: ":remove" uses "=", so a second line
+    # would silently replace the first and quietly put nss back.
+    PACKAGECONFIG:remove:pn-networkmanager = "nss bluez5"
     PACKAGECONFIG:append:pn-networkmanager = " gnutls"
 
     # polkit is deliberately absent, having once been here.

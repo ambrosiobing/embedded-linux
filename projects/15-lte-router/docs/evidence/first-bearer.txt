@@ -1,0 +1,63 @@
+The first working LTE bearer. Raspberry Pi 4 with a SIM7600E-H stacked on
+the header, second bench-router-image build, 15 September 2026.
+
+The blocker until this build was that NetworkManager had been built without
+its wwan plugin, so wwan0 was unmanaged and the lte profile bound to
+nothing. See journal entry 22. After the rebuild the only remaining step was
+a SIM PIN, sent by hand with mmcli.
+
+--- devices
+cdc-wdm0:gsm:connected:lte
+wlan0:wifi:connected:bench-ap
+eth0:ethernet:unavailable:
+
+--- addresses
+wlan0            UP             10.20.0.1/24
+wwan0            UNKNOWN        10.166.165.254/30
+
+--- routes
+default via 10.166.165.253 dev wwan0 proto static metric 700
+10.20.0.0/24 dev wlan0 proto kernel scope link src 10.20.0.1 metric 600
+10.166.165.252/30 dev wwan0 proto kernel scope link src 10.166.165.254 metric 700
+
+The metric of 700 on the default route is the LTE profile's configured
+value. eth0 would take 100 and win while it works; this bench has no cable
+within reach, so that half cannot be demonstrated here.
+
+--- packets actually leave through the bearer
+PING 1.1.1.1 from 10.166.165.254 wwan0: 56(84) bytes of data.
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=58 time=110 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=58 time=93.2 ms
+64 bytes from 1.1.1.1: icmp_seq=3 ttl=58 time=107 ms
+3 packets transmitted, 3 received, 0% packet loss
+rtt min/avg/max/mdev = 93.218/103.429/109.647/7.277 ms
+
+--- /var/lib/lte/lte.prom, written by the exporter against a live modem
+lte_modem_present 1
+lte_modem_state{state="connected"} 1      (every other state 0)
+lte_signal_rsrp_dbm -105
+lte_signal_rsrq_db -17
+lte_signal_snr_db -3.6
+lte_signal_quality_ratio 0.78
+lte_default_route_via{dev="eth0"} 0
+lte_default_route_via{dev="wwan0"} 1
+
+Note the disagreement in those five lines. RSRP -105 dBm, RSRQ -17 dB and
+SNR -3.6 dB describe a poor to marginal cell. ModemManager's coarse quality
+reports 78 per cent. That is why the exporter publishes the measurements
+rather than the friendly number.
+
+--- nft list ruleset, a few minutes after the bearer came up
+type filter hook input priority filter; policy drop;
+counter packets 40 bytes 6035 comment "dropped, mostly from the LTE side"
+type filter hook forward priority filter; policy drop;
+counter packets 0 bytes 0 comment "forward denied"
+type nat hook postrouting priority srcnat; policy accept;
+oifname { "eth0", "wwan0" } masquerade
+
+Forty packets dropped on input against zero forwarded. That is unsolicited
+traffic arriving at a carrier-assigned address within minutes. The
+specified ruleset has no input chain, so all forty would have reached the
+SSH server that debug-tweaks left without a root password, and the metrics
+endpoint that publishes this box's position and signal history. It is the
+measured case for Decision 25.

@@ -124,6 +124,26 @@ else
 	pass=$((pass + 1))
 fi
 
+# ------------------------------------------------------------ the SIM PIN
+
+# Optional, and the two cases are not symmetric. An absent PIN must produce
+# no key at all: "pin=" with nothing after it is a zero-length PIN, which
+# the modem rejects, and it would look in the file exactly like a PIN that
+# had simply not been filled in.
+printf 'APN=internet\nPIN=1234\n' >"$WORK/in.conf"
+run
+check "pin given: it reaches the gsm profile" \
+	"$(value lte.nmconnection pin)" "1234"
+
+printf 'APN=internet\n' >"$WORK/in.conf"
+run
+check "pin absent: no empty pin key is written" \
+	"$(grep -c '^pin=' "$WORK/out/lte.nmconnection")" "0"
+check "pin absent: no placeholder survives" \
+	"$(grep -c '@' "$WORK/out/lte.nmconnection")" "0"
+check "pin absent: the apn is still there" \
+	"$(value lte.nmconnection apn)" "internet"
+
 # ---------------------------------------------------------- partial input
 
 # An APN and no access point is a legitimate configuration: a router with

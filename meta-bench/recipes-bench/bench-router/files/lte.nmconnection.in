@@ -17,6 +17,7 @@ autoconnect-retries=0
 
 [gsm]
 apn=@APN@
+pin=@PIN@
 
 [ipv4]
 method=auto

@@ -8,11 +8,18 @@
 # it, and which APN this SIM wants. None of those belong in a repository,
 # and two of them are credentials.
 #
-# /boot/router.conf holds up to three lines:
+# /boot/router.conf holds up to four lines:
 #
 #   AP_SSID=bench-lte
 #   AP_PSK=at-least-eight-characters
 #   APN=internet
+#   PIN=1234                       optional, only if the SIM keeps its PIN
+#
+# The PIN is optional and absent by default. A SIM that keeps its PIN needs
+# that PIN sent after every power cut, and a box needing a person present
+# after a power cut is not a router. Disabling the PIN on the SIM is the
+# other answer; this one leaves the SIM as it is and lets NetworkManager
+# send the code, from a keyfile only root can read.
 #
 # The APN comes from the carrier. A wrong APN produces a modem that
 # registers and never connects, which reads like an antenna problem and is
@@ -38,6 +45,7 @@ fi
 ap_ssid=
 ap_psk=
 apn=
+pin=
 
 # The three Windows text traps, all of which this bench has walked into:
 # CRLF endings, a UTF-8 byte order mark on the first key, and a final line
@@ -50,12 +58,14 @@ while IFS='=' read -r key value || [ -n "$key" ]; do
 	AP_SSID) ap_ssid=$value ;;
 	AP_PSK) ap_psk=$value ;;
 	APN) apn=$value ;;
+	PIN) pin=$value ;;
 	esac
 done <"$SRC"
 
 ap_ssid=$(printf '%s' "$ap_ssid" | tr -d '\r')
 ap_psk=$(printf '%s' "$ap_psk" | tr -d '\r')
 apn=$(printf '%s' "$apn" | tr -d '\r')
+pin=$(printf '%s' "$pin" | tr -d '\r')
 
 # Substitute one placeholder. sed would need every value escaped for the
 # replacement side, and a passphrase is exactly the kind of string that
@@ -80,9 +90,30 @@ mkdir -p "$DST"
 umask 077
 written=
 
+# Drop any line still carrying a placeholder that has no value. An empty
+# NetworkManager key is not the same as an absent one: "pin=" with
+# nothing after it is a zero-length PIN, which the modem rejects.
+drop_placeholder() {
+	placeholder=$1
+	while IFS= read -r line || [ -n "$line" ]; do
+		case $line in
+		*"$placeholder"*) ;;
+		*) printf '%s\n' "$line" ;;
+		esac
+	done
+}
+
 if [ -n "$apn" ]; then
 	substitute '@APN@' "$apn" \
-		<"$TEMPLATES/lte.nmconnection.in" >"$DST/lte.nmconnection.new"
+		<"$TEMPLATES/lte.nmconnection.in" >"$DST/.gsm.stage"
+	if [ -n "$pin" ]; then
+		substitute '@PIN@' "$pin" \
+			<"$DST/.gsm.stage" >"$DST/lte.nmconnection.new"
+	else
+		drop_placeholder '@PIN@' \
+			<"$DST/.gsm.stage" >"$DST/lte.nmconnection.new"
+	fi
+	rm -f "$DST/.gsm.stage"
 	mv -f "$DST/lte.nmconnection.new" "$DST/lte.nmconnection"
 	chmod 600 "$DST/lte.nmconnection"
 	written="$written lte"

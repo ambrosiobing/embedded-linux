@@ -25,32 +25,37 @@ to extend all three rather than only use them.
 
 ## State
 
-**The image builds, the board boots, and the bearer does not come up yet.**
+**The router works.** On 15 September 2026, on a Raspberry Pi 4 with a
+SIM7600E-H stacked on the header:
 
-CI is green, the image built in 178 minutes with every task succeeding, and
-on 15 September 2026 it ran on a Raspberry Pi 4 with a SIM7600E-H stacked
-on the header. The modem enumerates in the expected USB composition, the
-udev names land, ModemManager claims it, the access point serves the bench
-LAN, and a laptop reaches the board over ssh through it.
+```
+cdc-wdm0:gsm:connected:lte
+wwan0        10.166.165.254/30
+default via 10.166.165.253 dev wwan0 proto static metric 700
+```
 
-Three defects were found that no amount of testing without hardware would
-have produced, and all three are fixed in the tree and waiting on a
-rebuild:
+A live LTE bearer at the configured metric, packets flowing through it at
+103 ms, the access point serving the bench LAN, the firewall loaded with
+drop policies on input and forward, and the exporter publishing real signal
+data. Full output in
+[docs/evidence/first-bearer.txt](docs/evidence/first-bearer.txt).
 
-1. Three kernel options in `router.cfg` that do not exist as Kconfig
-   symbols, caught by `./go kconfig` on the first build that compiled a
-   kernel rather than taking one from sstate.
-2. NetworkManager built without its `wwan` plugin, so `wwan0` is
-   `unmanaged` and the `lte` profile binds to nothing.
+It took two builds. The first one booted and had no bearer, and the reason
+was not visible from any amount of testing without hardware:
+
+1. Three kernel options in `router.cfg` that are not Kconfig symbols, caught
+   by `./go kconfig` on the first build that compiled a kernel rather than
+   taking one from sstate.
+2. NetworkManager built without its `wwan` plugin, so `wwan0` was
+   `unmanaged` and the `lte` profile bound to nothing.
 3. NetworkManager built without `concheck`, so the connectivity check this
-   project's failover depends on was not in the binary at all. That one
-   failed silently and is the reason acceptance criterion 3 could never
-   have passed.
+   project's failover depends on was not in the binary. That one fails
+   silently and is why acceptance criterion 3 could never have passed.
 
-The acceptance table says which criteria are proven and which are not. The
-[journal](JOURNAL.md) has all of it in order, including the four CI
-failures, the bring-up sequence, and the alarm about USB device number 29
-that turned out to be nothing.
+What remains is bounded and named in the table below. The
+[journal](JOURNAL.md) has the whole path in order, including four CI
+failures, the bring-up traps, and an alarm about a USB device number that
+turned out to be nothing.
 
 ## What this project adds to the repository
 
@@ -120,16 +125,22 @@ debugging a missing `brcmfmac` module.
 
 | Measurement | Value |
 |---|---|
-| Packages in `bench-router-image` | 220, against 113 for `bench-image` |
-| Installed size | 237 MiB |
-| Of which Python | 39 MiB, 16 percent |
-| Of which ICU, SpiderMonkey and NSS | 64 MiB, 27 percent. See below |
-| Image size, compressed | 97 MB, against 51 MB for `bench-image` |
-| Build time, warm sstate | 178 min 30 s |
-| Tasks | 5822 attempted, 1152 actually ran, all succeeded |
-| sstate reuse | 831 wanted, 422 local, 409 missed, 50 percent match |
-| Kernel fragment reached the `.config` | Yes, after three lines were removed. See journal entry 17 |
-| Boot time to a connected bearer | not yet measured |
+| | First build | Second build |
+|---|---|---|
+| Packages | 220 | 226 |
+| Image, compressed | 97 MB | **79 MB** |
+| Written to the card | 305.8 MiB | **255.0 MiB** |
+| Installed size | 237 MiB | not re-measured |
+| Of which Python | 39 MiB, 16 percent | unchanged |
+| Of which ICU, SpiderMonkey and NSS | 64 MiB, 27 percent | removed |
+| Build time, warm sstate | 178 min 30 s | 58 min 11 s |
+| Tasks | 5822, all succeeded | 5686, all succeeded |
+| Kernel fragment reached the `.config` | No, three lines | **Yes, all 37 options** |
+
+Six more packages and 18 MB less. Package count is a poor proxy for size:
+five large ones left (polkit, `libmozjs-115`, `nss`, `nspr`, three `libicu*`)
+and several small ones arrived (`networkmanager-wwan`, `usbutils`, `curl`,
+`mobile-broadband-provider-info`, GnuTLS and its dependencies).
 
 **The 64 MiB was nobody's decision, and `depends.dot` says whose fault it
 was.** The chain is `polkit -> libmozjs-115 -> libicuuc74`, plus
@@ -165,12 +176,12 @@ table: "configured" means a file says so, "measured" means a board did so.
 
 | # | Criterion | State |
 |---|---|---|
-| 1 | `ip route` shows two defaults, eth0 at metric 100 and wwan0 at 700 | **Blocked.** No `wwan` plugin yet, and this bench has no Ethernet cable. See journal 22 and 23 |
+| 1 | `ip route` shows two defaults, eth0 at metric 100 and wwan0 at 700 | **Half met.** `default via 10.166.165.253 dev wwan0 metric 700`, live, with packets flowing. `eth0` at 100 needs a cable this bench does not have |
 | 2 | Pulling the cable loses at most 5 replies; the route returns within 90 s | **Cannot be run here.** One uplink is not a failover. [failover-tests.md](docs/failover-tests.md) |
 | 3 | A dead upstream behind a live cable is detected within two connectivity intervals | **Was impossible and nobody knew.** NetworkManager was built with `-Dconcheck=false`, so the check was not in the binary. Fixed in the kas file, needs a rebuild |
 | 4 | `mmcli --location-get` reports a fix within 3 minutes, within 50 m | Not measured. The GNSS antenna is not attached |
-| 5 | After `AT+CFUN=0` the watchdog restores a bearer within 4 minutes, and the counters show the levels | Escalation logic tested against stubs. Level 3 now needs `pwrkey_verified` first, journal 21 |
-| 6 | `curl http://10.20.0.1:9101/lte.prom` returns valid Prometheus text | Format asserted in `tests/lte-exporter-test.sh`; endpoint not yet queried from a client |
+| 5 | After `AT+CFUN=0` the watchdog restores a bearer within 4 minutes, and the counters show the levels | Unblocked by the bearer. Escalation tested against stubs; level 3 needs `pwrkey_verified` first, journal 21 |
+| 6 | `curl http://10.20.0.1:9101/lte.prom` returns valid Prometheus text | **Met.** Real signal, one-hot state, and the live uplink. [first-bearer.txt](docs/evidence/first-bearer.txt) |
 | 7 | No undervoltage during a 10 minute `iperf3` over LTE | Not measured, but registration produced no undervoltage and throttle flags `0` |
 
 Proven on the board on 15 September 2026, in the first boot:

@@ -1,0 +1,51 @@
+./go kconfig -f router <path to the built .config>
+
+Run on the Yocto build host, 15 September 2026, against the kernel produced
+by the second bench-router-image build. The first build's run of this check
+found three options that had never reached the .config: CONFIG_NFT_CHAIN_NAT,
+CONFIG_NFT_RT and CONFIG_NFT_EXTHDR. None of the three is a Kconfig symbol.
+See journal entry 17.
+
+--- config   /home/bing/bench/build/tmp/work/raspberrypi4_64-poky-linux/linux-raspberrypi/6.6.63+git/linux-raspberrypi4_64-standard-build/.config
+--- built    2026-09-15 15:37
+--- fragment meta-bench/recipes-kernel/linux/files/bench.cfg
+ok        CONFIG_GPIO_CDEV=y
+ok        CONFIG_GPIO_CDEV_V1 off
+ok        CONFIG_IIO=y
+ok        CONFIG_IIO_BUFFER=y
+ok        CONFIG_IIO_KFIFO_BUF=y
+ok        CONFIG_IIO_TRIGGER=y
+ok        CONFIG_IIO_SYSFS_TRIGGER=y
+ok        CONFIG_SPI_SPIDEV=m
+ok        CONFIG_I2C_CHARDEV=m
+ok        CONFIG_IKCONFIG=y
+ok        CONFIG_IKCONFIG_PROC=y
+ok        CONFIG_FTRACE=y
+ok        CONFIG_FUNCTION_TRACER=y
+ok        CONFIG_DYNAMIC_FTRACE=y
+ok        CONFIG_PREEMPT_TRACER=y
+--- fragment meta-bench/recipes-kernel/linux/files/router.cfg
+ok        CONFIG_USB_SERIAL=y
+ok        CONFIG_USB_SERIAL_WWAN=y
+ok        CONFIG_USB_SERIAL_OPTION=y
+ok        CONFIG_USB_USBNET=y
+ok        CONFIG_USB_NET_QMI_WWAN=y
+ok        CONFIG_USB_WDM=y
+ok        CONFIG_USB_NET_CDCETHER=m
+ok        CONFIG_USB_NET_RNDIS_HOST=m
+ok        CONFIG_NETFILTER=y
+ok        CONFIG_NETFILTER_ADVANCED=y
+ok        CONFIG_NF_CONNTRACK=y
+ok        CONFIG_NF_NAT=y
+ok        CONFIG_NF_TABLES=y
+ok        CONFIG_NF_TABLES_INET=y
+ok        CONFIG_NF_TABLES_IPV4=y
+ok        CONFIG_NF_TABLES_IPV6=y
+ok        CONFIG_NFT_CT=y
+ok        CONFIG_NFT_NAT=y
+ok        CONFIG_NFT_MASQ=y
+ok        CONFIG_NF_CONNTRACK_PROCFS=y
+ok        CONFIG_NF_CONNTRACK_EVENTS=y
+ok        CONFIG_NF_CONNTRACK_TIMESTAMP=y
+ok        CONFIG_CFG80211_WEXT=y
+--- every option in every checked fragment is in the built .config

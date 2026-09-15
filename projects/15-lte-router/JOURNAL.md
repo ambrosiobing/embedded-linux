@@ -773,3 +773,70 @@ demonstrated on this bench as it stands.** Scenarios 1 and 2 in
 are a USB Ethernet adapter, or a USB Wi-Fi dongle as a client uplink while
 the onboard radio stays the access point. Either is a purchase, and the
 choice belongs in the failover document rather than in a rebuild.
+
+---
+
+## 24. The bearer came up, and the firewall justified itself in four minutes
+
+**What happened.** The rebuild carried the `wwan` plugin, `concheck`, the
+corrected kernel fragment and the polkit removal. On the second boot:
+
+```
+cdc-wdm0:gsm:connected:lte
+wwan0        10.166.165.254/30
+default via 10.166.165.253 dev wwan0 proto static metric 700
+```
+
+A live bearer, a carrier address, and the default route at the metric the
+`lte` profile configures. `ping -I wwan0` returned 0 per cent loss at 103 ms
+average. Full output in
+[docs/evidence/first-bearer.txt](docs/evidence/first-bearer.txt).
+
+**One step remained after the rebuild**, and it was neither software nor
+wiring: the SIM had a PIN, and `mmcli` said so precisely, `state: locked`.
+Sent by hand. The card is temporary and the PIN stays on it, so the proper
+fix went into the tree instead: `router.conf` gained an optional `PIN=` key,
+because a SIM PIN is identity and identity belongs on the card rather than
+in the image. It is absent by default, and absent means no key at all
+rather than an empty one, since `pin=` with nothing after it is a
+zero-length PIN the modem rejects. Both cases are tested.
+
+**The measurement worth keeping.** A few minutes after the bearer came up:
+
+```
+type filter hook input priority filter; policy drop;
+counter packets 40 bytes 6035 comment "dropped, mostly from the LTE side"
+type filter hook forward priority filter; policy drop;
+counter packets 0 bytes 0 comment "forward denied"
+```
+
+Forty packets dropped on input, zero forwarded. Unsolicited traffic
+arriving at a carrier-assigned address within minutes of it existing. The
+specified ruleset has no input chain, so its policy would have been accept
+and all forty would have reached the SSH server that `debug-tweaks` left
+without a root password, and the metrics endpoint that publishes this box's
+position. Decision 39 was argued from first principles; this is the
+measurement.
+
+**A small lesson in the metrics.** `lte_signal_quality_ratio 0.78` sits next
+to `rsrp -105`, `rsrq -17`, `snr -3.6`. Those three describe a poor to
+marginal cell. ModemManager's coarse quality says 78 per cent. They cannot
+both be a useful summary, and the exporter reports the measurements for
+exactly this reason.
+
+**Two more gaps the boot found, both fixed in the tree.** `hciuart.service`
+failed at every boot: poky carries `bluetooth` in `DISTRO_FEATURES`, which
+switches on NetworkManager's `bluez5` PACKAGECONFIG, which builds a
+Bluetooth plugin, which recommends BlueZ, whose `hciuart` then tries to
+attach a controller to the UART this board uses as its console. A gateway
+has no use for any of that chain, and a unit that fails at every boot
+teaches whoever reads `systemctl --failed` to ignore it. And `curl` was
+absent, while `docs/BRINGUP.md` instructs the reader to query the metrics
+endpoint with it. A documented command the image cannot run is a
+documentation defect, not a missing convenience.
+
+**Where that leaves the acceptance criteria.** Criterion 6 is met with real
+data. Half of criterion 1 is met: `wwan0` at metric 700. The other half,
+`eth0` at 100, and criteria 2 and 3 with it, need a second uplink this bench
+does not have. Criteria 4, 5 and 7 are now unblocked and need only time on
+the board.

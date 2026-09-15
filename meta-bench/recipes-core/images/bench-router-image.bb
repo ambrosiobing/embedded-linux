@@ -40,6 +40,10 @@ IMAGE_INSTALL:append = " \
 # device. The first question on a board that shows no modem is what is on
 # the bus, and the first bring-up answered it by reading sysfs by hand for
 # want of lsusb.
+#
+# curl for the same reason: docs/BRINGUP.md tells the reader to query the
+# metrics endpoint with it, and the second bring-up found it absent. A
+# documented command that the image cannot run is a documentation defect.
 
 # libqmi brings qmicli, which is how the QMI channel is inspected directly
 # when the question is whether ModemManager is wrong or the modem is. It is
