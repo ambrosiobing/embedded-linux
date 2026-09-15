@@ -928,3 +928,48 @@ upstream, still works exactly as designed through the connectivity check.
 For a genuinely physical carrier loss, power off the home access point.
 That is weaker evidence than unplugging a cable and it is written down here
 rather than glossed over.
+
+---
+
+## 26. An optional profile took out the way back in
+
+**What happened.** The third image booted and `bench-lte` did not appear.
+No access point, and with no Ethernet cable that leaves only the console.
+
+**What was done.** The cause was two `do_install` lines that never reached
+the recipe. `wan-wifi.nmconnection.in` and `76-bench-uplink.rules` were
+added to `SRC_URI`, the files existed, the layer linted clean and the build
+succeeded. Neither file was in the image.
+
+`bench-router-setup` then ran `substitute` reading
+`/usr/share/bench-router/wan-wifi.nmconnection.in`, which was not there.
+The script runs under `set -e`, so it exited at that line, **before** the
+block that writes the access point profile.
+
+**Why it got that far.** Nothing between the edit and the board could have
+noticed. `check_src_uri` verifies that every `file://` entry exists in
+`files/` and that every file in `files/` is referenced, which both did.
+BitBake fetches a `SRC_URI` file whether or not anything installs it. The
+image builds, flashes and boots. The first thing that knows is a shell
+script on a board you can no longer reach.
+
+**Two fixes, and the second matters more.**
+
+The first is a lint rule: every `SRC_URI` entry must appear somewhere after
+`do_install` begins, with `.c` and `.h` exempt because source is consumed by
+`do_compile` and what gets installed is a binary under another name. It was
+verified by breaking the recipe again the same way and watching it fail,
+because this project has already learned that a check which has never
+failed is not a check that is working.
+
+The second is ordering. The access point block now runs **first**, before
+the two optional profiles. Under `set -e` the order of blocks is a priority
+ordering whether or not anybody meant it to be, and the way back into the
+box should not be contingent on an optional feature succeeding. If the
+modem profile or the wireless uplink fails now, there is still an access
+point, an ssh server and a board that can be fixed without a keyboard.
+
+**Recovery on the day**, with no rebuild: delete the two `WAN_` lines from
+`/boot/router.conf` so the script skips the block that was dying, then
+`bench-router-setup` and `nmcli con reload`. The LTE uplink was never
+affected; only the access point and the new uplink were lost.

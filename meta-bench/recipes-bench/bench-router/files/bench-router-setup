@@ -111,6 +111,38 @@ drop_placeholder() {
 	done
 }
 
+# The access point is written first, before the two optional profiles,
+# and that ordering is deliberate rather than tidy.
+#
+# This script runs under set -e, so any failure below stops it. When a
+# template for one of the optional profiles was missing from the image,
+# the script died before reaching this block, no access point profile was
+# written, and the only way back into a board with no Ethernet cable was
+# the console. An optional feature took out the recovery path.
+#
+# So the way in gets written first. If anything below fails you still
+# have an access point, an ssh server and a board you can fix.
+if [ -n "$ap_ssid" ] && [ -n "$ap_psk" ]; then
+	# NetworkManager rejects a WPA passphrase shorter than 8 characters,
+	# and it does so at activation time, so the access point simply never
+	# appears. Say it here instead, where the message is readable.
+	if [ "${#ap_psk}" -lt 8 ]; then
+		echo "bench-router-setup: AP_PSK is shorter than 8 characters" >&2
+		exit 1
+	fi
+	substitute '@AP_SSID@' "$ap_ssid" \
+		<"$TEMPLATES/bench-ap.nmconnection.in" >"$DST/.ap.stage"
+	substitute '@AP_PSK@' "$ap_psk" \
+		<"$DST/.ap.stage" >"$DST/bench-ap.nmconnection.new"
+	rm -f "$DST/.ap.stage"
+	mv -f "$DST/bench-ap.nmconnection.new" "$DST/bench-ap.nmconnection"
+	chmod 600 "$DST/bench-ap.nmconnection"
+	written="$written bench-ap"
+elif [ -n "$ap_ssid" ] || [ -n "$ap_psk" ]; then
+	echo "bench-router-setup: $SRC needs both AP_SSID and AP_PSK" >&2
+	exit 1
+fi
+
 if [ -n "$apn" ]; then
 	substitute '@APN@' "$apn" \
 		<"$TEMPLATES/lte.nmconnection.in" >"$DST/.gsm.stage"
@@ -149,26 +181,6 @@ elif [ -n "$wan_ssid" ] || [ -n "$wan_psk" ]; then
 	exit 1
 fi
 
-if [ -n "$ap_ssid" ] && [ -n "$ap_psk" ]; then
-	# NetworkManager rejects a WPA passphrase shorter than 8 characters,
-	# and it does so at activation time, so the access point simply never
-	# appears. Say it here instead, where the message is readable.
-	if [ "${#ap_psk}" -lt 8 ]; then
-		echo "bench-router-setup: AP_PSK is shorter than 8 characters" >&2
-		exit 1
-	fi
-	substitute '@AP_SSID@' "$ap_ssid" \
-		<"$TEMPLATES/bench-ap.nmconnection.in" >"$DST/.ap.stage"
-	substitute '@AP_PSK@' "$ap_psk" \
-		<"$DST/.ap.stage" >"$DST/bench-ap.nmconnection.new"
-	rm -f "$DST/.ap.stage"
-	mv -f "$DST/bench-ap.nmconnection.new" "$DST/bench-ap.nmconnection"
-	chmod 600 "$DST/bench-ap.nmconnection"
-	written="$written bench-ap"
-elif [ -n "$ap_ssid" ] || [ -n "$ap_psk" ]; then
-	echo "bench-router-setup: $SRC needs both AP_SSID and AP_PSK" >&2
-	exit 1
-fi
 
 if [ -z "$written" ]; then
 	echo "bench-router-setup: $SRC named nothing to configure" >&2

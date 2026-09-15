@@ -100,6 +100,44 @@ def check_src_uri() -> None:
                 fail(recipe, f"files/{name} is not in SRC_URI")
 
 
+def check_src_uri_installed() -> None:
+    """A file fetched but never installed is a file that is not in the image.
+
+    This one is written from a specific failure. Two files were added to
+    SRC_URI and the do_install lines that should have gone with them were
+    lost in editing. The build succeeded, the layer linted clean, the image
+    flashed, and the first-boot script died on a missing template with
+    set -e, taking the access point down with it. Nothing between the edit
+    and the board noticed.
+
+    The check is deliberately crude: it asks whether the name appears
+    anywhere after do_install begins. A recipe that installs a file under a
+    different name, or through a loop, has to say so in a comment
+    containing the name, which is cheap and is the sort of thing worth
+    writing down anyway.
+
+    Source is exempt. A .c or .h file is consumed by do_compile and the
+    thing that gets installed is a binary with a different name, so
+    demanding it appear here would be asking a recipe to lie.
+    """
+    compiled = {".c", ".h"}
+    for recipe in list(ROOT.rglob("*.bb")) + list(ROOT.rglob("*.bbappend")):
+        if ".git" in recipe.parts:
+            continue
+        body = text(recipe)
+        start = body.find("do_install")
+        if start < 0:
+            continue
+        install = body[start:]
+        wanted, _ = recipe_files(recipe)
+        for name in sorted(wanted):
+            if name.startswith("${") or Path(name).suffix in compiled:
+                continue
+            if name not in install:
+                fail(recipe, f"SRC_URI names {name}, which do_install never "
+                             "mentions")
+
+
 def check_systemd_units() -> None:
     """A unit in SYSTEMD_SERVICE that do_install misses fails late and loudly."""
     for recipe in ROOT.rglob("*.bb"):
@@ -262,6 +300,7 @@ def main() -> int:
         check_ascii,
         check_dashes,
         check_src_uri,
+        check_src_uri_installed,
         check_systemd_units,
         check_license_headers,
         check_kas,

@@ -49,6 +49,8 @@ do_install() {
         ${D}${datadir}/bench-router/lte.nmconnection.in
     install -Dm0644 ${S}/bench-ap.nmconnection.in \
         ${D}${datadir}/bench-router/bench-ap.nmconnection.in
+    install -Dm0644 ${S}/wan-wifi.nmconnection.in \
+        ${D}${datadir}/bench-router/wan-wifi.nmconnection.in
 
     install -Dm0644 ${S}/nftables.conf ${D}${sysconfdir}/bench/nftables.conf
     install -Dm0644 ${S}/bench-lan.conf ${D}${sysconfdir}/bench/dnsmasq.conf
@@ -59,6 +61,8 @@ do_install() {
     install -Dm0644 ${S}/ModemManager.conf \
         ${D}${sysconfdir}/ModemManager/ModemManager.conf
 
+    install -Dm0644 ${S}/76-bench-uplink.rules \
+        ${D}${nonarch_base_libdir}/udev/rules.d/76-bench-uplink.rules
     install -Dm0644 ${S}/77-sim7600.rules \
         ${D}${nonarch_base_libdir}/udev/rules.d/77-sim7600.rules
 
