@@ -24,6 +24,7 @@ the stage of the project changes.
 | 09 | [Lifecycle](09-lifecycle.md) | Prototype, test, pre-production, production, field, maintenance, and what changes at each |
 | 10 | [Generalising](10-generalising.md) | Other boards, other peripherals, and where all twenty projects sit |
 | | [Decisions](DECISIONS.md) | A log of choices, each with the alternative that was rejected and why |
+| | [Design, Project 1](../projects/01-yocto-image/docs/DESIGN.md) | The four figures: architecture, schematic, bench layout, UML sequence, plus the software components |
 | | [Journal](../projects/01-yocto-image/JOURNAL.md) | What actually happened while building Project 1, in order, including the false starts |
 
 ## The through-line

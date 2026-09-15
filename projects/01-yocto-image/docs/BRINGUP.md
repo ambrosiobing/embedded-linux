@@ -3,6 +3,10 @@
 Everything in this file happens once, before the first image is written. It
 is separate from the README because it is about the bench, not the layer.
 
+The schematic, the bench layout and the component diagrams are in
+[DESIGN.md](DESIGN.md). This file is the procedure: what to connect, in
+what order, and what to check once it is powered.
+
 ## Parts
 
 | Part | Role | Interface |

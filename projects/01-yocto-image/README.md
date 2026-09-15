@@ -40,6 +40,11 @@ on purpose, so that the pair covers both major build systems.
 ./go sdk        # the SDK the other nineteen projects use
 ```
 
+[docs/DESIGN.md](docs/DESIGN.md) is the methodology: the architecture, the
+schematic, the bench layout, the UML sequence of a build-and-boot cycle, and
+the software component diagram. Read that first if you want to know how the
+thing is put together rather than what happened while building it.
+
 Wiring, serial console and the first commands on the board are in
 [docs/BRINGUP.md](docs/BRINGUP.md).
 
