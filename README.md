@@ -184,6 +184,7 @@ usually break can be:
 | Edge timing arithmetic | `sh tests/rt-analyze-test.sh` | Project 8's period recovery, against a synthesised square wave with known edge times, in both edge regimes |
 | Run protocol | `sh tests/rt-run-test.sh` | The measurement order, core confinement, the isolation claim in both directions, the throttle gate and every column of the results row |
 | Interrupt affinity | `sh tests/rt-irq-affinity-test.sh` | Movable interrupts against kernel-owned ones, against a fake `/proc/irq` |
+| Latency instrument comparison | `sh tests/rt-compare-test.sh` | Project 8's central claim, against a simulation: a constant GPIO write cost cancels in an interval measurement, and what survives is its variation |
 | Kernel fragment symbols | `sh tests/kernel-symbols-test.sh` | That `./go ksym` tells a real Kconfig symbol from a line that names nothing, and a settable one from a symbol only the kernel can select |
 | Wire protocol | `sh tests/sensorhub-proto-test.sh` | Project 12's frame format against frozen vectors, and a parser fed garbage, split frames, corrupted CRCs, absurd lengths and a lost byte |
 | Protocol, two implementations | `sh tests/sensorhub-cabi-test.sh` | The C compiled and driven through ctypes, compared byte for byte against an independent Python implementation over 900 randomised cases |

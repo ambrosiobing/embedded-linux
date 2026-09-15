@@ -31,6 +31,15 @@ the wake-up latency, and the difference between them is the measurement.
 That was in the original prose and not in any of its figures, and drawing
 it is what made it a testable claim rather than a remark.
 
+**Correction, added later.** That sentence is wrong. The external
+instrument measures an interval between two edges, and a constant system
+call cost appears in both ends of it and cancels; what survives is the
+*variation* in the output path. See entry 21, which has the algebra and the
+simulation that settled it. The point of this entry stands, and is if
+anything sharpened: drawing the sequence turned a remark into a claim
+specific enough to be checked, and checking it is what showed it to be
+wrong. A vaguer statement would still be in the repository.
+
 ---
 
 ## 2. PREEMPT_RT is not selectable on the kernel this repository uses
@@ -621,3 +630,109 @@ and no missing ones, so neither bug would have shown. The defects were
 found because the test generates inputs the fragment does not contain, and
 because the second input was real kernel text rather than a synthetic
 imitation of it.
+
+---
+
+## 21. The central claim of this project was wrong, and simulation showed it
+
+**What happened.** Acceptance criteria 3 and 5 both compare the two
+instruments, and nothing in the repository compared them: three histograms
+are written per run and `rt-run` extracted a maximum from one of them.
+Writing that tool meant deciding what the comparison should say, which
+meant doing algebra that nobody had done.
+
+Entry 1 of this journal, DESIGN.md, METHOD.md, the results notes and the
+project README all said the same thing: the external instrument sees the
+wake-up latency plus the cost of the GPIO write, so the difference between
+the instruments is that cost. It is the intuitive reading and it is wrong.
+
+The instrument does not measure when an edge happened. It measures the
+interval between two of them:
+
+```
+  edge_i = i*T + L_i + S_i
+  P_i    = T + (L_i+1 - L_i) + (S_i+1 - S_i)
+```
+
+A constant `S` is in both edges and subtracts out. The wire cannot see the
+cost of the GPIO write at all.
+
+**What was done.** The algebra was checked against a simulation before a
+line of it went into a document. 120000 periods, a one-sided latency
+distribution, and a deliberately large constant write cost of 6 us:
+
+```
+constant S             int: sd 2.83 | ext: mean 2000.000 sd 4.00 max 87.21
+S with 1.5 us jitter   int: sd 2.83 | ext: mean 2000.000 sd 4.53 max 87.59
+
+prediction sd_ext = sqrt(2) * sd_int = 4.01
+prediction mean_ext = T exactly      = 2000.0   (S does not appear)
+```
+
+The mean is 2000.000 in both rows. Six microseconds of constant write cost
+produced no effect anywhere. Adding 1.5 us of jitter to it moved the spread
+from 4.00 to 4.53, which is `sqrt(4.00^2 + 2*1.5^2)` to three digits.
+
+So the relationships that hold are:
+
+| Quantity | Value |
+|---|---|
+| mean period | exactly `T`, whatever the write costs |
+| spread | `sqrt(2)` times the internal spread, for independent latencies |
+| in general | `var(ext) = 2 var(int) + 2 var(write path)` |
+| maximum | tracks the largest latency above its mean |
+
+`rt-compare` implements that, `rt-run` calls it at the end of every run,
+and the five documents that stated the old claim now state the new one and
+say they were corrected. Entry 1 above carries a pointer here.
+
+**Why that and not the alternative.** The alternative was to build the lab,
+run sixteen configurations, and report a column called "system call cost"
+computed as `ext_max - int_max`. It would have produced numbers. They would
+have been differences between two maxima of two differently-shaped
+distributions, varying run to run for reasons having nothing to do with
+system calls, and the whole point of the second instrument would have been
+a number nobody could defend.
+
+The correction also makes the project's claim smaller and better. The wire
+does not tell you what a GPIO write costs. It tells you whether that cost
+is *steady*, which is the property a control loop actually depends on, and
+which no instrument inside the kernel can report.
+
+---
+
+## 22. Two more things the comparison got wrong before its test passed
+
+**What happened.** `tests/rt-compare-test.sh` builds a run from a known
+latency series and checks that the tool recovers what went in. Two
+assertions failed on the first run and both were the tool, not the test.
+
+**What was done.**
+
+*Binning inflates a variance.* The simulation put a perfectly constant
+write cost in, so the reported write-path variation should have been zero.
+It was 0.305 us. Binning spreads every value uniformly across its bin and
+adds `width^2/12` to the variance whatever the distribution is, and the
+external histogram has 2 us bins, so it carried 0.33 of variance that was
+not in the signal. The excess-over-sqrt(2) calculation is a difference of
+two variances, which turned that into a third of a microsecond of invented
+finding. Sheppard's correction subtracts `width^2/12` from each variance
+and the figure fell to 0.099 us, at which point the same test recovered an
+injected 2.0 us of write jitter as 2.02 us.
+
+*A low ratio is not a small write cost.* The test asserted that a run with
+a constant write cost would print the "ratio below sqrt(2)" explanation,
+and it printed the other branch, because the ratio came out at 1.422. The
+test was wrong to expect it: with independent latencies the ratio sits at
+sqrt(2) and lands either side of it by chance. The case that genuinely
+produces a low ratio is correlated latencies, which is what load does, so
+the generator grew an AR(1) mode. At `rho = 0.7` the ratio is
+`sqrt(2(1 - rho)) = 0.775` exactly, and the tool reports 0.779 and refuses
+to compute a write-path figure from it.
+
+**Why that and not the alternative.** Both corrections point the same way.
+A tool that reports a third of a microsecond of write-path variation for a
+system that has none, or that interprets a burst of correlated wake-ups as
+a cheap GPIO write, produces numbers that look like measurements. The
+alternative to finding this in a test was finding it in a results table,
+where a plausible number is indistinguishable from a real one.

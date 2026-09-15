@@ -37,20 +37,42 @@ the row rather than a person.
 
 ## Reading a row
 
-Three numbers describe the same run and they should not be equal:
+**This section originally said that `ext_max_us - int_max_us` is the cost
+of the GPIO write. It is not, and `rt-compare` exists because the correct
+comparison is not one to do in your head.**
+
+The three columns do not measure the same quantity. `int_*` and `cyc_*` are
+wake-up latencies. `ext_*` is the deviation of the interval between two
+edges, and an interval carries the *difference* of two latencies, so a
+constant write cost cancels out of it entirely.
+
+What to expect between the columns:
+
+| Comparison | Expected | What a departure means |
+|---|---|---|
+| `cyc_max_us` against `int_max_us` | about equal | the two internal instruments disagree, so one of them is wrong |
+| `ext_sd_us` against `int_sd_us` | a factor of sqrt(2), 1.414 | see below |
+| `ext_max_us` against `int_max_us` minus the typical latency | about equal | an isolated late wake-up makes one period long and the next short |
+
+The sqrt(2) is the interesting one. A period is the difference of two
+latencies, so its standard deviation is sqrt(2) times theirs when those
+latencies are independent and the write cost is constant. Excess over that
+factor is variation in the write path:
 
 ```
-  int_max_us   <   cyc_max_us  ~  int_max_us   <   ext_max_us
-  the measured                     the reference     what the wire saw
-  task's own                       task's own        = latency + the
-  lateness                         lateness          GPIO ioctl
+  var(ext) = 2 var(int) + 2 var(write path)
 ```
 
-`ext_max_us - int_max_us` is the cost of one GPIO character-device ioctl
-plus the instrument's own contribution. A few microseconds, and **stable
-across rows** is the expected result. If it grows under load, the system
-call itself is being delayed, which is a finding neither cyclictest nor the
-toggler's own histogram could have produced.
+which `rt-compare` solves and reports as `write_path_sd_us`. A figure that
+grows with load is the finding, and it is one neither cyclictest nor the
+toggler's own histogram could produce, because it happens after the task
+has already been scheduled.
+
+A ratio *below* sqrt(2) says the opposite of what it looks like: under load
+late wake-ups arrive in bursts, consecutive latencies correlate, and the
+factor falls. That is a statement about correlation and supports no claim
+about the write path at all. `rt-compare` says so rather than computing a
+number from it.
 
 ## Histograms
 

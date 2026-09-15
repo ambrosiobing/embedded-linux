@@ -1,0 +1,298 @@
+#!/usr/bin/env python3
+"""Compare the three instruments of one run against each other.
+
+    rt-compare rt-iso-aff-performance-load
+    rt-compare --json --results /var/lib/bench/rt LABEL
+
+Three files describe one run and they measure different things. Reading
+them side by side is the whole point of this project, and doing it wrongly
+is easy enough that this program exists rather than a paragraph telling
+somebody to eyeball two histograms.
+
+WHAT THE TWO INSTRUMENTS ACTUALLY MEASURE
+
+rt-toggle and cyclictest each record a wake-up latency: for each period,
+how long after the scheduled instant the task actually ran. Call it L.
+
+The MCC 118 records the interval between consecutive rising edges. Edge i
+leaves the pin at
+
+    i * T  +  L_i  +  S_i
+
+where T is the commanded period and S is everything between waking up and
+the voltage moving: the GPIO ioctl, the driver, the pin. So the interval
+the instrument reports is
+
+    P_i = T + (L_i+1 - L_i) + (S_i+1 - S_i)
+
+and three consequences follow that are not obvious and that this project
+originally got wrong in its own design notes:
+
+1. A CONSTANT S CANCELS. It appears in both edges and subtracts out. The
+   external measurement cannot see the cost of the GPIO write at all, only
+   its variation. "ext_max minus int_max is the syscall cost" is wrong, and
+   was written in three documents here before anyone did the algebra.
+
+2. THE SPREAD GROWS BY sqrt(2). A period carries the difference of two
+   latencies, so for uncorrelated L the standard deviation of the period
+   deviation is sqrt(2) times that of the latency. An external number that
+   looks worse than the internal one by that factor is the two instruments
+   agreeing, not disagreeing.
+
+3. THE MAXIMA SHOULD ROUGHLY AGREE. One isolated late wake-up of L_max
+   makes one period long by about L_max and the next short by the same, so
+   the largest absolute deviation tracks the largest latency.
+
+So the quantity worth reporting is the EXCESS over sqrt(2). From
+
+    var(P) = 2 var(L) + 2 var(S)
+
+the variation in the output path is
+
+    sd(S) = sqrt( max(0, (var_ext - 2 var_int) / 2) )
+
+and that is the number no internal instrument can produce. A few hundred
+nanoseconds is a GPIO write behaving itself. Microseconds that grow with
+load mean something is delaying the write after the task has already been
+scheduled, which is exactly what cyclictest is blind to.
+
+WHAT WOULD BREAK THE sqrt(2)
+
+Independence. Under heavy load late wake-ups arrive in bursts, consecutive
+latencies correlate, and the factor falls below sqrt(2). So a ratio under
+sqrt(2) is a statement about correlation rather than about the GPIO path,
+and only a ratio ABOVE it supports a claim about the write. The program
+says this in its output rather than leaving it to be remembered.
+
+No numpy: this is a few thousand bins of arithmetic, and keeping it to the
+standard library means it runs anywhere the test suite does.
+
+SPDX-License-Identifier: MIT
+"""
+
+import argparse
+import json
+import math
+import os
+import sys
+
+SQRT2 = math.sqrt(2.0)
+
+
+def read_pairs(path):
+    """Every "number number" line, ignoring comments. Returns [(x, count)]."""
+    out = []
+    with open(path, "r", encoding="ascii", errors="replace") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            fields = line.split()
+            if len(fields) < 2:
+                continue
+            try:
+                x = float(fields[0])
+            except ValueError:
+                continue
+            # cyclictest -h prints one count column per thread. Summing
+            # them is right for -t 1 and is the only sensible reading for
+            # more, since they share a histogram axis.
+            total = 0
+            ok = False
+            for field in fields[1:]:
+                try:
+                    total += int(field)
+                    ok = True
+                except ValueError:
+                    break
+            if ok:
+                out.append((x, total))
+    return out
+
+
+def bin_width(pairs):
+    """The narrowest gap between occupied bins, which is the bin width."""
+    if len(pairs) < 2:
+        return 1.0
+    gaps = [b[0] - a[0] for a, b in zip(pairs, pairs[1:]) if b[0] > a[0]]
+    return min(gaps) if gaps else 1.0
+
+
+def stats(pairs):
+    """Mean, standard deviation, count and percentiles from a histogram.
+
+    Every row is taken at the centre of its bin rather than at its label,
+    because all three files label a bin by its lower edge: rt-toggle
+    truncates nanoseconds to whole microseconds, cyclictest does the same,
+    and rt-analyze prints the left edges of 2 us bins. Reading a label as a
+    value biases every mean by half a bin, which is half a microsecond in
+    two files and a whole one in the third, against differences this
+    project cares about at exactly that scale.
+    """
+    if not pairs:
+        return None
+    n = sum(c for _, c in pairs)
+    if n == 0:
+        return None
+
+    width = bin_width(pairs)
+    shift = width / 2.0
+    centres = [(x + shift, c) for x, c in pairs]
+
+    mean = sum(x * c for x, c in centres) / n
+    var = sum(c * (x - mean) ** 2 for x, c in centres) / n
+
+    # Sheppard's correction. Binning spreads every value uniformly across
+    # its bin, which adds width^2/12 to the variance whatever the
+    # underlying distribution is. Left in, it is not a rounding detail
+    # here: the external histogram has 2 us bins, so it inflates that
+    # variance by 0.33, and the excess-over-sqrt(2) calculation reads the
+    # difference of two variances and turns the inflation into about
+    # 0.3 us of write-path variation that does not exist. The first run of
+    # this program reported exactly that for a simulation whose write cost
+    # was a constant.
+    var = max(0.0, var - (width * width) / 12.0)
+
+    def percentile(fraction):
+        want = fraction * n
+        seen = 0
+        for x, c in sorted(centres):
+            seen += c
+            if seen >= want:
+                return x
+        return centres[-1][0]
+
+    occupied = [x for x, c in centres if c]
+    return {
+        "count": n,
+        "mean_us": mean,
+        "sd_us": math.sqrt(var),
+        "min_us": min(occupied),
+        "max_us": max(occupied),
+        "max_abs_us": max(abs(min(occupied)), abs(max(occupied))),
+        "p99_us": percentile(0.99),
+        "p999_us": percentile(0.999),
+    }
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(
+        description="compare the internal and external latency instruments")
+    parser.add_argument("label", nargs="?",
+                        help="run label; the three files are found from it")
+    parser.add_argument("--results", default="/var/lib/bench/rt")
+    parser.add_argument("--toggle", help="override the rt-toggle histogram")
+    parser.add_argument("--external", help="override the rt-analyze histogram")
+    parser.add_argument("--cyclictest", help="override the cyclictest output")
+    parser.add_argument("--json", action="store_true")
+    return parser.parse_args(argv)
+
+
+def resolve(args):
+    def pick(explicit, suffix):
+        if explicit:
+            return explicit
+        if not args.label:
+            return None
+        return os.path.join(args.results, args.label + suffix)
+
+    return (pick(args.toggle, "-toggle.txt"),
+            pick(args.external, "-external-hist.txt"),
+            pick(args.cyclictest, "-cyclictest.txt"))
+
+
+def main(argv):
+    args = parse_args(argv)
+    toggle_path, external_path, cyclic_path = resolve(args)
+
+    if not toggle_path or not external_path:
+        print("rt-compare: give a run label, or both --toggle and --external",
+              file=sys.stderr)
+        return 2
+
+    for path in (toggle_path, external_path):
+        if not os.path.exists(path):
+            print("rt-compare: %s does not exist" % path, file=sys.stderr)
+            return 1
+
+    internal = stats(read_pairs(toggle_path))
+    external = stats(read_pairs(external_path))
+    cyclic = None
+    if cyclic_path and os.path.exists(cyclic_path):
+        cyclic = stats(read_pairs(cyclic_path))
+
+    if internal is None or external is None:
+        print("rt-compare: one of the histograms is empty", file=sys.stderr)
+        return 1
+
+    report = {
+        "int_count": internal["count"],
+        "int_mean_us": internal["mean_us"],
+        "int_sd_us": internal["sd_us"],
+        "int_max_us": internal["max_us"],
+        "ext_count": external["count"],
+        "ext_sd_us": external["sd_us"],
+        "ext_max_abs_us": external["max_abs_us"],
+    }
+
+    # The comparison the project exists to make.
+    if internal["sd_us"] > 0:
+        report["sd_ratio"] = external["sd_us"] / internal["sd_us"]
+    else:
+        report["sd_ratio"] = float("nan")
+    report["sd_ratio_expected"] = SQRT2
+
+    excess_var = (external["sd_us"] ** 2 - 2.0 * internal["sd_us"] ** 2) / 2.0
+    report["write_path_sd_us"] = math.sqrt(excess_var) if excess_var > 0 else 0.0
+
+    # An isolated late wake-up shows up in the period as itself, measured
+    # from the typical latency rather than from zero.
+    report["int_max_above_mean_us"] = internal["max_us"] - internal["mean_us"]
+    report["max_agreement_us"] = (external["max_abs_us"] -
+                                  report["int_max_above_mean_us"])
+
+    if cyclic:
+        report["cyc_count"] = cyclic["count"]
+        report["cyc_mean_us"] = cyclic["mean_us"]
+        report["cyc_sd_us"] = cyclic["sd_us"]
+        report["cyc_max_us"] = cyclic["max_us"]
+
+    if args.json:
+        print(json.dumps(report, sort_keys=True))
+        return 0
+
+    print("internal (rt-toggle)   n=%(int_count)d mean=%(int_mean_us).2f us "
+          "sd=%(int_sd_us).2f us max=%(int_max_us).1f us" % report)
+    if cyclic:
+        print("internal (cyclictest)  n=%(cyc_count)d mean=%(cyc_mean_us).2f us "
+              "sd=%(cyc_sd_us).2f us max=%(cyc_max_us).1f us" % report)
+    print("external (MCC 118)     n=%(ext_count)d sd=%(ext_sd_us).2f us "
+          "max=%(ext_max_abs_us).1f us" % report)
+    print()
+    print("sd ratio               %.3f  (sqrt(2) = %.3f if the write cost "
+          "is constant" % (report["sd_ratio"], SQRT2))
+    print("                              and consecutive latencies are "
+          "independent)")
+    print("write-path variation   %.3f us" % report["write_path_sd_us"])
+    print("max agreement          %.1f us  (external max minus internal max "
+          "above its mean)" % report["max_agreement_us"])
+    print()
+
+    if report["sd_ratio"] < SQRT2:
+        print("The external spread is below sqrt(2) times the internal one.")
+        print("That is a statement about correlation, not about the GPIO")
+        print("path: under load, late wake-ups arrive in bursts, consecutive")
+        print("latencies stop being independent, and the factor falls. No")
+        print("claim about the write cost can be made from this row.")
+    else:
+        print("The external spread exceeds sqrt(2) times the internal one by")
+        print("%.3f us of write-path variation. That is the quantity no"
+              % report["write_path_sd_us"])
+        print("internal instrument can produce, because it happens after the")
+        print("task has already been scheduled. Compare it across rows: a")
+        print("figure that grows with load is the finding.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

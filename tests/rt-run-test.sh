@@ -152,6 +152,12 @@ echo "rt-analyze $*" >>"$BENCH_TEST_DIR/calls"
 echo "edges=30000 periods=29999 mean_us=2000.012 expected_us=2000.000 clock_offset_ppm=6.000 sd_us=1.200 p99_us=4.000 p999_us=9.000 max_abs_us=23.000 subsample_fraction=0.980 sample_us=10.000 histogram=hist.txt"
 STUB
 
+cat >"$WORK/bin/rt-compare" <<'STUB'
+#!/bin/sh
+echo "rt-compare $*" >>"$BENCH_TEST_DIR/calls"
+echo "sd ratio 1.415"
+STUB
+
 cat >"$WORK/bin/rt-irq-affinity" <<'STUB'
 #!/bin/sh
 echo "rt-irq-affinity $*" >>"$BENCH_TEST_DIR/calls"
@@ -304,6 +310,14 @@ check "the governor was actually written" \
 	"performance"
 check "the capture file was removed after analysis" \
 	"$(find "$WORK/scratch" -mindepth 1 | wc -l | tr -d ' ')" "0"
+
+# The comparison runs at the end, on the label just recorded, and after the
+# analysis rather than instead of it.
+contains "the instruments are compared at the end of the run" "$calls" \
+	"rt-compare --results $WORK/results rt-iso-aff-performance-load"
+check "and after the analysis, not before" \
+	"$(before "$(at '^rt-analyze ')" "$(at '^rt-compare ')")" "yes"
+contains "and its verdict reaches the operator" "$out" "sd ratio"
 
 # --------------------------------------------------- the claims are checked
 

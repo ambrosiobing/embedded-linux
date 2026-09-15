@@ -11,12 +11,32 @@ of the method rather than an excuse attached to an inconvenient number.
 |---|---|---|---|
 | `rt-toggle`'s own histogram | wake-up latency of the measured task | the kernel under test, CLOCK_MONOTONIC | no |
 | `cyclictest` | wake-up latency of a reference task | the same | no |
-| MCC 118 through `rt-capture` | the interval the outside world sees between edges | its own crystal | yes |
+| MCC 118 through `rt-capture` | the interval the outside world sees between edges | its own crystal | its variation only |
 
 The first two answer "was the task woken on time". The third answers "did
-the pin move on time", which is the question an actuator asks. The
-difference between them is the cost of one ioctl on the GPIO character
-device, and it is the reason this project exists.
+the pin move on time", which is the question an actuator asks.
+
+**The last column of that table originally read "yes", and the sentence
+here originally said the difference between the instruments is the cost of
+one GPIO ioctl. Both were wrong.** The third instrument measures an
+*interval* between two edges, and a constant cost appears in both of them
+and subtracts out. What survives is the variation:
+
+```
+  var(external) = 2 var(latency) + 2 var(write path)
+```
+
+so the external spread is sqrt(2) times the internal one when the write
+cost is constant, and the excess over that factor is the only part of the
+output path an internal instrument cannot see. `rt-compare` does this
+arithmetic per run; [DESIGN.md](DESIGN.md) has the derivation and
+`tests/rt-compare-test.sh` checks it against a simulation whose answer is
+known in advance.
+
+This is why a second instrument is worth its wiring, and it is a smaller
+claim than the one this project started with. It does not tell you what a
+GPIO write costs. It tells you whether that cost is *steady*, which is the
+property a control loop actually depends on.
 
 ## Uncertainty 1: the edge has to be slower than the sample period
 

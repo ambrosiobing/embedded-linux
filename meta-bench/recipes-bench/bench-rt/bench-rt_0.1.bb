@@ -15,6 +15,7 @@ SRC_URI = "\
     file://rt-toggle.c \
     file://rt-capture \
     file://rt-analyze \
+    file://rt-compare \
     file://rt-run \
     file://rt-irq-affinity \
     file://rt.conf \
@@ -45,6 +46,7 @@ do_install() {
     install -Dm0755 rt-toggle ${D}${bindir}/rt-toggle
     install -Dm0755 ${S}/rt-capture ${D}${bindir}/rt-capture
     install -Dm0755 ${S}/rt-analyze ${D}${bindir}/rt-analyze
+    install -Dm0755 ${S}/rt-compare ${D}${bindir}/rt-compare
     install -Dm0755 ${S}/rt-run ${D}${bindir}/rt-run
     install -Dm0755 ${S}/rt-irq-affinity ${D}${bindir}/rt-irq-affinity
 

@@ -1219,4 +1219,46 @@ rule broad enough to catch something unintended.
 
 ---
 
+## 49. A measurement relationship is derived and simulated before it is believed
+
+**Context.** Project 8's whole justification is a second instrument that
+watches the pin from outside. Five documents in this repository stated what
+the comparison between the two instruments would show: that the external
+number carries the wake-up latency plus the cost of the GPIO write, so the
+difference between them is that cost.
+
+**Decision.** Derive the relationship, check the derivation against a
+simulation with a known answer, and only then write it down. The external
+instrument measures an interval, `P_i = T + (L_i+1 - L_i) + (S_i+1 - S_i)`,
+so a constant write cost cancels and what survives is
+`var(P) = 2 var(L) + 2 var(S)`. The reportable quantity is the excess over
+a factor of sqrt(2), which is the variation in the output path.
+
+**Rejected.** Shipping the intuitive claim. It had survived a design
+document, a method document, a results schema, a README and a journal entry
+without anyone doing the algebra.
+
+**Why.** The lab would have produced numbers either way. A column computed
+as `ext_max - int_max` is a difference between the maxima of two
+differently-shaped distributions; it varies run to run for reasons that
+have nothing to do with system calls, and it would have been reported as a
+system call cost. Wrong numbers that look like measurements are the failure
+this whole repository is arranged against, and here the check cost an hour
+and a hundred lines of simulation.
+
+The corrected claim is smaller and more useful. The wire does not say what
+a GPIO write costs. It says whether that cost is steady, which is the
+property a control loop depends on and the one no instrument inside the
+kernel can report.
+
+**Consequence.** `rt-compare` exists, `rt-run` calls it at the end of every
+run, and the five documents now state the derived relationship and say they
+were corrected rather than being quietly edited. Two further defects came
+out of writing its test: a binned variance needs Sheppard's correction, or
+2 us bins invent a third of a microsecond of finding; and a ratio below
+sqrt(2) means correlated wake-ups rather than a cheap write, so the tool
+refuses that interpretation instead of computing a number from it.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)

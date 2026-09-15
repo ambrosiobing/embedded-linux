@@ -391,6 +391,17 @@ rm -f "$capture"
 note "row appended to $CSV"
 tail -1 "$CSV"
 
+# The comparison the whole project is for, while the run is still in front
+# of you. It is only arithmetic over the three histograms, so it costs
+# nothing and it can be repeated later with rt-compare LABEL.
+#
+# Deliberately not fatal. A run whose instruments disagree is a result, and
+# an interesting one; refusing to record it would throw away the finding.
+if command -v rt-compare >/dev/null 2>&1; then
+	echo
+	rt-compare --results "$RT_RESULTS" "$label" || true
+fi
+
 case $throttled_after in
 0x0 | unknown) ;;
 *)

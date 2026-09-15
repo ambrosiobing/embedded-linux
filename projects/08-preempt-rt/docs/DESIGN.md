@@ -337,12 +337,45 @@ sequenceDiagram
     Note over A: the external period carries<br/>L and S; the internal one carries L
 ```
 
-The offset between the two is `S`, the cost of one GPIO character-device
-ioctl, plus whatever the instrument's own front end contributes. It should
-be a stable few microseconds. **A stable difference is the expected result;
-a difference that changes with the configuration is the finding**, because
-it means the system call itself is being delayed, which is exactly the kind
-of thing an internal measurement cannot see.
+**This paragraph originally said that the difference between the two
+instruments is `S`, the cost of the GPIO ioctl. That is wrong, and the
+algebra is worth following because the wrong version is the intuitive one.**
+
+The external instrument does not measure an edge time, it measures the
+interval between two of them. Edge `i` leaves the pin at
+`i*T + L_i + S_i`, so the interval is
+
+```
+  P_i = T + (L_i+1 - L_i) + (S_i+1 - S_i)
+```
+
+A constant `S` appears in both edges and subtracts out exactly. **The wire
+cannot see the cost of the GPIO write at all, only its variation.** A
+simulation with a 6 us constant write cost reports a mean period of
+2000.000 us, unchanged to three decimals when that cost is removed
+entirely.
+
+What the wire does see:
+
+| Quantity | Relationship | Why |
+|---|---|---|
+| mean period | exactly `T` | both latency and a constant write cost cancel |
+| spread | `sd(P) = sqrt(2) * sd(L)` | a period carries the difference of two latencies |
+| in general | `var(P) = 2 var(L) + 2 var(S)` | the two contributions add |
+| maximum | tracks `max(L)` above its mean | one late wake-up makes one period long and the next short |
+
+So the number worth reporting is the **excess over sqrt(2)**, which gives
+`sd(S) = sqrt((var_ext - 2 var_int) / 2)`: the variation in everything
+between waking up and the voltage moving. That is the quantity no internal
+instrument can produce, because it happens after the task has already been
+scheduled, and it is what makes the second instrument worth its wiring.
+
+One caveat the tool prints rather than leaves to memory: the sqrt(2)
+assumes consecutive latencies are independent. Under load they arrive in
+bursts and the ratio falls below sqrt(2), so a low ratio is a statement
+about correlation and only a high one supports a claim about the write
+path. `rt-compare` does this arithmetic and refuses the interpretation when
+the ratio is low.
 
 ---
 

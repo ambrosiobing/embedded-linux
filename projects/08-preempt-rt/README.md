@@ -9,13 +9,21 @@ scheduling, on the kernel's own clock. That is a useful number and it is
 not the number an actuator experiences. This project adds a second
 instrument that shares nothing with the first except a wire: an MCC 118 DAQ
 HAT samples the pin that the real-time task toggles, at 100 kS/s, on its own
-crystal. The period it reports includes the wake-up latency **and** the cost
-of the system call that moved the pin.
+crystal.
 
-Comparing the two is the lesson. When they agree, the GPIO write is cheap
-and constant and the internal number was trustworthy. When they disagree by
-a changing amount, something is delaying the system call itself, and no
-amount of cyclictest would have shown it.
+Comparing the two is the lesson, and the comparison is not the one it
+first appears to be. The instrument measures the *interval* between edges,
+so a constant cost between waking up and moving the pin appears in both
+ends of that interval and cancels. What the wire sees is the **variation**
+in the whole output path, which arrives as an excess over a factor of
+sqrt(2) that comes out of the algebra rather than out of the hardware.
+[docs/DESIGN.md](docs/DESIGN.md) derives it and `rt-compare` computes it.
+
+That is a smaller claim than "the external number includes the system
+call", which is what this project's own design notes said until the algebra
+was done. It is also the useful one: it does not tell you what a GPIO write
+costs, it tells you whether that cost is steady, which is the property a
+control loop actually depends on.
 
 The knobs are the ones an embedded interview asks about: the preemption
 model, CPU isolation, interrupt affinity, the frequency governor and load.
@@ -41,6 +49,7 @@ What is proven today, on a laptop and in CI:
 | An unresolved edge is detected and reported rather than silently trusted | the same test, both regimes |
 | The run protocol keeps its order and refuses every invalid claim | `tests/rt-run-test.sh`, 51 assertions against stubs |
 | Movable and kernel-owned interrupts are distinguished correctly | `tests/rt-irq-affinity-test.sh`, 14 assertions |
+| The relationship between the two instruments is the one the algebra predicts | `tests/rt-compare-test.sh`, 22 assertions against a simulation whose answer is known first |
 | `PREEMPT_RT` is selectable on this kernel at all | read out of `kernel/Kconfig.preempt` and `arch/arm64/Kconfig` in `rpi-6.12.y`, see below |
 | The fragment check catches a kernel built without it | `./go kconfig -f rt` against a deliberately broken config |
 | Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt` against the `rpi-6.12.y` Kconfig text |
@@ -57,7 +66,7 @@ the places where this departs from the original scope on purpose.
 | `meta-bench/recipes-kernel/linux/files/rt.cfg` | The opt-in kernel fragment: `PREEMPT_RT`, `NO_HZ_FULL`, `RCU_NOCB_CPU`, and the debug options that have to be off |
 | `kas/bench-rt.yml` | The fragment switch, the kernel version that can honour it, SPI, `meta-python` |
 | `meta-bench/recipes-core/images/bench-rt-image.bb` | `bench-image` plus both instruments and the load generator |
-| `meta-bench/recipes-bench/bench-rt/` | `rt-toggle`, `rt-capture`, `rt-analyze`, `rt-run`, `rt-irq-affinity` and their configuration |
+| `meta-bench/recipes-bench/bench-rt/` | `rt-toggle`, `rt-capture`, `rt-analyze`, `rt-compare`, `rt-run`, `rt-irq-affinity` and their configuration |
 | `meta-bench/recipes-bench/daqhats/` | The vendor library and its Python bindings, pinned to a commit, cross-compiled |
 | `scripts/rt-kernel-install.sh` | Puts the RT kernel on a card beside the generic one, with a one-line way back |
 | `scripts/check-kernel-config.sh` | Extended: `-f rt` checks the real-time fragment too |
@@ -136,9 +145,9 @@ each, and where that stands today.
 |---|---|---|---|
 | 1 | `/sys/kernel/realtime` reads 1 on the RT kernel and is absent on the generic one | the `realtime` column of every row, and `uname -v` beside it | **not started**, needs a board |
 | 2 | A 60 s capture at 100 kS/s with zero overruns, and 30000 +/- 1 rising edges | `ext_edges` in the row; `rt-capture` voids the run on any overrun | **not started** |
-| 3 | The external histogram reproduces the internal one in shape, and the difference is a stable offset | both histograms are kept per run, and the sequence diagram in DESIGN.md says what the offset is | **not started** |
+| 3 | The external histogram reproduces the internal one in shape: spread a factor of sqrt(2) larger, maxima agreeing, and any excess reported as write-path variation | `rt-compare` per run, which `rt-run` calls at the end of one | **not started** on a board; the arithmetic is proven against a simulation in `tests/rt-compare-test.sh` |
 | 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **not started** |
-| 5 | cyclictest alone agrees with the external measurement to within the system-call cost | the `cyc_*` and `ext_*` columns of the same row | **not started** |
+| 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **not started**. The original wording, "agrees to within the system-call cost", was not measurable: that cost cancels in an interval measurement |
 | 6 | Every row names kernel, isolation, affinity, governor, load and the throttle status before and after | the CSV header has 27 columns and `rt-run` fills all of them | **met in the code**, proven by `tests/rt-run-test.sh`, unproven on a board |
 | 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt` against `/proc/config.gz` from the running board | **tooling ready**, exercised against a synthetic config |
 | 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
@@ -194,6 +203,7 @@ the one grouped by kernel and then by isolation, which is the order above.
 | Host compile | `./go check` | `rt-toggle` with `-Werror` against host libgpiod v2 |
 | Fragment symbols | `./go ksym -f rt` | That every line names a real Kconfig symbol, and that a promptless one is declared as a consequence rather than presented as a request |
 | The fragment | `./go kconfig -f rt CONFIG` | Every line of `rt.cfg`, including the ones that ask for an option to stay off |
+| Instrument comparison | `sh tests/rt-compare-test.sh` | That a constant write cost is invisible, that 2 us of write jitter is recovered as 2 us, that correlated latencies are refused rather than interpreted, and that all three file formats parse |
 | The symbol checker itself | `sh tests/kernel-symbols-test.sh` | All five Kconfig declaration shapes against a six-file kernel, including the two that the checker got wrong first |
 
 Not covered, and only a board can cover it: that a PREEMPT_RT kernel boots
