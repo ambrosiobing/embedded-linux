@@ -474,6 +474,52 @@ consecutive red runs over two days, each sending an email, while the work
 carried on and the workflow was repeatedly described as the thing that would
 catch mistakes.
 
+**Seventeen failures, in full.** Newest last. The step column is where the
+job died; durations are from `gh run list`.
+
+| # | Commit being tested | Sec | Died at | Cause |
+|---|---|---|---|---|
+| 1 | one repository for the twenty projects | 17 | shellcheck | A |
+| 2 | host-setup: survive package renames | 21 | shellcheck | A |
+| 3 | docs: why each host package is installed | 19 | shellcheck | A |
+| 4 | host-check: pkg-config was missing | 23 | shellcheck | A |
+| 5 | walkthrough: why the repository is built this way | 27 | shellcheck | A |
+| 6 | project 01: first build measured | 25 | shellcheck | A |
+| 7 | dbus: drop x11 autolaunch | 19 | shellcheck | A |
+| 8 | project 01: journal of the build | 43 | shellcheck | A |
+| 9 | bench-image: a console you can actually see | 20 | shellcheck | A |
+| 10 | project 01: defer the LED indication | 20 | shellcheck | A |
+| 11 | project 01: console is the panel and SSH | 25 | shellcheck | A |
+| 12 | bench-provision: German keymap and WiFi | 19 | shellcheck | A |
+| 13 | scripts: refuse a second BitBake run | 18 | shellcheck | A |
+| 14 | shellcheck: an explicit if for SC2015 | 21 | compile | B |
+| 15 | shellcheck: find shell files rather than listing them | 21 | compile | B |
+| 16 | ci: pin the runner, ubuntu-latest carries libgpiod v1 | 22 | compile | B |
+| 17 | ci: build libgpiod v2 from a pinned tag | 18 | clone | C |
+| 18 | ci: pin libgpiod to v2.1.3 from kernel.org | 71 | passed | |
+
+**The durations are the tell.** Everything under about 30 seconds died
+before the runner had finished installing packages and compiling. The first
+green run took 71 seconds precisely because it finally reached the work:
+building a library, compiling twice and running thirteen tests. Run 8's 43
+seconds is the one outlier and reflects a slower runner rather than a
+different fault.
+
+Cause **A** is one `info`-level shellcheck note, `SC2015`, in a line of
+`scripts/reproduce.sh` written in the very first commit. The log was read
+for run 13 and named it; it was present and unchanged in every run before
+that. **Thirteen pushes went out while a one-line fix sat unread.**
+
+Cause **B** is libgpiod. Runs 14 and 15 got past shellcheck and died in the
+compile with forty lines of implicit-declaration errors, gcc helpfully
+suggesting v1 symbol names. Run 16 added a version check and said it in one
+sentence instead: `This runner has libgpiod v1.6.3; the daemon targets v2.`
+Same cause, legible output, which is the difference the check was for.
+
+Cause **C** is a tag I guessed. `v2.1` does not exist on the GitHub mirror,
+which carries only recent tags. `git ls-remote --tags` would have said so
+before the push rather than after.
+
 **Three causes, found in sequence.**
 
 1. `SC2015` in `scripts/reproduce.sh`, an *info*-level style note about
