@@ -25,12 +25,17 @@ to extend all three rather than only use them.
 
 ## State
 
-**The software is complete and the board work has not started.** Every
-static check passes and every piece of logic that can be exercised without a
-modem is tested. Nothing here has been near a SIM card. The acceptance
-table below says which is which, and the [journal](JOURNAL.md) records the
-decisions taken so far and the ones deliberately left until hardware
-contradicts them.
+**The software is complete and the board work has not started.** CI is
+green: the static checks pass, both C programs compile with `-Werror`
+against libgpiod 2.1.3, both Python programs byte-compile, and five test
+suites run 65 assertions with none failing. The image itself has not been
+built, because that needs the Yocto host, and nothing here has been near a
+SIM card.
+
+The acceptance table below says which criteria are proven and which are
+plans. The [journal](JOURNAL.md) records the decisions taken so far, the
+four CI failures it took to get green, and the things deliberately left
+open until hardware contradicts them.
 
 ## What this project adds to the repository
 

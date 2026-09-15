@@ -387,3 +387,46 @@ is the second entry in this journal pointing at the same missing tool.
 the whole watchdog escalation ladder passed against the PATH stubs on a
 host where the stubs actually execute, and both keyfile modes came back
 600. None of that could be checked on the authoring machine.
+
+---
+
+## 15. Green, and what that actually proves
+
+**What happened.** The fourth run passed every step.
+
+```
+Static layer checks              lint clean
+Shell scripts                    shellcheck -s sh, every shell file found by shebang
+Compile the daemon               bench-status.c, -Werror, libgpiod 2.1.3
+Compile the modem control tool   lte-gpio.c,     -Werror, libgpiod 2.1.3
+Python programs compile          lte-watchdog, lte-exporter, lint.py
+Tests                            5 suites, 65 assertions, 0 failed
+```
+
+The four suites this project added:
+
+| Suite | Assertions |
+|---|---|
+| `bench-router-nftables-test.sh` | 17 |
+| `bench-router-setup-test.sh` | 14 |
+| `lte-exporter-test.sh` | 24 |
+| `lte-watchdog-test.sh` | 19 |
+
+**Four CI failures to get there**, all in this project's own work and all
+read from the log rather than guessed at:
+
+1. `check_systemd_units` treating line continuations as unit names, which
+   answers differently on Windows and Linux.
+2. Four shellcheck notes, `ls` parsed where `stat` and `test -e` were meant.
+3. One assertion counting `# HELP` and `# TYPE` lines as samples.
+4. Nothing. The fourth run was the green one.
+
+Project 1 needed seventeen runs for its first green, thirteen of them
+against a single unread note. Four is better and three of them were
+avoidable with shellcheck and a Linux shell on the authoring machine, which
+remains this bench's most expensive missing tool.
+
+**What green does not mean.** No modem has been seen. No packet has been
+routed. The image has never been built: `./go router` needs the Yocto host,
+and the two things most likely to be wrong there are named at the end of
+entry 11, which is the whole reason they were named in advance.
