@@ -19,13 +19,27 @@ IMAGE_INSTALL:remove = "bench-net-wifi"
 
 IMAGE_INSTALL:append = " \
     networkmanager \
+    networkmanager-wwan \
     modemmanager \
     libqmi \
     dnsmasq \
     nftables \
+    usbutils \
     bench-router \
     bench-lte \
 "
+
+# networkmanager-wwan is the mobile broadband device plugin, and it is a
+# separate package. Installing networkmanager alone gives a daemon that
+# sees wwan0, logs "'wwan' plugin not available; creating generic device",
+# and marks it unmanaged for ever. The profile is then valid, the modem is
+# registered, and nothing connects. The package also has to be built, which
+# is the PACKAGECONFIG line in kas/bench-router.yml.
+#
+# usbutils is here because this project's subject is a USB composite
+# device. The first question on a board that shows no modem is what is on
+# the bus, and the first bring-up answered it by reading sysfs by hand for
+# want of lsusb.
 
 # libqmi brings qmicli, which is how the QMI channel is inspected directly
 # when the question is whether ModemManager is wrong or the modem is. It is

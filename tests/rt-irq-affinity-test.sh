@@ -97,8 +97,8 @@ RT_CPU=3
 RT_HOUSEKEEPING=0-2
 CONF
 
-export RT_ROOT=$WORK
-export RT_CONF=$WORK/rt.conf
+export RT_ROOT="$WORK"
+export RT_CONF="$WORK/rt.conf"
 
 # ------------------------------------------------------------- set
 

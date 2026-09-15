@@ -42,19 +42,25 @@ for name in $fragments; do
 		die "no fragment at $FRAGMENT_DIR/$name.cfg"
 done
 
-# The newest fragment is the reference for "is the built .config newer than
-# what it was built from".
-fragment=$FRAGMENT_DIR/bench.cfg
-
 # An explicit config wins. The best one is the running kernel own config,
 # taken from the board with "zcat /proc/config.gz", because it proves what
 # the hardware is executing rather than what a build tree once contained.
+#
+# This search used to carry "-newer $fragment", meaning to skip a .config
+# older than the fragment it should have been built from. It was wrong
+# twice over. Git sets mtime to checkout time, so any "git pull" that
+# touches a fragment makes every existing .config look stale and the search
+# returns nothing, which reports itself as "no built kernel .config found"
+# and sends you hunting for a build problem that is not there. And the
+# guard protected against nothing: a .config predating a fragment line is
+# a .config missing that line, which this script already reports as a
+# MISMATCH. An honest failure was being turned into a confusing absence.
 if [ -n "${1:-}" ]; then
 	[ -r "$1" ] || die "cannot read $1"
 	config=$1
 else
 	config=$(find "$KAS_BUILD_DIR/tmp/work" -path "*linux-raspberrypi*" \
-		-name ".config" -newer "$fragment" 2>/dev/null | sort | tail -1)
+		-name ".config" 2>/dev/null | sort | tail -1)
 fi
 
 if [ -z "$config" ]; then
@@ -71,6 +77,9 @@ if [ -z "$config" ]; then
 fi
 
 note "config   $config"
+# When it was built, so that a check passing against a week-old tree is
+# visible rather than implied.
+note "built    $(date -r "$config" '+%Y-%m-%d %H:%M' 2>/dev/null || echo unknown)"
 
 fail=0
 

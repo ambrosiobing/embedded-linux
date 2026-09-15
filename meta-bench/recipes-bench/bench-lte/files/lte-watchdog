@@ -55,7 +55,12 @@ DEFAULTS = {
     "settle_s": "60",
     "settle_cold_s": "120",
     "metrics_path": "/var/lib/lte/watchdog.prom",
+    # Level 3 is armed by hand, once, after somebody has confirmed which
+    # header pin PWRKEY actually reaches. See recover().
+    "pwrkey_verified": "0",
 }
+
+TRUE_VALUES = ("1", "yes", "true", "on")
 
 MAX_LEVEL = 3
 
@@ -116,6 +121,7 @@ class Counters:
         self.path = path
         self.probe_failures = 0
         self.recoveries = {1: 0, 2: 0, 3: 0}
+        self.pwrkey_refused = 0
         self.state = "waitmodem"
         self.level = 0
 
@@ -132,6 +138,9 @@ class Counters:
                 f'lte_recoveries_total{{level="{level}"}} {self.recoveries[level]}'
             )
         lines += [
+            "# HELP lte_pwrkey_refused_total Power cycles declined, unarmed.",
+            "# TYPE lte_pwrkey_refused_total counter",
+            f"lte_pwrkey_refused_total {self.pwrkey_refused}",
             "# HELP lte_watchdog_level Escalation level of the current incident.",
             "# TYPE lte_watchdog_level gauge",
             f"lte_watchdog_level {self.level}",
@@ -221,21 +230,44 @@ def power_cycle(config: dict[str, str]) -> None:
     run(["lte-gpio", "pwrkey", on_ms], timeout=30)
 
 
+def enabled(config: dict[str, str], key: str) -> bool:
+    return config.get(key, "0").strip().lower() in TRUE_VALUES
+
+
 def recover(level: int, config: dict[str, str], counters: Counters) -> float:
     """Perform one recovery action and return how long to wait afterwards."""
-    counters.recoveries[level] += 1
     counters.state = "recovering"
     counters.level = level
 
     if level == 1:
+        counters.recoveries[1] += 1
         log("level 1: rebuilding the bearer with nmcli")
         run(["nmcli", "con", "up", config["nm_connection"]], timeout=90)
         return number(config, "settle_s")
     if level == 2:
+        counters.recoveries[2] += 1
         log("level 2: resetting the modem with mmcli")
         run(["mmcli", "-m", "any", "--reset"], timeout=60)
         return number(config, "settle_s")
 
+    # Level 3 is the only rung that drives a GPIO line, and which header pin
+    # PWRKEY reaches is a property of the HAT revision and its jumper block
+    # rather than of the part. The defaults here come from a vendor demo. A
+    # wrong offset does not fail safely: it drives whatever else is on that
+    # pin, on a board that is by then already unattended and unreachable.
+    #
+    # So this rung is armed by hand, once, after somebody has put the
+    # schematic next to "lte-gpio info". Everything else works meanwhile,
+    # and the refusal is counted so that a box quietly stuck one rung below
+    # its last resort shows up on the dashboard instead of looking healthy.
+    if not enabled(config, "pwrkey_verified"):
+        counters.pwrkey_refused += 1
+        log("level 3 refused: pwrkey_verified is not set. Confirm the PWRKEY "
+            "offset against the HAT schematic, then set pwrkey_verified = 1 "
+            "in the configuration file.")
+        return number(config, "settle_cold_s")
+
+    counters.recoveries[3] += 1
     log("level 3: power cycling the module through PWRKEY")
     power_cycle(config)
     return number(config, "settle_cold_s")

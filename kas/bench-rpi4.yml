@@ -43,12 +43,22 @@ local_conf_header:
     INIT_MANAGER = "systemd"
     ENABLE_UART = "1"
 
-    # Two consoles, not one. meta-raspberrypi makes CMDLINE_CONSOLE
-    # conditional on ENABLE_UART and picks serial OR tty1, so with the
-    # UART enabled the kernel says nothing on HDMI. A bench board whose
-    # only console is a serial cable is undebuggable the day that cable
-    # fails, which is exactly how this line came to be written.
-    CMDLINE_CONSOLE = "console=serial0,115200 console=tty1"
+    # Two consoles, not one. A bench board whose only console is a serial
+    # cable is undebuggable the day that cable fails, and this bench has
+    # no working USB/TTL adapter at all.
+    #
+    # This used to say CMDLINE_CONSOLE, which does nothing. That variable
+    # is not in meta-raspberrypi scarthgap: rpi-cmdline.bb builds CMDLINE
+    # from CMDLINE_ISOL_CPUS, DWC_OTG, SERIAL, ROOTFS, CMA, KGDB, LOGO,
+    # PITFT, DEBUG, RNDIS and IFNAMES, and nothing else. The serial console
+    # comes from CMDLINE_SERIAL, which ENABLE_UART above already sets.
+    #
+    # So every image this bench has built has had a serial console only.
+    # The DSI panel has shown a login prompt, because systemd starts
+    # getty@tty1 whatever the kernel is told, and has never shown a kernel
+    # message. Appending is the only hook that recipe leaves open, and
+    # tty1 goes last so that it becomes /dev/console.
+    CMDLINE:append = " console=tty1"
 
     # The bench console is the official 7 inch DSI panel. Under the KMS
     # driver that panel needs its overlay named explicitly; without it

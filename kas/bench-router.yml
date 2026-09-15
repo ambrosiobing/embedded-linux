@@ -26,10 +26,46 @@ repos:
 
 local_conf_header:
   router: |
-    # NetworkManager needs polkit to let a non-root caller change a
-    # connection, and the packages pull in a good deal of glib. Both are
-    # distro features rather than image contents, so they are set here.
-    DISTRO_FEATURES:append = " polkit"
+    # Three things this project needs that the NetworkManager recipe does
+    # not build by default. Its PACKAGECONFIG ??= line is
+    #
+    #   readline nss ifupdown dnsmasq nmcli vala systemd
+    #   + bluez5 if bluetooth, + filter of DISTRO_FEATURES for wifi polkit ppp
+    #
+    # so none of the following is present unless it is asked for here.
+    #
+    #   wwan          builds networkmanager-wwan, which is
+    #                 libnm-device-plugin-wwan.so. Without it the daemon
+    #                 logs "'wwan' plugin not available; creating generic
+    #                 device", there is no gsm device type at all, and the
+    #                 lte profile can never bind to anything.
+    #   modemmanager  passes -Dmodem_manager=true. Without it the plugin
+    #                 above would have nothing to talk to.
+    #   concheck      passes -Dconcheck=true. Without it the connectivity
+    #                 check is compiled out, and this project's
+    #                 connectivity.conf is a file nothing reads. That is
+    #                 the whole of acceptance criterion 3, a dead upstream
+    #                 behind a live carrier, and it fails silently.
+    PACKAGECONFIG:append:pn-networkmanager = " wwan modemmanager concheck"
+
+    # NetworkManager's crypto backend. nss is its default and costs about
+    # 15 MB in the rootfs; gnutls does the same job for this image, which
+    # needs crypto only for WPA key handling on the access point.
+    PACKAGECONFIG:remove:pn-networkmanager = "nss"
+    PACKAGECONFIG:append:pn-networkmanager = " gnutls"
+
+    # polkit is deliberately absent, having once been here.
+    #
+    # It was added on the guess that NetworkManager required it. It does
+    # not: polkit governs what a non-root D-Bus caller may change, and
+    # every caller on this box is root. What it did do was reach
+    # NetworkManager and ModemManager through the DISTRO_FEATURES filter
+    # above and pull in polkit, SpiderMonkey and ICU's locale tables, which
+    # buildhistory measured at roughly 50 MB of a 237 MB rootfs.
+    #
+    # Adding it back is one line, and it is the right line the day a
+    # non-root user needs to change a connection. See the size table in
+    # projects/15-lte-router/README.md.
 
     # Turn on the router kernel fragment. See
     # meta-bench/recipes-kernel/linux/linux-raspberrypi_%.bbappend.

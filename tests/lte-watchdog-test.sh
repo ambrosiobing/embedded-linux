@@ -110,6 +110,7 @@ nm_connection = lte
 settle_s = 0
 settle_cold_s = 0
 pwrkey_gap_s = 0
+pwrkey_verified = 1
 CONF
 
 run() {
@@ -174,6 +175,37 @@ touch "$BENCH_TEST_DIR/no-modem"
 run 9
 check "cold start: a single press, not a pair" "$(calls 'lte-gpio pwrkey')" "1"
 rm -f "$BENCH_TEST_DIR/no-modem"
+
+# --------------------- level 3 is refused until it is armed by a human
+
+# The PWRKEY offset in lte.conf comes from a vendor demo and the default
+# jumper positions, both properties of a HAT revision rather than of the
+# part. A wrong offset drives an unknown header pin on a board that is by
+# then unattended, so the only rung that touches hardware stays off until
+# somebody has confirmed the wiring.
+#
+# The other half of that bargain is asserted here too: levels 1 and 2 must
+# keep working while it is unarmed, or the safety measure would cost more
+# than it saves.
+sed '/pwrkey_verified/d' "$WORK/lte.conf" >"$WORK/unarmed.conf"
+printf 'metrics_path = %s\n' "$WORK/unarmed.prom" >>"$WORK/unarmed.conf"
+
+touch "$BENCH_TEST_DIR/ping-fails"
+: >"$BENCH_TEST_DIR/calls"
+printf 'connected\n' >"$BENCH_TEST_DIR/state"
+"$PYTHON" "$SUT" --config "$WORK/unarmed.conf" --interval 0 \
+	--iterations 9 >"$WORK/log" 2>&1 || true
+
+check "unarmed: no power cycle attempted" "$(calls 'lte-gpio pwrkey')" "0"
+check "unarmed: level 1 still ran" "$(calls 'nmcli con up lte')" "1"
+check "unarmed: level 2 still ran" "$(calls 'mmcli -m any --reset')" "1"
+check "unarmed: the refusal is counted" \
+	"$(grep -c '^lte_pwrkey_refused_total 1$' "$WORK/unarmed.prom")" "1"
+check "unarmed: no level 3 recovery is claimed" \
+	"$(grep -c 'lte_recoveries_total{level="3"} 0' "$WORK/unarmed.prom")" "1"
+check "unarmed: it says why in the log" \
+	"$(grep -c 'level 3 refused' "$WORK/log")" "1"
+rm -f "$BENCH_TEST_DIR/ping-fails"
 
 # ------------------------------------------------- a success resets the level
 

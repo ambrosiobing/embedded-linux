@@ -1030,4 +1030,85 @@ interface, and the behaviour becomes testable.
 
 ---
 
+## 43. PACKAGECONFIG is part of the image specification, not a detail
+
+**Context.** Project 15's NetworkManager saw the modem's `wwan0` and
+refused to manage it, logging `'wwan' plugin not available`. The cause was
+in the recipe's `PACKAGECONFIG ??=` default, which omits `wwan`,
+`modemmanager` and `concheck`.
+
+**Decision.** Router-specific `PACKAGECONFIG` for `networkmanager` lives in
+`kas/bench-router.yml` alongside the other build policy, with a comment
+naming what each entry buys and what its absence costs.
+
+**Rejected.** Installing more packages and hoping, which is the habit a
+distribution teaches.
+
+**Why.** On a distribution you install a package and receive the features
+its maintainer chose. In Yocto you choose them. A configuration file proves
+nothing about whether the feature it configures exists in the binary, and
+the failure is silent in both directions: `connectivity.conf` is parsed
+without complaint by a NetworkManager built with `-Dconcheck=false`, and a
+`gsm` profile is valid without a device type to bind it to.
+
+**Consequence.** Every future project has to read the `PACKAGECONFIG` of
+anything it depends on for a specific feature, before believing that
+feature is present. That is a real cost and it is smaller than the
+alternative, which is finding out in the field.
+
+---
+
+## 44. A distro feature is added on evidence, not on a guess
+
+**Context.** `kas/bench-router.yml` carried
+`DISTRO_FEATURES:append = " polkit"` behind a comment stating that
+NetworkManager needed it. buildhistory later measured polkit, SpiderMonkey
+and ICU at roughly 50 MB of a 237 MB rootfs, and `depends.dot` traced every
+byte of it back to that one word.
+
+**Decision.** Removed, with the measurement and the condition for restoring
+it recorded in its place.
+
+**Rejected.** Leaving it, on the grounds that it might be needed one day.
+
+**Why.** polkit governs what a non-root D-Bus caller may change, and every
+caller on this box is root. The guess was never tested and was expressed as
+a fact in a comment, which is worse than leaving it unexplained: the next
+reader has no reason to question it.
+
+**Consequence.** The first time a non-root user needs to change a
+connection, one line comes back. The general rule is that a
+`DISTRO_FEATURES` entry costs whatever every recipe in the image does with
+it, which is unbounded until measured, so it needs a reason that has been
+checked rather than assumed.
+
+---
+
+## 45. Hardware the software cannot verify is armed by hand
+
+**Context.** `lte-watchdog`'s last-resort recovery pulses a GPIO whose
+header pin is a property of the HAT revision and its jumper block. The
+defaults come from a vendor demo. The recipe enabled the unit at boot,
+while the bring-up notes said to confirm the offsets against the schematic
+first. The recipe won.
+
+**Decision.** `pwrkey_verified` in `/etc/bench/lte.conf`, defaulting to
+`0`. The rung refuses, logs why, and counts the refusal in
+`lte_pwrkey_refused_total`.
+
+**Rejected.** Shipping the unit disabled, and trusting the notes.
+
+**Why.** Disabling the unit would disarm the two rungs that handle almost
+everything and need no hardware knowledge, and a router whose recovery runs
+only when somebody remembers to start it is not a router. Trusting the
+notes had already failed once, in this repository, in the same week.
+
+**Consequence.** A step for the operator, and a counter that makes the
+un-armed state visible instead of silent. A wrong GPIO offset does not fail
+safely: it drives whatever else is on that pin, on a board that is by then
+unattended. Software can verify almost everything about itself and nothing
+at all about which wire is where.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)

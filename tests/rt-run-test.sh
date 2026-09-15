@@ -34,7 +34,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 mkdir -p "$WORK/bin" "$WORK/results" "$WORK/scratch"
 CALLS=$WORK/calls
-export BENCH_TEST_DIR=$WORK
+export BENCH_TEST_DIR="$WORK"
 
 pass=0
 fail=0
@@ -187,8 +187,8 @@ RT_DURATION=5
 RT_SCRATCH=$WORK/scratch
 RT_RESULTS=$WORK/results
 CONF
-export RT_CONF=$WORK/rt.conf
-export RT_ROOT=$WORK
+export RT_CONF="$WORK/rt.conf"
+export RT_ROOT="$WORK"
 
 # A /sys as the kernel would present it: realtime either 1 or 0, an
 # isolated list that may be empty, and one cpufreq directory.
@@ -303,7 +303,7 @@ check "the governor was actually written" \
 	"$(cat "$WORK/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")" \
 	"performance"
 check "the capture file was removed after analysis" \
-	"$(ls "$WORK/scratch" | wc -l | tr -d ' ')" "0"
+	"$(find "$WORK/scratch" -mindepth 1 | wc -l | tr -d ' ')" "0"
 
 # --------------------------------------------------- the claims are checked
 

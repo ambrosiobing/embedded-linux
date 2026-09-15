@@ -4,12 +4,12 @@ From a flashed card to a gateway with two uplinks. Read
 [DESIGN.md](DESIGN.md) first: this file assumes you know which component
 owns what.
 
-Nothing below has been run on hardware yet. Every command here is written
-from the datasheet, the ModemManager and NetworkManager references and the
-Waveshare wiki, and the whole point of the journal is that the first run
-will contradict some of it. Where a step says "record this", it means write
-the answer into this file or into the two measurement documents, because
-the second person to do it will be you in a year.
+Steps 0 to 4 have been run on hardware, on 15 September 2026, and section
+1a records what that run contradicted. Steps 5 onwards have not: they need
+a bearer, and the bearer needs the rebuild described at the end of this
+file. Where a step says "record this", it means write the answer into this
+file or into the two measurement documents, because the second person to do
+it will be you in a year.
 
 ## 0. Before power
 
@@ -47,6 +47,20 @@ are all handled, and all three are tested in
 
 To change the access point name later, edit the file and run
 `bench-router-setup` again, then `nmcli con reload`.
+
+## 1a. What the first bring-up got wrong, so you do not
+
+Recorded from 15 September 2026. None of it is in the wiring table because
+none of it is about wiring.
+
+| Trap | What happens |
+|---|---|
+| Wiring 5 V, GND, TX and RX with jumpers instead of stacking | No USB, so no modem at all. The UART carries AT commands and nothing else. A single Dupont lead also drops too much voltage at the 2 A registration peak |
+| Connecting the HAT's **USB UART** socket rather than its **USB** socket | You get a serial bridge chip, `10c4:ea60` or `1a86:7523`, instead of `1e0e:9001` |
+| Connecting no USB cable at all | The module powers up, its PWR LED lights, and nothing appears on the bus. Power is not the data path |
+| Expecting `wifi.conf` to work | It does nothing here. This image has no wireless client; `wlan0` is an access point and the file it reads is `router.conf` |
+| Reading the USB device number as a fault | It counts every device on the bus and never reuses a number. Count enumerations over thirty seconds instead |
+| Forgetting the display board's power | The DSI ribbon carries video and touch, not power, and the HAT has taken the header pins. Use the adapter board's micro-USB, ideally from its own charger |
 
 ## 2. Enumerate
 
@@ -89,8 +103,19 @@ lsusb | grep 1e0e              # gone
 lte-gpio pwrkey 1200           # a short press: it should come back
 ```
 
-Only after both directions work should `lte-watchdog` be started again. Its
-level 3 recovery is exactly the pair of presses above.
+Only after both directions work should level 3 be armed. Its recovery is
+exactly the pair of presses above, and until you arm it the watchdog
+refuses that rung, says so in the journal and counts it in
+`lte_pwrkey_refused_total`:
+
+```sh
+sed -i 's/^pwrkey_verified = 0/pwrkey_verified = 1/' /etc/bench/lte.conf
+systemctl restart lte-watchdog
+```
+
+Levels 1 and 2 work from first boot regardless, and between them they
+handle almost everything. Only the rung that drives a header pin waits for
+a human who has seen the schematic.
 
 `lte-flight.service` holds FLIGHT inactive for as long as it runs. That is
 the feature, not a leak: releasing the line returns it to an input, and the
@@ -217,3 +242,31 @@ cable; that debt is still open and it is the reason this step is last.
 | A power cycle turns the modem on and off | PWRKEY toggles. The watchdog checks `mmcli -L` first for exactly this |
 | The radio is in flight mode after boot | FLIGHT floating on a pull-up. `lte-flight.service` holds it |
 | Clients connect, then large downloads stall | The MSS clamp. It is one line in the ruleset and one kernel option behind it |
+
+## 10. The rebuild this bring-up made necessary
+
+The first boot found three defects that only hardware could find. All three
+are fixed in the tree and none of them is on the card you are holding, so
+steps 5 onwards need a new image:
+
+```sh
+./go router
+./go kconfig -f router "$(find ~/bench/build/tmp/work -path '*linux-raspberrypi*' -name .config | head -1)"
+./go flash /dev/sdX
+```
+
+What changed and why it needs a rebuild rather than an edit on the board:
+
+| Change | Where | Why a rebuild |
+|---|---|---|
+| `wwan`, `modemmanager` and `concheck` added to NetworkManager's `PACKAGECONFIG` | `kas/bench-router.yml` | These are compile-time. `concheck` in particular is a feature that is either in the binary or is not, and a configuration file cannot add it |
+| `networkmanager-wwan` installed | `bench-router-image.bb` | The plugin is a package. There is no feed on the board |
+| `usbutils` installed | `bench-router-image.bb` | `lsusb` on a project whose subject is a USB device |
+| Three non-existent symbols removed | `router.cfg` | Cosmetic in effect, but it changes the recipe checksum, so the kernel recompiles anyway |
+| `polkit` removed from `DISTRO_FEATURES`, `nss` swapped for `gnutls` | `kas/bench-router.yml` | Should remove most of 64 MiB. This one invalidates broadly, so expect a longer build than the changes above alone would suggest |
+| `console=tty1` appended to `CMDLINE` | `kas/bench-rpi4.yml` | The panel has never had kernel messages. Until the rebuild, add it to `cmdline.txt` on the card by hand |
+
+Do not lose the card's `router.conf` when you reflash. Write it again, and
+this time you can leave `systemd.mask=lte-watchdog.service` off the kernel
+command line: the watchdog now refuses its hardware rung by itself until
+`pwrkey_verified` is set.

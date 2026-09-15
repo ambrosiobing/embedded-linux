@@ -25,17 +25,32 @@ to extend all three rather than only use them.
 
 ## State
 
-**The software is complete and the board work has not started.** CI is
-green: the static checks pass, both C programs compile with `-Werror`
-against libgpiod 2.1.3, both Python programs byte-compile, and five test
-suites run 65 assertions with none failing. The image itself has not been
-built, because that needs the Yocto host, and nothing here has been near a
-SIM card.
+**The image builds, the board boots, and the bearer does not come up yet.**
 
-The acceptance table below says which criteria are proven and which are
-plans. The [journal](JOURNAL.md) records the decisions taken so far, the
-four CI failures it took to get green, and the things deliberately left
-open until hardware contradicts them.
+CI is green, the image built in 178 minutes with every task succeeding, and
+on 15 September 2026 it ran on a Raspberry Pi 4 with a SIM7600E-H stacked
+on the header. The modem enumerates in the expected USB composition, the
+udev names land, ModemManager claims it, the access point serves the bench
+LAN, and a laptop reaches the board over ssh through it.
+
+Three defects were found that no amount of testing without hardware would
+have produced, and all three are fixed in the tree and waiting on a
+rebuild:
+
+1. Three kernel options in `router.cfg` that do not exist as Kconfig
+   symbols, caught by `./go kconfig` on the first build that compiled a
+   kernel rather than taking one from sstate.
+2. NetworkManager built without its `wwan` plugin, so `wwan0` is
+   `unmanaged` and the `lte` profile binds to nothing.
+3. NetworkManager built without `concheck`, so the connectivity check this
+   project's failover depends on was not in the binary at all. That one
+   failed silently and is the reason acceptance criterion 3 could never
+   have passed.
+
+The acceptance table says which criteria are proven and which are not. The
+[journal](JOURNAL.md) has all of it in order, including the four CI
+failures, the bring-up sequence, and the alarm about USB device number 29
+that turned out to be nothing.
 
 ## What this project adds to the repository
 
@@ -105,10 +120,40 @@ debugging a missing `brcmfmac` module.
 
 | Measurement | Value |
 |---|---|
-| Packages in `bench-router-image` | not yet built |
-| Rootfs size against `bench-image` | not yet built |
-| Build time, cold and warm | not yet built |
+| Packages in `bench-router-image` | 220, against 113 for `bench-image` |
+| Installed size | 237 MiB |
+| Of which Python | 39 MiB, 16 percent |
+| Of which ICU, SpiderMonkey and NSS | 64 MiB, 27 percent. See below |
+| Image size, compressed | 97 MB, against 51 MB for `bench-image` |
+| Build time, warm sstate | 178 min 30 s |
+| Tasks | 5822 attempted, 1152 actually ran, all succeeded |
+| sstate reuse | 831 wanted, 422 local, 409 missed, 50 percent match |
+| Kernel fragment reached the `.config` | Yes, after three lines were removed. See journal entry 17 |
 | Boot time to a connected bearer | not yet measured |
+
+**The 64 MiB was nobody's decision, and `depends.dot` says whose fault it
+was.** The chain is `polkit -> libmozjs-115 -> libicuuc74`, plus
+`networkmanager-daemon -> nss`. polkit reached the build because
+`kas/bench-router.yml` put `polkit` into `DISTRO_FEATURES` on a guess that
+NetworkManager needed it, behind a comment stating it as fact. It does not:
+polkit governs non-root D-Bus callers and every caller here is root. NSS is
+NetworkManager's default crypto backend, and `PACKAGECONFIG[gnutls]` is a
+smaller one. Both are changed in the tree; the next build should lose most
+of that 64 MiB.
+
+Python is the next 39 MiB, and it is `python3-modules` pulled whole: 57
+packages including `python3-tkinter`, `python3-idle` and `python3-venv` on
+a headless gateway, for two scripts that import five modules between them.
+Trimming it needs `oe-pkgdata-util` against a built image, which now
+exists.
+
+Two of those 5822 tasks are worth a line of their own. `libnftnl` and
+`intltool-native` both failed to fetch from their upstream homes,
+`git.netfilter.org` and `launchpad.net`, and completed from Yocto's
+mirrors. The build was never at risk, and it is the argument in
+[09. Lifecycle](../../walkthrough/09-lifecycle.md) for archiving `DL_DIR`
+turning up on the first build that needed those sources: they still existed
+because somebody else had kept a copy.
 
 ## Acceptance criteria
 
@@ -120,13 +165,27 @@ table: "configured" means a file says so, "measured" means a board did so.
 
 | # | Criterion | State |
 |---|---|---|
-| 1 | `ip route` shows two defaults, eth0 at metric 100 and wwan0 at 700 | Configured, not observed |
-| 2 | Pulling the cable loses at most 5 replies; the route returns within 90 s | Not measured. [failover-tests.md](docs/failover-tests.md) |
-| 3 | A dead upstream behind a live cable is detected within two connectivity intervals | Not measured |
-| 4 | `mmcli --location-get` reports a fix within 3 minutes, within 50 m | Not measured |
-| 5 | After `AT+CFUN=0` the watchdog restores a bearer within 4 minutes, and the counters show the levels | Escalation logic tested against stubs; not run against a modem |
-| 6 | `curl http://10.20.0.1:9101/lte.prom` returns valid Prometheus text | Format asserted in `tests/lte-exporter-test.sh`; endpoint not served yet |
-| 7 | No undervoltage during a 10 minute `iperf3` over LTE | Not measured |
+| 1 | `ip route` shows two defaults, eth0 at metric 100 and wwan0 at 700 | **Blocked.** No `wwan` plugin yet, and this bench has no Ethernet cable. See journal 22 and 23 |
+| 2 | Pulling the cable loses at most 5 replies; the route returns within 90 s | **Cannot be run here.** One uplink is not a failover. [failover-tests.md](docs/failover-tests.md) |
+| 3 | A dead upstream behind a live cable is detected within two connectivity intervals | **Was impossible and nobody knew.** NetworkManager was built with `-Dconcheck=false`, so the check was not in the binary. Fixed in the kas file, needs a rebuild |
+| 4 | `mmcli --location-get` reports a fix within 3 minutes, within 50 m | Not measured. The GNSS antenna is not attached |
+| 5 | After `AT+CFUN=0` the watchdog restores a bearer within 4 minutes, and the counters show the levels | Escalation logic tested against stubs. Level 3 now needs `pwrkey_verified` first, journal 21 |
+| 6 | `curl http://10.20.0.1:9101/lte.prom` returns valid Prometheus text | Format asserted in `tests/lte-exporter-test.sh`; endpoint not yet queried from a client |
+| 7 | No undervoltage during a 10 minute `iperf3` over LTE | Not measured, but registration produced no undervoltage and throttle flags `0` |
+
+Proven on the board on 15 September 2026, in the first boot:
+
+| Claim | Evidence |
+|---|---|
+| The kernel fragment reaches the hardware | `qmi_wwan` and `option` registered at 0.83 s and 0.94 s, before any module could load |
+| The module presents the 9001 composition | `1e0e:9001`, `ttyUSB0..4`, `cdc-wdm0`, `wwan0`, with no `AT+CUSBPIDSWITCH` |
+| The udev rules name the right ports | `/dev/lte-at -> ttyUSB2`, `/dev/lte-nmea -> ttyUSB1` |
+| The strict ModemManager filter does not block the modem | `mmcli -L` lists it |
+| The card carries the identity, the image the capability | The access point came up on the name and passphrase in `router.conf` |
+| The LAN works | A laptop associated, took a DHCP lease and reached `10.20.0.1` over ssh |
+| `lte-gpio` runs on target | `chip pinctrl-bcm2711, pwrkey offset 6, flight offset 4` |
+| The header carries the modem's 2 A peaks | No undervoltage through registration, throttle flags `0` |
+| Nothing fails at boot | `systemctl --failed` empty |
 
 Three further criteria, added here and not part of the original seven,
 because building the thing showed that a router without them is not a

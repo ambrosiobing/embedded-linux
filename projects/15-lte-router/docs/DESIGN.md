@@ -350,16 +350,26 @@ decision rather than an oversight. See
   USB_SERIAL_WWAN=y            NF_TABLES_INET=y             brcmfmac
   USB_NET_QMI_WWAN=y           NFT_CT=y NFT_NAT=y           (FullMAC,
   USB_USBNET=y                 NFT_MASQ=y                    AP mode in
-  USB_WDM=y                    NFT_CHAIN_NAT=y               firmware)
-                               NFT_RT=y NFT_EXTHDR=y
-  (CDCETHER, RNDIS_HOST=m:     NF_CONNTRACK=y
-   the compositions not used)
+  USB_WDM=y                    NF_CONNTRACK=y                firmware)
+  (CDCETHER, RNDIS_HOST=m:     NF_TABLES_IPV4=y
+   the compositions not used)  NF_TABLES_IPV6=y
 ```
 
-`NFT_RT` and `NFT_EXTHDR` are there for one line of the ruleset, the MSS
-clamp. Without them that line fails to load and takes the whole ruleset
-with it, and a box whose input policy is drop with no ruleset loaded is a
-box with no ruleset at all, which is the opposite of what was intended.
+**What is not in that list, and why.** An earlier version asked for
+`NFT_CHAIN_NAT`, `NFT_RT` and `NFT_EXTHDR` as well. None of the three is a
+Kconfig symbol: they were invented from the names of the kernel source
+files that implement the features. In 6.6, `net/netfilter/Makefile` builds
+`nft_rt.o` and `nft_exthdr.o` into `nf_tables` unconditionally, and
+`nft_chain_nat.o` comes with `CONFIG_NFT_NAT`. So the MSS clamp,
+`tcp option maxseg size set rt mtu`, works with the list above and never
+needed an option of its own.
+
+The lines were removed because `./go kconfig` reported all three as
+MISMATCH on the first build that compiled a kernel rather than taking one
+from sstate. That is the whole argument for the check in one example: a
+fragment line that names a symbol nobody defines is silently ignored, the
+build succeeds, and the belief that the option is on survives until the
+board disagrees.
 
 The reason for `=y` rather than `=m` is Project 1: `core-image-minimal`
 installs no kernel modules, so a driver built as a module is a driver

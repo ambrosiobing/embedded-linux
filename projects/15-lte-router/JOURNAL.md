@@ -116,7 +116,8 @@ syntax.
 the field:** the MSS clamp. Without it a client over LTE completes a TCP
 handshake and then stalls on the first large response, which is the single
 most confusing failure mode of any cellular gateway. It costs one line in
-the ruleset and two kernel options behind it.
+the ruleset and, as entry 17 records, no kernel options at all: the two
+this entry first claimed were needed turned out not to exist.
 
 ---
 
@@ -210,11 +211,9 @@ that might be loaded later. Building them in removes the class of failure
 entirely, at the cost of a larger kernel image, which on a mains-powered box
 with an SD card is not a cost worth counting.
 
-Two netfilter options are in the fragment for one line of the ruleset:
-`NFT_RT` and `NFT_EXTHDR`, which are what `tcp option maxseg size set rt mtu`
-is made of. Without them that line fails to load and takes the whole ruleset
-with it. A box whose input policy is drop, with no ruleset loaded, has no
-ruleset at all.
+This entry originally ended with a claim that two more options, `NFT_RT` and
+`NFT_EXTHDR`, were in the fragment to make the MSS clamp work. They were
+not options at all. See entry 17.
 
 ---
 
@@ -469,3 +468,308 @@ what the ownership table and the pin table in `docs/DESIGN.md` exist to
 avoid.
 
 The rule for all twenty projects is Decision 29.
+
+---
+
+## 17. Three kernel options that do not exist
+
+**What happened.** The first build that actually compiled a kernel, rather
+than taking one from sstate, made `./go kconfig` possible for the first time
+in this repository. It failed:
+
+```
+MISMATCH  CONFIG_NFT_CHAIN_NAT=y   (built: not set)
+MISMATCH  CONFIG_NFT_RT=y          (built: not set)
+MISMATCH  CONFIG_NFT_EXTHDR=y      (built: not set)
+```
+
+**What was done.** Checked `net/netfilter` in 6.6 rather than arguing with
+the kernel. `Kconfig` defines none of the three. `Makefile` line 91 puts
+`nft_rt.o` and `nft_exthdr.o` inside `nf_tables-objs`, so they are built
+into `nf_tables` whenever `NF_TABLES` is set; line 136 is
+`obj-$(CONFIG_NFT_NAT) += nft_chain_nat.o`. All three lines were deleted
+from `router.cfg` and replaced with that citation, and the two documents
+repeating the claim were corrected.
+
+**Why it happened.** The three names were derived from the source files
+that implement the features, which is how most netfilter options are named
+and is why the mistake was plausible enough to survive review, a CI run and
+a 178 minute build. `NFT_CT`, `NFT_NAT` and `NFT_MASQ` are real and follow
+exactly that pattern; `NFT_RT` and `NFT_EXTHDR` are not, because those two
+objects were folded into the core module years ago.
+
+**What it cost, and what it did not.** Nothing. The kernel that was built
+is correct: `NF_TABLES=y` and `NFT_NAT=y` bring in all three features, so
+the MSS clamp and the nat chain work on the image sitting on disk. Only the
+fragment was wrong, and only in claiming credit for something it was not
+doing.
+
+**Why this is the entry worth reading in this file.** Project 1 wrote
+`check-kernel-config.sh` for a failure mode nobody had yet experienced: a
+fragment silently ignored, a build that succeeds, and a driver that fails on
+the board a week later. It then never fired, because every subsequent build
+was a complete sstate hit and there was no `.config` to read. Fourteen
+projects' worth of fragments later, the first time it could run, it found
+three. A check that has never failed is not a check that is working.
+
+**And one more thing it exposed.** The check could not run at all at first:
+its search carried `-newer $fragment`, and `git pull` had just rewritten
+`bench.cfg`, so every existing `.config` looked stale and the script
+reported "no built kernel .config found". Git sets mtime to checkout time,
+not commit time. The guard was also pointless: a `.config` older than a
+fragment line is a `.config` missing that line, which the script already
+reports as a MISMATCH. It was turning an honest failure into a confusing
+absence, and it is gone.
+
+---
+
+## 18. First boot: what the hardware taught, in the order it taught it
+
+The board came up on 15 September 2026. Everything below is from that
+session, recorded because the interesting part of a bring-up is the
+sequence of wrong assumptions, not the working end state.
+
+**The card was written with two things on the FAT partition**, both
+editable from any machine: `router.conf` carrying the access point name,
+its passphrase and the APN, and an addition to `cmdline.txt`.
+
+**`systemd.mask=lte-watchdog.service` was added to `cmdline.txt` for the
+first boot.** The reason is entry 21. It cost nothing and it is the
+mechanism worth remembering: a unit can be masked from the boot partition,
+on a card, without mounting the root filesystem, which on a Windows machine
+is the difference between a two-minute edit and an afternoon.
+
+**The board was first wired with jumpers rather than stacked**, carrying
+5 V, GND, TX and RX. Three things were wrong with that and only one was
+obvious.
+
+The obvious one: PWRKEY and FLIGHT were not connected, so half this
+project's distinctive content was unavailable.
+
+The second: 5 V through a single Dupont lead. The module pulls close to 2 A
+when it powers its transmitter to attach, and a 24 to 28 AWG lead with a
+crimp at each end drops enough voltage at that current to reset the module
+mid-registration. The pin table in DESIGN.md lists 5 V on pins 2 **and** 4
+and GND on 6, 9 **and** 14 precisely because the header shares that current
+across several contacts. It had been written down and not understood.
+
+The third, and the one that actually blocked everything: with jumpers there
+was no USB. The UART carries AT commands and nothing else. `ttyUSB0..4`,
+`/dev/cdc-wdm0` and `wwan0` are all USB endpoints, and without them
+ModemManager has no modem, NetworkManager has no device and the entire
+stack has nothing to stand on. The UART is the recovery channel for a
+misconfigured USB composition, which is its only job.
+
+**Resolution:** stack it, and leave the PWRKEY and FLIGHT jumpers off the
+HAT's own block until the offsets are confirmed. Best of both: a proper
+power path and a data path, with the two unverified lines still
+disconnected. After stacking, `journalctl -k | grep -i voltage` stayed
+empty through registration, which is the header carrying 2 A peaks as the
+table said it would.
+
+---
+
+## 19. Two micro-USB sockets, and only one of them is the data path
+
+**What happened.** The HAT has two micro-USB connectors, labelled `USB` and
+`USB UART`. The first cable went into neither, then into the wrong one.
+
+**What it means.** `USB` is the module's own USB interface and is the data
+path: five `option` serial ports plus a `qmi_wwan` control channel and
+`wwan0`. `USB UART` is a USB-to-serial bridge chip on the HAT, for talking
+AT commands to the module from a PC without a Pi. Plugging the wrong one
+into the Pi gives a bridge chip, `10c4:ea60` or `1a86:7523`, rather than
+`1e0e:9001`, which is a quick way to tell which is which.
+
+**Also worth noting, for a different project.** That bridge chip is a
+working USB-to-serial adapter, and Project 1's serial console has been
+blocked since its PL2303HXA turned out to be a generation Windows refuses
+to drive. Whether it can serve as a Pi console adapter depends on whether
+the HAT's jumper block exposes the bridge's TX and RX as pins, which is one
+look at the silkscreen. Recorded here rather than chased.
+
+**The success, when the right socket was used:**
+
+```
+usb 1-1.1: New USB device found, idVendor=1e0e, idProduct=9001
+usb 1-1.1: Product: SimTech, Incorporated
+option 1-1.1:1.0 .. 1.4  ->  ttyUSB0 .. ttyUSB4
+qmi_wwan 1-1.1:1.5: cdc-wdm0: USB WDM device
+qmi_wwan 1-1.1:1.5 wwan0: register 'qmi_wwan'
+```
+
+That is the 9001 composition `docs/usb-modes.md` chose, arriving exactly as
+described, with no `AT+CUSBPIDSWITCH` needed. And the two drivers had
+registered at 0.83 s and 0.94 s, before any module could have loaded, which
+is entry 8's `=y` decision proven on hardware rather than against a
+`.config`.
+
+The udev rules worked first time: `/dev/lte-at -> ttyUSB2` and
+`/dev/lte-nmea -> ttyUSB1`.
+
+---
+
+## 20. A device number of 29, and the alarm that was not one
+
+**What happened.** The modem's `dmesg` line said `usb device number 29`,
+preceded by `device disconnected`. A module re-enumerating every few
+seconds never finishes registering, so this looked like the worst kind of
+fault: an intermittent power or cable problem.
+
+**What was done.** Counted rather than guessed:
+
+```
+n1=$(dmesg | grep -c 'idVendor=1e0e'); sleep 30
+n2=$(dmesg | grep -c 'idVendor=1e0e')
+```
+
+`20 then 20`. No undervoltage lines, throttle flags `0`. Not cycling.
+
+**Why the number was misleading.** USB device numbers are allocated across
+the whole bus and never reused within a session, so hubs, a keyboard and
+every one of the operator's own plug-and-unplug cycles advance the counter.
+Twenty of those twenty-nine were a human finding the right socket.
+
+**The lesson worth keeping.** The diagnosis took one command and thirty
+seconds because there was a way to measure the thing directly. The
+temptation was to start moving the display onto its own supply, shortening
+the cable, and re-seating the HAT, any of which would have "fixed" it and
+taught nothing. Measure the rate, not the counter.
+
+---
+
+## 21. The watchdog would have fired at an unverified GPIO on first boot
+
+**What happened.** `bench-lte` ships `SYSTEMD_AUTO_ENABLE`, so
+`lte-watchdog` starts at boot. With the HAT attached and the modem not yet
+registered, it reaches level 3 in three to nine minutes and pulses GPIO6.
+Meanwhile `docs/BRINGUP.md` step 3 says to confirm PWRKEY and FLIGHT
+against the HAT schematic **before** trusting the watchdog. The recipe does
+not allow that: it arms the thing before anyone has looked.
+
+The default offsets come from a vendor demo and the default jumper
+positions. Both are properties of a HAT revision rather than of the part. A
+wrong offset does not fail safely; it drives whatever else is on that pin,
+on a board that by then is unattended.
+
+**What was done.** Two things. For this boot,
+`systemd.mask=lte-watchdog.service` on the kernel command line. For every
+boot after, a `pwrkey_verified` key in `/etc/bench/lte.conf`, defaulting to
+`0`. Level 3 now refuses, logs why, and counts the refusal in
+`lte_pwrkey_refused_total` so that a box stuck one rung below its last
+resort appears on a dashboard rather than looking healthy.
+
+**Why a config flag and not a disabled unit.** Splitting the package so the
+watchdog ships disabled would mean the other three units lose their
+automatic start too, and a router whose recovery only runs when somebody
+remembers to start it is not a router. The flag keeps rungs 1 and 2 working
+from first boot, which handle almost everything, and gates only the rung
+that touches hardware whose wiring the software cannot verify.
+
+**What it costs.** Somebody has to set a flag after checking a schematic.
+That is the correct failure mode: forgetting leaves a modem that recovers
+two ways out of three and says so in the journal and the metrics, rather
+than a board that quietly toggles an unknown pin.
+
+---
+
+## 22. A daemon that could see the modem and refused to touch it
+
+**What happened.** With the modem enumerated, ModemManager claiming it and
+the udev symlinks correct, NetworkManager reported:
+
+```
+wwan0:wwan:unmanaged:
+manager: (wwan0): 'wwan' plugin not available; creating generic device
+```
+
+The `lte` profile existed and was bound to nothing. The listing of
+`/usr/lib/NetworkManager/1.46.6/` contained one plugin,
+`libnm-device-plugin-wifi.so`.
+
+**What was done.** Read the recipe rather than guessed. In
+`networkmanager_1.46.6.bb`, the version on the board:
+
+```
+PACKAGECONFIG ??= "readline nss ifupdown dnsmasq nmcli vala systemd \
+    <bluez5 if bluetooth> <filter of DISTRO_FEATURES: wifi polkit ppp> ..."
+```
+
+Three things this project needs are absent from that default.
+
+| Missing | What it costs |
+|---|---|
+| `wwan` | No `networkmanager-wwan` package, so no `libnm-device-plugin-wwan.so`, so no `gsm` device type. This is the observed symptom |
+| `modemmanager` | `-Dmodem_manager=false`. Even with the plugin, no ModemManager integration |
+| `concheck` | `-Dconcheck=true` is not passed, so the connectivity check is compiled out |
+
+The fix is two lines: `PACKAGECONFIG:append:pn-networkmanager` in
+`kas/bench-router.yml`, and `networkmanager-wwan` in the image recipe. Both
+are needed. Building the package without installing it, or installing a
+package that was never built, each leave the same symptom.
+
+**The third one is the serious one.** `concheck` fails silently and in the
+worst possible direction. `connectivity.conf` is installed, NetworkManager
+parses it without complaint, `nmcli general` reports a connectivity state,
+and none of it does anything, because the feature is not in the binary.
+That is acceptance criterion 3 in its entirety: the case where the cable is
+plugged in, the carrier is up, and the home router has lost its own uplink.
+Nothing about it would have shown up on a bench with one uplink. It was
+found by reading the recipe while chasing a different bug.
+
+**The general lesson, which is now Decision 43.** A configuration file
+proves nothing about whether the feature it configures exists. In a
+distribution you install a package and get the features its maintainer
+chose; in Yocto you choose them, and `PACKAGECONFIG` is where that choice
+lives. Every recipe in an image has one, most people never look at one, and
+the default is somebody else's idea of a sensible desktop.
+
+**And the size question, answered from the same file.** The 64 MB of ICU,
+SpiderMonkey and NSS that `buildhistory` found is two entries in that same
+list. `nss` is in the default and is the crypto backend, with
+`PACKAGECONFIG[gnutls]` as the alternative. `polkit` arrives through the
+`DISTRO_FEATURES` filter, and it is in `DISTRO_FEATURES` because
+`kas/bench-router.yml` put it there, on a guess that NetworkManager needed
+it. It does not. polkit governs what a non-root D-Bus caller may change,
+and every caller on this box is root.
+
+So one speculative word in a kas file cost about 50 MB of a 237 MB rootfs,
+and it sat behind a comment confidently explaining why it was necessary.
+Both are now changed, with the measurement recorded next to them.
+
+---
+
+## 23. What the first boot proved, and what it did not
+
+Proven on hardware, none of which could be checked before:
+
+| Claim | Evidence |
+|---|---|
+| The kernel fragment reaches the hardware | `qmi_wwan` and `option` registered at 0.83 s and 0.94 s, before any module could load |
+| The 9001 USB composition is what the module presents | `1e0e:9001`, `ttyUSB0..4`, `cdc-wdm0`, `wwan0`, with no `AT+CUSBPIDSWITCH` |
+| The udev rules name the right ports | `/dev/lte-at -> ttyUSB2`, `/dev/lte-nmea -> ttyUSB1` |
+| The strict ModemManager filter does not block the modem | `mmcli -L` lists it |
+| `bench-router-setup` reads a card written on Windows | The access point came up on the name and passphrase in `router.conf` |
+| The access point, DHCP and addressing work | A laptop associated, got a lease and reached `10.20.0.1` over ssh |
+| `lte-gpio` runs on target | `chip pinctrl-bcm2711, pwrkey offset 6, flight offset 4` |
+| The header carries the modem's current | No undervoltage through registration, throttle flags `0` |
+| Nothing fails at boot | `systemctl --failed` empty |
+
+Not proven, and why:
+
+| Not proven | Blocked by |
+|---|---|
+| A connected bearer | The `wwan` plugin, entry 22. Needs a rebuild |
+| Failover between two uplinks | This bench has no Ethernet cable within reach. One uplink is not a failover |
+| The connectivity check | `concheck`, entry 22, and also needs a second uplink |
+| A GNSS fix | The GNSS antenna is not attached |
+| The metrics endpoint over HTTP | Not yet queried from a client |
+| Anything the watchdog does | Masked for this boot, entry 21 |
+
+The Ethernet one is worth stating plainly because it is not a defect and
+cannot be fixed by a rebuild: **the central claim of this project cannot be
+demonstrated on this bench as it stands.** Scenarios 1 and 2 in
+`docs/failover-tests.md` both require pulling a wired uplink. The options
+are a USB Ethernet adapter, or a USB Wi-Fi dongle as a client uplink while
+the onboard radio stays the access point. Either is a purchase, and the
+choice belongs in the failover document rather than in a rebuild.
