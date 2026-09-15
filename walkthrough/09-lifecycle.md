@@ -116,7 +116,10 @@ for this repository:
 | Boot | Unverified | Signed, if the SoC supports it |
 | Update | None | A/B with rollback, bundle signing |
 
-Deliverables that are not the image:
+Deliverables that are not the image. All four are produced by
+`./go release`, which is `kas/bench-release.yml`: the everyday build does not
+carry them, because each costs time and none belongs in a 90-second cycle.
+
 
 - **Licence manifest.** Yocto produces `license.manifest` listing every
   package and its licence. For anything containing GPL code you also need

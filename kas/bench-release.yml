@@ -1,0 +1,43 @@
+# The pre-production build: everything the development image does, plus the
+# artefacts you need before a board leaves the bench.
+#
+#   ./go release
+#
+# These are deliberately not in the everyday build. Each costs time, and
+# stage 4 of the lifecycle is where they belong, not stage 2. See
+# walkthrough/09-lifecycle.md.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+local_conf_header:
+  release: |
+    # Software bill of materials, in SPDX.
+    #
+    # The EU Cyber Resilience Act obliges manufacturers of products with
+    # digital elements to produce and maintain one, and to handle reported
+    # vulnerabilities. Reporting duties began in September 2026 and the
+    # remaining obligations follow in 2027, so for anything shipping into
+    # Europe this stopped being optional.
+    #
+    # It is also simply the right answer to "what is in this image", which
+    # the package manifest answers by name and this answers by name,
+    # version, licence and checksum.
+    INHERIT += "create-spdx"
+
+    # Known vulnerabilities in what actually shipped, checked against the
+    # NVD database. It is noisy, it needs network, and it is the difference
+    # between knowing and not knowing. The output belongs in the release
+    # record, not in a passing glance.
+    INHERIT += "cve-check"
+
+    # Corresponding source for everything carrying a copyleft licence.
+    # That is a legal obligation rather than a nicety, and it is far easier
+    # to produce at build time than to reconstruct from a tag two years on.
+    INHERIT += "archiver"
+    ARCHIVER_MODE[src] = "original"
+
+    # Buildhistory already records what each image contained; committing it
+    # means the release record is a diff against the previous release.
+    BUILDHISTORY_COMMIT = "1"

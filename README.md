@@ -96,6 +96,7 @@ file.
 | `./go build` | `kas/bench-rpi4.yml` | `bench-image` for `raspberrypi4-64` |
 | `./go rpi3` | `kas/bench-rpi3.yml` | The same image for `raspberrypi3-64` |
 | `./go dev` | `kas/bench-dev.yml` | `bench-image-dev`, with gdbserver and perf |
+| `./go release` | `kas/bench-release.yml` | The same image plus an SPDX bill of materials, a CVE report and the corresponding source archive |
 
 Later projects that need a different kernel or a different image add their
 own kas file next to these rather than changing the shared one. Project 8

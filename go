@@ -7,6 +7,7 @@
 #   ./go build        build bench-image for the Raspberry Pi 4
 #   ./go dev          build the debugging variant
 #   ./go rpi3         build the same layer for a Raspberry Pi 3
+#   ./go release      build with SBOM, CVE check and source archive
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
 #   ./go sdk-check    cross-compile sdk/hello-gpiod with the installed SDK
@@ -28,6 +29,7 @@ check)      exec sh ./scripts/host-check.sh ;;
 build)      exec sh ./scripts/build.sh bench-rpi4 ;;
 dev)        exec sh ./scripts/build.sh bench-dev ;;
 rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
+release)    exec sh ./scripts/build.sh bench-release ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
@@ -59,6 +61,6 @@ clean)
 	esac
 	;;
 *)
-	sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
 	;;
 esac

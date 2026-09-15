@@ -12,6 +12,18 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege. This workflow reads the repository and writes nothing, so
+# say so rather than inheriting whatever the repository default happens to
+# be. A compromised action in a job with a write token can push.
+permissions:
+  contents: read
+
+# A newer push makes an older run pointless. Cancel it rather than pay for
+# both and read two results.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     # Pinned, not "latest". The daemon needs libgpiod v2 headers, and
@@ -19,7 +31,10 @@ jobs:
     # run failed with forty lines of implicit-declaration errors.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit, not a tag. A tag is mutable: whoever controls
+      # the action can move v4 to different code, which is the standard
+      # supply-chain attack on CI. Same rule as pinning Yocto layers.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Install checkers
         run: |
@@ -105,7 +120,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, yocto]
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to a commit, not a tag. A tag is mutable: whoever controls
+      # the action can move v4 to different code, which is the standard
+      # supply-chain attack on CI. Same rule as pinning Yocto layers.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Build bench-image
         run: ./go build
       - name: Kernel fragment reached the .config

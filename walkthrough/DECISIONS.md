@@ -415,4 +415,49 @@ inherit.
 
 ---
 
+## 21. Supply-chain artefacts are a separate build, not the default
+
+**Context.** The EU Cyber Resilience Act obliges manufacturers of products
+with digital elements to produce and maintain an SBOM and to handle reported
+vulnerabilities. Reporting duties began in September 2026. Yocto can produce
+all of it: `create-spdx` for the bill of materials, `cve-check` against the
+NVD, `archiver` for corresponding source.
+
+**Decision.** A separate configuration, `kas/bench-release.yml`, reached
+through `./go release`. The everyday build does not carry them.
+
+**Rejected.** Enabling them in `bench-rpi4.yml` so every build produces
+them, which is the tidier-looking option.
+
+**Why.** Each costs build time, `cve-check` needs network and a database,
+and the everyday cycle is 90 seconds precisely because nothing unnecessary
+runs. The lifecycle document puts these at stage 4, pre-production, not
+stage 2. Making the configuration match that division means the document
+describes something runnable rather than something aspirational.
+
+**Consequence.** Somebody has to remember to run `./go release` before a
+release. That is the correct failure mode: forgetting produces no SBOM,
+which is visible, rather than a development build silently carrying release
+machinery.
+
+---
+
+## 22. CI actions are pinned to commits, and the token is read-only
+
+**Context.** The workflow used `actions/checkout@v4` and inherited whatever
+token permissions the repository default gave it.
+
+**Decision.** Pin to the commit behind the tag, with the version in a
+comment, and declare `permissions: contents: read`. Add a `concurrency`
+group so a newer push cancels an older run.
+
+**Rejected.** Trusting the tag, which is what most workflows do.
+
+**Why.** A git tag is mutable. Whoever controls an action can move `v4` to
+different code, and a job holding a write token can then push. It is the
+same rule this repository already applies to Yocto layers and to libgpiod in
+CI: name the exact commit, not a label that can be repointed.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)
