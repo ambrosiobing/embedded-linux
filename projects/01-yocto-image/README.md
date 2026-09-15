@@ -149,7 +149,7 @@ that was actually built, including lines that ask for an option to stay off.
 | The daemon runs and owns its GPIO lines | `systemctl status bench-status`, `gpioinfo` | met, lines 17/22/27 held |
 | The state machine reports correctly | `bench-state show` | met, `ok` |
 | A stopped unit is reported as failed | `systemctl stop sshd.socket`, then `bench-state show` | met, `ok` then `failed` on the board |
-| Every package in the image can be justified | `./go packages` against the table above | met, all 112 ([evidence](docs/evidence/packages.txt)) |
+| Every package in the image can be justified | `./go packages` against the table above | met, all 112 |
 | The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options; 15 after adding IKCONFIG |
 | A second clean build gives the same package list | `./go reproduce` | met, 95 and 95, identical ([evidence](docs/evidence/reproduce.txt)) |
 | The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | met, aarch64, libgpiod 2.1.3 on the Pi ([evidence](docs/evidence/sdk-check.txt)) |
