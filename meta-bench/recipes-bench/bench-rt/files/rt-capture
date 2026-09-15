@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Record CH0 of an MCC 118 into a .npy file.
+
+    rt-capture --seconds 60 --out /dev/shm/run.npy
+
+This is the external instrument. It runs at ordinary priority on the
+housekeeping cores, because a capture process competing with the task it is
+measuring would be measuring itself; rt-run starts it under taskset and
+this program does not try to enforce that itself.
+
+Three properties of the scan matter enough to be spelled out:
+
+Continuous mode with chunked reads. The library keeps a ring buffer and
+fills it from an interrupt; the reader has to drain it faster than the
+converter fills it. Reading in 10000-sample chunks means about ten reads a
+second at 100 kS/s, which is slack enough that an ordinary scheduling delay
+on a loaded housekeeping core cannot overrun the buffer.
+
+Overruns discard the run, not the chunk. The library reports
+hardware_overrun and buffer_overrun per read. A run with a gap in it still
+produces a plausible histogram, because a missing edge looks exactly like
+one long period and lands in the tail that this project exists to measure.
+Silently keeping such a run would be the single easiest way to publish a
+wrong number, so the run is thrown away and said so.
+
+float32 on the way out. The library allocates float64 internally, so a 60 s
+scan is 48 MB in memory; on disk it is 24 MB as float32. The converter is
+12 bits over a 20 V span, which is 5 mV per code, and float32 resolves that
+with about five significant digits to spare.
+
+SPDX-License-Identifier: MIT
+"""
+
+import argparse
+import sys
+import time
+
+import numpy as np
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(
+        description="continuous MCC 118 scan of one channel to a .npy file")
+    parser.add_argument("--seconds", type=float, default=60.0)
+    parser.add_argument("--rate", type=float, default=100000.0)
+    parser.add_argument("--channel", type=int, default=0)
+    parser.add_argument("--address", type=int, default=0,
+                        help="HAT address set by the A0..A2 links")
+    parser.add_argument("--chunk", type=int, default=10000,
+                        help="samples per read (default 10000)")
+    parser.add_argument("--out", default="capture.npy")
+    return parser.parse_args(argv)
+
+
+def main(argv):
+    args = parse_args(argv)
+
+    # Imported here rather than at the top so that --help works, and fails
+    # readably, on a machine with no HAT and no vendor library.
+    try:
+        from daqhats import mcc118, OptionFlags
+    except ImportError as error:
+        print("rt-capture: the daqhats library is not installed: %s" % error,
+              file=sys.stderr)
+        print("It is in bench-rt-image as libdaqhats and python3-daqhats.",
+              file=sys.stderr)
+        return 1
+
+    board = mcc118(args.address)
+
+    # samples_per_channel sizes the ring buffer, not the run. One second of
+    # data is a compromise: large enough that a stalled reader has a second
+    # to recover, small enough that an overrun is detected while the run is
+    # still short enough to repeat.
+    board.a_in_scan_start(channel_mask=1 << args.channel,
+                          samples_per_channel=int(args.rate),
+                          sample_rate_per_channel=args.rate,
+                          options=OptionFlags.CONTINUOUS)
+
+    chunks = []
+    total = 0
+    overran = False
+    deadline = time.monotonic() + args.seconds
+    try:
+        while time.monotonic() < deadline:
+            result = board.a_in_scan_read_numpy(
+                samples_per_channel=args.chunk, timeout=5.0)
+            if result.hardware_overrun or result.buffer_overrun:
+                print("rt-capture: overrun after %d samples, discarding the "
+                      "run" % total, file=sys.stderr)
+                overran = True
+                break
+            if result.data.size:
+                chunks.append(result.data.astype(np.float32))
+                total += result.data.size
+    finally:
+        board.a_in_scan_stop()
+        board.a_in_scan_cleanup()
+
+    if overran:
+        return 2
+    if not chunks:
+        print("rt-capture: no samples returned", file=sys.stderr)
+        return 1
+
+    np.save(args.out, np.concatenate(chunks))
+    print("%d samples at %.0f S/s -> %s" % (total, args.rate, args.out))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

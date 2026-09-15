@@ -1,0 +1,400 @@
+#!/bin/sh
+#
+# rt-run - one configuration, one row of the results table.
+#
+#   rt-run [-i] [-a] [-g GOVERNOR] [-L] [-d SECONDS] [-n] [LABEL]
+#
+#     -i  claim CPU isolation      verified against the kernel, not assumed
+#     -a  apply IRQ affinity       move every movable interrupt away first
+#     -g  set the cpufreq governor performance, ondemand, schedutil, ...
+#     -L  run stress-ng            on the housekeeping cores only
+#     -d  seconds per run          default from rt.conf
+#     -n  dry run                  print the plan, touch nothing
+#
+# The order below is the measurement method, and every step in it exists
+# because getting it wrong produces a number that looks fine:
+#
+#   1. apply the configuration
+#   2. verify the kernel agrees with what this run is about to claim
+#   3. check the board is not already throttling
+#   4. start the load, then arm the DAQ scan, then start the toggler
+#   5. run cyclictest afterwards, never at the same time
+#   6. check the throttle status again
+#   7. analyse, and append one row naming every setting
+#
+# Step 2 is the one that is usually skipped. "isolcpus=3" in a text file is
+# not isolation; the kernel having accepted it is. A row labelled isolated
+# that was not is worse than a missing row, because it makes the whole
+# table untrustworthy and nothing in the output says so.
+#
+# Step 5 is the other one. Two SCHED_FIFO tasks at the same priority on the
+# same core take turns, and both histograms then describe the sharing
+# rather than the kernel.
+#
+# Everything the board provides is reached either as a command on PATH or
+# as a path under $RT_ROOT, which is empty on the board and a temporary
+# directory in tests/rt-run-test.sh.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+CONF=${RT_CONF:-/etc/bench/rt.conf}
+RT_ROOT=${RT_ROOT:-}
+
+if [ -r "$CONF" ]; then
+	. "$CONF"
+fi
+
+RT_CPU=${RT_CPU:-3}
+RT_HOUSEKEEPING=${RT_HOUSEKEEPING:-0-2}
+RT_PRIORITY=${RT_PRIORITY:-80}
+RT_TOGGLE_US=${RT_TOGGLE_US:-1000}
+RT_DURATION=${RT_DURATION:-60}
+RT_GPIO_CHIP=${RT_GPIO_CHIP:-/dev/gpiochip0}
+RT_GPIO_LINE=${RT_GPIO_LINE:-20}
+RT_DAQ_CHANNEL=${RT_DAQ_CHANNEL:-0}
+RT_DAQ_RATE=${RT_DAQ_RATE:-100000}
+RT_THRESHOLD=${RT_THRESHOLD:-1.65}
+RT_SCRATCH=${RT_SCRATCH:-/dev/shm}
+RT_RESULTS=${RT_RESULTS:-/var/lib/bench/rt}
+
+SYS=$RT_ROOT/sys
+CSV=$RT_RESULTS/results.csv
+
+isolated=no
+affinity=no
+governor=
+load=no
+duration=$RT_DURATION
+dry=no
+
+die() {
+	echo "rt-run: $*" >&2
+	exit 1
+}
+
+note() {
+	echo "--- $*"
+}
+
+usage() {
+	sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
+	exit 2
+}
+
+# Is CPU $1 inside a kernel CPU list such as "3", "2-3" or "0-1,3"? The
+# kernel writes ranges, so a plain comma match would read "2-3" as not
+# containing 3 and refuse a correctly isolated board.
+in_list() {
+	cpu=$1
+	list=$2
+	[ -n "$list" ] || return 1
+	IFS=,
+	for part in $list; do
+		case $part in
+		*-*)
+			lo=${part%-*}
+			hi=${part#*-}
+			if [ "$cpu" -ge "$lo" ] && [ "$cpu" -le "$hi" ]; then
+				unset IFS
+				return 0
+			fi
+			;;
+		"$cpu")
+			unset IFS
+			return 0
+			;;
+		esac
+	done
+	unset IFS
+	return 1
+}
+
+while getopts "iag:Ld:nh" opt; do
+	case $opt in
+	i) isolated=yes ;;
+	a) affinity=yes ;;
+	g) governor=$OPTARG ;;
+	L) load=yes ;;
+	d) duration=$OPTARG ;;
+	n) dry=yes ;;
+	*) usage ;;
+	esac
+done
+shift $((OPTIND - 1))
+
+# ------------------------------------------------------------- the kernel
+
+kernel_release=$(uname -r)
+kernel_version=$(uname -v)
+
+realtime=no
+if [ -r "$SYS/kernel/realtime" ]; then
+	# The file exists only on a PREEMPT_RT kernel and contains 1. Both
+	# facts are checked: a future kernel that creates it and writes 0
+	# should read as not real-time rather than as real-time.
+	if [ "$(cat "$SYS/kernel/realtime")" = "1" ]; then
+		realtime=yes
+	fi
+fi
+
+kernel_isolated=
+if [ -r "$SYS/devices/system/cpu/isolated" ]; then
+	kernel_isolated=$(cat "$SYS/devices/system/cpu/isolated")
+fi
+
+# The claim on the command line has to match the kernel, in both
+# directions. Isolation cannot be turned on or off at run time; it is a
+# boot parameter, so a mismatch means this run was started against the
+# wrong boot and the label would lie.
+if [ "$isolated" = yes ]; then
+	if ! in_list "$RT_CPU" "$kernel_isolated"; then
+		die "-i given, but the kernel isolated '${kernel_isolated:-nothing}',
+       and this run is about to measure CPU $RT_CPU.
+       Add isolcpus=$RT_CPU nohz_full=$RT_CPU rcu_nocbs=$RT_CPU to
+       cmdline.txt and reboot. All three: isolcpus alone leaves the tick
+       and the RCU callbacks on the core, and the tail of the histogram
+       is exactly where they show up."
+	fi
+elif [ -n "$kernel_isolated" ]; then
+	die "CPU isolation is active ($kernel_isolated) but -i was not given.
+       Reboot without isolcpus to measure the unisolated case. A row
+       labelled otherwise would not be the configuration it claims, and
+       one wrong row makes the whole table unusable."
+fi
+
+# ------------------------------------------------------- the configuration
+
+# The label is the configuration, spelled out, because a results directory
+# full of run1.npy is a directory nobody can read six months later. Every
+# "A && B" here is written as an if: under set -e a false test at the end
+# of an and-list ends the script, which is a silent exit in the middle of
+# building a file name.
+label=${1:-}
+if [ -z "$label" ]; then
+	if [ "$realtime" = yes ]; then
+		label=rt
+	else
+		label=generic
+	fi
+	if [ "$isolated" = yes ]; then
+		label="${label}-iso"
+	fi
+	if [ "$affinity" = yes ]; then
+		label="${label}-aff"
+	fi
+	if [ -n "$governor" ]; then
+		label="${label}-${governor}"
+	fi
+	if [ "$load" = yes ]; then
+		label="${label}-load"
+	fi
+fi
+
+capture=$RT_SCRATCH/$label.npy
+toggle_out=$RT_RESULTS/$label-toggle.txt
+cyclic_out=$RT_RESULTS/$label-cyclictest.txt
+
+note "label      $label"
+note "kernel     $kernel_release (realtime=$realtime)"
+note "cpu        $RT_CPU, housekeeping $RT_HOUSEKEEPING"
+note "isolated   $isolated   affinity $affinity   load $load"
+note "governor   ${governor:-unchanged}"
+note "duration   ${duration}s at ${RT_TOGGLE_US}us"
+
+if [ "$dry" = yes ]; then
+	note "dry run, nothing started"
+	exit 0
+fi
+
+mkdir -p "$RT_RESULTS"
+
+set_governor() {
+	want=$1
+	found=no
+	for f in "$SYS"/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+		[ -w "$f" ] || continue
+		echo "$want" >"$f"
+		found=yes
+	done
+	if [ "$found" = no ]; then
+		die "no writable scaling_governor under $SYS.
+       On a board with force_turbo=1 the clock is fixed in firmware and
+       cpufreq has nothing to offer; drop -g for those rows and record
+       the governor column as 'fixed'."
+	fi
+}
+
+governor_now() {
+	for f in "$SYS"/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+		[ -r "$f" ] || continue
+		cat "$f"
+		return
+	done
+	echo fixed
+}
+
+if [ -n "$governor" ]; then
+	set_governor "$governor"
+fi
+governor_actual=$(governor_now)
+
+if [ "$affinity" = yes ]; then
+	rt-irq-affinity set "$RT_HOUSEKEEPING"
+	rt-irq-affinity check "$RT_HOUSEKEEPING" ||
+		die "IRQ affinity did not take; see the lines above."
+fi
+
+throttled() {
+	if command -v vcgencmd >/dev/null 2>&1; then
+		vcgencmd get_throttled | sed 's/^throttled=//'
+	else
+		echo "unknown"
+	fi
+}
+
+throttled_before=$(throttled)
+case $throttled_before in
+0x0 | unknown) ;;
+*)
+	die "the board reports throttled=$throttled_before before the run.
+       Let it cool, or add a heatsink. A clock that changes mid-run
+       changes the numbers and nothing in the histogram says so."
+	;;
+esac
+
+# ------------------------------------------------------------------- run
+
+stress_pid=
+capture_pid=
+
+cleanup() {
+	if [ -n "$stress_pid" ]; then
+		kill "$stress_pid" 2>/dev/null || true
+	fi
+	if [ -n "$capture_pid" ]; then
+		kill "$capture_pid" 2>/dev/null || true
+	fi
+}
+trap cleanup EXIT INT TERM
+
+if [ "$load" = yes ]; then
+	# taskset is not decoration. stress-ng left to the scheduler lands
+	# on the isolated core too, and the run then measures the load
+	# rather than the kernel. The load outlives the toggler by ten
+	# seconds so that it is present for the last edge as well as the
+	# first.
+	taskset -c "$RT_HOUSEKEEPING" stress-ng --cpu 3 --vm 2 \
+		--vm-bytes 128M --hdd 1 --timeout "$((duration + 10))" \
+		>/dev/null 2>&1 &
+	stress_pid=$!
+	note "stress-ng on CPUs $RT_HOUSEKEEPING, pid $stress_pid"
+fi
+
+# Armed before the toggler starts, so that the first edges are in the
+# capture rather than in the gap before it. The scan is continuous and the
+# analysis works from edge to edge, so a second of leading idle costs
+# nothing and a missing first second costs a run.
+taskset -c "$RT_HOUSEKEEPING" rt-capture \
+	--seconds "$((duration + 3))" \
+	--rate "$RT_DAQ_RATE" \
+	--channel "$RT_DAQ_CHANNEL" \
+	--out "$capture" &
+capture_pid=$!
+note "rt-capture armed, pid $capture_pid"
+sleep 2
+
+rt-toggle -d "$duration" -c "$RT_CPU" -p "$RT_PRIORITY" \
+	-t "$RT_TOGGLE_US" -l "$RT_GPIO_LINE" -C "$RT_GPIO_CHIP" \
+	-o "$toggle_out"
+note "rt-toggle finished"
+
+wait "$capture_pid" || die "rt-capture failed or overran; the run is void."
+capture_pid=
+
+# cyclictest afterwards, on the same core, with the same period and the
+# same duration. Same load, too, which is why stress-ng was given
+# duration + 10 seconds rather than duration.
+if command -v cyclictest >/dev/null 2>&1; then
+	cyclictest -m -p "$RT_PRIORITY" -i "$RT_TOGGLE_US" -a "$RT_CPU" \
+		-t 1 -h 400 -q -D "$duration" >"$cyclic_out" || true
+	note "cyclictest finished"
+else
+	: >"$cyclic_out"
+	note "cyclictest absent, the internal reference column will be empty"
+fi
+
+if [ -n "$stress_pid" ]; then
+	kill "$stress_pid" 2>/dev/null || true
+	stress_pid=
+fi
+
+throttled_after=$(throttled)
+
+# ------------------------------------------------------------- the row
+
+# From rt-toggle's own header lines, which are the internal instrument.
+int_min=$(awk '/^# min_us/ { print $3 }' "$toggle_out")
+int_mean=$(awk '/^# min_us/ { print $5 }' "$toggle_out")
+int_max=$(awk '/^# min_us/ { print $7 }' "$toggle_out")
+int_p999=$(awk '/^# p99_us/ { print $5 }' "$toggle_out")
+
+# cyclictest -q prints one summary line per thread.
+cyc_min=$(awk '/^T: 0/ { for (i = 1; i < NF; i++)
+	if ($i == "Min:") print $(i + 1) }' "$cyclic_out")
+cyc_avg=$(awk '/^T: 0/ { for (i = 1; i < NF; i++)
+	if ($i == "Avg:") print $(i + 1) }' "$cyclic_out")
+cyc_max=$(awk '/^T: 0/ { for (i = 1; i < NF; i++)
+	if ($i == "Max:") print $(i + 1) }' "$cyclic_out")
+
+# And from the external instrument. rt-analyze prints key=value pairs, so
+# eval on a filtered list is safe and the alternative is a JSON parser in
+# shell.
+ext=$(rt-analyze --rate "$RT_DAQ_RATE" --threshold "$RT_THRESHOLD" \
+	--toggle-us "$RT_TOGGLE_US" \
+	--hist "$RT_RESULTS/$label-external-hist.txt" "$capture")
+note "external: $ext"
+
+field() {
+	printf '%s\n' "$ext" | tr ' ' '\n' |
+		sed -n "s/^$1=//p" | head -1
+}
+
+if [ ! -f "$CSV" ]; then
+	echo "timestamp,label,kernel,kernel_version,realtime,isolated,affinity,governor,load,duration_s,toggle_us,ext_edges,ext_mean_us,ext_sd_us,ext_p999_us,ext_max_us,ext_ppm,ext_subsample,int_min_us,int_mean_us,int_max_us,int_p999_us,cyc_min_us,cyc_avg_us,cyc_max_us,throttled_before,throttled_after" >"$CSV"
+fi
+
+# uname -v is in the row because the acceptance criterion asks for it: the
+# preemption model is in that string, so a reader can tell an RT row from a
+# generic one without believing the realtime column. Commas become spaces
+# so that one kernel build string cannot shift every later column.
+kernel_version=$(printf '%s' "$kernel_version" | tr ',' ' ')
+
+printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+	"$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$label" "$kernel_release" \
+	"$kernel_version" \
+	"$realtime" "$isolated" "$affinity" "$governor_actual" "$load" \
+	"$duration" "$RT_TOGGLE_US" \
+	"$(field edges)" "$(field mean_us)" "$(field sd_us)" \
+	"$(field p999_us)" "$(field max_abs_us)" \
+	"$(field clock_offset_ppm)" "$(field subsample_fraction)" \
+	"${int_min:-}" "${int_mean:-}" "${int_max:-}" "${int_p999:-}" \
+	"${cyc_min:-}" "${cyc_avg:-}" "${cyc_max:-}" \
+	"$throttled_before" "$throttled_after" >>"$CSV"
+
+# The capture is 24 MB and lives in tmpfs. Keeping it costs memory that the
+# next run needs; the histogram next to it is the thing worth keeping, and
+# a run that has to be re-examined is cheaper to repeat than to store.
+rm -f "$capture"
+
+note "row appended to $CSV"
+tail -1 "$CSV"
+
+case $throttled_after in
+0x0 | unknown) ;;
+*)
+	echo "rt-run: WARNING throttled=$throttled_after after the run." >&2
+	echo "The row is recorded and should be repeated after cooling." >&2
+	;;
+esac

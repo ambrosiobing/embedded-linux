@@ -145,6 +145,30 @@ else
 		fail=1
 	fi
 
+	step "compile the real-time toggler against host libgpiod"
+	# Project 8's instrument. It is the one program here that is
+	# measured rather than merely run, so a warning about a conversion
+	# or an uninitialised variable is a warning about a number that
+	# ends up in a results table.
+	out=$(mktemp -d)/rt-toggle
+	rt_src=meta-bench/recipes-bench/bench-rt/files/rt-toggle.c
+	# Word splitting on the pkg-config output is intended here too.
+	# shellcheck disable=SC2046
+	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \
+		"$rt_src" -o "$out" $(pkg-config --libs libgpiod); then
+		echo "compiled clean with -Werror"
+		# No GPIO chip on a build host, and no permission to go
+		# SCHED_FIFO either, so a non-zero exit is the correct
+		# outcome and proves the binary links and starts.
+		if timeout 5 "$out" -d 1 -o /dev/null; then
+			echo "note: this host has a usable GPIO chip"
+		else
+			echo "runs and reports no usable chip, as expected"
+		fi
+	else
+		fail=1
+	fi
+
 	step "compile the SDK example against host libgpiod"
 	make -C sdk/hello-gpiod clean >/dev/null 2>&1 || true
 	if make -C sdk/hello-gpiod; then

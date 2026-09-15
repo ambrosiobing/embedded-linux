@@ -19,3 +19,18 @@ SRC_URI += "file://bench.cfg"
 # router.cfg' that does not exist.
 BENCH_ROUTER_KERNEL ?= "0"
 SRC_URI += '${@"file://router.cfg" if d.getVar("BENCH_ROUTER_KERNEL") == "1" else ""}'
+
+# The real-time fragment is opt in for the same reason and with the same
+# mechanism. It is a larger change than the router one: PREEMPT_RT replaces
+# the locking primitives of the whole kernel, so every other image in this
+# repository would stop being comparable to stock the moment it was on by
+# default. Project 8 needs exactly one variable to differ between its two
+# rows, and this is that variable.
+#
+# Turning it on is not sufficient by itself. PREEMPT_RT depends on
+# ARCH_SUPPORTS_RT, which arm64 gained in 6.12, and the BSP default on
+# scarthgap is 6.6. kas/bench-rt.yml therefore sets both this switch and
+# PREFERRED_VERSION_linux-raspberrypi; setting only this one produces a
+# kernel that builds, boots, and is not preemptible.
+BENCH_RT_KERNEL ?= "0"
+SRC_URI += '${@"file://rt.cfg" if d.getVar("BENCH_RT_KERNEL") == "1" else ""}'

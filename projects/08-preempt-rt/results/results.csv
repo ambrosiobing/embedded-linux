@@ -1,0 +1,1 @@
+timestamp,label,kernel,kernel_version,realtime,isolated,affinity,governor,load,duration_s,toggle_us,ext_edges,ext_mean_us,ext_sd_us,ext_p999_us,ext_max_us,ext_ppm,ext_subsample,int_min_us,int_mean_us,int_max_us,int_p999_us,cyc_min_us,cyc_avg_us,cyc_max_us,throttled_before,throttled_after

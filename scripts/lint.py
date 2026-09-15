@@ -66,9 +66,19 @@ def check_dashes() -> None:
                 fail(path, f"line {number}: em or en dash")
 
 
+# LIC_FILES_CHKSUM uses file:// too, and means something else by it: a path
+# inside the fetched source, not a file this layer ships. The recipes that
+# name a poky licence get away with it because their path starts with
+# ${COMMON_LICENSE_DIR} and is skipped as a variable, but a recipe fetching
+# its own tree writes file://LICENSE;md5=..., which this check would then
+# demand be added to files/. Removing the assignment before scanning is the
+# fix; matching on the variable name is what makes it exact.
+LIC_CHKSUM = re.compile(r'LIC_FILES_CHKSUM\s*=\s*"(?:[^"\\]|\\.)*"', re.S)
+
+
 def recipe_files(recipe: Path) -> tuple[set[str], str]:
     body = text(recipe)
-    wanted = set(re.findall(r'file://([^\s"]+)', body))
+    wanted = set(re.findall(r'file://([^\s"]+)', LIC_CHKSUM.sub("", body)))
     return wanted, body
 
 

@@ -70,6 +70,7 @@ binary behind, because a silently missing tool is worse than a failed install.
 | `python3-yaml` | `scripts/lint.py` parses the kas files to check they are still valid |
 | `pkg-config` | Resolves the compiler and linker flags for libgpiod. Without it the compile step in `./go check` cannot run at all, and nothing else in the host list pulls it in. Newer releases are migrating the name to `pkgconf`, so both are in the list and whichever one exists is installed |
 | `nftables` | Project 15 ships the router's whole packet path as one ruleset file. The invariants in it are asserted by a test that runs anywhere; `nft -c -f` additionally checks the syntax, and only this package provides it |
+| `python3-numpy` | Project 8's analysis is arithmetic on a captured waveform, and `tests/rt-analyze-test.sh` proves that arithmetic against a synthesised square wave with known edge times. That is the one part of the latency lab that can be checked without the instrument, so the dependency that makes it runnable belongs in the host list rather than being skipped with a note |
 | `pipx` | Installs kas into its own environment. Current Debian and Ubuntu mark the system Python externally managed, so a plain `pip install` is refused |
 
 ### kas

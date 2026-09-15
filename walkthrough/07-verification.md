@@ -31,7 +31,10 @@ catch the mistakes that are most annoying to diagnose from the top.
 | shellcheck | Unquoted expansions, missing `cd` guards, the usual traps |
 | State machine | Seven status cases, against a fake `systemctl` |
 | WiFi provisioning | Seven cases over credentials written on Windows: CRLF endings, a byte order mark, a missing final newline, missing fields, file permissions |
-| Host compile | The daemon built with `-Wall -Wextra -Werror` against real libgpiod v2 headers |
+| Host compile | Three C programs built with `-Wall -Wextra -Werror` against real libgpiod v2 headers |
+| Edge timing arithmetic | Project 8's period recovery against a synthesised square wave whose edge times are known before the program runs, in both the resolved and the unresolved edge regime |
+| Run protocol | The measurement order, core confinement, an isolation claim checked against the kernel in both directions, the throttle gate, and an overrun voiding a run |
+| Interrupt affinity | A movable interrupt that was not moved, told apart from a per-CPU timer that cannot be |
 
 **These have already earned their keep.** The static checks caught
 `leds.conf` missing from `SRC_URI` when it was added, and a systemd unit
@@ -97,6 +100,19 @@ to matter, and the next section is about that.
 **This generalises to every later project that touches the kernel.** When
 you ask a build system for something, check that you got it, rather than
 assuming the absence of an error means success.
+
+Project 8 is where that stopped being a precaution. `CONFIG_PREEMPT_RT`
+depends on `ARCH_SUPPORTS_RT`, which `arch/arm64` gained in 6.12, and the
+BSP default on this release is 6.6. A fragment asking for it on 6.6 names a
+symbol that has no prompt: kconfig drops it without a word, the build
+succeeds, and the board boots a kernel that is not preemptible. Nothing
+anywhere says so except the check, `/sys/kernel/realtime`, and a latency
+histogram that looks disappointing for reasons nobody would guess.
+
+That is also why `rt.cfg` names the other three members of the preemption
+choice as explicitly off. A fragment that only states what it wants gives
+the checker nothing to notice when the kernel quietly chose something
+else.
 
 ## What the kernel check taught us about checks
 

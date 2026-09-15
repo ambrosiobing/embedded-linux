@@ -45,7 +45,11 @@ jobs:
           # the daemon targets v2. It is built from a pinned tag below.
           # nftables is here for the ruleset check in tests/: the
           # semantic assertions run anywhere, the syntax check needs nft.
-          sudo apt-get install -y shellcheck python3-yaml pkg-config build-essential autoconf autoconf-archive automake libtool nftables
+          # python3-numpy: tests/rt-analyze-test.sh checks Project 8's
+          # edge-timing arithmetic against a synthesised waveform, which
+          # is the only part of that lab a runner can prove anything
+          # about. Skipping it would mean the test silently never ran.
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
@@ -103,6 +107,13 @@ jobs:
         # three-hour image build.
         run: |
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-lte/files/lte-gpio.c -o /tmp/lte-gpio $(pkg-config --libs libgpiod)
+
+      - name: Compile the real-time toggler
+        # Project 8's instrument. A number that reaches a results table
+        # should come from a program that compiles without a warning about
+        # a conversion or an uninitialised variable.
+        run: |
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-rt/files/rt-toggle.c -o /tmp/rt-toggle $(pkg-config --libs libgpiod)
 
       - name: Python programs compile
         # Found by shebang, so a new one cannot quietly escape the check.

@@ -97,7 +97,7 @@ rather than pointing at where the original lives.
 | 05 | An IIO driver for the ADXL345 written from scratch | Raspberry Pi 3 | Kernel driver model, regmap, threaded IRQ, IIO events | Planned |
 | 06 | Explorer 700: every peripheral in one device-tree overlay | Raspberry Pi 3 | Device tree composition, sysfs, hwmon, rtc, w1, input | Planned |
 | 07 | A 3.5 inch SPI display as a DRM panel with touch | Raspberry Pi 3B+ | DRM/KMS tiny drivers, input subsystem, fbcon | Planned |
-| 08 | PREEMPT_RT latency lab with the MCC 118 as instrument | Raspberry Pi 4 | Real-time kernel, cyclictest, IRQ affinity, jitter | Planned |
+| 08 | [PREEMPT_RT latency lab with the MCC 118 as instrument](projects/08-preempt-rt) | Raspberry Pi 4 | Real-time kernel, cyclictest, IRQ affinity, jitter | **Software complete**: RT kernel fragment, both instruments, the run protocol and three test suites; no board work yet |
 | 09 | Kernel debugging lab: kgdb, ftrace, perf, pstore | Raspberry Pi 3B+ | Debugging and tracing over the serial console | Planned |
 | 10 | IIO in depth with the X-NUCLEO-IKS4A1 | Raspberry Pi 3B+ | IIO buffers and triggers, libiio, iiod, AHRS | Planned |
 | 11 | VL53L8CX: porting and packaging a vendor userspace driver | Raspberry Pi 4 | i2c-dev and spidev, shared libraries, packaging | Planned |
@@ -124,10 +124,15 @@ file.
 | `./go dev` | `kas/bench-dev.yml` | `bench-image-dev`, with gdbserver and perf |
 | `./go router` | `kas/bench-router.yml` | `bench-router-image`, the gateway of Project 15: two uplinks, NAT, a cellular watchdog |
 | `./go release` | `kas/bench-release.yml` | The same image plus an SPDX bill of materials, a CVE report and the corresponding source archive |
+| `./go rt` | `kas/bench-rt.yml` | `bench-rt-image`, the latency lab of Project 8: a `PREEMPT_RT` kernel, cyclictest, stress-ng and an MCC 118 DAQ HAT |
 
 Later projects that need a different kernel or a different image add their
 own kas file next to these rather than changing the shared one. Project 8
-will do exactly that for `PREEMPT_RT`.
+does exactly that for `PREEMPT_RT`, and it needs two lines rather than one:
+the fragment switch, and a kernel new enough to have the symbol at all.
+`arch/arm64` gained `ARCH_SUPPORTS_RT` in 6.12 and the BSP still defaults
+to 6.6, so without the version pin the option is dropped without a word and
+the image boots a kernel that is not preemptible.
 
 The build host needs a case-sensitive file system and about 60 GB. The
 scripts check both and refuse to start otherwise, because finding out three
@@ -174,7 +179,10 @@ usually break can be:
 | Cellular watchdog | `sh tests/lte-watchdog-test.sh` | The escalation ladder against stubbed `mmcli`, `ping`, `nmcli` and `lte-gpio` |
 | Modem metrics | `sh tests/lte-exporter-test.sh` | Parsing and Prometheus text format, with no modem present |
 | Firewall invariants | `sh tests/bench-router-nftables-test.sh` | Input policy drop, both uplinks masqueraded, the MSS clamp, no port opened towards an uplink |
-| Host compile | `./go check` | Both C programs built with `-Werror` against the host libgpiod v2, the same API the target uses, and both Python programs byte-compiled |
+| Edge timing arithmetic | `sh tests/rt-analyze-test.sh` | Project 8's period recovery, against a synthesised square wave with known edge times, in both edge regimes |
+| Run protocol | `sh tests/rt-run-test.sh` | The measurement order, core confinement, the isolation claim in both directions, the throttle gate and every column of the results row |
+| Interrupt affinity | `sh tests/rt-irq-affinity-test.sh` | Movable interrupts against kernel-owned ones, against a fake `/proc/irq` |
+| Host compile | `./go check` | All three C programs built with `-Werror` against the host libgpiod v2, the same API the target uses, and every Python program byte-compiled |
 
 CI runs all of these on every push, on a pinned `ubuntu-24.04` runner
 with libgpiod v2 built from a named tag, because no Ubuntu LTS image

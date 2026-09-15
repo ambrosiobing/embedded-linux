@@ -85,7 +85,7 @@ numbers rather than opinions.
 |---|---|---|
 | Boot time | `systemd-analyze`, kernel timestamps, a scope on a GPIO | 3 |
 | Energy per boot | PPK2 integrating current over the boot | 3 |
-| Interrupt latency | `cyclictest` under load, with a known instrument | 8 |
+| Interrupt latency | `cyclictest` under load, and an independent instrument on the wire, because a kernel measuring itself is one witness | 8 |
 | Functional correctness | Automated tests over a serial console, on real boards | 4 |
 | Driver behaviour | ptest, IIO buffer integrity, event counts | 5, 10 |
 | Failover and recovery | Missed replies during a forced outage, counted from a client | 15 |
@@ -99,6 +99,15 @@ scale and does not catch regressions.
 **The lifecycle point:** a measurement is only useful if it can be repeated
 on demand. A boot time you measured once is an anecdote. A boot time your CI
 measures on every commit is a specification.
+
+**And the measurement needs its own uncertainty stated before the numbers
+exist.** Project 8 writes down what its instruments can resolve, and why,
+before any row is recorded, because an uncertainty published alongside an
+inconvenient result reads as an excuse and the same sentence published
+beforehand is a specification. That project also found one of its two
+instruments to be an order of magnitude coarser than the received recipe
+claims, which is exactly the kind of thing that stays invisible until
+somebody writes the limits down.
 
 ## 4. Pre-production
 

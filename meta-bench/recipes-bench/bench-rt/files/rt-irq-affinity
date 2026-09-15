@@ -1,0 +1,193 @@
+#!/bin/sh
+#
+# rt-irq-affinity - move every movable interrupt off the isolated core.
+#
+#   rt-irq-affinity show          what each interrupt is allowed to use
+#   rt-irq-affinity set [LIST]    confine them to LIST, default from rt.conf
+#   rt-irq-affinity check [LIST]  exit 1 if anything can still land on the
+#                                 isolated core, print what
+#
+# irqaffinity= on the kernel command line sets the default for interrupts
+# that appear at boot. This script exists because that default is not the
+# whole story: a driver that requests an interrupt later, or a device
+# hotplugged afterwards, is not covered by it, and neither are the ones
+# whose affinity a driver sets for itself.
+#
+# Some interrupts cannot be moved at all. Per-CPU timers, IPIs and anything
+# the driver pinned deliberately return EIO on a write to smp_affinity_list,
+# and that is correct behaviour rather than an error to report. What would
+# be wrong is not knowing which ones they are, so they are counted and named
+# instead of being silently swallowed.
+#
+# Everything is reached through $RT_ROOT, which is empty on a board and a
+# temporary directory under test. That is what makes this file testable
+# without a kernel; see tests/rt-irq-affinity-test.sh.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+CONF=${RT_CONF:-/etc/bench/rt.conf}
+RT_ROOT=${RT_ROOT:-}
+
+# An explicit if, not "[ -r x ] && . x". Under set -e the and-list form
+# exits the script when the file is absent, because the list as a whole
+# then returns non-zero. That failure mode is silent and immediate, and it
+# cost this repository a CI run once already.
+if [ -r "$CONF" ]; then
+	. "$CONF"
+fi
+
+IRQ_DIR=$RT_ROOT/proc/irq
+INTERRUPTS=$RT_ROOT/proc/interrupts
+
+usage() {
+	sed -n '3,9p' "$0" | sed 's/^# \{0,1\}//'
+	exit 2
+}
+
+# The name a human recognises: "mmc1" rather than "interrupt 54".
+irq_name() {
+	irq=$1
+	for f in "$IRQ_DIR/$irq"/*/; do
+		[ -d "$f" ] || continue
+		basename "$f"
+		return
+	done
+	if [ -r "$INTERRUPTS" ]; then
+		awk -v n="$irq:" '$1 == n { print $NF; exit }' "$INTERRUPTS"
+		return
+	fi
+	echo "-"
+}
+
+# Is CPU $1 inside the affinity list $2, written the kernel's way as a
+# comma-separated set of numbers and ranges such as "0-2,5"?
+in_list() {
+	cpu=$1
+	list=$2
+	IFS=,
+	for part in $list; do
+		case $part in
+		*-*)
+			lo=${part%-*}
+			hi=${part#*-}
+			if [ "$cpu" -ge "$lo" ] && [ "$cpu" -le "$hi" ]; then
+				unset IFS
+				return 0
+			fi
+			;;
+		"$cpu")
+			unset IFS
+			return 0
+			;;
+		esac
+	done
+	unset IFS
+	return 1
+}
+
+do_show() {
+	for dir in "$IRQ_DIR"/*; do
+		irq=$(basename "$dir")
+		case $irq in
+		'*' | default_smp_affinity) continue ;;
+		esac
+		[ -r "$dir/smp_affinity_list" ] || continue
+		printf '%-5s %-20s %s\n' "$irq" "$(irq_name "$irq")" \
+			"$(cat "$dir/smp_affinity_list")"
+	done
+}
+
+do_set() {
+	want=$1
+	moved=0
+	fixed=0
+	fixed_list=
+
+	for dir in "$IRQ_DIR"/*; do
+		irq=$(basename "$dir")
+		case $irq in
+		'*' | default_smp_affinity) continue ;;
+		esac
+		# Existence, not writability. On a real board every one of
+		# these files is mode 644 and the kernel rejects the write
+		# afterwards with EIO, so testing -w would report success
+		# for interrupts that never moved. The write itself is the
+		# only honest test, and its failure is the interesting half.
+		[ -f "$dir/smp_affinity_list" ] || continue
+
+		if echo "$want" >"$dir/smp_affinity_list" 2>/dev/null; then
+			moved=$((moved + 1))
+		else
+			# EIO here means the kernel owns this one. Record it
+			# rather than hiding it: an interrupt that cannot be
+			# moved is a line in the results table, not a bug.
+			fixed=$((fixed + 1))
+			fixed_list="$fixed_list $irq($(irq_name "$irq"))"
+		fi
+	done
+
+	echo "moved $moved interrupts to CPUs $want"
+	if [ "$fixed" -gt 0 ]; then
+		echo "could not move $fixed:$fixed_list"
+		echo "(per-CPU interrupts and IPIs are expected here)"
+	fi
+}
+
+# The interesting question is not "does this interrupt list the isolated
+# core", because every per-CPU interrupt does and always will. It is "is
+# there an interrupt that could have been moved and was not".
+#
+# The discriminator is the write itself. Writing an interrupt's current
+# affinity back to it changes nothing and still goes through the kernel's
+# permission check, so it succeeds exactly for the movable ones. An entry
+# that lists the isolated core and accepts a write is a real finding; one
+# that lists it and refuses is a per-CPU timer or an IPI, and is reported
+# as expected rather than as a failure.
+do_check() {
+	want=$1
+	cpu=${RT_CPU:-3}
+	bad=0
+	kernel_owned=0
+
+	for dir in "$IRQ_DIR"/*; do
+		irq=$(basename "$dir")
+		case $irq in
+		'*' | default_smp_affinity) continue ;;
+		esac
+		[ -r "$dir/smp_affinity_list" ] || continue
+
+		list=$(cat "$dir/smp_affinity_list")
+		in_list "$cpu" "$list" || continue
+
+		if echo "$list" >"$dir/smp_affinity_list" 2>/dev/null; then
+			echo "movable and not moved: irq $irq" \
+				"($(irq_name "$irq")) -> $list"
+			bad=$((bad + 1))
+		else
+			kernel_owned=$((kernel_owned + 1))
+		fi
+	done
+
+	if [ "$bad" -eq 0 ]; then
+		echo "no movable interrupt can reach CPU $cpu (wanted $want)"
+		[ "$kernel_owned" -eq 0 ] ||
+			echo "$kernel_owned kernel-owned interrupt(s) still" \
+				"list it, which is expected"
+		return 0
+	fi
+	echo "$bad movable interrupt(s) can still be delivered to CPU $cpu."
+	echo "Run 'rt-irq-affinity set' before calling this run isolated."
+	return 1
+}
+
+action=${1:-}
+list=${2:-${RT_HOUSEKEEPING:-0-2}}
+
+case $action in
+show) do_show ;;
+set) do_set "$list" ;;
+check) do_check "$list" ;;
+*) usage ;;
+esac

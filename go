@@ -9,6 +9,8 @@
 #   ./go rpi3         build the same layer for a Raspberry Pi 3
 #   ./go router       build bench-router-image, the LTE router of Project 15
 #   ./go release      build with SBOM, CVE check and source archive
+#   ./go rt           build bench-rt-image, the PREEMPT_RT lab of Project 8
+#   ./go rt-kernel    install that kernel beside the generic one on a card
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
 #   ./go sdk-check    cross-compile sdk/hello-gpiod with the installed SDK
@@ -32,6 +34,8 @@ dev)        exec sh ./scripts/build.sh bench-dev ;;
 rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
 router)     exec sh ./scripts/build.sh bench-router ;;
 release)    exec sh ./scripts/build.sh bench-release ;;
+rt)         exec sh ./scripts/build.sh bench-rt ;;
+rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
@@ -63,6 +67,6 @@ clean)
 	esac
 	;;
 *)
-	sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
 	;;
 esac

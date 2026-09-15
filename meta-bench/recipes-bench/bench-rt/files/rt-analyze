@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""Turn a captured square wave into a period histogram.
+
+    rt-analyze capture.npy
+    rt-analyze --json --toggle-us 1000 capture.npy
+
+The instrument samples at 100 kS/s, so one sample is 10 us and the jitter
+this project is trying to see is smaller than that. Reporting edge times to
+the nearest sample would quantise every histogram into 10 us steps and make
+an RT kernel indistinguishable from a generic one.
+
+The recovery is linear interpolation of the threshold crossing between the
+two samples either side of it, and it only works when the edge is slower
+than the sample period. That is worth stating plainly, because the
+intuition runs the other way round: a fast edge sounds like a good edge.
+
+If the transition takes tens of nanoseconds, as a 3.3 V CMOS output into a
+short wire does, then the sample before every crossing sits at 0 V and the
+sample after it sits at 3.3 V. The interpolated fraction is then (1.65-0)
+over 3.3, which is one half, for every edge and regardless of when the edge
+actually happened. Interpolation returns a constant, the recovered time is
+the sample index plus a half, and the resolution is exactly one sample
+period. It looks like sub-sample precision and it is arithmetic.
+
+So this program measures whether it is in that regime instead of assuming
+either answer. subsample_fraction is the proportion of crossings where the
+two samples are closer together than a full logic swing, meaning at least
+one of them was taken part way up the edge. Near 1 the interpolation is
+real. Near 0 it is not, the per-edge resolution is one sample period, and
+the program says so on stderr rather than letting the histogram imply a
+precision it does not have.
+
+What survives in either regime is the mean. The toggle period and the
+sample period are not commensurate, so the crossings fall at a changing
+place inside the sample interval and the quantisation error averages out:
+over 30000 edges the mean period, and the clock offset computed from it,
+are good to nanoseconds. What does not survive is the tail. A 99.9th
+percentile read off quantised per-edge deviations carries one sample
+period of uncertainty, which at 100 kS/s is 10 us.
+
+docs/METHOD.md gives the arithmetic and the fix, which is to slow the edge
+on purpose with a series resistor and a capacitor so that the transition
+spans two or three samples.
+
+Deviation is measured from the mean period, not from the nominal one. The
+MCC 118 clock and the Pi clock differ by tens of parts per million, and
+that offset is a property of two crystals rather than of the scheduler.
+The offset itself is reported separately, because a change in it between
+runs means something changed in the clocks, not in the latency.
+
+SPDX-License-Identifier: MIT
+"""
+
+import argparse
+import json
+import sys
+
+import numpy as np
+
+
+REPORT_ORDER = (
+    "edges",
+    "periods",
+    "mean_us",
+    "expected_us",
+    "clock_offset_ppm",
+    "sd_us",
+    "p99_us",
+    "p999_us",
+    "max_abs_us",
+    "subsample_fraction",
+    "sample_us",
+    "histogram",
+)
+
+
+def format_value(value):
+    """Three decimals for a measurement, unchanged for anything else."""
+    if isinstance(value, float):
+        return "%.3f" % value
+    return str(value)
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(
+        description="period statistics of a captured square wave")
+    parser.add_argument("capture", help="the .npy file written by rt-capture")
+    parser.add_argument("--rate", type=float, default=100000.0,
+                        help="sample rate in S/s (default 100000)")
+    parser.add_argument("--threshold", type=float, default=1.65,
+                        help="volts, halfway up a 3.3 V edge")
+    parser.add_argument("--toggle-us", type=float, default=1000.0,
+                        help="commanded interval between edges in us")
+    parser.add_argument("--hist", default=None,
+                        help="histogram output (default: CAPTURE_hist.txt)")
+    parser.add_argument("--bin-us", type=float, default=2.0,
+                        help="histogram bin width in us (default 2)")
+    parser.add_argument("--json", action="store_true",
+                        help="one JSON object on stdout instead of a line")
+    return parser.parse_args(argv)
+
+
+def rising_edges(samples, threshold, rate):
+    """Crossing times in seconds, and how many of them were interpolated.
+
+    Returns (times, subsample_fraction). The fraction is the share of
+    crossings whose two straddling samples differ by less than 80 percent
+    of the full logic swing, which is the same thing as saying that at
+    least one of them was taken while the signal was on the ramp. It is the
+    only honest way to know whether the interpolation below did anything.
+    """
+    above = samples > threshold
+    # The index of the last sample below the threshold before each crossing.
+    idx = np.flatnonzero(~above[:-1] & above[1:])
+    if idx.size == 0:
+        return np.empty(0), 0.0
+
+    lo = samples[idx]
+    hi = samples[idx + 1]
+    span = hi - lo
+    # A zero span cannot happen for a real crossing, since one sample is
+    # below the threshold and the next is above it. Guarding anyway costs
+    # nothing and keeps a corrupt file from producing a plausible number.
+    safe = np.where(span != 0, span, 1.0)
+    frac = np.where(span != 0, (threshold - lo) / safe, 0.5)
+
+    swing = float(samples.max() - samples.min())
+    if swing > 0:
+        resolved = float(np.count_nonzero(span < 0.8 * swing)) / span.size
+    else:
+        resolved = 0.0
+
+    return (idx + frac) / rate, resolved
+
+
+def summarise(edge_times, toggle_us):
+    periods_us = np.diff(edge_times) * 1e6
+    mean = float(periods_us.mean())
+    deviation = periods_us - mean
+    absolute = np.abs(deviation)
+    # One toggle is half a square wave, so the expected time between two
+    # rising edges is twice the commanded interval.
+    expected = 2.0 * toggle_us
+    return {
+        "edges": int(edge_times.size),
+        "periods": int(periods_us.size),
+        "mean_us": mean,
+        "expected_us": expected,
+        "clock_offset_ppm": (mean - expected) / expected * 1e6,
+        "sd_us": float(deviation.std()),
+        "p99_us": float(np.percentile(absolute, 99)),
+        "p999_us": float(np.percentile(absolute, 99.9)),
+        "max_abs_us": float(absolute.max()),
+    }, deviation
+
+
+def write_histogram(path, deviation, bin_us):
+    limit = max(200.0, float(np.abs(deviation).max()) + bin_us)
+    edges = np.arange(-limit, limit + bin_us, bin_us)
+    counts, _ = np.histogram(deviation, bins=edges)
+    with open(path, "w", encoding="ascii") as handle:
+        handle.write("# deviation_us count\n")
+        for left, count in zip(edges[:-1], counts):
+            if count:
+                handle.write("%.1f %d\n" % (left, count))
+    return path
+
+
+def main(argv):
+    args = parse_args(argv)
+
+    samples = np.load(args.capture)
+    if samples.ndim != 1:
+        samples = samples.reshape(-1)
+
+    edge_times, subsample = rising_edges(samples, args.threshold, args.rate)
+    if edge_times.size < 2:
+        print("rt-analyze: %s has %d rising edges, which is not a run"
+              % (args.capture, edge_times.size), file=sys.stderr)
+        print("Check the jumper from header pin 38 to CH0, and that "
+              "rt-toggle actually ran.", file=sys.stderr)
+        return 1
+
+    stats, deviation = summarise(edge_times, args.toggle_us)
+    stats["subsample_fraction"] = subsample
+    stats["sample_us"] = 1e6 / args.rate
+
+    if subsample < 0.2:
+        print("rt-analyze: %.0f%% of edges were interpolated, so the "
+              "per-edge resolution of this capture is one sample period, "
+              "%.1f us." % (subsample * 100.0, stats["sample_us"]),
+              file=sys.stderr)
+        print("The mean and the clock offset are unaffected; sd, p99.9 and "
+              "max carry that quantisation. See docs/METHOD.md.",
+              file=sys.stderr)
+
+    hist_path = args.hist
+    if hist_path is None:
+        base = args.capture
+        if base.endswith(".npy"):
+            base = base[:-4]
+        hist_path = base + "_hist.txt"
+    stats["histogram"] = write_histogram(hist_path, deviation, args.bin_us)
+    stats["samples"] = int(samples.size)
+    stats["capture"] = args.capture
+
+    if args.json:
+        print(json.dumps(stats, sort_keys=True))
+    else:
+        # key=value pairs on one line, with the same key names the JSON
+        # uses. A human reads it, and so does rt-run, which would
+        # otherwise need a JSON parser written in shell. One output
+        # format means the two can never disagree about a number.
+        print(" ".join("%s=%s" % (key, format_value(stats[key]))
+                       for key in REPORT_ORDER))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

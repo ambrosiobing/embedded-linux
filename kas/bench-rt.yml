@@ -1,0 +1,57 @@
+# Project 8: the real-time latency lab.
+#
+#   kas build kas/bench-rt.yml        or  ./go rt
+#
+# A separate configuration, for the reason in the repository README: a
+# project that needs a different kernel adds its own kas file rather than
+# changing the shared one. Here that rule earns its keep twice over,
+# because this image is the experiment's variable. bench-image built from
+# bench-rpi4.yml is the control, and the two differ in the preemption model
+# and in nothing else that anyone had to think about.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+target: bench-rt-image
+
+repos:
+  # rt-tests (cyclictest) and stress-ng are in meta-oe, which is already
+  # pinned by bench-rpi4.yml. numpy is in meta-python, from the same
+  # repository and therefore the same pin: the analysis runs on the board
+  # so that a run can be judged before the card is carried back to a desk.
+  meta-openembedded:
+    layers:
+      meta-oe:
+      meta-python:
+
+local_conf_header:
+  rt: |
+    # The switch that adds recipes-kernel/linux/files/rt.cfg. See the
+    # bbappend for why it is opt in.
+    BENCH_RT_KERNEL = "1"
+
+    # And the kernel that can honour it. PREEMPT_RT depends on
+    # EXPERT && ARCH_SUPPORTS_RT, and arch/arm64/Kconfig gained the
+    # select in 6.12; conf/machine/include/rpi-default-versions.inc in
+    # meta-raspberrypi scarthgap still defaults to 6.6. Without this line
+    # the fragment asks for a symbol that has no prompt on 6.6, kconfig
+    # drops it silently, and the build succeeds with a kernel that is not
+    # preemptible. That failure is invisible until ./go kconfig or
+    # /sys/kernel/realtime is read on the board, which is why both are in
+    # the acceptance list for this project.
+    PREFERRED_VERSION_linux-raspberrypi = "6.12.%"
+
+    # The whole point of this image is to be measured, so the kernel is
+    # the one recipe whose work directory has to survive the build: the
+    # .config it produced is the evidence that the fragment arrived.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-rt libdaqhats"
+
+
+    # The MCC 118 is an SPI device on SPI0 CE0, so the bus has to be in
+    # config.txt. meta-raspberrypi turns this into "dtparam=spi=on"; the
+    # bench image does not set it, because nothing before this project had
+    # anything on the bus. Without it the HAT is powered, its EEPROM is
+    # read by the firmware into /proc/device-tree/hat, and every scan
+    # fails, which is a confusing place to start debugging.
+    ENABLE_SPI_BUS = "1"

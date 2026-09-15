@@ -217,6 +217,23 @@ week later. That is why `./go kconfig` exists and compares every line of the
 fragment against the `.config` that was actually built, including the lines
 that ask for an option to stay off.
 
+There are three fragments now, and the two later ones are opt in:
+
+| Fragment | Switch | Added by |
+|---|---|---|
+| `bench.cfg` | none, every image gets it | the bbappend, unconditionally |
+| `router.cfg` | `BENCH_ROUTER_KERNEL` | `kas/bench-router.yml` |
+| `rt.cfg` | `BENCH_RT_KERNEL` | `kas/bench-rt.yml` |
+
+Opt in, because a kernel another project has already measured should not
+change underneath it. `rt.cfg` adds a second requirement that is worth
+knowing before writing any fragment: **an option can only be set if the
+kernel has it**. `CONFIG_PREEMPT_RT` depends on `ARCH_SUPPORTS_RT`, which
+arm64 gained in 6.12, and the BSP default here is 6.6. So the kas file sets
+`PREFERRED_VERSION_linux-raspberrypi` as well as the switch. Without it the
+fragment is not wrong, it is inaudible: kconfig drops a symbol with no
+prompt and says nothing.
+
 ---
 
 Previous: [04. BitBake](04-bitbake.md) | Next: [06. Mechanism and policy](06-mechanism-policy.md)

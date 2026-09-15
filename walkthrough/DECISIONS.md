@@ -635,4 +635,115 @@ built as much as to the two that are.
 
 ---
 
+## 30. The real-time kernel is an opt-in fragment and a pinned version
+
+**Context.** `PREEMPT_RT` replaces the locking primitives of the whole
+kernel. Project 8 compares an RT kernel against a generic one, so exactly
+one variable has to differ between the two rows.
+
+**Decision.** `rt.cfg`, added to `SRC_URI` only when `BENCH_RT_KERNEL` is
+set, which `kas/bench-rt.yml` does. The same kas file also sets
+`PREFERRED_VERSION_linux-raspberrypi = "6.12.%"`.
+
+**Rejected.** The switch alone. Also rejected: applying the out-of-tree
+real-time patch series to the BSP default kernel.
+
+**Why.** `kernel/Kconfig.preempt` makes `PREEMPT_RT` depend on
+`EXPERT && ARCH_SUPPORTS_RT`, and `arch/arm64/Kconfig` gained that select
+in 6.12. meta-raspberrypi on scarthgap still defaults to 6.6 and ships a
+6.12 recipe beside it. Without the version pin the fragment names a symbol
+with no prompt, kconfig drops it in silence, the build succeeds, and the
+board boots a kernel that is not preemptible while the results table claims
+otherwise. Patching 6.6 would reach the same place through a rebase
+treadmill.
+
+**Consequence.** Two lines instead of one, and two independent checks that
+the intent arrived: `/sys/kernel/realtime` on the board, and
+`./go kconfig -f rt` against `/proc/config.gz`. The fragment names the
+other members of both kconfig choices as explicitly off, so that the
+checker has something to compare against rather than passing on the lines
+that were never in doubt.
+
+---
+
+## 31. A kernel is not allowed to be its own witness
+
+**Context.** Real-time Linux is argued about with cyclictest numbers.
+cyclictest measures the kernel from inside a task that kernel is
+scheduling, using that kernel's clock.
+
+**Decision.** A second instrument that shares nothing with the first except
+a wire. The measured task toggles a GPIO line; an MCC 118 DAQ HAT samples
+that line at 100 kS/s on its own crystal, from a process at normal priority
+on another core.
+
+**Rejected.** An in-kernel IIO driver for the HAT, which would be more
+elegant, and cyclictest alone, which is what everybody quotes.
+
+**Why.** An instrument inside the system under test is subject to the
+delays it is measuring. The external path also sees something the internal
+one structurally cannot: the cost of the system call that moved the pin.
+That difference is the finding rather than an error term, and the whole
+project exists to be able to interpret it.
+
+**Consequence.** Two clocks, so the measurement carries a constant offset
+of tens of parts per million. It is reported as its own column and
+deviations are measured from the run's mean rather than from the nominal
+period, so that a crystal difference is never counted as jitter.
+
+---
+
+## 32. A run refuses rather than records
+
+**Context.** A measurement script normally takes the configuration as
+arguments and writes it into the output, so that the row says what was set.
+
+**Decision.** `rt-run` takes the configuration as flags and then checks it
+against the kernel before measuring anything. `-i` on a kernel that
+isolated nothing is refused; no `-i` on a kernel that did isolate the core
+is refused too; a board already reporting a throttle state refuses to
+start; a DAQ overrun voids the run and writes no row.
+
+**Rejected.** Recording what was asked for, and trusting the operator.
+
+**Why.** `isolcpus=3` in a text file is not isolation; the kernel having
+accepted it is. One row labelled isolated that was not makes the whole
+table unusable, and nothing in the output would admit it. The reverse
+direction is easier to forget and just as damaging: a control row measured
+after a reboot that still carried the isolation parameters.
+
+**Consequence.** Runs fail more often, and they fail before spending sixty
+seconds. The refusal messages name the exact kernel command line to add
+rather than describing the problem.
+
+---
+
+## 33. Instrument resolution is measured, not assumed
+
+**Context.** Recovering an edge time below the sample period by
+interpolating the threshold crossing is standard practice, and the standard
+justification is that the edge is fast compared to the sample period.
+
+**Decision.** `rt-analyze` measures what fraction of crossings were
+actually interpolated, reports it as a column in every results row, and
+warns on stderr when that fraction says the interpolation did nothing.
+
+**Rejected.** Applying the interpolation and reporting three decimal places.
+
+**Why.** The justification is backwards. If the edge is much faster than a
+sample, then the sample before every crossing sits at one rail and the
+sample after it at the other, the interpolated fraction is exactly one half
+every time, and the resolution is one sample period wearing a decimal
+point. Interpolation needs an edge slow enough to be caught mid-transition,
+which on this bench means a deliberate series resistor and capacitor.
+
+**Consequence.** The schematic carries an optional RC that was not in the
+original parts list, and `tests/rt-analyze-test.sh` asserts the difference
+in microseconds: the same 2.0 us of injected jitter reads as 4.2 us through
+an ideal edge and as 2.0 us through a slowed one. The mean and the clock
+offset survive either way, which is stated rather than implied, because
+those are the two numbers a reader is most likely to take on trust.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)

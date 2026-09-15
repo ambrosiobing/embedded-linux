@@ -11,8 +11,40 @@
 
 . "$(dirname "$0")/common.sh"
 
-fragment=$REPO_DIR/meta-bench/recipes-kernel/linux/files/bench.cfg
-[ -f "$fragment" ] || die "no fragment at $fragment"
+FRAGMENT_DIR=$REPO_DIR/meta-bench/recipes-kernel/linux/files
+
+# Which fragments to check. bench.cfg goes into every image; router.cfg and
+# rt.cfg are opt in, so asking for them is opt in too:
+#
+#   ./go kconfig                     bench.cfg against the last build
+#   ./go kconfig -f rt /tmp/config   bench.cfg and rt.cfg against a config
+#                                    taken off the board
+#
+# Repeatable, because the real-time image gets both fragments and a check
+# that only looked at one of them would pass on a kernel missing half of
+# what was asked for.
+fragments=
+while [ $# -gt 0 ]; do
+	case ${1:-} in
+	-f)
+		[ $# -ge 2 ] || die "-f needs a fragment name, such as: -f rt"
+		fragments="$fragments $2"
+		shift 2
+		;;
+	-*) die "unknown option: $1" ;;
+	*) break ;;
+	esac
+done
+
+fragments="bench$fragments"
+for name in $fragments; do
+	[ -f "$FRAGMENT_DIR/$name.cfg" ] ||
+		die "no fragment at $FRAGMENT_DIR/$name.cfg"
+done
+
+# The newest fragment is the reference for "is the built .config newer than
+# what it was built from".
+fragment=$FRAGMENT_DIR/bench.cfg
 
 # An explicit config wins. The best one is the running kernel own config,
 # taken from the board with "zcat /proc/config.gz", because it proves what
@@ -38,36 +70,45 @@ if [ -z "$config" ]; then
            ./go kconfig /tmp/config"
 fi
 
-note "fragment $fragment"
 note "config   $config"
 
 fail=0
-while IFS= read -r line; do
-	case $line in
-	'' | '#'*'is not set')
-		# "# CONFIG_X is not set" is a request, so check it too.
-		sym=$(echo "$line" | sed -n 's/^# \(CONFIG_[A-Z0-9_]*\) is not set$/\1/p')
-		[ -n "$sym" ] || continue
-		if grep -q "^${sym}=" "$config"; then
-			echo "MISMATCH  $sym is set, fragment asks for it to be off"
-			fail=1
-		else
-			echo "ok        $sym off"
-		fi
-		;;
-	'#'*) ;;
-	CONFIG_*)
-		if grep -qxF "$line" "$config"; then
-			echo "ok        $line"
-		else
-			sym=${line%%=*}
-			echo "MISMATCH  $line   (built: $(grep "^${sym}=" "$config" ||
-				echo "not set"))"
-			fail=1
-		fi
-		;;
-	esac
-done <"$fragment"
+
+check_fragment() {
+	file=$1
+	note "fragment $file"
+	while IFS= read -r line; do
+		case $line in
+		'' | '#'*'is not set')
+			# "# CONFIG_X is not set" is a request, so check it too.
+			sym=$(echo "$line" |
+				sed -n 's/^# \(CONFIG_[A-Z0-9_]*\) is not set$/\1/p')
+			[ -n "$sym" ] || continue
+			if grep -q "^${sym}=" "$config"; then
+				echo "MISMATCH  $sym is set, the fragment wants it off"
+				fail=1
+			else
+				echo "ok        $sym off"
+			fi
+			;;
+		'#'*) ;;
+		CONFIG_*)
+			if grep -qxF "$line" "$config"; then
+				echo "ok        $line"
+			else
+				sym=${line%%=*}
+				echo "MISMATCH  $line   (built: $(grep "^${sym}=" "$config" ||
+					echo "not set"))"
+				fail=1
+			fi
+			;;
+		esac
+	done <"$file"
+}
+
+for name in $fragments; do
+	check_fragment "$FRAGMENT_DIR/$name.cfg"
+done
 
 [ "$fail" -eq 0 ] || die "the fragment did not fully reach the kernel."
-note "every option in the fragment is in the built .config"
+note "every option in every checked fragment is in the built .config"
