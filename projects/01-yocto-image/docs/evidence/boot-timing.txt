@@ -1,0 +1,36 @@
+Boot time, Project 01
+=====================
+
+Criterion: boots to a login prompt in under 15 s from power on.
+
+Measured on the board, from systemd's own report in the journal:
+
+    # journalctl -b | grep -i "startup finished"
+    systemd[1]: Startup finished in 3.183s (kernel) + 5.146s (userspace)
+                = 8.330s.
+
+    kernel space    3.183 s
+    user space      5.146 s
+    total           8.330 s
+
+PASS, with 6.7 s of margin.
+
+Method
+------
+
+systemd-analyze is a separate package and is not in this image, since
+nothing in Project 01 needs its per-unit breakdown. systemd itself logs the
+same figure to the journal at the end of startup, so the number costs
+nothing to obtain.
+
+Project 03 measures boot time properly, with systemd-analyze blame,
+critical-chain and a scope on a GPIO, and the package earns its place in
+the image then.
+
+Note on the timestamp
+---------------------
+
+The journal line is dated in June because the board has no real-time clock
+and had not yet synchronised time. A Raspberry Pi keeps no time across a
+power cycle without a battery-backed RTC, which is one of the peripherals
+Project 06 binds on the Explorer 700 board.

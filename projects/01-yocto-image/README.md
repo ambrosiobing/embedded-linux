@@ -153,7 +153,7 @@ that was actually built, including lines that ask for an option to stay off.
 | The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options; 15 after adding IKCONFIG |
 | A second clean build gives the same package list | `./go reproduce` | met, 95 and 95, identical ([evidence](docs/evidence/reproduce.txt)) |
 | The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | to do |
-| Boots to a login prompt in under 15 s | `systemd-analyze` on the board | not measured |
+| Boots to a login prompt in under 15 s | journal, `Startup finished` | met, 8.33 s: 3.18 kernel + 5.15 userspace ([evidence](docs/evidence/boot-timing.txt)) |
 
 `./go reproduce` tests a narrow claim and states it precisely: a clean build
 from the same commit produces the same package list. It does not claim
