@@ -178,7 +178,7 @@ table: "configured" means a file says so, "measured" means a board did so.
 | 1 | `ip route` shows two defaults, the primary at metric 100 and wwan0 at 700 | **Half met, unblocked.** `wwan0` at 700 is live with packets flowing. The primary is now a USB wireless adapter on `wan0` at metric 100, standing in for the cable. Needs the third build |
 | 2 | Losing the primary uplink loses at most 5 replies; the route returns within 90 s | **Unblocked.** A wireless uplink makes the disconnect a software event unless the home access point is powered off; both methods and what each proves are in [failover-tests.md](docs/failover-tests.md) |
 | 3 | A dead upstream behind a live carrier is detected within two connectivity intervals | **Was impossible and nobody knew.** NetworkManager was built with `-Dconcheck=false`, so the check was not in the binary. Fixed, and unaffected by the uplink being wireless |
-| 4 | `mmcli --location-get` reports a fix within 3 minutes, within 50 m | Not measured. The GNSS antenna is not attached |
+| 4 | `mmcli --location-get` reports a fix within 3 minutes, within 50 m | **Deferred**, with the reason in the table below |
 | 5 | After `AT+CFUN=0` the watchdog restores a bearer within 4 minutes, and the counters show the levels | Unblocked by the bearer. Escalation tested against stubs; level 3 needs `pwrkey_verified` first, journal 21 |
 | 6 | `curl http://10.20.0.1:9101/lte.prom` returns valid Prometheus text | **Met.** Real signal, one-hot state, and the live uplink. [first-bearer.txt](docs/evidence/first-bearer.txt) |
 | 7 | No undervoltage during a 10 minute `iperf3` over LTE | Not measured, but registration produced no undervoltage and throttle flags `0` |
@@ -225,6 +225,7 @@ the measurement documents are for.
 
 | Item | Why | Where it goes |
 |---|---|---|
+| A GNSS fix, acceptance criterion 4 | The engine works and the software is written: `export_location` in `/etc/bench/lte.conf`, the exporter's `lte_gnss_*` metrics, and step 7 of the bring-up notes. What is missing is sky. This bench is an indoor desk, the antenna is an active patch that needs a window, and a first fix there takes one to three minutes and on a desk may never come. Deferring it is honest about the room rather than about the code | Attach the puck at a window and run the two commands in [BRINGUP.md](docs/BRINGUP.md) step 7. Nothing needs rebuilding |
 | gpsd on the NMEA port | ModemManager's location API covers this project's need and the two cannot share the port | A stretch goal, and the natural pairing with `chrony` |
 | The ModemManager D-Bus API in place of `mmcli` | `--output-keyvalue` is stable and needs nothing extra in the image. The D-Bus version also replaces polling with state-change signals, which is the real prize | After the first board run, and it is Project 12's technique |
 | WireGuard following the default route | The one thing that makes a flow survive a failover, and independent of everything here | Stretch goal |

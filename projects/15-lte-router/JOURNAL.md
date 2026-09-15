@@ -1032,3 +1032,34 @@ worth recording: the comment named the firmware package and not the module,
 so there was nothing for the rule to check. The test was wrong, not the
 rule, and the fix was to name both in the comment. A check can only see
 what the prose actually says.
+
+---
+
+## 28. GNSS is deferred, and that is a statement about the room
+
+**What happened.** Acceptance criterion 4 asks for a position fix within
+three minutes and within 50 m. The GNSS engine is supported end to end: the
+`export_location` key in `/etc/bench/lte.conf`, the `lte_gnss_*` metrics in
+the exporter with a test covering both the fix and the no-fix case, and
+step 7 of the bring-up notes. None of it has been run.
+
+**What was done.** Moved from "not measured" to deferred, with the reason
+written next to it, the way Project 1 deferred its LED indication and its
+serial console.
+
+**Why that and not leaving it open.** An open criterion and a deferred one
+say different things, and only one of them is true here. "Not measured"
+suggests nobody has got round to it. What is actually the case is that the
+antenna is an active patch that needs to see sky, the bench is an indoor
+desk, and a first fix at a window takes one to three minutes while on a
+desk it may never come at all. That is a property of the room. Leaving the
+row open would make the repository look as though it were waiting on work
+that does not exist.
+
+**What un-defers it**, and it is deliberately one line: put the puck on a
+windowsill and run the two commands already written down. No rebuild, no
+code, no decision. The criterion is not hard, it is just somewhere else.
+
+**What it does not change.** The position was never part of what makes this
+a gateway. The failover is, and that is the one measurement still
+genuinely outstanding.
