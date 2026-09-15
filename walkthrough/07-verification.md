@@ -35,6 +35,7 @@ catch the mistakes that are most annoying to diagnose from the top.
 | Edge timing arithmetic | Project 8's period recovery against a synthesised square wave whose edge times are known before the program runs, in both the resolved and the unresolved edge regime |
 | Run protocol | The measurement order, core confinement, an isolation claim checked against the kernel in both directions, the throttle gate, and an overrun voiding a run |
 | Interrupt affinity | A movable interrupt that was not moved, told apart from a per-CPU timer that cannot be |
+| Fragment symbols | A `CONFIG_` line that names nothing the kernel has, and one that names a symbol no fragment can set |
 | BlueST protocol | A mask bit with no field in the table stopping the decode, rather than shifting every field after it to an offset that is now wrong |
 | BLE connection ladder | A failure at each of scan, connect, resolve and stream, the doubling and the cap, and a link that is connected and silent |
 | Gateway sinks | Columns fixed by a feature mask, a day rolling over, an incomplete record staying visibly incomplete, and one LED lit per state |
@@ -106,6 +107,45 @@ to matter, and the next section is about that.
 **This generalises to every later project that touches the kernel.** When
 you ask a build system for something, check that you got it, rather than
 assuming the absence of an error means success.
+
+### Two checks, because they answer different questions
+
+`./go kconfig` compares a fragment against a `.config`, and a `.config`
+exists only after `do_compile`. So the earliest it can report a fragment
+line that was never a Kconfig symbol is at the end of a build. Project 15
+paid that bill: three lines in `router.cfg` named objects inside a module
+rather than options, and the invoice was one build cycle.
+
+`./go ksym` asks the earlier question against the unpacked source, which is
+on disk minutes into a build:
+
+| Check | Question | Needs | Costs |
+|---|---|---|---|
+| `./go ksym` | Is this line a request the kernel can receive | `do_unpack` | seconds |
+| `./go kconfig` | Did the answer come back | `do_compile`, or a board | seconds, after hours |
+
+Neither substitutes for the other. A symbol can be real and still be
+dropped for an unmet dependency, which only the second check sees; a symbol
+can be absent entirely, which the second check cannot distinguish from a
+value that simply is not set.
+
+The second question `ksym` asks is subtler and it is the one that caught
+something here. A Kconfig symbol without a prompt cannot be set by a
+fragment at all: it is chosen by whatever selects it. A fragment line for
+such a symbol is a prediction dressed as a request, and when the prediction
+is right, `./go kconfig` prints `ok` and the line looks like it worked.
+`rt.cfg` had one, `CONFIG_IRQ_FORCED_THREADING`, which `arch/arm64/Kconfig`
+selects unconditionally. Nothing downstream would ever have said so.
+
+Such a line is now allowed only when the fragment admits what it is:
+
+```
+# consequence: promptless, selected by arch/arm64/Kconfig
+CONFIG_IRQ_FORCED_THREADING=y
+```
+
+and the check prints the actual selector next to it, so the claim in the
+comment is verified rather than trusted.
 
 Project 8 is where that stopped being a precaution. `CONFIG_PREEMPT_RT`
 depends on `ARCH_SUPPORTS_RT`, which `arch/arm64` gained in 6.12, and the

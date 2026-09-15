@@ -113,10 +113,27 @@ threshold is wrong for the actual swing: measure it with
 
 ## 6. Install the RT kernel beside the generic one
 
-Power off, card out, into a reader.
+First build it, and check the fragment before paying for the compile:
 
 ```sh
-./go rt                                        # on the build host
+kas shell kas/bench-rt.yml -c 'bitbake -c unpack virtual/kernel'
+./go ksym -f rt
+./go rt
+```
+
+`do_unpack` is minutes in; `do_compile` is most of an hour. `./go ksym`
+reads the unpacked tree and says whether every line of both fragments names
+a symbol this kernel actually has. Project 15 skipped that step because it
+did not exist, and found three lines that were never symbols at the end of
+a full build.
+
+Expect two lines reported as consequences rather than requests, both
+already marked in `rt.cfg`: `IRQ_FORCED_THREADING`, which arm64 selects
+unconditionally, and `LOCKUP_DETECTOR`, which the two detectors select.
+
+Then power off, card out, into a reader.
+
+```sh
 ./go rt-kernel install /mnt/boot /mnt/root
 ./go rt-kernel status /mnt/boot
 ```

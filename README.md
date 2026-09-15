@@ -104,7 +104,7 @@ rather than pointing at where the original lives.
 | 12 | [A sensor-hub D-Bus service over UART](projects/12-sensor-hub) | Raspberry Pi 4 | CBOR wire protocols, sd-bus, polkit, socket activation | **Linux side complete**: wire protocol, daemon, policy, activation, client and three test suites; firmware specified, no board work yet |
 | 13 | A Wayland kiosk HMI on the 7 inch touchscreen | Raspberry Pi 4 | DRM/KMS, Wayland, libinput, LVGL or Qt | Planned |
 | 14 | The Pi as a USB gadget: Ethernet, serial and HID | Raspberry Pi 4 | USB gadget configfs, libcomposite, evdev to HID | Planned |
-| 15 | [An LTE router with failover and GNSS](projects/15-lte-router) | Raspberry Pi 4 | ModemManager, NetworkManager, QMI, nftables, gpsd | **Software complete**: image, watchdog, exporter, firewall and four test suites; no board work yet |
+| 15 | [An LTE router with failover and GNSS](projects/15-lte-router) | Raspberry Pi 4 | ModemManager, NetworkManager, QMI, nftables, gpsd | **Working**: live LTE bearer at metric 700, NAT for the bench LAN, metrics with real signal. Failover itself needs a second uplink this bench does not have |
 | 16 | A low-power Cat-M and NB-IoT tracker | Raspberry Pi 3 | AT state machines, CoAP/LwM2M, PSM/eDRX, current budget | Planned |
 | 17 | [A BLE gateway for the STWIN.box with BlueZ](projects/17-ble-gateway) | Raspberry Pi 3B+ | BLE central on Linux, BlueZ D-Bus GATT, pipelines | **Software complete**: kernel fragment, BlueZ configuration, the gateway and three test suites; no board work yet |
 | 18 | Edge Wi-Fi access point with MQTT over TLS and a private PKI | Raspberry Pi 3 | hostapd, dnsmasq, Mosquitto, X.509 | Planned |
@@ -184,6 +184,7 @@ usually break can be:
 | Edge timing arithmetic | `sh tests/rt-analyze-test.sh` | Project 8's period recovery, against a synthesised square wave with known edge times, in both edge regimes |
 | Run protocol | `sh tests/rt-run-test.sh` | The measurement order, core confinement, the isolation claim in both directions, the throttle gate and every column of the results row |
 | Interrupt affinity | `sh tests/rt-irq-affinity-test.sh` | Movable interrupts against kernel-owned ones, against a fake `/proc/irq` |
+| Kernel fragment symbols | `sh tests/kernel-symbols-test.sh` | That `./go ksym` tells a real Kconfig symbol from a line that names nothing, and a settable one from a symbol only the kernel can select |
 | Wire protocol | `sh tests/sensorhub-proto-test.sh` | Project 12's frame format against frozen vectors, and a parser fed garbage, split frames, corrupted CRCs, absurd lengths and a lost byte |
 | Protocol, two implementations | `sh tests/sensorhub-cabi-test.sh` | The C compiled and driven through ctypes, compared byte for byte against an independent Python implementation over 900 randomised cases |
 | A D-Bus service's eight files | `sh tests/sensorhub-policy-test.sh` | Interface name, object path, polkit action, device path and unit name compared across the daemon, the bus policy, the activation file, the polkit action and rule, the udev rule, the unit and the recipe |

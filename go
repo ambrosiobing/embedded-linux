@@ -17,6 +17,7 @@
 #   ./go sdk install  run that installer into /opt/poky
 #   ./go sdk-check    cross-compile sdk/hello-gpiod with the installed SDK
 #   ./go flash /dev/sdX   write the image to a card
+#   ./go ksym         check the fragment names real symbols, before a build
 #   ./go kconfig      check that the kernel fragment reached the .config
 #   ./go reproduce    build the same commit again and diff the package lists
 #   ./go packages     the image package list, for the README table
@@ -43,6 +44,7 @@ hub)        exec sh ./scripts/build.sh bench-hub ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
+ksym)       shift; exec sh ./scripts/check-kernel-symbols.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
 reproduce)  shift; exec sh ./scripts/reproduce.sh "$@" ;;
 packages)   exec sh ./scripts/packages.sh ;;
@@ -71,6 +73,15 @@ clean)
 	esac
 	;;
 *)
-	sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+	# The header block, to the first line that is not part of it. This
+	# used to be a hand-written line range, and a hand-written line
+	# range drifts: adding a target without bumping it silently drops
+	# the last one off the help, which is the kind of wrong that nobody
+	# notices because the output still looks complete.
+	awk 'NR > 1 {
+		if ($0 !~ /^#/ || $0 ~ /SPDX/) exit
+		sub(/^# ?/, "")
+		print
+	}' "$0"
 	;;
 esac

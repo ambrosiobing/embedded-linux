@@ -43,6 +43,7 @@ What is proven today, on a laptop and in CI:
 | Movable and kernel-owned interrupts are distinguished correctly | `tests/rt-irq-affinity-test.sh`, 14 assertions |
 | `PREEMPT_RT` is selectable on this kernel at all | read out of `kernel/Kconfig.preempt` and `arch/arm64/Kconfig` in `rpi-6.12.y`, see below |
 | The fragment check catches a kernel built without it | `./go kconfig -f rt` against a deliberately broken config |
+| Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt` against the `rpi-6.12.y` Kconfig text |
 
 What that does not prove is any latency number whatsoever. See
 [Acceptance criteria](#acceptance-criteria) for which rows are evidence and
@@ -60,12 +61,14 @@ the places where this departs from the original scope on purpose.
 | `meta-bench/recipes-bench/daqhats/` | The vendor library and its Python bindings, pinned to a commit, cross-compiled |
 | `scripts/rt-kernel-install.sh` | Puts the RT kernel on a card beside the generic one, with a one-line way back |
 | `scripts/check-kernel-config.sh` | Extended: `-f rt` checks the real-time fragment too |
+| `scripts/check-kernel-symbols.sh` | The check that runs before a build: is each fragment line a symbol the kernel can receive |
 | `tests/rt-analyze-test.sh` and two more | What can be proven without the instrument |
 
 ## Running it
 
 ```sh
 ./go check                   # about 2 minutes, no board and no HAT
+./go ksym -f rt              # after the kernel unpacks, before it compiles
 ./go rt                      # bench-rt-image, with the PREEMPT_RT kernel
 ./go flash /dev/sdX          # or install beside the generic kernel:
 ./go rt-kernel install /mnt/boot /mnt/root
@@ -138,6 +141,7 @@ each, and where that stands today.
 | 5 | cyclictest alone agrees with the external measurement to within the system-call cost | the `cyc_*` and `ext_*` columns of the same row | **not started** |
 | 6 | Every row names kernel, isolation, affinity, governor, load and the throttle status before and after | the CSV header has 27 columns and `rt-run` fills all of them | **met in the code**, proven by `tests/rt-run-test.sh`, unproven on a board |
 | 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt` against `/proc/config.gz` from the running board | **tooling ready**, exercised against a synthetic config |
+| 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
 
 Criterion 4 is the one with a caveat attached, and it is in
 [METHOD.md](docs/METHOD.md): a 150 us threshold measured through an
@@ -188,7 +192,9 @@ the one grouped by kernel and then by isolation, which is the order above.
 | The run protocol | `sh tests/rt-run-test.sh` | Ordering, core confinement, both directions of the isolation claim, the throttle gate, an overrun voiding the run, and every column of the row |
 | Interrupt affinity | `sh tests/rt-irq-affinity-test.sh` | Movable against kernel-owned interrupts, ranges in a CPU list, the failure that matters |
 | Host compile | `./go check` | `rt-toggle` with `-Werror` against host libgpiod v2 |
+| Fragment symbols | `./go ksym -f rt` | That every line names a real Kconfig symbol, and that a promptless one is declared as a consequence rather than presented as a request |
 | The fragment | `./go kconfig -f rt CONFIG` | Every line of `rt.cfg`, including the ones that ask for an option to stay off |
+| The symbol checker itself | `sh tests/kernel-symbols-test.sh` | All five Kconfig declaration shapes against a six-file kernel, including the two that the checker got wrong first |
 
 Not covered, and only a board can cover it: that a PREEMPT_RT kernel boots
 on this hardware, that the HAT enumerates, that the vendor library

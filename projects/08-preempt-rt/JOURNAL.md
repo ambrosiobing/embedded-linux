@@ -491,3 +491,133 @@ its first section rather than at the bottom.
   clock pinned at turbo, a hotter board, and the warranty bit set
   permanently. Putting it in a kas file would make it the default for
   anybody who built this image.
+
+---
+
+## 18. Project 15 met hardware, and its first defect was ours too
+
+**What happened.** Project 15 reached a board on 15 September and found
+three defects that no amount of testing without hardware had produced. The
+first one was not about modems at all: `router.cfg` asked for
+`CONFIG_NFT_CHAIN_NAT`, `CONFIG_NFT_RT` and `CONFIG_NFT_EXTHDR`, and none
+of the three is a Kconfig symbol. `nft_rt.o` and `nft_exthdr.o` are objects
+inside `nf_tables-objs`, and `nft_chain_nat.o` arrives with `NFT_NAT`.
+`./go kconfig` caught them, on the first build in fourteen projects that
+compiled a kernel rather than taking one from shared state.
+
+That is the same class of defect `rt.cfg` could carry, and this project has
+never had a kernel compiled at all.
+
+**What was done.** Every symbol in `rt.cfg` and `bench.cfg` was checked
+against the actual `rpi-6.12.y` tree, before any build. Two things are
+needed for a fragment line to do anything: the symbol has to exist, and it
+has to have a prompt, because kconfig will not let a fragment set a symbol
+that is chosen by whatever selects it.
+
+`bench.cfg` came out clean, fifteen symbols. `rt.cfg` had one:
+
+```
+kernel/irq/Kconfig:116   config IRQ_FORCED_THREADING
+                           bool                     <- no prompt
+arch/arm64/Kconfig:251     select IRQ_FORCED_THREADING
+```
+
+So `CONFIG_IRQ_FORCED_THREADING=y` in the fragment does nothing, and arm64
+selects the symbol unconditionally, so the built kernel has it anyway.
+
+**Why that and not the alternative.** The obvious fix is to delete the
+line. It stayed, marked as a consequence rather than a request, because the
+check it enables is still worth making: an arm64 that stopped selecting it
+would take the `threadirqs` comparison row away and nothing else in this
+repository would notice.
+
+The important part is what the outcome would have looked like without this.
+The line is inert, the value is right anyway, and `./go kconfig` would have
+printed `ok CONFIG_IRQ_FORCED_THREADING=y` after the build. A check passing
+for the wrong reason is worse than one failing, because it is evidence that
+is not evidence, and there is no later step that catches it.
+
+---
+
+## 19. A check that runs before the build, because the other one cannot
+
+**What happened.** `./go kconfig` compares a fragment against a `.config`,
+and a `.config` exists only after `do_compile`. So the earliest moment a
+bad symbol can be found is at the end of a build, which is what Project 15
+paid for. The kernel source, though, is on disk after `do_unpack`, minutes
+in rather than hours.
+
+**What was done.** `scripts/check-kernel-symbols.sh`, wired up as
+`./go ksym`. It indexes every `config` and `menuconfig` declaration in the
+tree in one pass, then for each fragment line asks two questions:
+
+| Verdict | Meaning |
+|---|---|
+| `MISSING` | not declared anywhere, so the line can never do anything |
+| `PROMPTLESS` | declared, but a fragment cannot set it |
+| `consequence` | promptless and the fragment says so, with the selector printed |
+
+A promptless symbol is allowed only with a marker directly above it:
+
+```
+# consequence: promptless, selected by arch/arm64/Kconfig
+CONFIG_IRQ_FORCED_THREADING=y
+```
+
+and the script prints what actually selects the symbol, so the claim in the
+comment can be checked rather than believed.
+
+Run against `router.cfg` as it was before the board corrected it, all three
+defects are reported. That is the check validated against a known answer
+rather than against an opinion.
+
+**Why that and not the alternative.** The alternative is to keep relying on
+`./go kconfig`, which does work, at the price of a build cycle per defect.
+Two checks in sequence answer two different questions, and both are worth
+asking: `ksym` asks whether the line is a request the kernel can receive,
+`kconfig` asks whether the answer came back. Neither substitutes for the
+other, and the cheap one now runs first.
+
+---
+
+## 20. The checker was wrong twice, and its own test found both
+
+**What happened.** Writing the test before trusting the script paid for
+itself immediately.
+
+**What was done.** The first run reported 22 of 25 assertions passing, and
+the three failures all pointed at the same place: the branch that reports a
+missing symbol printed nothing at all. Under `set -e`, a `grep` that
+matches nothing returns 1 and takes the script with it, so the lookup that
+established a symbol was missing killed the process that was about to say
+so. A checker that exits silently is worse than no checker, because the
+absence of output reads as success.
+
+The second was found by pointing the script at real netfilter text rather
+than at the synthetic tree. `CONFIG_NF_CONNTRACK_TIMESTAMP` came back
+`PROMPTLESS`, which it is not:
+
+```
+net/netfilter/Kconfig:178       bool  'Connection tracking timestamping'
+```
+
+Kconfig accepts either quote character, and that one file uses single
+quotes eighty-one times. A check that only knew double quotes would have
+called eighty-one ordinary settable symbols promptless, in one file, and
+the natural response to a wall of false failures is to stop running the
+check.
+
+Both shapes are now in the test tree, and a third case was added for the
+other way this can mislead: a partial kernel tree makes real symbols look
+missing, so when anything is reported missing and the tree declares fewer
+than five thousand symbols, the script says the tree is the likely problem
+rather than leaving a wall of MISSING lines to be read as a broken
+fragment.
+
+**Why that and not the alternative.** The alternative was to write the
+script, run it once against `rt.cfg`, see a plausible answer, and ship it.
+It would have given a plausible answer: `rt.cfg` has no netfilter symbols
+and no missing ones, so neither bug would have shown. The defects were
+found because the test generates inputs the fragment does not contain, and
+because the second input was real kernel text rather than a synthetic
+imitation of it.

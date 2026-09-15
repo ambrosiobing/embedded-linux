@@ -1111,4 +1111,50 @@ at all about which wire is where.
 
 ---
 
+## 46. A fragment line is checked before the build, not only after it
+
+**Context.** `./go kconfig` compares a kernel fragment against the
+`.config` that was built from it. That `.config` exists only after
+`do_compile`, so the earliest a line naming a symbol the kernel does not
+have can be reported is at the end of a build. Project 15 found three such
+lines in `router.cfg` that way, on the first build in fourteen projects
+that compiled a kernel rather than reusing shared state.
+
+**Decision.** A second check, `./go ksym`, against the unpacked kernel
+source, which is on disk minutes into a build. It answers two questions per
+line: is the symbol declared anywhere, and does it carry a prompt. A
+promptless symbol cannot be set by a fragment at all, and such a line is
+allowed only when it is marked `# consequence:` and the check prints what
+actually selects it.
+
+**Rejected.** Relying on `./go kconfig` alone, which does work at the price
+of a build cycle per defect. Also rejected: treating a promptless symbol as
+an error to be deleted, which would have removed a line that is still worth
+checking.
+
+**Why.** The promptless case is the one that does not announce itself. The
+line does nothing, the value is usually right anyway because something else
+selects it, and `./go kconfig` then prints `ok` for a request that was
+never made. A check passing for the wrong reason is worse than a check
+failing, because there is no later step that catches it. `rt.cfg` had
+exactly one, `CONFIG_IRQ_FORCED_THREADING`, which `arch/arm64/Kconfig`
+selects unconditionally.
+
+**Consequence.** Two checks in sequence rather than one, answering
+different questions: whether the kernel could receive the request, and
+whether the answer came back. The cheap one runs first. The marker
+convention adds a line of prose to a fragment and makes the fragment say
+which of its lines are requests and which are predictions.
+
+The checker was wrong twice before it was right, and both bugs were found
+by its own test rather than by reading it: a `grep` that matched nothing
+killed the script under `set -e` exactly in the branch that reports a
+missing symbol, and single-quoted Kconfig prompts were not recognised,
+which would have called eighty-one ordinary netfilter symbols promptless.
+A checker whose failures are silent or false is worse than none, so its
+test generates inputs the real fragments do not contain, and one of them is
+real kernel text rather than an imitation.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)
