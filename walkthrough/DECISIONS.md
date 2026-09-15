@@ -487,8 +487,8 @@ recorded count of 112 now counts a differently sliced set.
 
 ## 24. The watchdog is two programs, and the GPIO half is not Python
 
-**Context.** The book's watchdog is one Python program that drives PWRKEY
-through libgpiod's Python bindings.
+**Context.** The watchdog as originally specified is one Python program that
+drives PWRKEY through libgpiod's Python bindings.
 
 **Decision.** `lte-gpio` in C owns the control lines; `lte-watchdog` in
 Python owns the probe and the escalation and reaches hardware only by
@@ -590,6 +590,48 @@ extras, so the class of failure is removed rather than managed.
 
 **Consequence.** A larger kernel image, on a mains-powered box with an SD
 card.
+
+---
+
+## 29. Every project is self-contained, and cites nothing outside the repository
+
+**Context.** These twenty projects were scoped in a separate document that
+lives outside this tree. The early text referred to it, with sentences like
+"the specification's Project 1 drives three LEDs" and pointers to figure
+sources by filename. A reader who did not have that document could not
+check the claim, could not see the figure, and in several places could not
+tell what the project had actually been asked to do.
+
+**Decision.** Nothing in this repository refers to a document that is not in
+this repository. Where the outside text was the authority, its content is
+written out here instead: the acceptance criteria are listed in full in each
+project's README, the four figures are redrawn as ASCII and mermaid in each
+project's `docs/DESIGN.md`, and a difference from the original scope is
+described by what the difference is rather than by naming where the original
+lives.
+
+**Rejected.** Two alternatives. The first was to keep the references and add
+a note explaining where to find the source, which solves nothing for a
+reader who will never have it and quietly makes the repository a companion
+volume rather than a work. The second was to delete the sentences that
+referred outward, which is cheaper and loses the reasoning: "four things are
+done differently" is only interesting if the reader can see what they are
+different from.
+
+**Why.** This repository is read by people who arrive at a URL with no
+context: an engineer evaluating the work, a colleague looking for how a
+thing was done, or the author in three years. Every one of them is served
+by a tree that answers its own questions. It is also the same discipline the
+rest of the repository already applies to builds, where a kas file that
+depends on state outside itself is the defect that
+[05. kas and layers](05-kas-and-layers.md) exists to prevent. A document
+that depends on state outside itself is the same defect in prose.
+
+**Consequence.** The project READMEs are longer, because a criterion written
+out is longer than a citation. Narrative that summarised an outside source
+now has to state it: where a sentence would have said "as specified", it
+says what was specified. This applies to the eighteen projects not yet
+built as much as to the two that are.
 
 ---
 

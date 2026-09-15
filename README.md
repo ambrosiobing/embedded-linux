@@ -61,6 +61,31 @@ a recipe, the narrative, the wiring, the measurements and the evidence,
 lives under `projects/NN-slug/`, so each project reads as a unit while the
 build stays a single coherent tree.
 
+## How each project is written
+
+**Every project is self-contained.** Nothing here cites a document that is
+not in this repository. There is no companion text to fetch, no figure to
+look up elsewhere and no acceptance criterion you have to take on trust:
+what a project was asked to do is written out where the project is, in
+words, and a reader who arrives at this URL with no other context can read
+it end to end and judge it.
+
+That rule shapes what each `projects/NN-slug/` directory contains, and the
+same four files are expected of all twenty:
+
+| File | What it holds |
+|---|---|
+| `README.md` | What the project is, what it adds to the layer, how to run it, its acceptance criteria written out in full, and what was measured against each |
+| `docs/DESIGN.md` | The methodology before the results: system architecture, the wiring and its pin table, the bench layout, and the software's structure, all drawn as ASCII or mermaid so they diff and grep |
+| `JOURNAL.md` | What actually happened in order, failures included. Each entry says what happened, what was done, and why that rather than the alternative |
+| `docs/evidence/` | The raw output behind every number claimed: build logs, boot timings, package manifests, reproducibility diffs |
+
+Choices that outlive one project go in
+[walkthrough/DECISIONS.md](walkthrough/DECISIONS.md) instead, each entry
+naming the alternative that was rejected. Where a project departs from what
+it was originally scoped to do, it says what the difference is and why,
+rather than pointing at where the original lives.
+
 ## The twenty projects
 
 | # | Project | Board | Theme | State |

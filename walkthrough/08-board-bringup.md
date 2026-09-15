@@ -134,8 +134,8 @@ not booting" from "the console is not connected".
 
 **Over SSH you would see none of it**, because SSH needs a network that does
 not exist yet at the moment things go wrong. Every board bring-up in this
-book starts with the console for that reason, and projects 2, 3, 4 and 9
-depend on it entirely.
+this repository starts with the console for that reason, and projects 2, 3,
+4 and 9 depend on it entirely.
 
 Log to a file rather than photographing the screen: boot timings live in the
 kernel timestamps, and a text log is quotable, searchable and diffable

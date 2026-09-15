@@ -1,6 +1,6 @@
 # Design, Project 15
 
-The four figures the book specifies for this project, plus the software
+The four figures this project is specified by, plus the software
 diagrams behind them. This is the methodology: what the components are,
 which of them owns what, and how a packet and a failure each travel through
 the system. What happened while building it is the [journal](../JOURNAL.md);
@@ -8,9 +8,8 @@ why each choice was made rather than its alternative is
 [DECISIONS](../../../walkthrough/DECISIONS.md).
 
 Drawn as text on purpose, the same as Project 1: diagrams here survive a
-diff, can be grepped, and need no build step. The book renders the same four
-figures as TikZ and circuitikz, in `figures/p15_{arch,schematic,bench,uml}.tex`
-of the EmbeddedLinux_Top20 sources.
+diff, can be grepped, and need no build step. Everything needed to read them
+is in this file.
 
 ---
 
@@ -327,7 +326,7 @@ This is the same split Project 1 made between `bench-status` and
    `tests/lte-watchdog-test.sh` and it exists because of this split.
 2. **The C stays short enough to read in one sitting.** `lte-gpio` does one
    thing and has no opinion about when to do it.
-3. **The power-cycle path has no Python in it.** The book's version calls
+3. **The power-cycle path has no Python in it.** The obvious alternative calls
    libgpiod through its Python bindings. Those are a separate package whose
    name and availability differ between Yocto releases, and a recovery path
    that fails on an import is a recovery path that does not exist.

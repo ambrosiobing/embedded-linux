@@ -112,8 +112,11 @@ debugging a missing `brcmfmac` module.
 
 ## Acceptance criteria
 
-The book's criteria, with what has been shown so far. The distinction
-between a proof and a plan is the whole point of keeping this table.
+The seven criteria the project was specified against, written out in full
+below so that nothing outside this repository has to be consulted to judge
+whether it is finished, with what has been shown so far against each. The
+distinction between a proof and a plan is the whole point of keeping this
+table: "configured" means a file says so, "measured" means a board did so.
 
 | # | Criterion | State |
 |---|---|---|
@@ -125,8 +128,9 @@ between a proof and a plan is the whole point of keeping this table.
 | 6 | `curl http://10.20.0.1:9101/lte.prom` returns valid Prometheus text | Format asserted in `tests/lte-exporter-test.sh`; endpoint not served yet |
 | 7 | No undervoltage during a 10 minute `iperf3` over LTE | Not measured |
 
-Beyond the book, three things this repository asserts and the book's
-version does not:
+Three further criteria, added here and not part of the original seven,
+because building the thing showed that a router without them is not a
+router:
 
 | # | Criterion | State |
 |---|---|---|

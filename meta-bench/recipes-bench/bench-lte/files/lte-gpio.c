@@ -12,9 +12,9 @@
  * laptop with no GPIO chip anywhere, because the only thing it does to the
  * hardware is run a command that a stub can replace.
  *
- * It also keeps a Python interpreter out of the GPIO path. The book's
- * version calls libgpiod through its Python bindings; those bindings are a
- * separate package whose name and availability differ between Yocto
+ * It also keeps a Python interpreter out of the GPIO path. The obvious
+ * alternative calls libgpiod through its Python bindings; those bindings are
+ * a separate package whose name and availability differ between Yocto
  * releases, and a power-cycle path that fails to import is a power-cycle
  * path that does not exist.
  *

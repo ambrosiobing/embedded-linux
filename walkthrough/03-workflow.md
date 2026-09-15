@@ -4,24 +4,30 @@
 
 ```
 Windows laptop                  GitHub                   Ubuntu laptop (WSL2)
-MasterCatalog/                  ambrosiobing/            ~/src/embedded-linux-bench
-  EmbeddedLinux_Top20/            embedded-linux-bench      the same files
-    sections/*.tex   the book                                     |
-    embedded-linux-bench/  push --> the shared copy --> pull      | ./go build
-       where it is written                                        v
+embedded-linux-bench/           ambrosiobing/            ~/src/embedded-linux-bench
+  where it is written             embedded-linux-bench      the same files
+  editor, git, docs      push --> the shared copy --> pull      | ./go build
+                                                                v
                                                           ~/bench/    about 60 GB
                                                             build/    the image
                                                             downloads/    10 GB
                                                             sstate-cache/
 ```
 
-**Windows** is where the repository is written, because the book and the
-catalogue live there.
+The split is not a recommendation, it is this bench: one laptop is a
+Windows machine used for writing and one is a Linux machine with the disk
+to spare. Anyone with a single Linux box does all three columns in one
+place and loses nothing.
+
+**Windows** is where the repository is written, because that is where the
+editor and the rest of the working notes are.
 
 **Ubuntu under WSL2** is where anything real happens. It has the compiler,
 the case sensitive filesystem and the disk.
 
-**GitHub** is the only channel between them.
+**GitHub** is the only channel between them. Nothing is copied over a
+network share or a USB stick, so there is exactly one answer to "which copy
+is current".
 
 ## Why a Yocto build cannot run on the Windows side
 

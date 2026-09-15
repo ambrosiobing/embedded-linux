@@ -15,8 +15,12 @@ The output that matters is not the image. It is
 [`meta-bench/`](../../meta-bench), the layer the other nineteen projects
 extend, and the SDK that cross-compiles their code.
 
-`daqring` builds its image with Buildroot. This one uses the Yocto Project
-on purpose, so that the pair covers both major build systems.
+The build system is the Yocto Project rather than Buildroot, and that is a
+choice rather than a default: Buildroot is faster to learn and builds a
+whole image from one `make`, but it has no layers, no package manager and no
+per-recipe licence accounting, so a second product sharing most of a first
+means copying a tree. The reasoning in full, including what Buildroot is
+better at, is [02. Build systems](../../walkthrough/02-build-systems.md).
 
 ## What this project adds to the repository
 
@@ -168,8 +172,8 @@ bit-identical images. Timestamps and build paths still differ, which is what
 
 ## Deferred: the LED indication
 
-The book's Project 1 drives three LEDs from the status daemon. That is
-deferred, and the reason is worth recording rather than hiding.
+This project's specification drives three LEDs from the status daemon. That
+is deferred, and the reason is worth recording rather than hiding.
 
 The bench LEDs are Joy-IT LinkerKit LK-LED10 modules. They have a 2.0 mm
 socket and, in the manufacturer's own words, require "a Linker Kit baseboard
@@ -193,10 +197,9 @@ voltages. That needs either an LED or a meter, and it is the single
 unverified link in the chain.
 
 To close it, either fit three bare LEDs with 330 Ohm series resistors from
-GPIO17, GPIO27 and GPIO22 to ground, which is what the book originally
-specified and which is unambiguously active high, or buy an LK-Cable and use
-the modules as the manufacturer intends. Grove 4-pin cables are the same
-2.0 mm pitch and fit.
+GPIO17, GPIO27 and GPIO22 to ground, which is the original wiring and is
+unambiguously active high, or buy an LK-Cable and use the modules as the
+manufacturer intends. Grove 4-pin cables are the same 2.0 mm pitch and fit.
 
 The polarity and line-offset configuration in `/etc/bench/leds.conf` stays.
 It costs one small file and one libgpiod call, it is the correct design for
@@ -324,10 +327,11 @@ one package became two, so the manifest is now 113 entries covering the
 same files. The manifest in `docs/evidence/` is the one from the build that
 was measured, and it is left as it was taken.
 
-## Where this differs from the book
+## Where this differs from the original plan
 
-The book's Project 1 is the specification. Four things are done differently,
-each for a reason worth keeping:
+The project as first scoped is the specification, and the figures in
+[docs/DESIGN.md](docs/DESIGN.md) are what it asked for. Six things are done
+differently, each for a reason worth keeping:
 
 1. **The LEDs are four-pin modules, not bare LEDs.** `S1` is the signal, `S2`
    is unused, `U` is the 3V3 supply, `G` is ground, and the series resistor
@@ -340,9 +344,9 @@ each for a reason worth keeping:
 3. **The GPIO chip is found by label, not by index.** `/dev/gpiochip0` is the
    header on a Pi 4 but not on every board, and the numbering moves when an
    expander probes first.
-4. **`bench-state` and its units are part of the recipe.** The book's
-   acceptance criteria require a state file and an `OnFailure` drop-in, but
-   its repository layout does not include them. They are here, with a test.
+4. **`bench-state` and its units are part of the recipe.** The acceptance
+   criteria require a state file and an `OnFailure` drop-in, but the original
+   file layout did not include them. They are here, with a test.
 
 5. **The LED indication is deferred.** The bench LED modules cannot be
    connected with the cables available, so the daemon drives its lines and

@@ -17,15 +17,20 @@ All entries are 15 September 2026 unless noted.
 were written last, after being asked for twice. The specification existed
 the whole time and was not consulted.
 
-**What was done.** This project started by reading `sections/p15.tex` and
-the four `figures/p15_*.tex` sources, and
-[docs/DESIGN.md](docs/DESIGN.md) was written from them before any recipe.
+**What was done.** This project started from the written specification and
+its four figures: system architecture, wiring and schematic, bench layout,
+and the software's UML. All four were redrawn as text in
+[docs/DESIGN.md](docs/DESIGN.md), in this repository, before a single recipe
+was written. That file is now the specification of record: the architecture
+it shows, the pin table it gives, the acceptance criteria it implies and the
+sequence of a failover are all in the repository, and nothing outside it has
+to be opened to review the design.
 
 **Why that and not the alternative.** The alternative is what happened last
 time: build the thing, then reconstruct the design from the thing. That
 produces documentation that describes the implementation rather than the
 intent, and it cannot catch the case where the implementation drifted from
-what was asked for. It also wastes the figures somebody already drew.
+what was asked for.
 
 ---
 
@@ -55,10 +60,10 @@ noted here rather than quietly corrected.
 
 ---
 
-## 3. The watchdog was split in two, against the book
+## 3. The watchdog was split in two, against the specification
 
-**What happened.** The book's watchdog is a single Python program that calls
-libgpiod through its Python bindings to pulse PWRKEY.
+**What happened.** The specified watchdog is a single Python program that
+calls libgpiod through its Python bindings to pulse PWRKEY.
 
 **What was done.** Two programs. `lte-gpio`, in C against libgpiod v2, owns
 the two control lines and nothing else. `lte-watchdog`, in Python, owns the
@@ -85,7 +90,7 @@ the one time it matters is the one time nobody is watching.
 
 ---
 
-## 4. The book's firewall has no input chain
+## 4. The specified firewall has no input chain
 
 **What happened.** The specified `nftables.conf` has a forward chain and a
 postrouting chain. Input is therefore at the default policy, accept.
@@ -117,7 +122,7 @@ the ruleset and two kernel options behind it.
 
 ## 5. The metrics endpoint was bound to the LAN, not to everything
 
-**What happened.** The book's exporter is `python3 -m http.server 9101
+**What happened.** The specified exporter is `python3 -m http.server 9101
 --directory /var/lib/lte`, which binds every address.
 
 **What was done.** `--bind 10.20.0.1`, from an environment file so the
@@ -134,9 +139,9 @@ has behaved.
 
 ## 6. dnsmasq and nftables got their own units
 
-**What happened.** The book installs `bench-lan.conf` into `/etc/dnsmasq.d/`
-and `nftables.conf` into `/etc/nftables.conf`, both relying on the
-distribution's packaged service to pick them up.
+**What happened.** The specification installs `bench-lan.conf` into
+`/etc/dnsmasq.d/` and `nftables.conf` into `/etc/nftables.conf`, both relying
+on the distribution's packaged service to pick them up.
 
 **What was done.** Both configurations go to `/etc/bench/`, and two units of
 ours read them: `bench-router-dhcp.service` and `bench-router-nft.service`.
@@ -430,3 +435,37 @@ remains this bench's most expensive missing tool.
 routed. The image has never been built: `./go router` needs the Yocto host,
 and the two things most likely to be wrong there are named at the end of
 entry 11, which is the whole reason they were named in advance.
+
+---
+
+## 16. The specification was cited, which is not the same as being included
+
+**What happened.** Entry 1 of this journal claimed a virtue: the design was
+written before the code, from the specification and its four figures. It
+then named those figures by their filenames in a tree that is not in this
+repository. Five other entries did the same thing in passing, each opening
+with "the specified X is" where X was a design a reader could not see.
+
+The claim was true and the writing made it unverifiable. Anyone reading this
+repository alone was told there is a specification, told the implementation
+departs from it in six places, and given no way to see either.
+
+**What was done.** All six entries rewritten so the original design is
+stated where it is departed from. Entry 3 now says the specified watchdog is
+one Python program calling libgpiod's bindings, which is the fact that
+matters; entry 4 says the specified ruleset has a forward chain and a
+postrouting chain and no input chain, which is the fact the rest of the
+entry argues against. `docs/DESIGN.md` lost its pointer to the external
+figure sources and gained a sentence saying it is now the design of record.
+The README's acceptance table says the seven criteria are written out in
+full below, and the three added here are labelled as added here.
+
+**Why that and not the alternative.** The alternative is to keep the
+citations, on the grounds that they are honest about where the design came
+from. They are, and honesty about provenance is not the same as being
+readable. A design document that names a file the reader does not have is
+a design document that asks the reader to take it on trust, which is exactly
+what the ownership table and the pin table in `docs/DESIGN.md` exist to
+avoid.
+
+The rule for all twenty projects is Decision 29.

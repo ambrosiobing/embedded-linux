@@ -787,6 +787,55 @@ written reasons.
 
 ---
 
+## 24. The documentation still pointed outside the repository
+
+**What happened.** These twenty projects were scoped in a separate document
+that is not in this tree, and the text written for Project 1 kept referring
+to it. One README section was headed as a comparison against that outside
+document; the design document said the same four figures were also rendered
+as vector drawings in files it named by path; the kernel fragment justified
+an option by saying no project in that outside document used it. None of
+that is readable by someone who has only this repository, which is everyone
+who will ever find it.
+
+Worse, it made two claims uncheckable. Naming an outside document as the
+specification tells a reader that a specification exists and that they do
+not have it. "The acceptance criteria require a state file" asserts a
+requirement whose text is then elsewhere.
+
+**What was done.** Every reference removed, and in each place the content
+replaced the citation rather than the sentence being deleted:
+
+- The eleven acceptance criteria were already written out in the README's
+  verification table, so that section needed nothing.
+- The comparison section became "Where this differs from the original
+  plan", and each of its items now says what the original asked for inside
+  the item itself. While checking it, the introduction turned out to say
+  "four things" above a list of six; corrected.
+- `docs/DESIGN.md` lost its pointer to the external figure sources. The
+  figures themselves were already here as ASCII and mermaid, which was the
+  point of drawing them that way.
+- `bench.cfg` now says "if no project in this repository uses it".
+- The workflow diagram in the walkthrough showed the repository nested
+  inside the outside document's tree. It now shows the repository alone, and
+  says that the three-machine split is this bench rather than a
+  recommendation.
+- One Buildroot comparison in the README named another piece of work without
+  explaining it. It now states the trade directly and points at
+  `walkthrough/02-build-systems.md`, which is in this repository.
+
+**Why that and not the alternative.** The cheap fix is to delete every
+sentence that points outward. It takes ten minutes and it costs the
+reasoning: "six things are done differently" is only worth reading if the
+reader can see what they differ from. Writing the original requirement into
+the sentence keeps the comparison and removes the dependency.
+
+The rule is now recorded as Decision 29 and in the root README, because it
+has to hold for the eighteen projects not yet written. A convention that
+lives only in a diff is a convention that lasts one project.
+
+---
+
 ## Still open
 
 **Project 01 is complete.** Eleven of eleven criteria met, four evidence

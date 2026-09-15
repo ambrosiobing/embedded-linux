@@ -1,15 +1,14 @@
 # Design, Project 01
 
-The four figures the book specifies for this project, plus the two software
+The four figures this project is specified by, plus the two software
 diagrams behind them. This is the methodology: what the components are and
 how they connect. What actually happened while building it is the
 [journal](../JOURNAL.md); why each choice was made is
 [DECISIONS](../../../walkthrough/DECISIONS.md).
 
 Drawn as text on purpose. Diagrams here survive a diff, can be grepped, and
-need no build step. The book renders the same four figures as TikZ and
-circuitikz, in `figures/p01_{arch,schematic,bench,uml}.tex` of the
-EmbeddedLinux_Top20 sources.
+need no build step. Everything needed to read them is in this file, so the
+design can be reviewed from a terminal with nothing else open.
 
 ---
 
