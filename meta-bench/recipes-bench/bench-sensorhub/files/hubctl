@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""A client for org.bench.SensorHub1, and a demonstration of why the
+interface is worth having.
+
+    hubctl                 what the hub is doing
+    hubctl rate 200        SetRate, and report what the property became
+    hubctl monitor 10      count SampleReady signals for ten seconds
+    hubctl calibrate       the polkit-guarded one
+
+Nothing in this file knows the frame format, the CRC, the baud rate or
+which tty the hub is on. That is the whole return on building a D-Bus
+interface instead of handing every client a serial port: the wire protocol
+can change completely, and this file keeps working.
+
+The proxy is built from the daemon's own introspection data, so the method
+and property names below are derived from the running service rather than
+typed from the documentation. A name that does not exist is an error here
+rather than a call that goes nowhere.
+
+busctl can do all of this without any client code, and docs/BRINGUP.md
+shows that first. This exists for the part busctl is bad at: counting
+signals over a window and saying whether the rate is what was asked for.
+
+SPDX-License-Identifier: MIT
+"""
+
+import asyncio
+import sys
+import time
+
+NAME = "org.bench.SensorHub1"
+PATH = "/org/bench/SensorHub1"
+
+
+def die(message):
+    print("hubctl: %s" % message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+async def connect():
+    try:
+        from dbus_next import BusType
+        from dbus_next.aio import MessageBus
+    except ImportError:
+        die("python3-dbus-next is not installed")
+
+    try:
+        bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+    except Exception as error:               # noqa: BLE001
+        die("cannot reach the system bus: %s" % error)
+
+    try:
+        introspection = await bus.introspect(NAME, PATH)
+    except Exception as error:               # noqa: BLE001
+        # The bus activates the service on demand, so this failing means
+        # the service file is missing or the daemon cannot start, not
+        # that somebody forgot to start it.
+        die("cannot introspect %s: %s\n"
+            "       Is sensorhubd installed, and is the Nucleo plugged in?\n"
+            "       systemctl status sensorhubd, then journalctl -u sensorhubd"
+            % (NAME, error))
+
+    proxy = bus.get_proxy_object(NAME, PATH, introspection)
+    return bus, proxy.get_interface(NAME)
+
+
+async def show(hub):
+    print("firmware   %s" % await hub.get_firmware_version())
+    print("protocol   %d" % await hub.get_protocol_version())
+    print("rate       %d Hz" % await hub.get_rate_hz())
+    print("dropped    %d frames" % await hub.get_frames_dropped())
+
+
+async def set_rate(hub, value):
+    try:
+        await hub.call_set_rate(value)
+    except Exception as error:               # noqa: BLE001
+        die("SetRate(%d) refused: %s" % (value, error))
+    # Read the property back rather than printing the argument. The daemon
+    # only changes it once the hub has acknowledged, so this is the
+    # difference between "asked for" and "running at".
+    print("rate       %d Hz" % await hub.get_rate_hz())
+
+
+async def calibrate(hub):
+    try:
+        await hub.call_calibrate()
+    except Exception as error:               # noqa: BLE001
+        text = str(error)
+        if "AccessDenied" in text or "not authorised" in text:
+            die("not authorised. Calibrate is behind the polkit action\n"
+                "       org.bench.sensorhub.calibrate, which "
+                "50-sensorhub.rules grants\n"
+                "       to the bench group. Try: usermod -aG bench $USER")
+        die("Calibrate failed: %s" % text)
+    print("calibrated")
+
+
+async def monitor(hub, seconds):
+    seen = []
+
+    def on_sample(t_us, accel, gyro):
+        seen.append((t_us, accel, gyro))
+
+    hub.on_sample_ready(on_sample)
+    started = time.monotonic()
+    await asyncio.sleep(seconds)
+    elapsed = time.monotonic() - started
+    hub.off_sample_ready(on_sample)
+
+    if not seen:
+        die("no samples in %.1f s. The name is owned, so the daemon is\n"
+            "       running; that points at the hub or the cable rather "
+            "than at Linux." % elapsed)
+
+    print("samples    %d in %.2f s, %.1f Hz"
+          % (len(seen), elapsed, len(seen) / elapsed))
+    print("property   %d Hz" % await hub.get_rate_hz())
+    print("dropped    %d frames" % await hub.get_frames_dropped())
+
+    # The hub's own clock, for comparison with the wall clock above. A
+    # difference between the two is the same measurement Project 8 makes
+    # with a DAQ, done badly and for free.
+    span_us = seen[-1][0] - seen[0][0]
+    if span_us > 0 and len(seen) > 1:
+        print("hub clock  %.1f Hz over %.2f s"
+              % ((len(seen) - 1) * 1e6 / span_us, span_us / 1e6))
+
+    t_us, accel, gyro = seen[-1]
+    print("last       t=%d us accel=%s gyro=%s"
+          % (t_us,
+             " ".join("%+.3f" % v for v in accel),
+             " ".join("%+.1f" % v for v in gyro)))
+
+
+async def main(argv):
+    command = argv[0] if argv else "show"
+    bus, hub = await connect()
+    try:
+        if command == "show":
+            await show(hub)
+        elif command == "rate":
+            if len(argv) < 2:
+                die("rate needs a value in Hz, 1 to 1000")
+            await set_rate(hub, int(argv[1]))
+        elif command == "calibrate":
+            await calibrate(hub)
+        elif command == "monitor":
+            await monitor(hub, float(argv[1]) if len(argv) > 1 else 5.0)
+        else:
+            die("unknown command %r. Try show, rate, monitor or calibrate."
+                % command)
+    finally:
+        bus.disconnect()
+
+
+if __name__ == "__main__":
+    asyncio.run(main(sys.argv[1:]))

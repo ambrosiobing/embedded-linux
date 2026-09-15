@@ -203,4 +203,49 @@ command stream.
 
 ---
 
+## The same split, one level up: who is allowed to ask
+
+The status daemon splits mechanism from policy inside one machine. Project
+12 splits it across a privilege boundary, and the shape is the same
+argument with higher stakes.
+
+`sensorhubd` owns a serial port and a bus name. Two questions follow:
+
+| Question | Answered by | Knows about |
+|---|---|---|
+| May this connection talk to this name at all | the bus policy, `org.bench.SensorHub1.conf` | connections and names |
+| May this user run this particular action | polkit, `org.bench.sensorhub.calibrate` | users, groups, sessions, actions |
+
+Neither is answered in C, and the reason is the same one as before: an
+`if (uid == 0)` in a daemon is policy compiled into mechanism. It cannot
+express "the bench group", it cannot be changed without a rebuild, and it
+lives in the file least likely to be reviewed.
+
+The two are not interchangeable, which is the part worth internalising.
+The bus has no notion of an action, so "only the bench group may
+calibrate" cannot be written as a bus policy. polkit has no notion of name
+ownership, so "only this user may own this name" cannot be written as a
+polkit rule. Choosing the wrong one produces something that looks like it
+works until the day somebody tests the case it cannot express.
+
+```
+   caller --> [ bus policy ]  --> [ vtable flags ] --> [ polkit ] --> handler
+              may you talk?      may you call        may you do
+                                 without CAP_SYS_ADMIN?   this?
+```
+
+The middle box is the one that surprises people. Without
+`SD_BUS_VTABLE_UNPRIVILEGED`, sd-bus itself requires `CAP_SYS_ADMIN` from
+the caller before the handler runs, so polkit is never consulted and no
+rule can fix it. Three layers, and the failure of any one of them presents
+as a permission error pointing at the wrong layer.
+
+**The generalisation:** when a decision is about identity rather than
+about mechanism, it belongs in something built to know about identity. On
+Linux that is the bus policy and polkit for D-Bus, the file mode and group
+for a device, and capabilities for a process. It is almost never an if
+statement.
+
+---
+
 Previous: [05. kas and layers](05-kas-and-layers.md) | Next: [07. Verification](07-verification.md)

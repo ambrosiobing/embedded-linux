@@ -1,0 +1,51 @@
+# Project 12: the sensor hub D-Bus service.
+#
+#   kas build kas/bench-hub.yml        or  ./go hub
+#
+# A separate configuration, for the same reason as the other two: a
+# project that needs a different image adds its own kas file rather than
+# changing the shared one. This one adds a distro feature as well, which
+# is the part worth reading before copying it.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+target: bench-hub-image
+
+repos:
+  # polkit and libcbor are in meta-oe, already pinned by bench-rpi4.yml.
+  # python3-dbus-next is in meta-python, from the same repository and so
+  # from the same pin.
+  meta-openembedded:
+    layers:
+      meta-oe:
+      meta-python:
+
+local_conf_header:
+  hub: |
+    # polkit is a distro feature, not a package. Its recipe carries
+    # REQUIRED_DISTRO_FEATURES = "polkit" and will refuse to build
+    # otherwise, and so will anything that depends on it, which is how
+    # this line comes to be needed by a recipe that never mentions it.
+    DISTRO_FEATURES:append = " polkit"
+
+    # polkit evaluates its rules with a JavaScript engine, and the
+    # default is mozjs, which is SpiderMonkey: tens of megabytes of
+    # rootfs and one of the longest compiles in the whole build, to run
+    # eleven lines of rule.
+    #
+    # duktape is the alternative the recipe already offers. Its warning
+    # is real and worth repeating: it is not a complete modern
+    # JavaScript, and a rule using something like Array.includes will
+    # fail on it. 50-sensorhub.rules uses an equality test and
+    # subject.isInGroup, which is the oldest part of the polkit API.
+    #
+    # If a later project writes a rule that duktape cannot run, the fix
+    # is to delete these two lines rather than to contort the rule.
+    PACKAGECONFIG:remove:pn-polkit = "mozjs"
+    PACKAGECONFIG:append:pn-polkit = " duktape"
+
+    # The hub is debugged through its own frames more than through
+    # anything else, so keep the sources of the thing that parses them.
+    RM_WORK_EXCLUDE += "bench-sensorhub libcbor"

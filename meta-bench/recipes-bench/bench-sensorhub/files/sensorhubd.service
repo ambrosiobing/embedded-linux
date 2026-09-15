@@ -1,0 +1,65 @@
+[Unit]
+Description=Sensor hub D-Bus service
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+
+# BindsTo rather than Requires: the unit stops when the device goes away,
+# which is what unplugging the Nucleo should do. Requires would leave the
+# daemon running against a tty that no longer exists, and it would keep
+# the bus name, so a client would get an answer from a service that has
+# nothing to answer with.
+#
+# The device unit name is what systemd calls /dev/sensorhub, which is the
+# symlink 80-sensorhub.rules creates. TAG+="systemd" in that rule is what
+# makes the device unit exist at all.
+BindsTo=dev-sensorhub.device
+After=dev-sensorhub.device
+
+[Service]
+# Type=dbus, so systemd considers the service started when the name is
+# owned rather than when the process exists. A client activated through
+# the bus is waiting for exactly that moment.
+Type=dbus
+BusName=org.bench.SensorHub1
+ExecStart=/usr/bin/sensorhubd /dev/sensorhub
+User=sensorhub
+Group=sensorhub
+SupplementaryGroups=dialout
+
+Restart=on-failure
+RestartSec=1
+
+# The hardening is not decoration on a daemon that parses bytes from a
+# device somebody plugged in. Each line removes something this process
+# has no use for, and the list is short enough to justify entry by entry:
+#
+#   ProtectSystem=strict      /usr and /etc read only; it writes nothing
+#   ProtectHome=yes           there are no home directories in its world
+#   PrivateTmp=yes            no shared /tmp to be raced in
+#   NoNewPrivileges=yes       nothing it execs can gain privilege
+#   RestrictAddressFamilies   AF_UNIX only: the bus. Not the network
+#   MemoryDenyWriteExecute    no JIT here, so no writable executable pages
+#   SystemCallFilter=@system-service   the ordinary set, minus the exotic
+#   CapabilityBoundingSet=    it needs no capability at all
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# DeviceAllow narrows what this process may open to the one device it
+# exists for. Without DevicePolicy=closed the list is advisory, because
+# the default policy already allows the usual set.
+DevicePolicy=closed
+DeviceAllow=char-ttyACM rw
+
+[Install]
+WantedBy=multi-user.target

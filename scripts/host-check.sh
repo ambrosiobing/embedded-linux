@@ -169,6 +169,33 @@ else
 		fail=1
 	fi
 
+	step "compile the sensor hub daemon"
+	# Project 12's daemon is the one program here that talks to two
+	# libraries at once, and the sd-bus vtable is a table of macros
+	# whose mistakes are compile errors rather than run-time ones. That
+	# makes this compile worth more than most: it is the only thing
+	# short of a board that can check the interface declaration at all.
+	if ! pkg-config --exists libsystemd libcbor; then
+		echo "libsystemd or libcbor development files are missing."
+		echo "Run scripts/host-setup.sh, or:"
+		echo "  sudo apt-get install -y libsystemd-dev libcbor-dev"
+		fail=1
+	else
+		out=$(mktemp -d)/sensorhubd
+		hub_src=meta-bench/recipes-bench/bench-sensorhub/files
+		hub_cflags=$(pkg-config --cflags libsystemd libcbor)
+		hub_libs=$(pkg-config --libs libsystemd libcbor)
+		# Word splitting on the pkg-config output is intended here too.
+		# shellcheck disable=SC2086
+		if gcc -Wall -Wextra -Werror -O2 -I"$hub_src" $hub_cflags \
+			"$hub_src/sensorhubd.c" "$hub_src/proto.c" \
+			-o "$out" $hub_libs; then
+			echo "compiled clean with -Werror"
+		else
+			fail=1
+		fi
+	fi
+
 	step "compile the SDK example against host libgpiod"
 	make -C sdk/hello-gpiod clean >/dev/null 2>&1 || true
 	if make -C sdk/hello-gpiod; then

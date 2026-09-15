@@ -35,6 +35,9 @@ catch the mistakes that are most annoying to diagnose from the top.
 | Edge timing arithmetic | Project 8's period recovery against a synthesised square wave whose edge times are known before the program runs, in both the resolved and the unresolved edge regime |
 | Run protocol | The measurement order, core confinement, an isolation claim checked against the kernel in both directions, the throttle gate, and an overrun voiding a run |
 | Interrupt affinity | A movable interrupt that was not moved, told apart from a per-CPU timer that cannot be |
+| A wire protocol | Frozen frame bytes, and a parser fed garbage, split frames, corrupted CRCs, absurd lengths and a lost byte |
+| Two implementations of it | The C compiled and driven through ctypes, compared byte for byte against an independent Python implementation over 900 randomised cases |
+| A D-Bus service's eight files | One interface name, one object path, one action id, one device path and one unit name, compared across every file that repeats them |
 
 **These have already earned their keep.** The static checks caught
 `leds.conf` missing from `SRC_URI` when it was added, and a systemd unit

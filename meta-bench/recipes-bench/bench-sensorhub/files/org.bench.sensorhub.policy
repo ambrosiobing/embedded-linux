@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD polkit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  One action, because there is one privileged thing to do.
+
+  Calibrate moves the zero point of a sensor that something else may be
+  relying on, and it takes the hub out of service for two seconds. SetRate
+  has no action of its own: it is bounded, validated and reversible, and
+  an authorisation prompt for it would be the kind of ceremony that
+  teaches people to click through prompts.
+
+  The defaults below are what applies when no rule matches. auth_admin
+  everywhere means a stranger has to prove they are an administrator;
+  50-sensorhub.rules is what lets the bench group past without that.
+-->
+<policyconfig>
+
+  <vendor>embedded-linux-bench</vendor>
+  <vendor_url>https://github.com/ambrosiobing/embedded-linux-bench</vendor_url>
+
+  <action id="org.bench.sensorhub.calibrate">
+    <description>Calibrate the sensor hub</description>
+    <message>Authentication is required to calibrate the sensor hub</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+</policyconfig>

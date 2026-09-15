@@ -746,4 +746,168 @@ those are the two numbers a reader is most likely to take on trust.
 
 ---
 
+## 34. A protocol is a document first, and one implementation second
+
+**Context.** Project 12 has a framed binary protocol between a
+microcontroller and Linux. The obvious order is to write the encoder, get
+frames flowing, and document it afterwards.
+
+**Decision.** `docs/PROTOCOL.md` was written first and is the
+specification of record. `proto.c` is compiled into both ends, so there is
+one implementation rather than two. A second implementation exists in
+Python, written from the document, purely so that the first can be
+compared against something.
+
+**Rejected.** Documenting after the fact, and implementing separately at
+each end.
+
+**Why.** A frame layout has a field order, an endianness, a CRC variant
+and a resynchronisation rule, and every one of those becomes impossible to
+change once two implementations exist. Writing them down forced the
+resynchronisation rule to be decided rather than to emerge, and that rule
+turned out to be the only substantive decision in the format.
+
+Two implementations of one protocol drift, and they drift silently,
+because each end is consistent with itself. One implementation compiled
+twice cannot. The Python reference is not a third end: it is a test
+instrument, and it is only useful because it was written from the document
+rather than transcribed from the C.
+
+**Consequence.** `tests/sensorhub-cabi-test.sh` can compare the C against
+the specification byte for byte, including 900 randomised cases, on any
+machine with a compiler. The firmware's protocol layer is therefore
+covered before the firmware exists.
+
+---
+
+## 35. Encode by hand, decode with a library
+
+**Context.** CBOR at both ends. The conventional answer is tinycbor on the
+microcontroller and libcbor on Linux.
+
+**Decision.** The five payloads are encoded by hand in `proto.c`, about
+sixty lines with no dependency and no allocation. Incoming payloads are
+decoded with libcbor.
+
+**Rejected.** A library at both ends, and hand-written code at both ends.
+
+**Why.** The two directions are not the same problem. Outgoing payloads
+have a fixed shape that will never grow: a sample is always a four entry
+map with integer keys, two three element arrays and two scalars. Incoming
+bytes have unknown shape and arbitrary length, arrive from a device that
+may be running half a firmware, and are parsed by a daemon on the system
+bus. The first is bounded work; the second is a job for a parser somebody
+else has already fuzzed.
+
+The firmware then needs no CBOR library at all, which on a part where
+tinycbor is a measurable fraction of the image is not a small saving.
+
+**Consequence.** The hand encoder must obey RFC 8949's preferred
+serialisation exactly, because otherwise two implementations produce
+different bytes for the same value and the byte-for-byte comparison is
+impossible. That rule is in the protocol document and asserted at four
+integer widths.
+
+---
+
+## 36. A method handler may block only for as long as nobody would notice
+
+**Context.** Two D-Bus methods have to wait for a microcontroller to
+acknowledge. `SetRate` waits microseconds; `Calibrate` waits about two
+seconds.
+
+**Decision.** They are implemented differently. `SetRate` blocks the event
+loop for at most 200 ms, measured against `CLOCK_MONOTONIC`. `Calibrate`
+takes a reference to the message, returns without replying, and the reply
+is sent from the frame parser or from a three second timer.
+
+**Rejected.** One mechanism for both. Either would work for one of them
+and be wrong for the other.
+
+**Why.** The bus default timeout is 25 seconds, and a handler that
+approaches it does not merely fail: it stalls every other client of the
+daemon, so the failure looks like a hung service rather than a slow
+device. Two seconds of that is already too much. Two hundred milliseconds
+on something that answers in microseconds is a bound on a case that does
+not happen.
+
+**Consequence.** The deferred path needs a pending message, a timer and a
+reply from a callback, which is more machinery than the blocking path and
+is the reason the blocking path is kept where it is safe. It also produced
+one bug worth recording: the first bounded wait counted loop iterations
+rather than consulting the clock, which with samples arriving continuously
+expires in microseconds.
+
+---
+
+## 37. Policy lives outside the daemon, in two different places
+
+**Context.** A system service has to decide who may talk to it and who may
+do the privileged thing. The short answer is an if statement on the
+caller's uid.
+
+**Decision.** Neither question is answered in C. The bus policy answers
+"may this connection talk to this name", before a byte reaches the daemon.
+polkit answers "may this user run this action", through a rule that grants
+the `bench` group and a default that refuses everybody else.
+
+**Rejected.** Checking the caller's uid in the daemon; expressing the
+group rule in the bus policy.
+
+**Why.** The two questions look alike and are not. The bus knows about
+connections and names; polkit knows about users, sessions and actions.
+"Only the bench group may calibrate" cannot be written in a bus policy,
+because the bus has no notion of an action. "Nobody outside this image may
+own this name" cannot be written in polkit. A uid check in C reimplements
+the first badly, cannot express the second at all, and puts the security
+decision in the file least likely to be reviewed.
+
+polkit is asked without user interaction, which is its own small decision:
+a system service must not block a bus call while polkit looks for an
+authentication agent, because on a headless board that wait is unbounded
+and usually pointless. The answer comes from the rules immediately, and
+authorisation is therefore a property of the caller's group rather than of
+somebody being at a keyboard.
+
+**Consequence.** Two more files to keep in step with the daemon and with
+each other, which is what `tests/sensorhub-policy-test.sh` exists for. And
+one trap worth naming: without `SD_BUS_VTABLE_UNPRIVILEGED` on the method,
+sd-bus demands `CAP_SYS_ADMIN` from the caller before the handler runs, so
+polkit is never asked and no rule can fix it.
+
+---
+
+## 38. Nothing is enabled at boot, because there are two ways to start
+
+**Context.** The daemon needs a device that may not be plugged in. The
+default answer is to enable the unit and let it restart until the device
+appears.
+
+**Decision.** The unit is installed and not enabled. udev starts it when
+the device appears, through `TAG+="systemd"` and `ENV{SYSTEMD_WANTS}`, and
+the bus starts it when a client calls, through a D-Bus service file naming
+`SystemdService=`. `BindsTo=dev-sensorhub.device` stops it when the device
+leaves.
+
+**Rejected.** `WantedBy=multi-user.target` and a restart loop; polling for
+the device inside the daemon.
+
+**Why.** A unit enabled at boot on a board with nothing attached starts,
+fails to open the device, and spends its restart budget before anybody
+plugs anything in. Both activation paths are free, they cover the two
+situations that actually occur, and neither makes an assumption about boot
+order.
+
+The third mechanism is the one usually left out. A daemon that keeps its
+bus name after its device has gone answers calls with stale data, and a
+client has no way to tell. `BindsTo` makes the unit's life the device's
+life.
+
+**Consequence.** Four files have to agree about one device path and one
+unit name, including a systemd device unit name derived from the path by
+escaping it. A test derives it the same way rather than trusting that two
+strings were typed consistently.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)

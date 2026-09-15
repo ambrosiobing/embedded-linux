@@ -101,7 +101,7 @@ rather than pointing at where the original lives.
 | 09 | Kernel debugging lab: kgdb, ftrace, perf, pstore | Raspberry Pi 3B+ | Debugging and tracing over the serial console | Planned |
 | 10 | IIO in depth with the X-NUCLEO-IKS4A1 | Raspberry Pi 3B+ | IIO buffers and triggers, libiio, iiod, AHRS | Planned |
 | 11 | VL53L8CX: porting and packaging a vendor userspace driver | Raspberry Pi 4 | i2c-dev and spidev, shared libraries, packaging | Planned |
-| 12 | A sensor-hub D-Bus service over UART | Raspberry Pi 4 | CBOR wire protocols, sd-bus, polkit, socket activation | Planned |
+| 12 | [A sensor-hub D-Bus service over UART](projects/12-sensor-hub) | Raspberry Pi 4 | CBOR wire protocols, sd-bus, polkit, socket activation | **Linux side complete**: wire protocol, daemon, policy, activation, client and three test suites; firmware specified, no board work yet |
 | 13 | A Wayland kiosk HMI on the 7 inch touchscreen | Raspberry Pi 4 | DRM/KMS, Wayland, libinput, LVGL or Qt | Planned |
 | 14 | The Pi as a USB gadget: Ethernet, serial and HID | Raspberry Pi 4 | USB gadget configfs, libcomposite, evdev to HID | Planned |
 | 15 | [An LTE router with failover and GNSS](projects/15-lte-router) | Raspberry Pi 4 | ModemManager, NetworkManager, QMI, nftables, gpsd | **Software complete**: image, watchdog, exporter, firewall and four test suites; no board work yet |
@@ -125,6 +125,7 @@ file.
 | `./go router` | `kas/bench-router.yml` | `bench-router-image`, the gateway of Project 15: two uplinks, NAT, a cellular watchdog |
 | `./go release` | `kas/bench-release.yml` | The same image plus an SPDX bill of materials, a CVE report and the corresponding source archive |
 | `./go rt` | `kas/bench-rt.yml` | `bench-rt-image`, the latency lab of Project 8: a `PREEMPT_RT` kernel, cyclictest, stress-ng and an MCC 118 DAQ HAT |
+| `./go hub` | `kas/bench-hub.yml` | `bench-hub-image`, the sensor hub of Project 12: the system bus, polkit, the D-Bus service and OpenOCD |
 
 Later projects that need a different kernel or a different image add their
 own kas file next to these rather than changing the shared one. Project 8
@@ -182,7 +183,10 @@ usually break can be:
 | Edge timing arithmetic | `sh tests/rt-analyze-test.sh` | Project 8's period recovery, against a synthesised square wave with known edge times, in both edge regimes |
 | Run protocol | `sh tests/rt-run-test.sh` | The measurement order, core confinement, the isolation claim in both directions, the throttle gate and every column of the results row |
 | Interrupt affinity | `sh tests/rt-irq-affinity-test.sh` | Movable interrupts against kernel-owned ones, against a fake `/proc/irq` |
-| Host compile | `./go check` | All three C programs built with `-Werror` against the host libgpiod v2, the same API the target uses, and every Python program byte-compiled |
+| Wire protocol | `sh tests/sensorhub-proto-test.sh` | Project 12's frame format against frozen vectors, and a parser fed garbage, split frames, corrupted CRCs, absurd lengths and a lost byte |
+| Protocol, two implementations | `sh tests/sensorhub-cabi-test.sh` | The C compiled and driven through ctypes, compared byte for byte against an independent Python implementation over 900 randomised cases |
+| A D-Bus service's eight files | `sh tests/sensorhub-policy-test.sh` | Interface name, object path, polkit action, device path and unit name compared across the daemon, the bus policy, the activation file, the polkit action and rule, the udev rule, the unit and the recipe |
+| Host compile | `./go check` | Four C programs built with `-Werror`: three against the host libgpiod v2, and the sensor hub daemon against libsystemd and libcbor, which is the only check anywhere that reads a D-Bus vtable. Every Python program byte-compiled |
 
 CI runs all of these on every push, on a pinned `ubuntu-24.04` runner
 with libgpiod v2 built from a named tag, because no Ubuntu LTS image

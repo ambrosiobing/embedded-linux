@@ -1,0 +1,32 @@
+# The Nucleo's ST-LINK virtual COM port, named and claimed.
+#
+# Three separate jobs in one rule, and all three are load bearing:
+#
+#   SYMLINK        /dev/ttyACM0 is a number that depends on what else was
+#                  plugged in first. The unit names /dev/sensorhub, which
+#                  does not move.
+#   TAG+="systemd" without it there is no dev-sensorhub.device unit for
+#                  the service to be bound to, and BindsTo in
+#                  sensorhubd.service silently binds to nothing.
+#   ID_MM_DEVICE_IGNORE
+#                  ModemManager probes new ACM devices by sending AT
+#                  commands at them. On this device that is a burst of
+#                  bytes into a framed protocol, which the daemon then
+#                  reports as CRC errors for the first few seconds after
+#                  every plug. Project 15 needs ModemManager on the same
+#                  bench, so telling it to leave this device alone is
+#                  better than not installing it.
+#
+# The product ID is the one to check on a new board: ST uses 0x3748,
+# 0x374b, 0x374e and others across ST-LINK versions, and the V3E on the
+# NUCLEO-H7A3ZI-Q is not the same as the V2-1 on older Nucleos. Read it
+# from lsusb before trusting this line; docs/BRINGUP.md says where.
+ACTION=="remove", GOTO="sensorhub_end"
+SUBSYSTEM!="tty", GOTO="sensorhub_end"
+
+ATTRS{idVendor}=="0483", ATTRS{idProduct}=="374e", \
+    SYMLINK+="sensorhub", GROUP="dialout", MODE="0660", \
+    TAG+="systemd", ENV{SYSTEMD_WANTS}="sensorhubd.service", \
+    ENV{ID_MM_DEVICE_IGNORE}="1"
+
+LABEL="sensorhub_end"

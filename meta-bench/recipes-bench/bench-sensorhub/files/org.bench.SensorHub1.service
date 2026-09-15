@@ -1,0 +1,5 @@
+[D-BUS Service]
+Name=org.bench.SensorHub1
+Exec=/bin/false
+User=sensorhub
+SystemdService=sensorhubd.service

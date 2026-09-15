@@ -49,7 +49,11 @@ jobs:
           # edge-timing arithmetic against a synthesised waveform, which
           # is the only part of that lab a runner can prove anything
           # about. Skipping it would mean the test silently never ran.
-          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables
+          # libsystemd-dev and libcbor-dev: Project 12's daemon is
+          # sd-bus plus libcbor, and the sd-bus vtable is a table of
+          # macros whose mistakes are compile errors. Nothing short
+          # of a board can check an interface declaration; this can.
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
@@ -114,6 +118,14 @@ jobs:
         # a conversion or an uninitialised variable.
         run: |
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-rt/files/rt-toggle.c -o /tmp/rt-toggle $(pkg-config --libs libgpiod)
+
+      - name: Compile the sensor hub daemon
+        # Two libraries at once, and the only check anywhere that looks at
+        # the D-Bus interface declaration. proto.c is compiled in here too,
+        # which is the same file the firmware compiles.
+        run: |
+          src=meta-bench/recipes-bench/bench-sensorhub/files
+          gcc -Wall -Wextra -Werror -O2 -I"$src" $(pkg-config --cflags libsystemd libcbor) "$src/sensorhubd.c" "$src/proto.c" -o /tmp/sensorhubd $(pkg-config --libs libsystemd libcbor)
 
       - name: Python programs compile
         # Found by shebang, so a new one cannot quietly escape the check.

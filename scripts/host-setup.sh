@@ -27,7 +27,7 @@ chrpath socat cpio python3 python3-pip python3-pexpect
 xz-utils debianutils iputils-ping python3-git python3-jinja2
 python3-subunit zstd lz4 liblz4-tool file locales libacl1
 bmap-tools libgpiod-dev gpiod shellcheck python3-yaml pipx
-pkg-config pkgconf nftables python3-numpy
+pkg-config pkgconf nftables python3-numpy libsystemd-dev libcbor-dev
 "
 
 # Packages that have no candidate on this release and are not worth a

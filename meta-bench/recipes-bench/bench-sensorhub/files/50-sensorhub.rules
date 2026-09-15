@@ -1,0 +1,21 @@
+/*
+ * Members of the bench group may calibrate without authenticating.
+ *
+ * This file is the reason sensorhubd asks polkit with
+ * AllowUserInteraction set to zero: with a rule, the answer is immediate
+ * and comes from group membership, so a system service never has to block
+ * a D-Bus method call while somebody finds a password prompt.
+ *
+ * polkit evaluates rules in lexical order and the first that returns a
+ * result wins, which is why the number is 50: low enough for a site rule
+ * in the 10s or 20s to override it, high enough to sit above the
+ * distribution defaults.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.bench.sensorhub.calibrate" &&
+        subject.isInGroup("bench")) {
+        return polkit.Result.YES;
+    }
+});
