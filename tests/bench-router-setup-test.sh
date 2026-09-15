@@ -100,16 +100,29 @@ run
 # would fail on the authoring machine and prove nothing about the target.
 # The check still runs in CI and on the build host, which is where the
 # claim has to hold.
+#
+# stat, not "ls -l | cut". The pipe is what shellcheck's SC2012 objects to,
+# and it was worth fixing rather than silencing: stat asks for the mode,
+# where the pipe counts columns in a listing meant for people.
 : >"$WORK/modeprobe"
 chmod 600 "$WORK/modeprobe"
-if [ "$(ls -l "$WORK/modeprobe" | cut -c1-10)" = "-rw-------" ]; then
-	mode=$(ls -l "$WORK/out/bench-ap.nmconnection" | cut -c1-10)
-	check "the keyfile is not readable by anyone else" "$mode" "-rw-------"
+if [ "$(stat -c %a "$WORK/modeprobe" 2>/dev/null)" = "600" ]; then
+	mode=$(stat -c %a "$WORK/out/bench-ap.nmconnection")
+	check "the keyfile is not readable by anyone else" "$mode" "600"
+	mode=$(stat -c %a "$WORK/out/lte.nmconnection")
+	check "the gsm keyfile is not readable either" "$mode" "600"
 else
 	echo "note     this file system has no POSIX modes, permissions unchecked"
 fi
-check "no staging file left behind" \
-	"$(ls -a "$WORK/out" | grep -c '^\.ap\.stage$')" "0"
+
+# A test, not a listing: the question is whether one named file is there.
+if [ -e "$WORK/out/.ap.stage" ]; then
+	echo "FAILED   a staging file was left behind"
+	fail=$((fail + 1))
+else
+	echo "ok       no staging file left behind"
+	pass=$((pass + 1))
+fi
 
 # ---------------------------------------------------------- partial input
 
@@ -119,8 +132,13 @@ printf 'APN=internet\n' >"$WORK/in.conf"
 run
 check "apn only: the gsm profile is written" \
 	"$(value lte.nmconnection apn)" "internet"
-check "apn only: no access point invented" \
-	"$(ls "$WORK/out" | grep -c bench-ap)" "0"
+if [ -e "$WORK/out/bench-ap.nmconnection" ]; then
+	echo "FAILED   apn only: an access point was invented"
+	fail=$((fail + 1))
+else
+	echo "ok       apn only: no access point invented"
+	pass=$((pass + 1))
+fi
 
 # Half an access point is not.
 printf 'AP_SSID=bench-lte\nAPN=internet\n' >"$WORK/in.conf"

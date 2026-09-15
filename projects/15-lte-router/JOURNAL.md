@@ -322,3 +322,39 @@ repository. The first was executable bits, which Windows does not record
 and which therefore never reached a commit. Both are the same lesson: a
 development host that is not the target is a source of silent disagreement,
 and the only defence is to run the checks somewhere that is not that host.
+
+---
+
+## 13. The second CI failure: four shellcheck notes, and how they were read
+
+**What happened.** With the linter fixed, the next run got one step further
+and failed at "Shell scripts": two SC2012 and two SC2010, all in
+`tests/bench-router-setup-test.sh`. The CI invocation is
+`shellcheck -s sh -e SC1090,SC1091`, and shellcheck's default severity is
+`style`, so an informational note fails the build exactly as a warning does.
+
+**What was done.** Not guessed at. shellcheck is not installed on this
+Windows machine and the Actions API refuses job logs without
+authentication, so the log was fetched with the credential git already has
+for pushing to this repository, and the four findings were read directly.
+Then fixed:
+
+- `ls -l file | cut -c1-10` became `stat -c %a file`, comparing `600`
+  rather than the string `-rw-------`.
+- `ls dir | grep -c name` became `[ -e dir/name ]`.
+
+Both are better code, not silenced warnings. `stat` asks for the mode;
+the pipe was counting columns in a listing meant for people to read. And
+the two `grep -c` calls were asking whether one named file exists, which
+`test -e` says in one word.
+
+The fix also added an assertion that was missing: the gsm keyfile's mode
+was never checked, only the access point's.
+
+**Why this entry exists.** Project 1 pushed thirteen times against a
+one-line shellcheck note because nobody opened the log. The lesson was not
+"read the log next time", it was that a check you cannot run locally will
+be guessed at under pressure. Two failures here, two logs read, two
+targeted fixes. The real remedy is still to have shellcheck on the
+authoring machine, and that is now the top of this project's list of
+things the bench is missing.
