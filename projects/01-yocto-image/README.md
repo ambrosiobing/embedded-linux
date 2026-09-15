@@ -152,7 +152,7 @@ that was actually built, including lines that ask for an option to stay off.
 | Every package in the image can be justified | `./go packages` against the table above | met, all 107 |
 | The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options; 15 after adding IKCONFIG |
 | A second clean build gives the same package list | `./go reproduce` | met, 95 and 95, identical ([evidence](docs/evidence/reproduce.txt)) |
-| The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | to do |
+| The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | met, aarch64, libgpiod 2.1.3 on the Pi ([evidence](docs/evidence/sdk-check.txt)) |
 | Boots to a login prompt in under 15 s | journal, `Startup finished` | met, 8.33 s: 3.18 kernel + 5.15 userspace ([evidence](docs/evidence/boot-timing.txt)) |
 
 `./go reproduce` tests a narrow claim and states it precisely: a clean build
@@ -203,7 +203,13 @@ Measured on this bench. The empty cells are not yet run.
 
 | Host | Cores | RAM | First build | Rebuild, warm sstate | SDK |
 |---|---|---|---|---|---|
-| WSL2 Ubuntu 26.04 | 8 | 15 GiB | 194 min | 21 s | |
+| WSL2 Ubuntu 26.04 | 8 | 15 GiB | 194 min | 21 s | see note |
+
+The SDK column has no clean figure and says so. The first `populate_sdk`
+ran for about 100 minutes before dying when the Windows drive filled, and
+the second completed from shared state with 6231 of 6264 tasks restored.
+Neither is a cold-cache measurement, and inventing one would be worse than
+the gap.
 
 `BB_NUMBER_THREADS` and `PARALLEL_MAKE` are both 8 in the kas file, which
 matches this host exactly. On a machine with a different core count, both

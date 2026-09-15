@@ -739,9 +739,56 @@ criterion. The tool was missing; the measurement was not.
 
 ---
 
+## 23. The SDK, and a command that lied
+
+**What happened.** `./go sdk` built the installer in a couple of minutes,
+because the run that died on the full disk had already done the work: 6264
+tasks, 6231 restored from shared state.
+
+Then `./go sdk install` ran a **build** instead of an installer. The `go`
+script had `sdk) exec sh ./scripts/sdk.sh build ;;`, which matches on the
+first word and drops everything after it. The word `install` went nowhere.
+
+**Why that is worse than an error.** It did not fail. It printed a plausible
+build log and finished successfully, and only the absence of an installer
+prompt gave it away. A command that quietly does the wrong thing is the same
+fault as the skipped compile in entry 7: the failure was invisible. Fixed by
+passing the subcommand through.
+
+**Then it worked.** The environment script supplied everything:
+
+```
+aarch64-poky-linux-gcc -mcpu=cortex-a72+crc -mbranch-protection=standard
+  -fstack-protector-strong --sysroot=/opt/poky/5.0.20/sysroots/cortexa72-poky-linux
+  ... -lgpiod
+aarch64 binary: SDK is cross
+```
+
+None of that is in the Makefile, which names no compiler and no sysroot.
+
+On the board:
+
+```
+hello-gpiod, libgpiod 2.1.3
+  /dev/gpiochip0     pinctrl-bcm2711      58 lines
+  /dev/gpiochip1     raspberrypi-exp-gpio 8 lines
+```
+
+**Two things that confirmed earlier guesses rather than leaving them
+assumed.** The target carries libgpiod **2.1.3**, which is exactly the tag
+CI was pinned to after `v2.1` turned out not to exist on the GitHub mirror.
+That pin was chosen on the belief that scarthgap ships the 2.1 line, and
+this is the first evidence for it. And the second chip, the
+`raspberrypi-exp-gpio` expander, is the reason matching the GPIO chip by
+label rather than by index was worth the forty lines it cost.
+
+**That closes Project 01.** Every criterion met, two items deferred with
+written reasons.
+
+---
+
 ## Still open
 
-- The SDK has not been generated, which is the last substantial criterion.
 - Five of the seven evidence artefacts are not yet captured. `packages.txt`
   exists on the build laptop and has not been committed; `kconfig-check.txt`
   needs the next flash, since it now reads `/proc/config.gz` from the board;

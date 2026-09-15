@@ -1,0 +1,66 @@
+Cross SDK, Project 01
+=====================
+
+Criterion: the SDK compiles and runs a program that links against libgpiod
+on the target.
+
+The SDK
+-------
+
+    poky-glibc-x86_64-bench-image-cortexa72-raspberrypi4-64-toolchain-5.0.20.sh
+
+Built with "bitbake bench-image -c populate_sdk", installed to
+/opt/poky/5.0.20. The name describes it: an x86_64 host toolchain targeting
+cortexa72 on raspberrypi4-64, carrying bench-image's own sysroot.
+
+Cross compile, on the laptop
+----------------------------
+
+    $ ./go sdk-check
+    --- using /opt/poky/5.0.20/environment-setup-cortexa72-poky-linux
+    aarch64-poky-linux-gcc -mcpu=cortex-a72+crc -mbranch-protection=standard
+      -fstack-protector-strong -O2 -D_FORTIFY_SOURCE=2 -Wformat
+      -Wformat-security -Werror=format-security
+      --sysroot=/opt/poky/5.0.20/sysroots/cortexa72-poky-linux
+      -O2 -pipe -g -feliminate-unused-debug-types -Wall -Wextra -O2
+      hello-gpiod.c -o hello-gpiod
+      -Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed -Wl,-z,relro,-z,now -lgpiod
+    aarch64 binary: SDK is cross
+
+None of those flags are in sdk/hello-gpiod/Makefile. The CPU tuning, the
+hardening set and the sysroot all come from the environment script. The
+Makefile names no compiler and no sysroot, which is the point.
+
+The "aarch64 binary" line is an assertion, not a comment. Forgetting to
+source the environment produces a working x86 binary that silently will not
+run on the target, so "make check" refuses anything else.
+
+Run, on the board
+-----------------
+
+    $ scp sdk/hello-gpiod/hello-gpiod root@192.168.92.85:/tmp/
+    hello-gpiod    100%   77KB   1.2MB/s
+
+    root@raspberrypi4-64:~# /tmp/hello-gpiod
+    hello-gpiod, libgpiod 2.1.3
+      /dev/gpiochip0     pinctrl-bcm2711      58 lines
+      /dev/gpiochip1     raspberrypi-exp-gpio 8 lines
+
+PASS
+
+What this proves
+----------------
+
+A program compiled on x86_64, against the target's own libgpiod headers and
+libraries, linked against the target's glibc, running on the Raspberry Pi
+and talking to the real kernel through the GPIO character device. That is
+the whole chain, and it is what Projects 5, 10, 11 and 12 will use instead
+of rebuilding an image for every edit.
+
+The reported version is libgpiod 2.1.3. CI builds libgpiod from tag v2.1.3
+for its host compile, chosen on the assumption that scarthgap ships the 2.1
+line. This output confirms the assumption rather than leaving it assumed.
+
+The two chips are the same ones gpiodetect reports, including the
+raspberrypi-exp-gpio expander that made matching the GPIO chip by label
+rather than by index worth doing.
