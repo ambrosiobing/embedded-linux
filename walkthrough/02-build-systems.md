@@ -55,6 +55,46 @@ It is also the right tool for this specific job. Project 1 has to produce an
 SDK for nineteen later projects, and SDK generation is a Yocto feature that
 Buildroot only approximates.
 
+## What the choice actually cost, measured
+
+The section above was written before the image existed. Having built it, the
+trade is no longer theoretical, and it is worth stating both halves.
+
+### What Yocto charged
+
+| | |
+|---|---|
+| First build | 194 minutes, 5095 tasks |
+| Disk | 60 GB working, and it filled a 254 GB Windows drive to zero |
+| An evening | Three kernel modules missing one at a time: firmware, driver, vendor module |
+
+That last one is the honest cost, and it is a direct consequence of the
+thing the choice was made for. `core-image-minimal` installs **no** kernel
+modules. Buildroot, by default, installs every module the kernel built. On
+Buildroot the WiFi would very likely have worked the first time, and the
+three journal entries about `brcmfmac` would not exist.
+
+### What it paid back
+
+| | Evidence from this project |
+|---|---|
+| Incremental rebuilds | 194 minutes to **21 seconds**, from shared state |
+| "What changed and why" | `buildhistory` answered both package mysteries as a `git diff` against a tag: which package dragged in libx11, and what the wireless stack brought with it |
+| A justifiable image | A per-package manifest is what makes "every package can be justified" a checkable criterion rather than a slogan |
+| Licence discipline | The proprietary radio firmware would not build until `LICENSE_FLAGS_ACCEPTED` named it. Shipping a non-open binary had to be a decision somebody made |
+| A matching SDK | `populate_sdk` produces a cross toolchain plus the image's own sysroot. Buildroot approximates this |
+| Reproducibility | Two independent builds of the same commit, separate caches, identical 95-package lists |
+
+### The trade in one sentence
+
+**Yocto makes you name everything**, which is why the image is explicable
+package by package, and also why the radio took three attempts. Buildroot
+would have given a working radio sooner and a less answerable image.
+
+Neither is better. They price the same property differently, and having paid
+Yocto's price once, on a project where the hardware was deliberately
+trivial, is the reason the price is worth knowing.
+
 ## The vocabulary, because four names confuse everyone
 
 ```

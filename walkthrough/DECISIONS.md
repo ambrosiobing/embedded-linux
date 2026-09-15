@@ -23,9 +23,24 @@ only approximates. And `daqring` already demonstrates Buildroot, so the pair
 covers both major build systems, which is usually the first question asked
 about this kind of work.
 
-**Consequence.** A slower first build and a steeper learning curve, in
-exchange for the ability to discuss the trade honestly rather than
-theoretically.
+**Consequence, now measured rather than predicted.** 194 minutes for the
+first build against Buildroot's roughly one hour, 60 GB of disk, and an
+evening lost to three kernel modules that had to be named one at a time.
+Buildroot installs every module the kernel builds; `core-image-minimal`
+installs none, so the WiFi would probably have worked first time on the
+other system.
+
+Against that: 21-second incremental rebuilds from shared state, a
+per-package manifest that makes "every package can be justified" a checkable
+criterion, `buildhistory` answering two package mysteries as a `git diff`, a
+licence mechanism that refused to ship proprietary firmware until it was
+explicitly accepted, a cross SDK that matches the image exactly, and a
+demonstrated reproducible build.
+
+The trade in one line: Yocto makes you name everything, which is why the
+image is explicable and why the radio took three attempts. That is worth
+knowing from having paid it, and is written up with the numbers in
+[02. Build systems](02-build-systems.md).
 
 ---
 
