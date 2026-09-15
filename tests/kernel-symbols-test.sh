@@ -136,7 +136,7 @@ EOF
 
 FRAGS=$WORK/files
 mkdir -p "$FRAGS"
-export BENCH_FRAGMENT_DIR=$FRAGS
+export BENCH_FRAGMENT_DIR="$FRAGS"
 
 run() {
 	rc=0
