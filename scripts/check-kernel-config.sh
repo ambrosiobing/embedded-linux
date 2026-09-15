@@ -14,13 +14,29 @@
 fragment=$REPO_DIR/meta-bench/recipes-kernel/linux/files/bench.cfg
 [ -f "$fragment" ] || die "no fragment at $fragment"
 
-config=$(find "$KAS_BUILD_DIR/tmp/work" -path '*linux-raspberrypi*' \
-	-name '.config' -newer "$fragment" 2>/dev/null | sort | tail -1)
-[ -n "$config" ] ||
-	config=$(find "$KAS_BUILD_DIR/tmp/work" -path '*linux-raspberrypi*' \
-		-name '.config' 2>/dev/null | sort | tail -1)
-[ -n "$config" ] || die "no built kernel .config found. Build first, and keep
-       RM_WORK_EXCLUDE containing linux-raspberrypi."
+# An explicit config wins. The best one is the running kernel own config,
+# taken from the board with "zcat /proc/config.gz", because it proves what
+# the hardware is executing rather than what a build tree once contained.
+if [ -n "${1:-}" ]; then
+	[ -r "$1" ] || die "cannot read $1"
+	config=$1
+else
+	config=$(find "$KAS_BUILD_DIR/tmp/work" -path "*linux-raspberrypi*" \
+		-name ".config" -newer "$fragment" 2>/dev/null | sort | tail -1)
+fi
+
+if [ -z "$config" ]; then
+	die "no built kernel .config found.
+
+       A build that was a complete sstate hit never compiles the kernel,
+       so no work directory exists for RM_WORK_EXCLUDE to preserve.
+       Either force one with: bitbake -c compile -f virtual/kernel
+       or pass the running kernel own config, which is better evidence:
+
+           scp root@BOARD:/proc/config.gz /tmp/
+           zcat /tmp/config.gz > /tmp/config
+           ./go kconfig /tmp/config"
+fi
 
 note "fragment $fragment"
 note "config   $config"

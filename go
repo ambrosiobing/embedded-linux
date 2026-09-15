@@ -30,7 +30,7 @@ rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
 sdk)        exec sh ./scripts/sdk.sh build ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
-kconfig)    exec sh ./scripts/check-kernel-config.sh ;;
+kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
 reproduce)  shift; exec sh ./scripts/reproduce.sh "$@" ;;
 packages)   exec sh ./scripts/packages.sh ;;
 lint)       exec python3 ./scripts/lint.py ;;
