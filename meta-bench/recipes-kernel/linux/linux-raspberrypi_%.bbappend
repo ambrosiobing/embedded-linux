@@ -34,3 +34,11 @@ SRC_URI += '${@"file://router.cfg" if d.getVar("BENCH_ROUTER_KERNEL") == "1" els
 # kernel that builds, boots, and is not preemptible.
 BENCH_RT_KERNEL ?= "0"
 SRC_URI += '${@"file://rt.cfg" if d.getVar("BENCH_RT_KERNEL") == "1" else ""}'
+
+# And the Bluetooth fragment, on the same switch pattern. Project 17 runs a
+# BLE gateway on a Raspberry Pi 3B+, where the radio is on a UART rather
+# than on USB, so the transport has to be built into the kernel. The cost
+# is a larger image for anything that does not use a radio, which is why it
+# is not in bench.cfg.
+BENCH_BLE_KERNEL ?= "0"
+SRC_URI += '${@"file://ble.cfg" if d.getVar("BENCH_BLE_KERNEL") == "1" else ""}'

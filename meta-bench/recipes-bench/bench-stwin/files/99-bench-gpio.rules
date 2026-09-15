@@ -1,0 +1,11 @@
+# Give the gpio group access to the GPIO character devices.
+#
+# Without this /dev/gpiochip0 is root-owned and mode 0600, so a service
+# running as an ordinary user cannot drive an LED. Raspberry Pi OS ships
+# the same rule; a Yocto image ships no such rule at all, which is why the
+# gateway's LEDs work as root and fail in exactly the configuration the
+# acceptance criteria ask for.
+#
+# The alternative is to run the gateway as root, which trades a one-line
+# udev rule for every other hardening line in the unit being decorative.
+SUBSYSTEM=="gpio", KERNEL=="gpiochip[0-9]*", GROUP="gpio", MODE="0660"

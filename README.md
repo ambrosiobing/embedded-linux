@@ -106,7 +106,7 @@ rather than pointing at where the original lives.
 | 14 | The Pi as a USB gadget: Ethernet, serial and HID | Raspberry Pi 4 | USB gadget configfs, libcomposite, evdev to HID | Planned |
 | 15 | [An LTE router with failover and GNSS](projects/15-lte-router) | Raspberry Pi 4 | ModemManager, NetworkManager, QMI, nftables, gpsd | **Software complete**: image, watchdog, exporter, firewall and four test suites; no board work yet |
 | 16 | A low-power Cat-M and NB-IoT tracker | Raspberry Pi 3 | AT state machines, CoAP/LwM2M, PSM/eDRX, current budget | Planned |
-| 17 | A BLE gateway for the STWIN.box with BlueZ | Raspberry Pi 3B+ | BLE central on Linux, BlueZ D-Bus GATT, pipelines | Planned |
+| 17 | [A BLE gateway for the STWIN.box with BlueZ](projects/17-ble-gateway) | Raspberry Pi 3B+ | BLE central on Linux, BlueZ D-Bus GATT, pipelines | **Software complete**: kernel fragment, BlueZ configuration, the gateway and three test suites; no board work yet |
 | 18 | Edge Wi-Fi access point with MQTT over TLS and a private PKI | Raspberry Pi 3 | hostapd, dnsmasq, Mosquitto, X.509 | Planned |
 | 19 | A/B updates with RAUC, a watchdog and a read-only rootfs | Raspberry Pi 3 | OTA, U-Boot bootcount, overlayfs, dm-verity | Planned |
 | 20 | OP-TEE on the Pi 3: a trusted application for key storage | Raspberry Pi 3 | TrustZone, OP-TEE OS, TEE Client API, secure storage | Planned |
@@ -125,6 +125,7 @@ file.
 | `./go router` | `kas/bench-router.yml` | `bench-router-image`, the gateway of Project 15: two uplinks, NAT, a cellular watchdog |
 | `./go release` | `kas/bench-release.yml` | The same image plus an SPDX bill of materials, a CVE report and the corresponding source archive |
 | `./go rt` | `kas/bench-rt.yml` | `bench-rt-image`, the latency lab of Project 8: a `PREEMPT_RT` kernel, cyclictest, stress-ng and an MCC 118 DAQ HAT |
+| `./go ble` | `kas/bench-ble.yml` | `bench-ble-image`, the BLE gateway of Project 17: BlueZ, the radio firmware, a Python BLE client and a local broker |
 | `./go hub` | `kas/bench-hub.yml` | `bench-hub-image`, the sensor hub of Project 12: the system bus, polkit, the D-Bus service and OpenOCD |
 
 Later projects that need a different kernel or a different image add their
@@ -186,6 +187,9 @@ usually break can be:
 | Wire protocol | `sh tests/sensorhub-proto-test.sh` | Project 12's frame format against frozen vectors, and a parser fed garbage, split frames, corrupted CRCs, absurd lengths and a lost byte |
 | Protocol, two implementations | `sh tests/sensorhub-cabi-test.sh` | The C compiled and driven through ctypes, compared byte for byte against an independent Python implementation over 900 randomised cases |
 | A D-Bus service's eight files | `sh tests/sensorhub-policy-test.sh` | Interface name, object path, polkit action, device path and unit name compared across the daemon, the bus policy, the activation file, the polkit action and rule, the udev rule, the unit and the recipe |
+| BlueST protocol | `sh tests/stwin-bluest-test.sh` | Project 17's decoder: masks read from UUIDs, both frame shapes, and an unknown mask bit stopping the walk rather than shifting every field after it |
+| BLE connection ladder | `sh tests/stwin-supervisor-test.sh` | Scan, connect, resolve, stream and back off, with a fake link that can fail at any step |
+| Gateway sinks | `sh tests/stwin-sinks-test.sh` | CSV columns fixed by the feature mask, daily rollover, the MQTT topic and payload, one LED per state |
 | Host compile | `./go check` | Four C programs built with `-Werror`: three against the host libgpiod v2, and the sensor hub daemon against libsystemd and libcbor, which is the only check anywhere that reads a D-Bus vtable. Every Python program byte-compiled |
 
 CI runs all of these on every push, on a pinned `ubuntu-24.04` runner

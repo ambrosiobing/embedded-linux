@@ -35,6 +35,9 @@ catch the mistakes that are most annoying to diagnose from the top.
 | Edge timing arithmetic | Project 8's period recovery against a synthesised square wave whose edge times are known before the program runs, in both the resolved and the unresolved edge regime |
 | Run protocol | The measurement order, core confinement, an isolation claim checked against the kernel in both directions, the throttle gate, and an overrun voiding a run |
 | Interrupt affinity | A movable interrupt that was not moved, told apart from a per-CPU timer that cannot be |
+| BlueST protocol | A mask bit with no field in the table stopping the decode, rather than shifting every field after it to an offset that is now wrong |
+| BLE connection ladder | A failure at each of scan, connect, resolve and stream, the doubling and the cap, and a link that is connected and silent |
+| Gateway sinks | Columns fixed by a feature mask, a day rolling over, an incomplete record staying visibly incomplete, and one LED lit per state |
 | A wire protocol | Frozen frame bytes, and a parser fed garbage, split frames, corrupted CRCs, absurd lengths and a lost byte |
 | Two implementations of it | The C compiled and driven through ctypes, compared byte for byte against an independent Python implementation over 900 randomised cases |
 | A D-Bus service's eight files | One interface name, one object path, one action id, one device path and one unit name, compared across every file that repeats them |
@@ -139,6 +142,35 @@ tool was missing; the measurement was not.
 **The pattern worth taking:** when a check cannot run, ask whether the
 evidence exists somewhere better, before adding machinery to recreate the
 place it used to live.
+
+## Making a check possible, when it was not
+
+The other half of that question is what to change so that a check can exist
+at all. Project 17 is the clearest case: a BLE gateway needs a controller,
+a daemon and a peripheral, none of which is on a laptop, and the parts most
+likely to be wrong are the reconnect logic and the frame decoding, neither
+of which is about radio.
+
+One module imports bleak, and the supervisor takes a link object with two
+methods. The sinks take their clients as arguments, and the LED sink drives
+a wrapper with two boolean methods rather than libgpiod directly. That cost
+about thirty lines and bought 87 assertions that run in under two seconds,
+including three cases that are genuinely awkward to produce on a bench: a
+peripheral that accepts a connection and drops it, one that connects and
+never notifies, and a frame two bytes short.
+
+Two of those three suites failed on their first run, and both failures were
+real. One found a state the LED table did not list, so the indicators went
+dark during Resolving, which is the one thing three LEDs are not supposed
+to be able to say. The other was the test's own fault and worth keeping as
+a warning: the supervisor takes an injectable clock so that timestamps are
+assertable, and the stall test supplied a clock that never moved, so the
+timeout it was testing could never elapse and the suite hung.
+
+**The pattern:** when a device makes a behaviour untestable, put the device
+behind an interface rather than accepting that the behaviour is untestable.
+The part that can only be proven on a board then becomes identifiable and
+small, which is also what the bring-up notes get organised around.
 
 ## Continuous integration
 

@@ -1,0 +1,43 @@
+# Project 17: the BLE gateway.
+#
+#   kas build kas/bench-ble.yml        or  ./go ble
+#
+# A Raspberry Pi 3B+, because that is the board with the radio this project
+# is written for, and because the Pi 4 in the bench is busy being the
+# router and the latency lab. bench-rpi3.yml already sets the machine, so
+# this file adds only what the radio and the gateway need.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-ble-image
+
+repos:
+  # meta-python has bleak, paho-mqtt and the libgpiod v2 Python bindings;
+  # meta-networking has mosquitto. Both are layers of the repository that
+  # bench-rpi4.yml already pins, so the branch is pinned there and this
+  # file only names the layers.
+  meta-openembedded:
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+
+local_conf_header:
+  ble: |
+    # The switch that adds recipes-kernel/linux/files/ble.cfg. See the
+    # bbappend for why it is opt in and why the transport is built in.
+    BENCH_BLE_KERNEL = "1"
+
+    # No DISTRO_FEATURES line here, and that is deliberate rather than an
+    # omission. meta/conf/distro/include/default-distrovars.inc has
+    # bluetooth in DISTRO_FEATURES_DEFAULT, and poky.conf takes that
+    # default, so bluez5 builds without anything being asked for. A line
+    # setting a feature that is already set reads like a requirement and
+    # is really a no-op, which is the sort of thing that survives into a
+    # product's documentation and misleads the next person.
+
+    # The radio and the gateway are what gets debugged here, so keep their
+    # work directories when rm_work runs.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bluez5 bench-stwin"

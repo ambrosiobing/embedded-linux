@@ -1,0 +1,81 @@
+[Unit]
+Description=STWIN.box BLE gateway
+Documentation=file:///usr/share/doc/bench-stwin/README
+# bluetoothd owns ATT and GATT. Without it this program has nothing to
+# talk to, and Requires rather than Wants because there is no degraded
+# mode worth running: a gateway with no Bluetooth is a log file saying so.
+Requires=bluetooth.service
+After=bluetooth.service
+# The broker may be on this board or across the network. Ordering only,
+# because MQTT is one of three sinks and losing it is not fatal.
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/bench/stwin.conf
+ExecStart=/usr/bin/stwin-gw
+Restart=always
+RestartSec=5
+
+# Unprivileged. The user is created by the recipe, and the gpio group is
+# what the udev rule hands /dev/gpiochip* to.
+User=stwingw
+Group=stwingw
+SupplementaryGroups=gpio
+
+# No SupplementaryGroups=bluetooth, and that is deliberate. Upstream
+# BlueZ's own D-Bus policy, src/bluetooth.conf, ends with
+#
+#   <policy context="default"><allow send_destination="org.bluez"/></policy>
+#
+# so any user may call bluetoothd. The "bluetooth" group that every
+# tutorial mentions comes from Debian's patched copy of that file, and no
+# such group exists on this image. Naming it here would not tighten
+# anything; it would stop the unit from starting, because systemd cannot
+# resolve a group that does not exist.
+
+# /var/lib/stwin-gw, created and chowned at start. It also survives
+# ProtectSystem=strict, which is the reason for using it rather than a
+# path in the configuration file.
+StateDirectory=stwin-gw
+
+# Hardening. Each of these is a refusal, and together they are what makes
+# "systemd-analyze security stwin-gw" worth quoting.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# PrivateDevices=yes would give this service an empty /dev, and the LEDs
+# live in /dev. So the device policy is closed and exactly one node is
+# allowed back in.
+PrivateDevices=no
+DevicePolicy=closed
+DeviceAllow=/dev/gpiochip0 rw
+
+# AF_UNIX is the system bus, AF_INET and AF_INET6 are the broker, and
+# AF_NETLINK is what glibc's getaddrinfo uses to choose a source address.
+# AF_BLUETOOTH is absent on purpose: this program never opens a raw
+# Bluetooth socket. bluetoothd does, and bluetoothd is a different unit
+# with a different threat model.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

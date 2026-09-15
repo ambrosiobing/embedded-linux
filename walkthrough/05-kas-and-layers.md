@@ -197,6 +197,14 @@ parsed straight afterwards and adds to it. The `%` in
 `linux-raspberrypi_%.bbappend` is a wildcard over the version, so the append
 survives the BSP bumping its kernel.
 
+A `.bbappend` is also how a file that an upstream recipe does *not* ship
+gets added. poky's `bluez5` installs `network.conf` and `input.conf` into
+`/etc/bluetooth` and no `main.conf` at all, so `bluetoothd` runs on its
+compiled-in defaults. `meta-bench/recipes-connectivity/bluez5/` adds one,
+which is the same mechanism as the kernel fragment applied to a
+configuration file rather than to a config symbol: the upstream recipe is
+never edited, and the layer's addition is a file plus four lines.
+
 `bench.cfg` is a kernel configuration fragment:
 
 ```
@@ -224,9 +232,15 @@ There are three fragments now, and the two later ones are opt in:
 | `bench.cfg` | none, every image gets it | the bbappend, unconditionally |
 | `router.cfg` | `BENCH_ROUTER_KERNEL` | `kas/bench-router.yml` |
 | `rt.cfg` | `BENCH_RT_KERNEL` | `kas/bench-rt.yml` |
+| `ble.cfg` | `BENCH_BLE_KERNEL` | `kas/bench-ble.yml` |
 
 Opt in, because a kernel another project has already measured should not
-change underneath it. `rt.cfg` adds a second requirement that is worth
+change underneath it. All three of the opt-in fragments turn something on
+with `=y` rather than `=m`, and for the same reason each time:
+`core-image-minimal` installs no kernel modules at all, so a driver built
+as a module is a driver that exists in the build tree and is absent from
+the image. This repository has paid for that three times, with `brcmfmac`,
+with `spidev`, and it would have paid a fourth with `hci_uart`. `rt.cfg` adds a second requirement that is worth
 knowing before writing any fragment: **an option can only be set if the
 kernel has it**. `CONFIG_PREEMPT_RT` depends on `ARCH_SUPPORTS_RT`, which
 arm64 gained in 6.12, and the BSP default here is 6.6. So the kas file sets

@@ -11,6 +11,7 @@
 #   ./go release      build with SBOM, CVE check and source archive
 #   ./go rt           build bench-rt-image, the PREEMPT_RT lab of Project 8
 #   ./go rt-kernel    install that kernel beside the generic one on a card
+#   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
@@ -37,6 +38,7 @@ router)     exec sh ./scripts/build.sh bench-router ;;
 release)    exec sh ./scripts/build.sh bench-release ;;
 rt)         exec sh ./scripts/build.sh bench-rt ;;
 rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
+ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
@@ -69,6 +71,6 @@ clean)
 	esac
 	;;
 *)
-	sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
 	;;
 esac

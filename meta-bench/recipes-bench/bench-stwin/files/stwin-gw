@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""stwin-gw: a BLE sensor gateway.
+
+Finds a BlueST peripheral, subscribes to its notifying characteristics,
+decodes the frames and forwards them to a CSV file, an MQTT topic and three
+LEDs. Reconnects on its own, for as long as the service is running.
+
+    stwin-gw --mac C0:6E:... --broker localhost --leds
+    stwin-gw --scan-only            list what is advertising, and stop
+
+Every option also has an environment variable, because the systemd unit
+passes its configuration through an EnvironmentFile rather than through the
+command line. That is not a style preference: a MAC address or a broker
+name in ExecStart has to survive systemd's own expansion and quoting
+rules, and an empty variable there silently becomes a missing argument
+rather than an error.
+
+SPDX-License-Identifier: MIT
+"""
+
+import argparse
+import asyncio
+import logging
+import os
+import signal
+import sys
+
+from bench_stwin.blelink import BleakLink
+from bench_stwin.sinks import CsvSink, LedSink, LogSink, MqttSink
+from bench_stwin.supervisor import Supervisor
+
+log = logging.getLogger("stwin-gw")
+
+
+def env(name, default=None):
+    value = os.environ.get(name)
+    return value if value not in (None, "") else default
+
+
+def env_flag(name):
+    return env(name, "0").lower() in ("1", "true", "yes", "on")
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="STWIN.box BLE gateway")
+    parser.add_argument("--mac", default=env("STWIN_MAC"),
+                        help="peripheral address; without it, the first "
+                             "device advertising the BlueST service wins")
+    parser.add_argument("--adapter", default=env("STWIN_ADAPTER"),
+                        help="hci0, for a host with more than one radio")
+    parser.add_argument("--broker", default=env("STWIN_BROKER"))
+    parser.add_argument("--port", type=int,
+                        default=int(env("STWIN_PORT", "1883")))
+    parser.add_argument("--topic-prefix",
+                        default=env("STWIN_TOPIC", "bench/stwin"))
+    parser.add_argument("--csv-dir",
+                        default=env("STWIN_CSV_DIR", "/var/lib/stwin-gw"))
+    parser.add_argument("--no-csv", action="store_true")
+    parser.add_argument("--leds", action="store_true",
+                        default=env_flag("STWIN_LEDS"))
+    parser.add_argument("--led-chip",
+                        default=env("STWIN_LED_CHIP", "/dev/gpiochip0"))
+    parser.add_argument("--scan-timeout", type=float,
+                        default=float(env("STWIN_SCAN_TIMEOUT", "10")))
+    parser.add_argument("--stall-timeout", type=float,
+                        default=float(env("STWIN_STALL_TIMEOUT", "30")),
+                        help="0 disables the quiet-link check")
+    parser.add_argument("--filter-uuid", action="store_true",
+                        default=env_flag("STWIN_FILTER_UUID"),
+                        help="filter the scan in BlueZ rather than here; "
+                             "lighter, and hides every other advertiser")
+    parser.add_argument("--scan-only", action="store_true",
+                        help="report advertisements and exit")
+    parser.add_argument("--rounds", type=int, default=None,
+                        help="stop after N connection attempts, for tests")
+    parser.add_argument("--log-level", default=env("STWIN_LOG_LEVEL", "info"))
+    return parser.parse_args(argv)
+
+
+def build_sinks(args):
+    sinks = [LogSink(log)]
+
+    if not args.no_csv and args.csv_dir:
+        try:
+            sinks.append(CsvSink(args.csv_dir))
+            log.info("csv in %s", args.csv_dir)
+        except OSError as error:
+            # Not fatal. A gateway that refuses to start because one of
+            # three sinks is unavailable is a gateway that stops reporting
+            # when a disk fills, which is when reporting matters most.
+            log.error("no CSV sink: %s", error)
+
+    if args.broker:
+        try:
+            sinks.append(MqttSink(args.broker, args.port, args.topic_prefix))
+            log.info("publishing to %s:%d under %s",
+                     args.broker, args.port, args.topic_prefix)
+        except Exception as error:
+            log.error("no MQTT sink: %s: %s", type(error).__name__, error)
+
+    if args.leds:
+        try:
+            sinks.append(LedSink(args.led_chip))
+            log.info("link-state LEDs on %s", args.led_chip)
+        except Exception as error:
+            log.error("no LED sink: %s: %s", type(error).__name__, error)
+
+    return sinks
+
+
+async def scan_only(link, timeout):
+    """Print every advertisement for `timeout` seconds, then stop."""
+    seen = {}
+
+    def report(address, rssi):
+        if address not in seen or abs(seen[address] - rssi) >= 5:
+            seen[address] = rssi
+            print("%-20s rssi %4d" % (address, rssi))
+
+    # A None address never matches, so this scans for the whole timeout
+    # and reports everything it hears, which is the point.
+    await link.scan(None, timeout, report)
+    print("%d device(s) in %.0f s" % (len(seen), timeout))
+    return 0
+
+
+async def main_async(args):
+    link = BleakLink(adapter=args.adapter, filter_uuid=args.filter_uuid)
+
+    if args.scan_only:
+        return await scan_only(link, args.scan_timeout)
+
+    sinks = build_sinks(args)
+    supervisor = Supervisor(link, sinks, address=args.mac,
+                            scan_timeout=args.scan_timeout,
+                            stall_timeout=args.stall_timeout)
+
+    loop = asyncio.get_running_loop()
+    runner = asyncio.ensure_future(supervisor.run(rounds=args.rounds))
+
+    # SIGTERM is how systemd stops this, and a gateway that has to be
+    # killed leaves its GPIO lines held and its MQTT session hanging until
+    # the broker's keepalive expires.
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, runner.cancel)
+
+    try:
+        await runner
+    except asyncio.CancelledError:
+        log.info("stopping")
+    finally:
+        supervisor.close()
+    return 0
+
+
+def main(argv):
+    args = parse_args(argv)
+    logging.basicConfig(
+        level=getattr(logging, args.log_level.upper(), logging.INFO),
+        format="%(levelname)s %(message)s")
+    try:
+        return asyncio.run(main_async(args))
+    except KeyboardInterrupt:
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -910,4 +910,124 @@ strings were typed consistently.
 
 ---
 
+## 39. A decoder stops at the first thing it does not recognise
+
+**Context.** BlueST frames carry a 16-bit timestamp and then the fields of
+every feature named in a 32-bit mask, back to back, highest bit first.
+There are no length fields, no type tags and no padding.
+
+**Decision.** The decoder walks all 32 bits rather than only the ones it
+knows. At an unrecognised set bit it stops, keeps every field above it, and
+marks the record with `undecoded_mask` and the remaining bytes. Those two
+fields are columns in the CSV and keys in the MQTT payload.
+
+**Rejected.** Skipping unknown bits and carrying on, which is what a
+decoder written from the happy path does. Also rejected: raising on any
+unknown bit.
+
+**Why.** Without lengths, the width of every field is needed to locate the
+ones below it, so an unknown bit makes everything after it unlocatable.
+Skipping produces a complete record of plausible numbers read from the
+wrong offsets, and nothing downstream can distinguish it from a good one.
+Raising is safe and throws away measurements that were located correctly,
+which matters because the likeliest unknown bit is a new low-order feature
+in a firmware update.
+
+**Consequence.** A frame shorter than its mask promises still raises, and
+the distinction is the point: there the peripheral and the table disagree
+about a field that is supposedly known, which is a fault rather than a gap.
+The same reasoning applies to any length-free wire format, which includes
+most sensor protocols that were designed to fit in a 20-byte BLE
+notification.
+
+---
+
+## 40. Back-off is reset by data, not by connection
+
+**Context.** A gateway that reconnects on its own needs a delay that grows
+while a fault lasts, and returns to its floor when the fault clears.
+
+**Decision.** The ladder resets when the link reaches Streaming, meaning at
+least one characteristic is notifying, rather than when the peripheral
+accepts a connection. A separate stall timeout ends a link that is still up
+and has stopped delivering.
+
+**Rejected.** Resetting on `Connected`, which is the obvious place and is
+what the original scope does.
+
+**Why.** A peripheral that accepts a connection and drops it immediately is
+a common failure and the worst case for the obvious version: every attempt
+"succeeds", the delay returns to one second, and the gateway retries as
+fast as the radio allows for as long as the fault lasts. Resetting on data
+makes the delay mean "how long since this link last actually worked". The
+stall timeout closes the other half of the same gap: a supervision timeout
+detects a peripheral that has gone away and cannot detect one that is
+present and silent, which is what a firmware with one crashed task looks
+like from the other end of a radio.
+
+**Consequence.** A gateway sitting in Streaming with a green LED and an
+empty file is now impossible, which was the failure mode worth designing
+against because it looks exactly like success.
+
+---
+
+## 41. A dependency of a program is not a permission of a service
+
+**Context.** Running a BLE client as a non-root user is documented
+everywhere as "add the user to the bluetooth group", and adding a user to a
+group is the kind of instruction that gets copied without checking.
+
+**Decision.** No `bluetooth` group is created or joined. A `gpio` group is
+created by the recipe, and the service joins that one.
+
+**Rejected.** The documented instruction, and its alternative of running
+the gateway as root.
+
+**Why.** Two files settle it. Upstream BlueZ's own policy,
+`src/bluetooth.conf`, ends with a default-context rule allowing any user to
+send to `org.bluez`; the restricted policy with a `bluetooth` group in it
+is Debian's patch. And poky's `bluez5` recipe creates no user and no group,
+so on this image the group does not exist at all: naming it in
+`SupplementaryGroups=` would not tighten a permission that is already
+granted, it would stop the unit from starting. The LEDs are the opposite
+case: `/dev/gpiochip0` really is inaccessible to an ordinary user, so there
+the group is load bearing and the recipe has to make it.
+
+**Consequence.** Every permission line in that unit is now there because
+something needs it, which is the only way a hardened unit stays honest as
+it is edited. It also generalises: a distribution's group is a property of
+that distribution's patches, and the question to ask about any such
+instruction is which file grants the permission.
+
+---
+
+## 42. One module imports the library, so the other three can be tested
+
+**Context.** A BLE gateway needs a controller, a daemon and a peripheral.
+None of them exists on a laptop, and the parts most likely to be wrong are
+the reconnect logic and the frame decoding, neither of which is about
+radio.
+
+**Decision.** `blelink.py` is the only module that imports bleak, and it is
+deliberately the smallest. The supervisor takes a link object with two
+methods, the sinks take their clients as arguments, and the LED sink drives
+a wrapper with two boolean methods rather than libgpiod directly.
+
+**Rejected.** One module that does all of it, which is shorter and is what
+the original scope sketches.
+
+**Why.** It cost about thirty lines and bought 87 assertions that run in
+under two seconds, including cases that are genuinely hard to produce on a
+bench: a peripheral that accepts a connection and drops it, one that
+connects and never notifies, a frame that is two bytes short. Two of the
+three suites found a real defect on their first run.
+
+**Consequence.** The part that can only be proven on a board is now
+identifiable and small, which is also what the bring-up notes are organised
+around. The same split is worth applying to any program whose interesting
+behaviour is failure handling around a device: the device goes behind an
+interface, and the behaviour becomes testable.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)
