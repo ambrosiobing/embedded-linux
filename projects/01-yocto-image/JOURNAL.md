@@ -789,12 +789,25 @@ written reasons.
 
 ## Still open
 
-- Five of the seven evidence artefacts are not yet captured. `packages.txt`
-  exists on the build laptop and has not been committed; `kconfig-check.txt`
-  needs the next flash, since it now reads `/proc/config.gz` from the board;
-  `state-transition.txt` and `sdk-check.txt` are commands away.
-- The LED indication and the serial console are deferred with written
-  reasons rather than open.
+**Project 01 is complete.** Eleven of eleven criteria met, four evidence
+artefacts captured in `docs/evidence/`.
+
+Two optional transcripts remain, and neither changes a result:
+
+- `state-transition.txt`. The transition was observed on the board, `ok`
+  then `failed`, and is recorded in the verification table; only the
+  transcript is missing.
+- `kconfig-check.txt`, which needs the next flash, because the check now
+  reads `/proc/config.gz` from the running board rather than a build tree.
+
+Deferred with written reasons rather than open: the LED indication, because
+the LinkerKit modules cannot be connected with the cables available, and the
+serial console, which Project 2 makes mandatory.
+
+One loose end outside the repository: the build laptop's `git push` is
+refused by a token scope, so `packages.txt` was transcribed and committed
+from the other machine instead. `gh auth refresh -s repo` there, and a
+`git reset --hard origin/main` to drop the stranded duplicate commit.
 
 **A correction that belongs here.** Earlier entries and the project README
 listed the `kbd` and `keymaps` packages as unjustified, on the grounds that
