@@ -8,6 +8,7 @@
 #   ./go dev          build the debugging variant
 #   ./go rpi3         build the same layer for a Raspberry Pi 3
 #   ./go sdk          build the cross SDK installer
+#   ./go sdk install  run that installer into /opt/poky
 #   ./go sdk-check    cross-compile sdk/hello-gpiod with the installed SDK
 #   ./go flash /dev/sdX   write the image to a card
 #   ./go kconfig      check that the kernel fragment reached the .config
@@ -27,7 +28,7 @@ check)      exec sh ./scripts/host-check.sh ;;
 build)      exec sh ./scripts/build.sh bench-rpi4 ;;
 dev)        exec sh ./scripts/build.sh bench-dev ;;
 rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
-sdk)        exec sh ./scripts/sdk.sh build ;;
+sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
@@ -58,6 +59,6 @@ clean)
 	esac
 	;;
 *)
-	sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
 	;;
 esac
