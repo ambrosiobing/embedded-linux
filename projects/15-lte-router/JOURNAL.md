@@ -290,3 +290,35 @@ now so that the journal can say whether the guess was right:
    higher.
 4. The size `python3-modules` adds, which decides whether the two scripts
    stay Python.
+
+---
+
+## 12. The linter passed on the laptop and failed in CI, for a real reason
+
+**What happened.** The first push failed at the "Static layer checks" step
+after passing the identical check locally a minute earlier.
+
+**What was done.** The cause was `check_systemd_units` in `scripts/lint.py`.
+It reads `SYSTEMD_SERVICE` and splits it on whitespace, which is right for
+the one-line form `bench-status` uses and wrong for the multi-line form both
+new recipes use: the line continuations come out as unit names. The check
+then asks whether `files/` contains a file whose name is a single
+backslash.
+
+On Windows that path resolves to `files/` itself, because the backslash is
+a separator there, and `.exists()` returns true. On Linux it is a filename,
+it does not exist, and seven spurious failures are reported. The fix is one
+line, stripping continuations before the split, and it is commented in
+place so the next person does not simplify it back.
+
+**Why this entry exists.** Not for the fix, which is trivial. For the shape
+of it: a check whose answer depends on which operating system runs it is
+worse than no check, because it teaches whoever sees the red run that the
+linter is unreliable. That is precisely how Project 1 came to push thirteen
+times with a one-line shellcheck note nobody read.
+
+It is also the second time the same class of bug has appeared in this
+repository. The first was executable bits, which Windows does not record
+and which therefore never reached a commit. Both are the same lesson: a
+development host that is not the target is a source of silent disagreement,
+and the only defence is to run the checks somewhere that is not that host.

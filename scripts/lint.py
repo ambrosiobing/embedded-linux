@@ -99,7 +99,15 @@ def check_systemd_units() -> None:
         match = re.search(r'SYSTEMD_SERVICE:\$\{PN\}\s*=\s*"([^"]*)"', body)
         if not match:
             continue
-        for unit in match.group(1).split():
+        # A multi-line SYSTEMD_SERVICE is ordinary BitBake, and its line
+        # continuations are not unit names. Dropping them is not cosmetic:
+        # "files" / chr(92) is a path that exists on Windows, because the
+        # backslash is a separator there and it resolves to files/ itself,
+        # and does not exist on Linux. So this check passed on the laptop
+        # that wrote the recipe and failed in CI, which is the worst
+        # possible place for a linter to disagree with itself.
+        units = match.group(1).replace(chr(92), " ").split()
+        for unit in units:
             if unit not in body:
                 fail(recipe, f"SYSTEMD_SERVICE lists {unit}, never installed")
             if not (recipe.parent / "files" / unit).exists():
