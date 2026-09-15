@@ -133,8 +133,13 @@ check "failover: eth0 reports zero, not absent" \
 
 # A series that disappears when a device goes down leaves the last value
 # on the dashboard for ever. Both uplinks are reported every time.
+#
+# The pattern is anchored and carries the brace so that only samples are
+# counted. Matching the bare name counts the HELP and TYPE lines as well,
+# which is how this assertion came to be written with the answer 4 here and
+# 2 twenty lines further down.
 check "failover: both uplinks still reported" \
-	"$(has 'lte_default_route_via')" "4"
+	"$(has '^lte_default_route_via{')" "2"
 
 # --------------------------------------------------- lowest metric wins
 
@@ -170,7 +175,8 @@ chmod +x "$WORK/bin/mmcli"
 collect
 check "no modem: a file is still written" "$(has '^lte_modem_present 0$')" "1"
 check "no modem: no signal metrics invented" "$(has 'lte_signal_rsrp')" "0"
-check "no modem: the route is still reported" "$(has 'lte_default_route_via')" "2"
+check "no modem: the route is still reported" \
+	"$(has '^lte_default_route_via{')" "2"
 
 # ------------------------------------------------------- format check
 

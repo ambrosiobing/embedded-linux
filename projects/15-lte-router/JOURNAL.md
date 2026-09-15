@@ -358,3 +358,32 @@ be guessed at under pressure. Two failures here, two logs read, two
 targeted fixes. The real remedy is still to have shellcheck on the
 authoring machine, and that is now the top of this project's list of
 things the bench is missing.
+
+---
+
+## 14. The third CI failure: one assertion counted comments as samples
+
+**What happened.** Everything passed on the runner except one line of
+`tests/lte-exporter-test.sh`: "no modem: the route is still reported",
+wanted 2, got 4.
+
+**What was done.** The assertion counted every line matching
+`lte_default_route_via`, which includes the `# HELP` and `# TYPE` lines the
+exporter emits above the two samples. The correct answer is 4, and twenty
+lines earlier the same count is asserted as 4, so the file disagreed with
+itself. Both are now anchored to `^lte_default_route_via{`, which matches
+samples only and reads as what is meant: two uplinks, always both reported.
+
+**Why this one got through.** The harness that stood in for these tests on
+the Windows machine computed `text.count(...) - 2`, subtracting the two
+comment lines. It compensated for the very thing the shell test was
+getting wrong, so it passed while the real test failed. A substitute check
+that is not the same check will agree with you about the wrong things.
+That is the cost of not being able to run the real tests locally, and it
+is the second entry in this journal pointing at the same missing tool.
+
+**What the same run proved, and is worth recording as a success:**
+`lte-gpio.c` compiled clean with `-Werror` against a real libgpiod 2.1.3,
+the whole watchdog escalation ladder passed against the PATH stubs on a
+host where the stubs actually execute, and both keyfile modes came back
+600. None of that could be checked on the authoring machine.
