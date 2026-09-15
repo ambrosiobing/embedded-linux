@@ -12,4 +12,6 @@ actually run; nothing in this folder should be written from expectation.
 | `sdk-check.txt` | `./go sdk-check > projects/01-yocto-image/docs/evidence/sdk-check.txt`, plus the output of running the binary on the board |
 | `state-transition.txt` | `bench-state show`, then `systemctl stop sshd.socket`, then `bench-state show` again. The state machine on hardware, without needing LEDs |
 | `leds.mp4` | Deferred. Needs three bare LEDs or an LK-Cable, see the project README |
-| `build-times.md` | Wall-clock of the first build and of a warm rebuild, with the host's core count and RAM |
+
+Build times are not a separate file: they live in the table in the
+[project README](../../README.md), so there is one place to look.

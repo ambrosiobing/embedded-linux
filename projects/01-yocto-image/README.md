@@ -283,14 +283,28 @@ longer needed to exist, removed 23 now-unreachable sstate objects, and
 produced a 48 MB image with **95 packages** and no `libx` entries. The
 criterion that every package can be justified is met for all 95.
 
-### Still open
+### Two more from packagegroup-core-boot
 
-`kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine` and `keymaps`
-are console keymaps, which a board reached over serial and SSH does not
-need. `update-rc.d` and `update-alternatives-opkg` are package-management
-machinery on an image with no package manager. Both come from
-`packagegroup-core-boot`, so trimming them means overriding that rather than
-a `PACKAGECONFIG`, which is a larger change than it looks.
+`update-alternatives-opkg` implements the alternatives mechanism that
+resolves which package provides a shared command name, and it runs during
+rootfs construction even on an image with no package manager on it.
+`update-rc.d` is its sysvinit-era sibling, pulled in alongside. Both arrive
+from `packagegroup-core-boot` rather than from anything this layer asked
+for.
+
+They are explicable rather than wanted. Trimming them means overriding a
+packagegroup, which is a larger change than a `PACKAGECONFIG` and buys a few
+kilobytes, so they stay and are written down instead.
+
+### A correction
+
+An earlier version of this section listed `kbd`, `kbd-consolefonts`,
+`kbd-keymaps`, `kbd-keymaps-pine` and `keymaps` as unjustified, on the
+grounds that a board reached over serial and SSH has no use for console
+keymaps. That was wrong for this bench. The console here is a touchscreen
+with a German keyboard attached, `bench-provision` depends on `keymaps` and
+`kbd` to set `KEYMAP=de`, and removing them would have broken the console
+this project is actually used through.
 
 ## Where this differs from the book
 

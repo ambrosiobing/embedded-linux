@@ -741,12 +741,23 @@ criterion. The tool was missing; the measurement was not.
 
 ## Still open
 
-- `kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine`, `keymaps`,
-  `update-rc.d` and `update-alternatives-opkg` remain unjustified. All come
-  from `packagegroup-core-boot`, so trimming them means overriding a
-  packagegroup, which is a larger change than a `PACKAGECONFIG` and has not
-  been attempted yet.
-- The SDK has not been generated.
+- The SDK has not been generated, which is the last substantial criterion.
+- Five of the seven evidence artefacts are not yet captured. `packages.txt`
+  exists on the build laptop and has not been committed; `kconfig-check.txt`
+  needs the next flash, since it now reads `/proc/config.gz` from the board;
+  `state-transition.txt` and `sdk-check.txt` are commands away.
+- The LED indication and the serial console are deferred with written
+  reasons rather than open.
+
+**A correction that belongs here.** Earlier entries and the project README
+listed the `kbd` and `keymaps` packages as unjustified, on the grounds that
+a board reached over serial and SSH does not need console keymaps. That was
+wrong for this bench: the console is a touchscreen with a German keyboard,
+`bench-provision` depends on those packages to set `KEYMAP=de`, and acting
+on the recommendation would have broken the console this project is used
+through. The lesson is narrow and worth keeping: a package that looks
+unnecessary in the abstract may be load-bearing for how the thing is
+actually used.
 
 ---
 
