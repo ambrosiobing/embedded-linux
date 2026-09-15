@@ -59,6 +59,8 @@ decision was taken over its alternative.
 | `wpa-supplicant`, via `bench-provision` | Joins the wireless network. This bench has no wired network within reach |
 | `linux-firmware-rpidistro-bcm43455` | The Pi 4 radio does not initialise without it. Proprietary and binary-redistributable, so its licence must be accepted explicitly |
 | `kernel-module-brcmfmac` | The radio driver. `core-image-minimal` installs no kernel modules, so firmware alone gives a device that never probes |
+| `kernel-module-brcmfmac-wcc` | The vendor half of that driver. `brcmfmac` asks for it by name at probe time and fails to attach without it, after detecting the chip and finding its firmware |
+| `kernel-module-brcmutil`, `kernel-module-cfg80211`, `kernel-module-rfkill` | Pulled in by the driver. Notably not `mac80211`: `brcmfmac` is a FullMAC driver, so the MAC layer runs in the chip firmware and the host speaks `cfg80211` directly |
 
 Those choices pull in eight more, all of them the wireless stack. They were
 traced with `buildhistory`, which records the package list after every build

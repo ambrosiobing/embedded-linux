@@ -23,6 +23,7 @@ IMAGE_INSTALL:append = " \
     bench-provision \
     linux-firmware-rpidistro-bcm43455 \
     kernel-module-brcmfmac \
+    kernel-module-brcmfmac-wcc \
     bench-status \
 "
 
@@ -30,7 +31,20 @@ IMAGE_INSTALL:append = " \
 # has to be named. Firmware without a driver is a radio that never probes:
 # /lib/firmware/brcm was full and dmesg had no brcmfmac line anywhere.
 # Yocto resolves module dependencies from the modules' own metadata, so this
-# pulls brcmutil, cfg80211 and mac80211 with it.
+# pulls brcmutil, cfg80211 and rfkill with it. Not mac80211: brcmfmac is a
+# FullMAC driver, so the MAC layer runs in the chip's firmware and the host
+# side speaks cfg80211 directly.
+#
+# The core driver is not enough on its own. Modern brcmfmac splits the
+# vendor-specific part into its own module and asks for it by name at probe
+# time. Without it the chip is detected, the firmware file is found, and
+# attach fails at the last step:
+#
+#   brcmf_fwvid_request_module: mod=wcc: failed 256
+#   brcmf_attach: brcmf_fwvid_attach failed
+#
+# wcc is the Cypress and Infineon variant, which is what the Pi 4 carries.
+# bca is the other one and is not needed here.
 
 # The Pi 4 radio firmware is proprietary and binary-redistributable, so
 # Yocto refuses to build it until the licence is accepted explicitly.
