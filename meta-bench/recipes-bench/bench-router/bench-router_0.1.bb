@@ -14,11 +14,13 @@ SRC_URI = "\
     file://eth0-uplink.nmconnection \
     file://lte.nmconnection.in \
     file://bench-ap.nmconnection.in \
+    file://wan-wifi.nmconnection.in \
     file://connectivity.conf \
     file://bench-lan.conf \
     file://nftables.conf \
     file://90-forward.conf \
     file://ModemManager.conf \
+    file://76-bench-uplink.rules \
     file://77-sim7600.rules \
     file://bench-router-setup \
     file://bench-router-setup.service \

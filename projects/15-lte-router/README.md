@@ -67,6 +67,7 @@ turned out to be nothing.
 | `meta-bench/recipes-bench/bench-net-wifi/` | The wireless client half of the old `bench-provision`, split out so this image can leave it behind |
 | `meta-bench/recipes-kernel/linux/files/router.cfg` | The opt-in kernel fragment: modem drivers and netfilter, built in |
 | `kas/bench-router.yml` | `meta-networking`, the fragment switch, `bench-router-image` |
+| `meta-bench/recipes-kernel/linux-firmware/` | A firmware package poky does not provide, for the second uplink's radio |
 | `tests/lte-watchdog-test.sh` and three more | What can be proven without a modem |
 
 ## Running it
@@ -123,8 +124,6 @@ rather than modular. See [DESIGN.md](docs/DESIGN.md#what-the-kernel-has-to-provi
 for the reasoning, which comes directly from Project 1's two rounds of
 debugging a missing `brcmfmac` module.
 
-| Measurement | Value |
-|---|---|
 | | First build | Second build |
 |---|---|---|
 | Packages | 220 | 226 |
@@ -176,9 +175,9 @@ table: "configured" means a file says so, "measured" means a board did so.
 
 | # | Criterion | State |
 |---|---|---|
-| 1 | `ip route` shows two defaults, eth0 at metric 100 and wwan0 at 700 | **Half met.** `default via 10.166.165.253 dev wwan0 metric 700`, live, with packets flowing. `eth0` at 100 needs a cable this bench does not have |
-| 2 | Pulling the cable loses at most 5 replies; the route returns within 90 s | **Cannot be run here.** One uplink is not a failover. [failover-tests.md](docs/failover-tests.md) |
-| 3 | A dead upstream behind a live cable is detected within two connectivity intervals | **Was impossible and nobody knew.** NetworkManager was built with `-Dconcheck=false`, so the check was not in the binary. Fixed in the kas file, needs a rebuild |
+| 1 | `ip route` shows two defaults, the primary at metric 100 and wwan0 at 700 | **Half met, unblocked.** `wwan0` at 700 is live with packets flowing. The primary is now a USB wireless adapter on `wan0` at metric 100, standing in for the cable. Needs the third build |
+| 2 | Losing the primary uplink loses at most 5 replies; the route returns within 90 s | **Unblocked.** A wireless uplink makes the disconnect a software event unless the home access point is powered off; both methods and what each proves are in [failover-tests.md](docs/failover-tests.md) |
+| 3 | A dead upstream behind a live carrier is detected within two connectivity intervals | **Was impossible and nobody knew.** NetworkManager was built with `-Dconcheck=false`, so the check was not in the binary. Fixed, and unaffected by the uplink being wireless |
 | 4 | `mmcli --location-get` reports a fix within 3 minutes, within 50 m | Not measured. The GNSS antenna is not attached |
 | 5 | After `AT+CFUN=0` the watchdog restores a bearer within 4 minutes, and the counters show the levels | Unblocked by the bearer. Escalation tested against stubs; level 3 needs `pwrkey_verified` first, journal 21 |
 | 6 | `curl http://10.20.0.1:9101/lte.prom` returns valid Prometheus text | **Met.** Real signal, one-hot state, and the live uplink. [first-bearer.txt](docs/evidence/first-bearer.txt) |

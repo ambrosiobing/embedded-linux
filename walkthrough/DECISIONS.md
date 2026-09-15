@@ -1157,4 +1157,66 @@ real kernel text rather than an imitation.
 
 ---
 
+## 47. A firmware file with no package gets one
+
+**Context.** The bench's second uplink is a TP-Link TL-WN823N v2/v3, a
+Realtek RTL8192EU driven by the in-tree `rtl8xxxu`, which asks for
+`rtlwifi/rtl8192eu_nic.bin`. poky's `linux-firmware` recipe splits out
+`rtl8188`, `rtl8192cu`, `rtl8192ce`, `rtl8192su`, `rtl8723`, `rtl8821` and
+`rtl8822`, and nothing claims that file.
+
+**Decision.** A four-line bbappend in `meta-bench` creating
+`linux-firmware-rtl8192eu`, with `PACKAGES =+` so it claims the file before
+the catch-all package does.
+
+**Rejected.** Installing `linux-firmware` whole, which is what the absence
+of a package nudges you towards.
+
+**Why.** The catch-all is every firmware blob for every device Linux
+supports, on a board with two radios and a modem. And the rule this
+repository already follows is that every package in the image is justified
+in one line; "we needed one file out of it" does not justify the rest.
+
+**Consequence.** One more thing to carry across a Yocto release, and it is
+the kind of thing that breaks loudly rather than silently: if upstream ever
+splits the file out itself, the build complains about an empty package
+instead of quietly shipping the wrong thing. `PACKAGES =+` rather than `+=`
+is the whole trick, and it is commented in place, because appending would
+produce an empty package and a rootfs full of firmware for hardware nobody
+owns.
+
+---
+
+## 48. Interface names are assigned, not hoped for
+
+**Context.** Adding a USB wireless adapter gives the router two radios. The
+onboard `brcmfmac` is built in but waits for firmware from the rootfs; the
+adapter's `rtl8xxxu` loads as soon as USB enumerates. Which of them
+registers its netdev first is genuinely undecided, and `wlan0` is named by
+the access point profile, the DHCP configuration and three nftables rules.
+
+**Decision.** A udev rule renames the adapter to `wan0`, matched on its USB
+vendor and product ids.
+
+**Rejected.** Letting the kernel number them and referring to `wlan1`.
+
+**Why.** `wan0` is a name the kernel never assigns, so whichever order the
+two appear in, the onboard radio ends up on `wlan0`: if the adapter
+registers first it is renamed away before the other asks, and if it
+registers second it was never going to take `wlan0` anyway. The failure
+this avoids is not a crash. It is an access point that comes up on the
+wrong radio, at the wrong power, on the wrong antenna, and works well
+enough that nobody looks.
+
+The ids rather than the driver name, because a driver name is a property of
+the kernel version and the ids are a property of the part in the drawer.
+This is the same reasoning as `77-sim7600.rules`, which gives the modem's
+AT and NMEA ports stable names for the same reason: allocation order is not
+a promise.
+
+**Consequence.** A second adapter needs its own line. That is better than a
+rule broad enough to catch something unintended.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)

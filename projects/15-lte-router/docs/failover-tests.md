@@ -30,12 +30,32 @@ journalctl -f -u NetworkManager -u ModemManager -u lte-watchdog
 The measurement is the number of consecutive "no answer" lines, which at
 one ping per second is the outage in seconds.
 
+## A note on what "the cable" means here
+
+This bench has no Ethernet cable within reach, so the primary uplink is a
+USB wireless adapter on `wan0` at metric 100, joining the network the cable
+would have reached. Journal entry 25 has why.
+
+That changes how the scenarios are provoked, and it is worth being precise
+about which of them is weakened.
+
+| Scenario | With a cable | Here |
+|---|---|---|
+| 1, carrier loss | Unplug it. A physical event the kernel sees immediately | `nmcli dev disconnect wan0`, or power off the home access point. The second is a real carrier loss and the better test |
+| 2, live carrier, dead upstream | Unplug the home router's own uplink | Identical. Nothing about it depends on the medium |
+| 3, the modem stops | `AT+CFUN=0` | Identical |
+
+Scenario 1 is the weakened one: a software disconnect proves NetworkManager
+withdraws the routes, which is most of what matters, but it does not prove
+the driver notices a carrier that vanished. Powering off the access point
+does, and takes longer to recover, so record which method each run used.
+
 ## Scenario 1: the cable comes out
 
 The carrier drops, so NetworkManager withdraws the eth0 routes at once and
 no connectivity check is involved. This should be the fastest of the three.
 
-| Run | Replies lost, out | Replies lost, back | Notes |
+| Run | Method | Replies lost, out | Replies lost, back |
 |---|---|---|---|
 | 1 | | | |
 | 2 | | | |

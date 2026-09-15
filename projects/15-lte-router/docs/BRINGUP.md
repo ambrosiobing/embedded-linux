@@ -4,12 +4,13 @@ From a flashed card to a gateway with two uplinks. Read
 [DESIGN.md](DESIGN.md) first: this file assumes you know which component
 owns what.
 
-Steps 0 to 4 have been run on hardware, on 15 September 2026, and section
-1a records what that run contradicted. Steps 5 onwards have not: they need
-a bearer, and the bearer needs the rebuild described at the end of this
-file. Where a step says "record this", it means write the answer into this
-file or into the two measurement documents, because the second person to do
-it will be you in a year.
+Steps 0 to 6 have been run on hardware, on 15 September 2026, across two
+builds. Section 1a records what those runs contradicted, and the journal
+has the whole path. Step 4a and the failover measurements need a third
+build, because the second uplink they depend on is new: see section 10.
+Where a step says "record this", it means write the answer into this file
+or into the two measurement documents, because the second person to do it
+will be you in a year.
 
 ## 0. Before power
 
@@ -31,7 +32,15 @@ create `router.conf` next to `config.txt`:
 AP_SSID=bench-lte
 AP_PSK=at-least-eight-characters
 APN=internet
+PIN=1234                  optional, only if the SIM keeps its PIN
+WAN_SSID=HomeNetwork      optional, the wireless uplink
+WAN_PSK=...               optional, its passphrase
 ```
+
+`PIN`, `WAN_SSID` and `WAN_PSK` are all optional. The last two are how this
+bench gets a second uplink without an Ethernet cable: a USB wireless
+adapter joins the network the cable would have reached, at metric 100, and
+the LTE profile's 700 still loses to it. Both of that pair or neither.
 
 The APN comes from the carrier and nowhere else. A wrong APN produces a
 modem that registers and never connects, which reads exactly like an
@@ -147,10 +156,35 @@ mmcli -L                       # must list the USB modem and nothing else
 ls -l /dev/serial0             # the header UART, which must not appear above
 ```
 
+## 4a. The second uplink
+
+Only if you are using the USB wireless adapter. The onboard radio is the
+access point; this is a separate radio doing the opposite job.
+
+```sh
+ip -br link                    # wan0 should exist, renamed by udev
+dmesg | grep -i rtl8xxxu       # driver bound, firmware loaded
+nmcli -t -f DEVICE,TYPE,STATE,CONNECTION d
+```
+
+`wan0` rather than `wlan1` is deliberate: the two radios race for `wlan0`
+and the access point profile names it. See
+[`76-bench-uplink.rules`](../../../meta-bench/recipes-bench/bench-router/files/76-bench-uplink.rules)
+and Decision 48.
+
+If `wan0` is absent but `lsusb` shows the adapter, the two candidates are
+the driver and the firmware, and `dmesg` distinguishes them: no `rtl8xxxu`
+line at all means the module is missing, and a line asking for
+`rtlwifi/rtl8192eu_nic.bin` means the firmware package is. Both are named
+in the image recipe, for exactly the reason Project 1 learned on `wlan0`.
+
+If it exists and does not associate, check the band. RTL8192EU is 2.4 GHz
+only and cannot join a 5 GHz network.
+
 ## 5. The profiles and the routes
 
 ```sh
-nmcli con show                 # eth0-uplink, lte, bench-ap
+nmcli con show                 # eth0-uplink, wan-wifi, lte, bench-ap
 nmcli general                  # connectivity: full
 ip route                       # two defaults, metric 100 and metric 700
 ```
@@ -243,30 +277,37 @@ cable; that debt is still open and it is the reason this step is last.
 | The radio is in flight mode after boot | FLIGHT floating on a pull-up. `lte-flight.service` holds it |
 | Clients connect, then large downloads stall | The MSS clamp. It is one line in the ruleset and one kernel option behind it |
 
-## 10. The rebuild this bring-up made necessary
+## 10. The third build, for the second uplink
 
-The first boot found three defects that only hardware could find. All three
-are fixed in the tree and none of them is on the card you are holding, so
-steps 5 onwards need a new image:
+The first build had no bearer and the second one does. What the second one
+does not have is a second uplink, which is what criteria 1, 2 and 3 need,
+so there is one more rebuild:
 
 ```sh
 ./go router
+./go ksym -f router
 ./go kconfig -f router "$(find ~/bench/build/tmp/work -path '*linux-raspberrypi*' -name .config | head -1)"
 ./go flash /dev/sdX
 ```
 
-What changed and why it needs a rebuild rather than an edit on the board:
-
 | Change | Where | Why a rebuild |
 |---|---|---|
-| `wwan`, `modemmanager` and `concheck` added to NetworkManager's `PACKAGECONFIG` | `kas/bench-router.yml` | These are compile-time. `concheck` in particular is a feature that is either in the binary or is not, and a configuration file cannot add it |
-| `networkmanager-wwan` installed | `bench-router-image.bb` | The plugin is a package. There is no feed on the board |
-| `usbutils` installed | `bench-router-image.bb` | `lsusb` on a project whose subject is a USB device |
-| Three non-existent symbols removed | `router.cfg` | Cosmetic in effect, but it changes the recipe checksum, so the kernel recompiles anyway |
-| `polkit` removed from `DISTRO_FEATURES`, `nss` swapped for `gnutls` | `kas/bench-router.yml` | Should remove most of 64 MiB. This one invalidates broadly, so expect a longer build than the changes above alone would suggest |
-| `console=tty1` appended to `CMDLINE` | `kas/bench-rpi4.yml` | The panel has never had kernel messages. Until the rebuild, add it to `cmdline.txt` on the card by hand |
+| `CONFIG_RTL8XXXU=m` | `router.cfg` | A kernel module is in the kernel or it is not |
+| `linux-firmware-rtl8192eu`, a package this layer creates | new `linux-firmware_%.bbappend` | poky ships no package for `rtlwifi/rtl8192eu_nic.bin`. Decision 47 |
+| `kernel-module-rtl8xxxu`, `linux-firmware-rtl8192eu` | `bench-router-image.bb` | Driver and firmware are separate packages and both have to be named |
+| `76-bench-uplink.rules`, renaming the adapter to `wan0` | `bench-router` | Two radios race for `wlan0`. Decision 48 |
+| `wan-wifi.nmconnection.in`, a client profile at metric 100 | `bench-router` | |
+| `WAN_SSID` and `WAN_PSK` in `router.conf` | `bench-router-setup` | |
+| Three uplinks in the forward and masquerade lists, ssh in on `wan0` | `nftables.conf` | Without `wan0` in the masquerade list, a failover moves the route and the packets are then dropped on the way out |
+| `uplinks = eth0 wan0 wwan0` | `lte.conf` | So the exporter reports which of the three holds the route |
 
-Do not lose the card's `router.conf` when you reflash. Write it again, and
-this time you can leave `systemd.mask=lte-watchdog.service` off the kernel
-command line: the watchdog now refuses its hardware rung by itself until
-`pwrkey_verified` is set.
+When you rewrite `router.conf` after flashing, add the two new keys:
+
+```
+WAN_SSID=YourHomeNetwork
+WAN_PSK=its-passphrase
+```
+
+Then `ip route` should finally show what this project is about: two default
+routes, the wireless uplink at metric 100 and the modem at 700, with the
+kernel sending everything through the first while it works.

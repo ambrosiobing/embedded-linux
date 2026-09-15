@@ -58,10 +58,10 @@ want "the loopback is not filtered" "iif lo accept"
 want "ICMP survives, so path MTU discovery works" "meta l4proto icmp accept"
 want "the LAN can reach the metrics endpoint" "9101"
 want "the LAN gets DHCP and DNS" "udp dport { 53, 67 } accept"
-want "masquerade names both uplinks" \
-	'oifname { "eth0", "wwan0" } masquerade'
+want "masquerade names every uplink" \
+	'oifname { "eth0", "wan0", "wwan0" } masquerade'
 want "forwarding is from the LAN to an uplink only" \
-	'iifname "wlan0" oifname { "eth0", "wwan0" } accept'
+	'iifname "wlan0" oifname { "eth0", "wan0", "wwan0" } accept'
 want "the MSS is clamped to the path MTU" "tcp option maxseg size set rt mtu"
 want "what is dropped is counted" "counter"
 

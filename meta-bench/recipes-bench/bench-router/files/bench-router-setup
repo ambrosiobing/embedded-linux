@@ -8,12 +8,14 @@
 # it, and which APN this SIM wants. None of those belong in a repository,
 # and two of them are credentials.
 #
-# /boot/router.conf holds up to four lines:
+# /boot/router.conf holds up to six lines:
 #
 #   AP_SSID=bench-lte
 #   AP_PSK=at-least-eight-characters
 #   APN=internet
 #   PIN=1234                       optional, only if the SIM keeps its PIN
+#   WAN_SSID=HomeNetwork           optional, the wireless uplink
+#   WAN_PSK=...                    optional, its passphrase
 #
 # The PIN is optional and absent by default. A SIM that keeps its PIN needs
 # that PIN sent after every power cut, and a box needing a person present
@@ -46,6 +48,8 @@ ap_ssid=
 ap_psk=
 apn=
 pin=
+wan_ssid=
+wan_psk=
 
 # The three Windows text traps, all of which this bench has walked into:
 # CRLF endings, a UTF-8 byte order mark on the first key, and a final line
@@ -59,6 +63,8 @@ while IFS='=' read -r key value || [ -n "$key" ]; do
 	AP_PSK) ap_psk=$value ;;
 	APN) apn=$value ;;
 	PIN) pin=$value ;;
+	WAN_SSID) wan_ssid=$value ;;
+	WAN_PSK) wan_psk=$value ;;
 	esac
 done <"$SRC"
 
@@ -66,6 +72,8 @@ ap_ssid=$(printf '%s' "$ap_ssid" | tr -d '\r')
 ap_psk=$(printf '%s' "$ap_psk" | tr -d '\r')
 apn=$(printf '%s' "$apn" | tr -d '\r')
 pin=$(printf '%s' "$pin" | tr -d '\r')
+wan_ssid=$(printf '%s' "$wan_ssid" | tr -d '\r')
+wan_psk=$(printf '%s' "$wan_psk" | tr -d '\r')
 
 # Substitute one placeholder. sed would need every value escaped for the
 # replacement side, and a passphrase is exactly the kind of string that
@@ -117,6 +125,28 @@ if [ -n "$apn" ]; then
 	mv -f "$DST/lte.nmconnection.new" "$DST/lte.nmconnection"
 	chmod 600 "$DST/lte.nmconnection"
 	written="$written lte"
+fi
+
+# The wireless uplink, if this bench is standing one in for the Ethernet
+# cable it does not have. Both keys or neither: an SSID with no
+# passphrase produces a profile NetworkManager will never activate,
+# and it fails at activation time where nobody is reading.
+if [ -n "$wan_ssid" ] && [ -n "$wan_psk" ]; then
+	if [ "${#wan_psk}" -lt 8 ]; then
+		echo "bench-router-setup: WAN_PSK is shorter than 8 characters" >&2
+		exit 1
+	fi
+	substitute '@WAN_SSID@' "$wan_ssid" \
+		<"$TEMPLATES/wan-wifi.nmconnection.in" >"$DST/.wan.stage"
+	substitute '@WAN_PSK@' "$wan_psk" \
+		<"$DST/.wan.stage" >"$DST/wan-wifi.nmconnection.new"
+	rm -f "$DST/.wan.stage"
+	mv -f "$DST/wan-wifi.nmconnection.new" "$DST/wan-wifi.nmconnection"
+	chmod 600 "$DST/wan-wifi.nmconnection"
+	written="$written wan-wifi"
+elif [ -n "$wan_ssid" ] || [ -n "$wan_psk" ]; then
+	echo "bench-router-setup: $SRC needs both WAN_SSID and WAN_PSK" >&2
+	exit 1
 fi
 
 if [ -n "$ap_ssid" ] && [ -n "$ap_psk" ]; then

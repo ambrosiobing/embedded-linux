@@ -840,3 +840,91 @@ data. Half of criterion 1 is met: `wwan0` at metric 700. The other half,
 `eth0` at 100, and criteria 2 and 3 with it, need a second uplink this bench
 does not have. Criteria 4, 5 and 7 are now unblocked and need only time on
 the board.
+
+---
+
+## 25. The second uplink, bought rather than built
+
+**What happened.** Entry 23 closed with the limit of this bench stated
+plainly: criteria 1, 2 and 3 need two uplinks and there is no Ethernet
+cable within reach, so the central claim of the project could not be
+measured. That is a purchase, not a build.
+
+**What was considered.** Three ways to give the board a second uplink.
+
+| Option | Verdict |
+|---|---|
+| A long Ethernet cable | Truest to the design, since `eth0` at metric 100 is what the profiles already describe. Needs the router to be within cable distance |
+| A powerline adapter pair | Same, without running a cable. Ethernet over the mains, no driver risk at all |
+| A USB wireless adapter as a client uplink | Works anywhere, at the cost of a driver question and a slightly weaker test |
+
+A USB **Ethernet** adapter was also considered and rejected immediately: the
+Pi already has an Ethernet port. The problem is the cable, not the socket.
+
+**What was done.** The third, because the adapter was already in the
+drawer. And the driver question was answered by reading the kernel rather
+than by trusting a product name, which mattered more than expected.
+
+**The product name was wrong.** The candidate under discussion was an
+Archer T3U, AC1300 dual band. `2357:012d` is in the mainline `rtw8822bu` id
+table in 6.6, so that would have worked. But `lsusb` on the board reported:
+
+```
+ID 2357:0109 TP-Link TL-WN823N v2/v3 [Realtek RTL8192EU]
+```
+
+A different device entirely, and single-band 802.11n rather than dual-band
+AC. This is the TL-WN722N lesson in a new costume: with TP-Link the model
+name on the box does not determine the chip inside, and `lsusb` is the only
+thing that does.
+
+`2357:0109` turns out to be better supported than the device it was mistaken
+for. In `rtl8xxxu_core.c` it is not merely in the id table, it is above the
+`#ifdef CONFIG_RTL8XXXU_UNTESTED` guard and carries an explicit exemption:
+
+```c
+case 0x2357:
+	if (id->idProduct == 0x0109)
+		untested = 0;
+```
+
+The driver records that somebody tested this exact part. One config symbol,
+`CONFIG_RTL8XXXU=m`, no out-of-tree driver, no DKMS.
+
+**And then the firmware had no package.** The driver asks for
+`rtlwifi/rtl8192eu_nic.bin`. poky's `linux-firmware` recipe splits out seven
+Realtek packages and none of them claims that file, so the only way to get
+it is the catch-all package: every firmware blob for every device Linux
+supports, on a board with two radios and a modem. A four-line bbappend
+creates `linux-firmware-rtl8192eu` instead. Decision 47.
+
+**A module, not built in.** Everything else in `router.cfg` is `=y`, for the
+reason in entry 8. This one is `=m` deliberately: the adapter is a stopgap
+for a missing cable rather than part of the board, and a module says so.
+
+**The naming problem, which is the interesting one.** Two radios now race
+for `wlan0`. The onboard `brcmfmac` is built in but waits for firmware from
+the rootfs; `rtl8xxxu` loads the moment USB enumerates. Nothing decides the
+order. And `wlan0` is named by the access point profile, by the DHCP
+configuration and by three nftables rules, none of which would notice being
+pointed at the wrong radio until nothing worked.
+
+So a udev rule renames the adapter to `wan0`, matched on its USB ids.
+`wan0` is a name the kernel never assigns, which leaves `wlan0` free for the
+onboard radio whichever order they appear in. Decision 48, and it is the
+same reasoning as `77-sim7600.rules` for the modem's serial ports.
+
+**What it changes elsewhere.** `router.conf` gains `WAN_SSID` and
+`WAN_PSK`, both optional and both or neither, the same shape as the access
+point pair. The nftables forward and masquerade lists name three uplinks
+rather than two, and ssh is allowed in on `wan0` as well as `eth0`, because
+without a cable that is the only way to reach the box other than its own
+access point. The exporter's `uplinks` becomes `eth0 wan0 wwan0`.
+
+**What it does not fix.** "Pull the cable" becomes
+`nmcli dev disconnect wan0`, a software action rather than a physical one.
+Scenario 2 in `docs/failover-tests.md`, the live carrier with a dead
+upstream, still works exactly as designed through the connectivity check.
+For a genuinely physical carrier loss, power off the home access point.
+That is weaker evidence than unplugging a cable and it is written down here
+rather than glossed over.

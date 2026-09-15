@@ -29,7 +29,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 mkdir -p "$WORK/templates" "$WORK/out"
 cp "$FILES/lte.nmconnection.in" "$FILES/bench-ap.nmconnection.in" \
-	"$WORK/templates/"
+	"$FILES/wan-wifi.nmconnection.in" "$WORK/templates/"
 
 pass=0
 fail=0
@@ -143,6 +143,43 @@ check "pin absent: no placeholder survives" \
 	"$(grep -c '@' "$WORK/out/lte.nmconnection")" "0"
 check "pin absent: the apn is still there" \
 	"$(value lte.nmconnection apn)" "internet"
+
+# -------------------------------------------------- the wireless uplink
+
+# This bench has no Ethernet cable within reach, so a USB wireless adapter
+# stands in for it at the same metric. Both keys or neither: an SSID with
+# no passphrase is a profile NetworkManager never activates, and it says so
+# only at activation time where nobody is reading.
+printf 'APN=internet\nWAN_SSID=HomeNetwork\nWAN_PSK=homepassphrase\n' \
+	>"$WORK/in.conf"
+run
+check "wan: the ssid reaches the profile" \
+	"$(value wan-wifi.nmconnection ssid)" "HomeNetwork"
+check "wan: the passphrase does too" \
+	"$(value wan-wifi.nmconnection psk)" "homepassphrase"
+check "wan: it is a client, not an access point" \
+	"$(value wan-wifi.nmconnection mode)" "infrastructure"
+check "wan: metric 100, so it beats the modem" \
+	"$(value wan-wifi.nmconnection route-metric)" "100"
+
+printf 'APN=internet\n' >"$WORK/in.conf"
+run
+if [ -e "$WORK/out/wan-wifi.nmconnection" ]; then
+	echo "FAILED   wan: a profile was written with no credentials"
+	fail=$((fail + 1))
+else
+	echo "ok       wan: no profile without credentials"
+	pass=$((pass + 1))
+fi
+
+printf 'APN=internet\nWAN_SSID=HomeNetwork\n' >"$WORK/in.conf"
+if run; then
+	echo "FAILED   wan: an SSID with no passphrase should be refused"
+	fail=$((fail + 1))
+else
+	echo "ok       wan: an SSID with no passphrase is refused"
+	pass=$((pass + 1))
+fi
 
 # ---------------------------------------------------------- partial input
 

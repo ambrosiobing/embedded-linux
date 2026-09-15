@@ -1,0 +1,21 @@
+# A stable name for the wireless uplink adapter.
+#
+# Without this the two radios race for wlan0. The onboard brcmfmac is a
+# built-in driver that still has to fetch firmware from the rootfs, and the
+# USB adapter's rtl8xxxu loads as soon as the device enumerates, so which
+# of them registers its netdev first is genuinely not decided. The access
+# point profile, the DHCP configuration and three nftables rules all name
+# wlan0, and none of them would notice being pointed at the wrong radio
+# until nothing worked.
+#
+# So the USB adapter is renamed out of the wlan namespace entirely. wan0 is
+# a name the kernel never assigns, which leaves wlan0 free for the onboard
+# radio whichever order they appear in: if the adapter registers first it
+# is renamed away before the other one asks, and if it registers second it
+# was never going to get wlan0 anyway.
+#
+# Matched on the USB ids rather than the driver, because a driver name is
+# a property of the kernel version and these ids are a property of the part
+# in the drawer. Add a line for a different adapter rather than widening
+# this one.
+SUBSYSTEM=="net", ACTION=="add", ATTRS{idVendor}=="2357", ATTRS{idProduct}=="0109", NAME="wan0"

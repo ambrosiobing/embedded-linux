@@ -44,6 +44,18 @@ IMAGE_INSTALL:append = " \
 # curl for the same reason: docs/BRINGUP.md tells the reader to query the
 # metrics endpoint with it, and the second bring-up found it absent. A
 # documented command that the image cannot run is a documentation defect.
+#
+# rtl8xxxu and its firmware are the second uplink. This bench has no
+# Ethernet cable within reach, and one uplink is not a failover, so the
+# wired uplink the design describes is played by a USB wireless adapter
+# joining the same network the cable would have reached. Both halves are
+# named, because a driver without firmware is a radio that never probes
+# and that lesson cost Project 1 two rounds on wlan0.
+#
+# linux-firmware-rtl8192eu is a package this layer creates. poky does not
+# split that file out, so without the bbappend in
+# recipes-kernel/linux-firmware the only way to get it is the whole
+# firmware archive. See that file for why PACKAGES =+ rather than +=.
 
 # libqmi brings qmicli, which is how the QMI channel is inspected directly
 # when the question is whether ModemManager is wrong or the modem is. It is

@@ -1,0 +1,34 @@
+# The wired uplink this bench does not have, over the air instead.
+#
+# A template: the network this joins is not a property of the image. The
+# SSID and passphrase come from WAN_SSID and WAN_PSK in /boot/router.conf,
+# and the profile is not written at all if they are absent.
+#
+# Metric 100, the same as eth0-uplink, because this plays the same part:
+# the cheap, fast uplink that wins while it works. The LTE profile's 700
+# still loses to it, which is the whole failover.
+#
+# interface-name is wan0, the udev name from 76-bench-uplink.rules, not
+# wlan1. Interface numbering is allocation order and this board has two
+# radios that race for it.
+[connection]
+id=wan-wifi
+type=wifi
+interface-name=wan0
+autoconnect=true
+
+[wifi]
+mode=infrastructure
+ssid=@WAN_SSID@
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=@WAN_PSK@
+
+[ipv4]
+method=auto
+route-metric=100
+never-default=false
+
+[ipv6]
+method=disabled
