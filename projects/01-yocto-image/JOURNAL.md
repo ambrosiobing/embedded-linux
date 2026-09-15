@@ -561,8 +561,9 @@ than mistakes.
 
 ## 20. The driver was not enough either
 
-**What happened.** With `kernel-module-brcmfmac` in the image, `wlan0`
-appeared. It sat at `no-carrier` and never associated.
+**What happened.** With `kernel-module-brcmfmac` in the image, rebuilt and
+reflashed, `networkctl` still listed no `wlan0` at all. Identical symptom to
+entry 19, different cause.
 
 **What was done.** `lsmod` showed `brcmfmac` loaded with a usage count of
 **0**: the driver was in memory and no device was bound to it.
@@ -581,11 +582,34 @@ variant, which is what the Pi 4 carries. `bca` is the Broadcom one.
 
 **The fix** is `kernel-module-brcmfmac-wcc` in the image.
 
-**Three layers, and each absence looked identical.** Firmware, driver,
-vendor module. Every one of them produced the same symptom from
-`networkctl`: no `wlan0` at all, or one that never associated. I added them
-one at a time across an evening because each time I fixed the layer I could
-see and assumed it was the last one.
+## Why `wlan0` was empty, in full
+
+Four distinct states, three of them looking the same from `networkctl`. The
+command that distinguished each one is the useful column.
+
+| State | What `networkctl` showed | Cause | The command that proved it |
+|---|---|---|---|
+| 1 | No `wlan0` | No driver in the image. `core-image-minimal` ships no kernel modules | `find /lib/modules -name "brcmfmac*"` returned nothing |
+| 2 | No `wlan0` | Driver present but no vendor module. `brcmfmac` loaded, bound to nothing | `lsmod` showed `brcmfmac` with usage count **0**, and `dmesg` said `mod=wcc: failed 256` |
+| 3 | `wlan0`, `no-carrier` | Driver attached, supplicant never configured | `journalctl -u bench-wifi-setup` said `/boot/wifi.conf has no PSK= line` |
+| 4 | `wlan0`, `routable` | Working | |
+
+State 3 had its own sub-cause, which is entry 21: the `PSK` line *was* in
+the file, and the parser could not see it because the file had no trailing
+newline.
+
+Things that were present and correct the entire time, and therefore never
+the problem: the firmware blobs in `/lib/firmware/brcm`, the SDIO card at
+`mmc1`, the three SDIO function devices, the network file for `wlan0`, and
+the credentials on the card.
+
+**Each absence looked identical, and that is the lesson.** Firmware, driver,
+vendor module: three layers, one symptom. I added them one at a time across
+an evening because each time I fixed the layer I could see, I assumed it was
+the last one. The faster route was available at every step: read `dmesg` for
+what the kernel itself was complaining about, rather than reasoning about
+what an image ought to contain. At state 2 the driver said `mod=wcc` by
+name, which is more specific than anything inference would have produced.
 
 **What would have been faster.** Reading `dmesg` for the driver's own
 complaint, rather than reasoning about what the image ought to contain. The
