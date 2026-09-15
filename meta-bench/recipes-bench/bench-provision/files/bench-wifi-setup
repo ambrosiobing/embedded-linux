@@ -38,7 +38,12 @@ ssid=
 psk=
 
 # Ignore comments, blank lines and anything that is not one of the two keys.
-while IFS='=' read -r key value; do
+#
+# The "|| [ -n "$key" ]" matters. read returns false on a final line with no
+# trailing newline, which would normally end the loop before the body runs,
+# so the last key in the file would be silently ignored. Notepad writes files
+# without a final newline, and this file is written in Notepad.
+while IFS='=' read -r key value || [ -n "$key" ]; do
 	# Keep only the characters a key can legitimately contain. This drops
 	# a UTF-8 byte order mark, which Notepad writes by default and which
 	# would otherwise make the first key unrecognisable, and any stray

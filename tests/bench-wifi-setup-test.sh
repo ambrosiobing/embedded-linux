@@ -51,6 +51,14 @@ run
 check "LF input works" \
 	"$(sed -n 's/.*ssid="\(.*\)"/\1/p' "$WORK/out.conf")" "Plain"
 
+# Notepad writes no final newline, and "while read" returns false on an
+# unterminated last line, which silently dropped the last key. This is the
+# bug that produced a board with an SSID and no passphrase.
+printf 'SSID=NoNewline\r\nPSK=beef' >"$WORK/in.conf"
+run
+check "a missing final newline still yields a psk" \
+	"$(sed -n 's/^ *psk=//p' "$WORK/out.conf")" "beef"
+
 # Notepad writes a UTF-8 byte order mark by default, which would otherwise
 # hide the first key. Three bytes, written in octal so this file stays ASCII.
 printf '\357\273\277SSID=BomNet\r\nPSK=f00d\r\n' >"$WORK/in.conf"
