@@ -149,7 +149,7 @@ that was actually built, including lines that ask for an option to stay off.
 | The daemon runs and owns its GPIO lines | `systemctl status bench-status`, `gpioinfo` | met, lines 17/22/27 held |
 | The state machine reports correctly | `bench-state show` | met, `ok` |
 | A stopped unit is reported as failed | `systemctl stop sshd.socket`, then `bench-state show` | met, `ok` then `failed` on the board |
-| Every package in the image can be justified | `./go packages` against the table above | met, all 107 |
+| Every package in the image can be justified | `./go packages` against the table above | met, all 112 ([evidence](docs/evidence/packages.txt)) |
 | The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options; 15 after adding IKCONFIG |
 | A second clean build gives the same package list | `./go reproduce` | met, 95 and 95, identical ([evidence](docs/evidence/reproduce.txt)) |
 | The SDK compiles and runs a libgpiod program | `./go sdk-check`, then run it on the board | met, aarch64, libgpiod 2.1.3 on the Pi ([evidence](docs/evidence/sdk-check.txt)) |
@@ -223,7 +223,7 @@ are worth changing together.
 | Wall clock | 194 min |
 | Image | 49 MB compressed, 48 MB after the dbus fix |
 | Kernel | 6.6.63, Raspberry Pi fork, via meta-raspberrypi |
-| Packages in the image | 99, then 95 after the dbus fix, then 107 with WiFi and the keymap |
+| Packages in the image | 99 at first; 95 after the dbus fix; 107 with WiFi and the keymap; **112** with the radio driver and its vendor module |
 | Warnings | 36, all of one class: a primary download URL was unreachable and the mirror served it instead |
 | Warm rebuild, no change | 21 s, 5091 of 5095 tasks reused, sstate 100% match |
 | Rebuild after one recipe changed | 2 min 31 s, sstate 84% match, 25 tasks missed |
