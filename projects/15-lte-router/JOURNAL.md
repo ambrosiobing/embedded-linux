@@ -973,3 +973,62 @@ point, an ssh server and a board that can be fixed without a keyboard.
 `/boot/router.conf` so the script skips the block that was dying, then
 `bench-router-setup` and `nmcli con reload`. The LTE uplink was never
 affected; only the access point and the new uplink were lost.
+
+---
+
+## 27. The same editing accident, one layer up
+
+**What happened.** The fourth image booted with the udev rule present, so
+entry 26's fix had worked, and with no `wan0`. The board said why in four
+lines:
+
+```
+dmesg | grep rtl8xxxu     nothing
+find /lib/modules         nothing
+ls /lib/firmware/rtlwifi  No such file or directory
+ls .../76-bench-uplink.rules   present
+```
+
+`IMAGE_INSTALL` named neither `kernel-module-rtl8xxxu` nor
+`linux-firmware-rtl8192eu`. Nor, it turned out, `curl`. Three packages the
+recipe's own comments explain at length, in a recipe that installs none of
+them.
+
+**Why BitBake said nothing.** It cannot. A package nobody asks for is
+simply absent. The image builds, flashes and boots, and the first thing
+that knows is a board with a missing network interface. This is the same
+shape as entry 26 one layer up: there the file was fetched and not
+installed, here the package is described and not requested.
+
+**The cause, stated plainly.** Four times in this session an edit that
+added a line ending in a backslash continuation was silently dropped,
+because the tool carrying the edit consumed the backslash and the
+replacement then matched nothing. Three of those four were caught by a
+check. This one was caught by hardware, twice, at forty-five minutes and a
+reflash each time.
+
+**The fix, and the rule.** The three packages are named. And a new lint
+check: in an image recipe, any `kernel-module-*` or `linux-firmware-*`
+named in a comment must be installed by some image in the layer.
+
+Two refinements were needed before it was usable, and both are honest
+limits rather than tidying.
+
+It follows `require`. The variant images inherit `bench-image`'s package
+list, so a comment in `bench-ble-image` about the radio firmware is talking
+about something `bench-image` already installs.
+
+And it asks whether *any* image installs the package, not this one.
+`bench-hub-image` explains itself by pointing at what the real-time image
+does: "for the same reason the RT image names `kernel-module-spidev`". A
+cross-reference is legitimate prose and the check has to allow it. That
+makes the rule weaker than it first looked, and it still catches the case
+it was written for, where a driver and its firmware were described in three
+paragraphs and named in no image at all.
+
+Verified by removing each of the two install lines in turn and watching it
+fire, after the first attempt at that verification failed for a reason
+worth recording: the comment named the firmware package and not the module,
+so there was nothing for the rule to check. The test was wrong, not the
+rule, and the fix was to name both in the comment. A check can only see
+what the prose actually says.

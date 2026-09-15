@@ -138,6 +138,70 @@ def check_src_uri_installed() -> None:
                              "mentions")
 
 
+def check_image_packages() -> None:
+    """An image recipe must install the drivers and firmware it talks about.
+
+    Written from a defect that cost a build and a reflash. The recipe's
+    comments explained at length why kernel-module-rtl8xxxu and
+    linux-firmware-rtl8192eu were needed, and the IMAGE_INSTALL line named
+    neither, because an edit was lost. BitBake cannot notice: a package
+    nobody asks for is simply absent, and the image builds, flashes and
+    boots without it. The board says so by not having a network interface.
+
+    Only kernel-module-* and linux-firmware-* are checked. Those two
+    prefixes are unambiguously package names, and they are the pairing that
+    goes wrong: Project 1 lost two rounds to a driver without its module
+    package and then to a vendor module nobody had named. Ordinary package
+    names are left alone because a comment may legitimately name one it
+    rejected.
+    """
+    pattern = re.compile(r"\b((?:kernel-module|linux-firmware)-[a-z0-9-]+)\b")
+
+    def installs(recipe: Path, seen: set[Path]) -> set[str]:
+        """What this recipe installs, plus whatever it requires.
+
+        The variant images say "require recipes-core/images/bench-image.bb"
+        and inherit its package list, so a comment in bench-ble-image about
+        the radio firmware is talking about something bench-image already
+        installs. Without following the require, this check would report
+        every variant as broken.
+        """
+        if recipe in seen or not recipe.is_file():
+            return set()
+        seen.add(recipe)
+        body = text(recipe)
+        found: set[str] = set()
+        for value in re.findall(r'IMAGE_INSTALL:append\s*=\s*"([^"]*)"', body):
+            found |= set(value.replace(chr(92), " ").split())
+        for required in re.findall(r"^require\s+(\S+)", body, re.M):
+            found |= installs(ROOT / "meta-bench" / required, seen)
+        return found
+
+    images = [r for r in ROOT.rglob("*-image*.bb") if ".git" not in r.parts]
+
+    # A comment may legitimately name a package a sibling image installs:
+    # bench-hub-image explains itself by pointing at what the real-time
+    # image does. So the question is not "does this recipe install it" but
+    # "does anything here install it". That is weaker and it still catches
+    # the case it was written for, where a driver and its firmware were
+    # described in three paragraphs and named in no image at all.
+    anywhere: set[str] = set()
+    for recipe in images:
+        anywhere |= installs(recipe, set())
+
+    for recipe in images:
+        body = text(recipe)
+        if "IMAGE_INSTALL" not in body:
+            continue
+        comments = "\n".join(
+            line for line in body.splitlines() if line.lstrip().startswith("#")
+        )
+        for name in sorted(set(pattern.findall(comments))):
+            if name not in anywhere:
+                fail(recipe, f"a comment names {name}, which no image "
+                             "installs")
+
+
 def check_systemd_units() -> None:
     """A unit in SYSTEMD_SERVICE that do_install misses fails late and loudly."""
     for recipe in ROOT.rglob("*.bb"):
@@ -301,6 +365,7 @@ def main() -> int:
         check_dashes,
         check_src_uri,
         check_src_uri_installed,
+        check_image_packages,
         check_systemd_units,
         check_license_headers,
         check_kas,

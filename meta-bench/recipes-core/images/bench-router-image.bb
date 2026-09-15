@@ -25,6 +25,9 @@ IMAGE_INSTALL:append = " \
     dnsmasq \
     nftables \
     usbutils \
+    curl \
+    kernel-module-rtl8xxxu \
+    linux-firmware-rtl8192eu \
     bench-router \
     bench-lte \
 "
@@ -45,7 +48,7 @@ IMAGE_INSTALL:append = " \
 # metrics endpoint with it, and the second bring-up found it absent. A
 # documented command that the image cannot run is a documentation defect.
 #
-# rtl8xxxu and its firmware are the second uplink. This bench has no
+# kernel-module-rtl8xxxu and its firmware are the second uplink. This bench has no
 # Ethernet cable within reach, and one uplink is not a failover, so the
 # wired uplink the design describes is played by a USB wireless adapter
 # joining the same network the cable would have reached. Both halves are
