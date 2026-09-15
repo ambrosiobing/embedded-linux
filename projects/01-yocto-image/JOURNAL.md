@@ -559,6 +559,116 @@ than mistakes.
 
 ---
 
+## 20. The driver was not enough either
+
+**What happened.** With `kernel-module-brcmfmac` in the image, `wlan0`
+appeared. It sat at `no-carrier` and never associated.
+
+**What was done.** `lsmod` showed `brcmfmac` loaded with a usage count of
+**0**: the driver was in memory and no device was bound to it.
+`ls /sys/bus/sdio/devices` showed three function devices, so the radio had
+enumerated. `dmesg | grep -i brcmf` gave the answer in one line:
+
+```
+brcmf_fwvid_request_module: mod=wcc: failed 256
+brcmf_attach: brcmf_fwvid_attach failed
+brcmf_sdio_firmware_callback: brcmf_attach failed
+```
+
+Modern `brcmfmac` splits its vendor-specific half into a separate module and
+asks for it by name at probe time. `wcc` is the Cypress and Infineon
+variant, which is what the Pi 4 carries. `bca` is the Broadcom one.
+
+**The fix** is `kernel-module-brcmfmac-wcc` in the image.
+
+**Three layers, and each absence looked identical.** Firmware, driver,
+vendor module. Every one of them produced the same symptom from
+`networkctl`: no `wlan0` at all, or one that never associated. I added them
+one at a time across an evening because each time I fixed the layer I could
+see and assumed it was the last one.
+
+**What would have been faster.** Reading `dmesg` for the driver's own
+complaint, rather than reasoning about what the image ought to contain. The
+driver said exactly what it wanted, by name, the first time it was asked.
+
+---
+
+## 21. Three ways Windows breaks a text file
+
+**What happened.** The board had WiFi hardware working and would not
+associate. `bench-wifi-setup` refused the credentials file with
+`/boot/wifi.conf has no PSK= line`, while `cat` on the board appeared to
+show only an `SSID=` line.
+
+**What was done.** I concluded the `PSK` line was missing and said so. The
+reply was "no it's there, see image". It was there.
+
+`od -c` settled it: the file ended `"` with **no trailing newline**. The
+parser is `while IFS='=' read -r key value; do`, and `read` returns false on
+an unterminated final line, so the loop exits *before* the body runs. The
+last key in the file is silently dropped. Notepad does not write a final
+newline.
+
+The fix is the standard idiom, `|| [ -n "$key" ]`, which runs the body once
+more when `read` hits data with no newline after it.
+
+**That was the third of three.** This one small script now handles:
+
+| Trap | Symptom | Handling |
+|---|---|---|
+| CRLF line endings | `ssid` contains a stray carriage return | `tr -d` on both values |
+| UTF-8 byte order mark | The first key is unrecognisable | `tr -cd` on the key, which drops any non-alphanumeric byte |
+| No final newline | The last key is silently ignored | `|| [ -n "$key" ]` on the read loop |
+
+All three have tests. The first two were written defensively before anyone
+hit them. The third was found on hardware, at two in the morning, because
+the user did not accept my reading of `cat`.
+
+**Why that matters more than the bug.** I had evidence, `cat` showing one
+line, and treated it as proof of the file's contents rather than as a
+rendering of them. `od -c` was one command away the whole time and shows
+bytes rather than an interpretation. The lesson from entry 13 was to ask the
+build rather than reason from memory; this is the same lesson about a file.
+
+---
+
+## 22. Measuring what the build tree no longer has
+
+**What happened.** `./go kconfig` failed with "no built kernel .config
+found", despite `RM_WORK_EXCLUDE` naming `linux-raspberrypi` precisely to
+prevent that.
+
+**What it actually was.** `RM_WORK_EXCLUDE` preserves a work directory that
+a build creates. After `build/tmp` was deleted during the disk recovery,
+every subsequent build was a complete shared-state hit, so the kernel was
+never compiled and no work directory ever existed to preserve. The setting
+was working; there was simply nothing for it to protect.
+
+**What was done.** Two changes rather than one.
+
+`./go kconfig` now takes an optional path, so it can check any config rather
+than only one it finds in the build tree.
+
+And `CONFIG_IKCONFIG=y` with `CONFIG_IKCONFIG_PROC=y` went into the kernel
+fragment, which gives `/proc/config.gz` on the board. That turns the
+criterion from "the fragment reached a build directory" into "the fragment
+reached the kernel that is currently executing", which is a stronger claim
+and checkable at any time on any flashed card.
+
+**Why that and not the alternative.** The alternative was
+`bitbake -c compile -f virtual/kernel`, forcing a kernel rebuild to
+recreate the work directory. It costs the same fifteen minutes as the
+fragment change, produces evidence about a build tree rather than about
+hardware, and has to be repeated every time the tree is cleaned.
+
+**A smaller version of the same thing.** `systemd-analyze` is not in the
+image, so the boot-time criterion looked unmeasurable. systemd logs the
+figure to its own journal at the end of startup, so the number was already
+there: 8.330 s, 3.183 kernel plus 5.146 userspace, against a 15 s
+criterion. The tool was missing; the measurement was not.
+
+---
+
 ## Still open
 
 - `kbd`, `kbd-consolefonts`, `kbd-keymaps`, `kbd-keymaps-pine`, `keymaps`,

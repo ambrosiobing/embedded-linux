@@ -90,10 +90,13 @@ three years later starts from. See [09. Lifecycle](09-lifecycle.md).
 | `ENABLE_UART = "1"` | Brings the serial console up in firmware, early enough to catch a kernel panic |
 | `IMAGE_FSTYPES = "wic.bz2 wic.bmap"` | A partitioned image plus its block map, so flashing skips empty blocks |
 | `INHERIT += "rm_work"` | Deletes each recipe's work directory after packaging. The difference between 60 GB and several hundred |
-| `RM_WORK_EXCLUDE += "linux-raspberrypi bench-status"` | Keeps the two that actually get debugged. This is what makes `./go kconfig` possible at all |
+| `RM_WORK_EXCLUDE += "linux-raspberrypi bench-status"` | Keeps the two that actually get debugged. Note what it cannot do: a build that is a complete shared-state hit never compiles the kernel, so there is no work directory to preserve, which is why the kernel check moved onto the running board |
 | `INHERIT += "buildhistory"` and `BUILDHISTORY_COMMIT = "1"` | Records what each image contained and commits it to its own git repository |
 | `DL_DIR`, `SSTATE_DIR` | Caches outside the build tree, so `./go clean` is cheap |
 | `BB_NUMBER_THREADS`, `PARALLEL_MAKE` | Parallelism. Match to your core count |
+| `CMDLINE_CONSOLE` | Both consoles, serial and `tty1`. meta-raspberrypi makes this conditional on `ENABLE_UART` and picks one or the other, so enabling the UART silences the display |
+| `RPI_EXTRA_CONFIG` | Appended verbatim to `config.txt`. Carries the DSI panel overlay, without which the 7 inch screen lights its backlight and draws nothing |
+| `LICENSE_FLAGS_ACCEPTED` | The Pi 4 radio firmware is proprietary. Yocto refuses to build a recipe carrying `LICENSE_FLAGS` until the flag is named here, so shipping a non-open binary is a decision somebody made rather than an accident |
 
 `rm_work` and `RM_WORK_EXCLUDE` are a good example of a trade being made
 explicitly rather than by default. Disk is reclaimed everywhere except the
@@ -128,7 +131,7 @@ warns rather than breaking silently.
 ```
 require recipes-core/images/core-image-minimal.bb
 IMAGE_FEATURES += "ssh-server-openssh debug-tweaks"
-IMAGE_INSTALL:append = " libgpiod libgpiod-tools i2c-tools bench-status"
+IMAGE_INSTALL:append = " libgpiod libgpiod-tools i2c-tools bench-status \n    bench-provision linux-firmware-rpidistro-bcm43455 \n    kernel-module-brcmfmac kernel-module-brcmfmac-wcc"
 ```
 
 `IMAGE_FEATURES` are higher level than packages: `ssh-server-openssh` pulls

@@ -41,6 +41,19 @@ file on the board.
 cheap to change, and the part that changes rarely in the place that is fast
 and precise. Policy in configuration and shell, mechanism in C.
 
+## What is proven, and what is deferred
+
+Everything below describes a working system, with one link unverified. The
+daemon runs on the board, holds lines 17, 22 and 27, and reports state
+correctly. What has never been observed is an LED lighting, because the
+bench modules are LinkerKit parts with a 2.0 mm socket that standard 2.54 mm
+jumper wires cannot mate with.
+
+So the mechanism is verified up to the kernel call and no further. That is
+recorded as a deferral with a written reason rather than quietly omitted,
+and it changes nothing about the design below, which is the part worth
+reading.
+
 ## The state machine
 
 ```mermaid

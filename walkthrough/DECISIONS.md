@@ -180,8 +180,12 @@ and hides which twelve options you actually care about. A fragment survives
 the BSP rebasing and reads as a list of reasons.
 
 **Consequence.** A fragment can be silently ignored, so `./go kconfig`
-checks every line, including the ones asking for an option to stay off. That
-check only works because `RM_WORK_EXCLUDE` keeps the kernel work directory.
+checks every line, including the ones asking for an option to stay off.
+
+That check originally read the build tree, which turned out to be fragile:
+`RM_WORK_EXCLUDE` preserves a work directory that a build creates, and a
+build that is a complete shared-state hit never compiles the kernel at all.
+Decision 19 moves the check onto the running kernel instead.
 
 ---
 
@@ -240,6 +244,159 @@ stays empty until the board has actually run.
 **Consequence.** Anyone reading the repository before the first build can
 see precisely what has and has not been done, which is more useful than a
 table of plausible numbers.
+
+---
+
+## 13. The LED indication is deferred, the code is not
+
+**Context.** The bench LEDs are Joy-IT LinkerKit LK-LED10 modules with a
+2.0 mm socket. The available jumper wires are 2.54 mm Dupont. They cannot
+mate, so the modules were never electrically connected.
+
+**Decision.** Defer the LED output, keep every line of the software, and
+write down precisely what is and is not verified.
+
+**Rejected.** Removing `bench-status` from the project, which would have
+deleted the part that actually demonstrates something: a C program packaged
+in a Yocto recipe with systemd units, a state machine, and tests.
+
+**Why.** The daemon is verified on hardware. It runs, holds lines 17, 22 and
+27, and reports state correctly. The single unverified link is that output
+values reach the pins as voltages, which needs an LED or a meter. Saying
+that plainly is worth more than a diode.
+
+---
+
+## 14. The serial console is deferred to Project 2
+
+**Context.** The bench cable is a PL2303HXA. Prolific's current Windows
+driver refuses it, it dropped its USB connection twice during bring-up, and
+the 7 inch DSI panel works as a console instead.
+
+**Decision.** Drop serial from Project 1's criteria. Keep `ENABLE_UART` and
+the kernel's `serial0` console in the image.
+
+**Rejected.** Removing the UART configuration entirely, and buying a cable
+before continuing.
+
+**Why.** Project 2 brings up a NanoPi NEO Air, which has no HDMI and no DSI.
+Serial is its only console and interrupting U-Boot requires it. Removing the
+capability now would mean rediscovering it in a month. A CP2102 or FTDI
+adapter is the thing to own before then.
+
+---
+
+## 15. The image carries WiFi capability, the card carries the credentials
+
+**Context.** The bench has no wired network in reach, and the repository is
+public.
+
+**Decision.** The image ships firmware, `wpa-supplicant` and a network file.
+A first-boot service reads `SSID` and `PSK` from `wifi.conf` on the FAT boot
+partition and writes the supplicant configuration from them.
+
+**Rejected.** Putting the credentials in the layer or in the kas file. Both
+are tracked, so the password would be in the history permanently, where
+rotating it does not remove it.
+
+**Why.** Images carry capability, devices carry identity. It is the same
+split as per-device key provisioning at manufacturing, which is stage 5 in
+[the lifecycle](09-lifecycle.md), and it means the card can be written from
+any machine with a text editor.
+
+---
+
+## 16. CI pins its runner and builds libgpiod from a tag
+
+**Context.** Thirteen consecutive CI failures. The last and real cause was
+that GitHub's `ubuntu-latest` ships libgpiod **1.6.3**, and the daemon
+targets v2. No Ubuntu LTS image packages v2.
+
+**Decision.** Pin `runs-on: ubuntu-24.04`, do not install `libgpiod-dev`
+from apt at all, and build libgpiod from tag `v2.1.3` taken from kernel.org.
+
+**Rejected.** Skipping the compile when v2 is absent, which is a gate that
+passes by not checking, exactly the fault in decision 10.
+
+**Why.** `ubuntu-latest` is a moving target in the same way a git branch is,
+and this repository's whole rule is to name the version. Building the
+library also means the check no longer depends on what any distribution
+happens to package.
+
+---
+
+## 17. Shell files and tests are discovered, not listed
+
+**Context.** A new script, `bench-wifi-setup`, was written and shellchecked
+by nothing, because the CI invocation named its files by hand. The same
+shape had already bitten the test runner, where a new test file would not
+have been run.
+
+**Decision.** Both `./go check` and CI find their inputs: shell files by
+shebang and by `.sh` extension, tests by globbing `tests/*.sh`.
+
+**Rejected.** Adding the new files to the existing lists, which fixes today
+and fails the next time somebody adds a file.
+
+**Why.** A hand-maintained list of things to check is a list that new things
+do not join, and the failure is silent: the check passes because it never
+looked.
+
+---
+
+## 18. The disk guard checks the host, not only the guest
+
+**Context.** A build filled a 254 GB Windows drive to zero bytes, the guest
+filesystem remounted read-only mid-build, and BitBake died with I/O errors.
+`require_disk_gb` had reported 919 GB free minutes earlier.
+
+**Decision.** `require_host_disk_gb` also checks `/mnt/c` when it exists.
+25 GB for a build or SDK, 60 GB for a reproduce run.
+
+**Rejected.** Treating it as a one-off and remembering to watch the host
+drive.
+
+**Why.** Under WSL the guest reports the virtual disk's maximum size, not
+what Windows can supply. The check was precise and about the wrong number.
+Nobody remembers to watch a number manually.
+
+---
+
+## 19. The kernel reports its own configuration
+
+**Context.** `./go kconfig` had nothing to read: a build that is a complete
+shared-state hit never compiles the kernel, so `RM_WORK_EXCLUDE` has no work
+directory to preserve.
+
+**Decision.** `CONFIG_IKCONFIG_PROC` in the fragment, giving
+`/proc/config.gz` on the board, and `./go kconfig` accepts a path.
+
+**Rejected.** Forcing a kernel rebuild with `bitbake -c compile -f` whenever
+the check is needed.
+
+**Why.** Same cost in build time, and the evidence is better: it proves what
+the hardware is executing rather than what a build directory once contained.
+It also survives cleaning the build tree, which the alternative does not.
+
+---
+
+## 20. Bench policy is its own recipe
+
+**Context.** The German console keymap, the wireless network file and the
+credential provisioning all needed a home.
+
+**Decision.** A separate `bench-provision` recipe, not additions to
+`bench-status`.
+
+**Rejected.** Folding them into the existing recipe, which already ships
+configuration to `/etc/bench`.
+
+**Why.** `bench-status` is about status. These are about this workshop: its
+keyboard, its network, its lack of a cable. Two recipes with one subject
+each stay explicable; one recipe with two subjects does not. The root README
+lists every one of these assumptions with the file that sets it, because
+they are choices about one bench rather than defaults anyone should
+inherit.
 
 ---
 

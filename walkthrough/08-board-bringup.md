@@ -19,7 +19,18 @@ become seconds, and checksums are verified as it goes.
 target is one of the few commands that can destroy a laptop's filesystem
 without warning. Confirmation and a refusal list cost nothing.
 
-## Wiring
+## Wiring (deferred)
+
+The bench LED modules are Joy-IT LinkerKit LK-LED10 parts with a 2.0 mm
+socket, and the available jumper wires are 2.54 mm Dupont. They do not mate,
+so this wiring has never been connected and the LED output is deferred. The
+manufacturer says it in one line: a baseboard and a connecting cable are
+required.
+
+Three bare LEDs with 330 Ohm series resistors from GPIO17, GPIO27 and GPIO22
+to a ground rail work immediately and are unambiguously active high, which
+is the daemon's default. The table below is for the four-pin modules,
+for whenever an LK-Cable arrives.
 
 ```
                     Raspberry Pi 4, 40-pin header
@@ -69,15 +80,57 @@ Both are instances of the same habit: before connecting anything, ask what
 voltage appears on each pin in every state, including the states where
 nothing is driving.
 
-## The serial console
+## Networking, and how credentials reach the board
+
+This bench has no wired network in reach, so the image joins a wireless one.
+Three layers had to be present, and each absence looked identical from
+`networkctl`, which showed no `wlan0` at all:
+
+| Layer | Package | Symptom when missing |
+|---|---|---|
+| Firmware | `linux-firmware-rpidistro-bcm43455` | Radio never initialises |
+| Driver | `kernel-module-brcmfmac` | `core-image-minimal` ships no modules, so the device never probes |
+| Vendor module | `kernel-module-brcmfmac-wcc` | Chip detected, firmware found, `brcmf_attach` fails at the last step |
+
+`wcc` is the Cypress and Infineon variant. Modern `brcmfmac` asks for it by
+name at probe time, and says so in `dmesg` when it is absent, which is
+faster than reasoning about what an image ought to contain.
+
+The credentials never enter the repository. A first-boot service reads
+`SSID` and `PSK` from `wifi.conf` on the FAT boot partition, which you write
+from any machine after flashing. The image carries capability; the card
+carries identity.
+
+That file is usually written in Notepad, which breaks text three different
+ways, all of which the parser now handles and tests: CRLF line endings, a
+UTF-8 byte order mark, and no final newline. The last of those is the
+interesting one, because `while read` returns false on an unterminated final
+line and silently drops the last key in the file.
+
+## The serial console (deferred to Project 2)
 
 ```sh
 picocom -b 115200 --logfile boot-console.log /dev/ttyUSB0
 ```
 
-115200 8N1, no flow control. This is why `ENABLE_UART = "1"` is in the kas
-file: the console comes up in firmware, before the kernel, so you see early
-messages and any panic.
+Not used in Project 1. The console here is the 7 inch DSI panel, and the
+bench cable is a PL2303HXA that Prolific's current Windows driver refuses
+and that dropped its USB connection twice during bring-up. `ENABLE_UART`
+stays set and the kernel still prints to `serial0`, so the capability is in
+the image.
+
+Project 2 makes it mandatory: a NanoPi NEO Air has no HDMI and no DSI, so
+serial is its only console and interrupting U-Boot requires it. A CP2102 or
+genuine FTDI adapter is the thing to own before then.
+
+115200 8N1, no flow control. `ENABLE_UART = "1"` brings the console up in
+firmware, before the kernel, so you see early messages and any panic.
+
+One correction worth keeping: the firmware itself is **silent** on the UART
+by default. `enable_uart=1` only guarantees the port is available at a fixed
+clock for the kernel. `uart_2ndstage=1` in `config.txt` makes the firmware
+narrate its own boot, which is the setting that distinguishes "the board is
+not booting" from "the console is not connected".
 
 **Over SSH you would see none of it**, because SSH needs a network that does
 not exist yet at the moment things go wrong. Every board bring-up in this
@@ -110,7 +163,8 @@ driver work will help.
 
 ## Expect the colours to be wrong first
 
-There is a 50 percent chance the modules are active low.
+Whenever LEDs are connected, there is a 50 percent chance they are active
+low, and nothing on the silkscreen says which.
 
 ```sh
 gpioset -c gpiochip0 17=1     # green lights? active high
@@ -131,8 +185,9 @@ systemctl start sshd.socket    # green again
 ```
 
 Twenty seconds, and it exercises the whole chain: systemd notices, the shell
-script decides, the file changes, the C program reads it, the kernel drives
-the line, the LED lights.
+script decides, the file changes, the C program reads it and the kernel
+drives the line. Verified on the board as `ok`, then `failed`. The last step,
+a diode lighting, is the deferred part.
 
 ## The SDK, which is the real deliverable
 
