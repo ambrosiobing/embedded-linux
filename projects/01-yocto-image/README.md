@@ -148,7 +148,7 @@ that was actually built, including lines that ask for an option to stay off.
 | `systemctl --failed` is empty | On the board | met, 0 units |
 | The daemon runs and owns its GPIO lines | `systemctl status bench-status`, `gpioinfo` | met, lines 17/22/27 held |
 | The state machine reports correctly | `bench-state show` | met, `ok` |
-| A stopped unit is reported as failed | `systemctl stop sshd.socket`, then `bench-state show` | to do |
+| A stopped unit is reported as failed | `systemctl stop sshd.socket`, then `bench-state show` | met, `ok` then `failed` on the board |
 | Every package in the image can be justified | `./go packages` against the table above | met, all 107 |
 | The kernel fragment reached the kernel | `./go kconfig` | met, all 13 options |
 | A second clean build gives the same package list | `./go reproduce` | met, 95 and 95, identical ([evidence](docs/evidence/reproduce.txt)) |
