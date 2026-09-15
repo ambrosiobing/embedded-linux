@@ -736,3 +736,44 @@ system that has none, or that interprets a burst of correlated wake-ups as
 a cheap GPIO write, produces numbers that look like measurements. The
 alternative to finding this in a test was finding it in a results table,
 where a plausible number is indistinguishable from a real one.
+
+---
+
+## 23. The new check looked for the kernel where BitBake does not put it
+
+**What happened.** `./go ksym` was about to be run on the build host for the
+first time. Its autodetect searched `tmp/work` for a directory whose path
+contained `linux-raspberrypi` and whose name began with `linux-`. That was
+written from an idea of where a recipe's source lands, not from reading
+anything.
+
+**What was done.** Read it instead:
+
+```
+kernel.bbclass:26     S = "${STAGING_KERNEL_DIR}"
+bitbake.conf:481      STAGING_KERNEL_DIR =
+                        "${TMPDIR}/work-shared/${MACHINE}/kernel-source"
+```
+
+The kernel is unpacked once per machine into a shared tree, not once per
+recipe, so that the kernel and its modules build against the same sources.
+Only an alternate kernel recipe, one whose `KERNEL_PACKAGE_NAME` is not
+`kernel`, gets a `kernel-source` under its own `WORKDIR`.
+
+The search now looks for the directory name under both locations, and three
+test cases cover it: the shared tree, the per-recipe one, and an unbuilt
+tree, which has to be an error rather than an empty pass.
+
+**Why that and not the alternative.** The failure would not have looked
+like a bug in the checker. It would have printed "no unpacked kernel source
+found" on a build host where the kernel had just been unpacked
+successfully, and the obvious reading of that is that the unpack failed.
+The next half hour goes into BitBake rather than into the sixteen-line
+function that was wrong.
+
+Worth noting what prompted it: a question about which build target to run
+next, not a test failure. The check had passed its own suite thirty-three
+times by then, because every one of those cases passed the tree in
+explicitly and none exercised the branch that goes looking for it. A test
+suite that only exercises the arguments you remember to pass is a suite
+with a hole in exactly the shape of the thing you assumed.

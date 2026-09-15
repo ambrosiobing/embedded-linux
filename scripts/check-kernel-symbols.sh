@@ -65,25 +65,39 @@ for name in $fragments; do
 		die "no fragment at $FRAGMENT_DIR/$name.cfg"
 done
 
-# The kernel source, unpacked by BitBake. RM_WORK_EXCLUDE keeps it, which
-# is why the kas files list linux-raspberrypi there.
+# The kernel source, unpacked by BitBake.
+#
+# Not under tmp/work, which is where this first looked and found nothing.
+# kernel.bbclass sets S to STAGING_KERNEL_DIR, and bitbake.conf defines
+# that as ${TMPDIR}/work-shared/${MACHINE}/kernel-source: one shared tree
+# per machine rather than one per recipe, so that a kernel and its modules
+# build against the same sources. Only an alternate kernel recipe, meaning
+# one whose KERNEL_PACKAGE_NAME is not "kernel", gets a kernel-source
+# directory under its own WORKDIR instead.
+#
+# Both are covered by looking for the directory name rather than for a
+# path shape, which is also why this does not try to match
+# "linux-raspberrypi" anywhere: the name of the recipe is not the name of
+# the directory its source lands in.
 if [ -n "${1:-}" ]; then
 	src=$1
 else
-	src=$(find "$KAS_BUILD_DIR/tmp/work" -maxdepth 6 -type d \
-		-path "*linux-raspberrypi*" -name "linux-*" \
+	src=$(find "$KAS_BUILD_DIR/tmp/work-shared" "$KAS_BUILD_DIR/tmp/work" \
+		-maxdepth 4 -type d -name kernel-source \
 		-exec test -f "{}/Kconfig" ";" -print 2>/dev/null |
 		sort | tail -1)
 fi
 
-[ -n "${src:-}" ] || die "no unpacked kernel source found.
+[ -n "${src:-}" ] || die "no unpacked kernel source found under
+       $KAS_BUILD_DIR/tmp/work-shared or tmp/work.
 
        It appears after do_unpack, which is minutes into a build rather
        than hours:
 
            kas shell kas/bench-rt.yml -c 'bitbake -c unpack virtual/kernel'
 
-       or pass a tree directly:
+       and lands in tmp/work-shared/<machine>/kernel-source. Or pass a tree
+       directly:
 
            ./go ksym -f rt ~/linux"
 

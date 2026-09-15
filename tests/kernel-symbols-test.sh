@@ -249,6 +249,45 @@ out=$(sh "$SUT" -f nosuch "$SRC" 2>&1) || rc=$?
 check "a fragment that does not exist is an error" "$rc" "1"
 contains "and says which" "$out" "nosuch.cfg"
 
+# ------------------------------------- finding the tree without being told
+#
+# This is the part that was wrong first. The search looked under tmp/work
+# for a path containing the recipe name, and BitBake does not put the
+# kernel there: kernel.bbclass sets S to STAGING_KERNEL_DIR, which
+# bitbake.conf defines as tmp/work-shared/<machine>/kernel-source. The
+# script found nothing and said so, which on a build host reads as a
+# failed unpack rather than as a wrong search.
+
+cat >"$FRAGS/bench.cfg" <<'EOF'
+CONFIG_SPARSE_IRQ=y
+EOF
+
+SHARED=$WORK/bench/build/tmp/work-shared/raspberrypi4-64
+mkdir -p "$SHARED"
+cp -r "$SRC" "$SHARED/kernel-source"
+
+rc=0
+out=$(BENCH_WORK=$WORK/bench sh "$SUT" 2>&1) || rc=$?
+check "the kernel is found where BitBake actually puts it" "$rc" "0"
+contains "and the path is reported" "$out" "work-shared/raspberrypi4-64/kernel-source"
+
+# An alternate kernel recipe, one whose KERNEL_PACKAGE_NAME is not
+# "kernel", gets its own kernel-source under WORKDIR instead.
+rm -rf "$WORK/bench/build/tmp/work-shared"
+ALT=$WORK/bench/build/tmp/work/raspberrypi4_64-poky-linux/linux-other/1.0
+mkdir -p "$ALT"
+cp -r "$SRC" "$ALT/kernel-source"
+rc=0
+out=$(BENCH_WORK=$WORK/bench sh "$SUT" 2>&1) || rc=$?
+check "and under a recipe work directory when it lives there" "$rc" "0"
+
+rm -rf "$WORK/bench"
+rc=0
+out=$(BENCH_WORK=$WORK/bench sh "$SUT" 2>&1) || rc=$?
+check "an unbuilt tree is an error, not an empty pass" "$rc" "1"
+contains "and it says where it looked" "$out" "work-shared"
+contains "and how to produce one" "$out" "bitbake -c unpack virtual/kernel"
+
 # ------------------------------------------------- not a kernel at all
 
 cat >"$FRAGS/bench.cfg" <<'EOF'
