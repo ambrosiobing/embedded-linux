@@ -1,0 +1,20 @@
+[Unit]
+Description=Bench router DHCP and DNS for the access point
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+After=NetworkManager.service
+Wants=NetworkManager.service
+ConditionPathExists=/etc/bench/dnsmasq.conf
+
+[Service]
+# Our own instance with an explicit configuration file, rather than the
+# packaged dnsmasq.service reading whatever happens to be in /etc/dnsmasq.d.
+# Whether that directory is scanned at all depends on a conf-dir line in the
+# distribution's dnsmasq.conf, which is not something this layer controls.
+# The packaged unit is masked so that only one of the two can bind port 53.
+ExecStart=/usr/bin/dnsmasq -k --conf-file=/etc/bench/dnsmasq.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

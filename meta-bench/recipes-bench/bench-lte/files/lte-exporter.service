@@ -1,0 +1,8 @@
+[Unit]
+Description=Collect modem metrics into the textfile directory
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+After=ModemManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/lte-exporter

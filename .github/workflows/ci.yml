@@ -43,7 +43,9 @@ jobs:
           # image usually has it, and "usually" is not a dependency.
           # No libgpiod-dev here on purpose: Ubuntu LTS packages v1, and
           # the daemon targets v2. It is built from a pinned tag below.
-          sudo apt-get install -y shellcheck python3-yaml pkg-config build-essential autoconf autoconf-archive automake libtool
+          # nftables is here for the ruleset check in tests/: the
+          # semantic assertions run anywhere, the syntax check needs nft.
+          sudo apt-get install -y shellcheck python3-yaml pkg-config build-essential autoconf autoconf-archive automake libtool nftables
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
@@ -94,6 +96,23 @@ jobs:
             ;;
           esac
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-status/files/bench-status.c -o /tmp/bench-status $(pkg-config --libs libgpiod)
+
+      - name: Compile the modem control tool
+        # Project 15's mechanism half. Same source, same -Werror: a
+        # toolchain upgrade should fail here rather than in someone's
+        # three-hour image build.
+        run: |
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-lte/files/lte-gpio.c -o /tmp/lte-gpio $(pkg-config --libs libgpiod)
+
+      - name: Python programs compile
+        # Found by shebang, so a new one cannot quietly escape the check.
+        run: |
+          files=$( {
+            grep -rl --exclude-dir=.git --exclude=*.md "^#!/usr/bin/env python3" .
+            find . -path ./.git -prune -o -name "*.py" -print
+          } | sed "s|^[.]/||" | sort -u)
+          echo "checking:"; echo "$files"
+          for f in $files; do python3 -m py_compile "$f"; done
 
       - name: Daemon starts and reports no GPIO chip on a runner
         # There is no gpiochip on a hosted runner, so a clean exit code 1 is

@@ -5,7 +5,8 @@ applies to the other nineteen projects and to embedded Linux work in
 general.
 
 Project 1 is the worked example throughout, because it is the one that
-exists. The last two documents pull back from it: where each piece belongs
+has been built and booted. Project 15 is the second, and where it
+contradicts what is written here the contradiction is in its journal. The last two documents pull back from it: where each piece belongs
 in a product lifecycle, and what changes when the board, the peripheral or
 the stage of the project changes.
 
@@ -26,6 +27,8 @@ the stage of the project changes.
 | | [Decisions](DECISIONS.md) | A log of choices, each with the alternative that was rejected and why |
 | | [Design, Project 1](../projects/01-yocto-image/docs/DESIGN.md) | The four figures: architecture, schematic, bench layout, UML sequence, plus the software components |
 | | [Journal](../projects/01-yocto-image/JOURNAL.md) | What actually happened while building Project 1, in order, including the false starts |
+| | [Design, Project 15](../projects/15-lte-router/docs/DESIGN.md) | The LTE router: architecture, schematic, bench, the watchdog state machine, and who owns which interface |
+| | [Journal, Project 15](../projects/15-lte-router/JOURNAL.md) | Where this project departed from its own specification, and why |
 
 ## The through-line
 

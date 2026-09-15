@@ -1,0 +1,14 @@
+[Unit]
+Description=Fill in the router profiles from the boot partition
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+ConditionPathExists=/boot/router.conf
+Before=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/bench-router-setup
+
+[Install]
+WantedBy=multi-user.target

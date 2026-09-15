@@ -1,0 +1,117 @@
+#!/bin/sh
+#
+# bench-router-setup - instantiate the NetworkManager profiles from
+# identity left on the boot partition.
+#
+# The image carries the capability to be a router. The card carries the
+# identity: which access point name to announce, which passphrase protects
+# it, and which APN this SIM wants. None of those belong in a repository,
+# and two of them are credentials.
+#
+# /boot/router.conf holds up to three lines:
+#
+#   AP_SSID=bench-lte
+#   AP_PSK=at-least-eight-characters
+#   APN=internet
+#
+# The APN comes from the carrier. A wrong APN produces a modem that
+# registers and never connects, which reads like an antenna problem and is
+# not one, so it is worth checking this line before climbing on a roof.
+#
+# The templates in /usr/share/bench-router are shipped by the image; this
+# script only substitutes and installs them, so re-running it is safe and
+# is the documented way to change the access point name.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+SRC=${BENCH_ROUTER_SOURCE:-/boot/router.conf}
+DST=${BENCH_ROUTER_TARGET:-/etc/NetworkManager/system-connections}
+TEMPLATES=${BENCH_ROUTER_TEMPLATES:-/usr/share/bench-router}
+
+if [ ! -r "$SRC" ]; then
+	echo "bench-router-setup: no $SRC, leaving the profiles as shipped"
+	exit 0
+fi
+
+ap_ssid=
+ap_psk=
+apn=
+
+# The three Windows text traps, all of which this bench has walked into:
+# CRLF endings, a UTF-8 byte order mark on the first key, and a final line
+# with no newline, which ends a plain "while read" before the body runs and
+# silently drops the last key. See bench-wifi-setup, which learned the same
+# lesson the expensive way.
+while IFS='=' read -r key value || [ -n "$key" ]; do
+	key=$(printf '%s' "$key" | tr -cd 'A-Za-z0-9_')
+	case $key in
+	AP_SSID) ap_ssid=$value ;;
+	AP_PSK) ap_psk=$value ;;
+	APN) apn=$value ;;
+	esac
+done <"$SRC"
+
+ap_ssid=$(printf '%s' "$ap_ssid" | tr -d '\r')
+ap_psk=$(printf '%s' "$ap_psk" | tr -d '\r')
+apn=$(printf '%s' "$apn" | tr -d '\r')
+
+# Substitute one placeholder. sed would need every value escaped for the
+# replacement side, and a passphrase is exactly the kind of string that
+# contains an ampersand or a slash, so the substitution is done in the
+# shell instead.
+substitute() {
+	placeholder=$1
+	value=$2
+	while IFS= read -r line || [ -n "$line" ]; do
+		case $line in
+		*"$placeholder"*)
+			before=${line%%"$placeholder"*}
+			after=${line#*"$placeholder"}
+			printf '%s%s%s\n' "$before" "$value" "$after"
+			;;
+		*) printf '%s\n' "$line" ;;
+		esac
+	done
+}
+
+mkdir -p "$DST"
+umask 077
+written=
+
+if [ -n "$apn" ]; then
+	substitute '@APN@' "$apn" \
+		<"$TEMPLATES/lte.nmconnection.in" >"$DST/lte.nmconnection.new"
+	mv -f "$DST/lte.nmconnection.new" "$DST/lte.nmconnection"
+	chmod 600 "$DST/lte.nmconnection"
+	written="$written lte"
+fi
+
+if [ -n "$ap_ssid" ] && [ -n "$ap_psk" ]; then
+	# NetworkManager rejects a WPA passphrase shorter than 8 characters,
+	# and it does so at activation time, so the access point simply never
+	# appears. Say it here instead, where the message is readable.
+	if [ "${#ap_psk}" -lt 8 ]; then
+		echo "bench-router-setup: AP_PSK is shorter than 8 characters" >&2
+		exit 1
+	fi
+	substitute '@AP_SSID@' "$ap_ssid" \
+		<"$TEMPLATES/bench-ap.nmconnection.in" >"$DST/.ap.stage"
+	substitute '@AP_PSK@' "$ap_psk" \
+		<"$DST/.ap.stage" >"$DST/bench-ap.nmconnection.new"
+	rm -f "$DST/.ap.stage"
+	mv -f "$DST/bench-ap.nmconnection.new" "$DST/bench-ap.nmconnection"
+	chmod 600 "$DST/bench-ap.nmconnection"
+	written="$written bench-ap"
+elif [ -n "$ap_ssid" ] || [ -n "$ap_psk" ]; then
+	echo "bench-router-setup: $SRC needs both AP_SSID and AP_PSK" >&2
+	exit 1
+fi
+
+if [ -z "$written" ]; then
+	echo "bench-router-setup: $SRC named nothing to configure" >&2
+	exit 1
+fi
+
+echo "bench-router-setup: wrote$written"

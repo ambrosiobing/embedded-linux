@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+"""lte-watchdog - keep the cellular bearer alive, and say what it cost.
+
+NetworkManager already handles the ordinary cases: a metric decides which
+uplink carries the default route, and the connectivity check catches a live
+cable behind a dead upstream. None of that needs code, and none of it is
+what this program is for.
+
+This program is for the case NetworkManager cannot fix, where the modem
+itself has stopped answering. It probes once a minute, and after three
+consecutive failures it performs the cheapest recovery it has not yet tried
+in this incident:
+
+    level 1   nmcli con up lte          seconds, rebuilds the bearer
+    level 2   mmcli --reset             about 30 s, re-registers the modem
+    level 3   PWRKEY off, wait, on      about a minute, a cold start
+
+A success resets the level to zero, so a single bad hour does not leave the
+box permanently in the expensive path. Every action is logged and counted,
+and the counters are exported, because a modem that flaps is a support call
+that should arrive as a graph rather than as a phone call.
+
+The escalation ordering is the whole design. Doing the cheap thing first
+costs a minute when the expensive thing was needed; doing the expensive
+thing first costs a minute of downtime every time the cheap thing would
+have worked, which on a flapping link is most of the day.
+
+Testing: every external command is invoked by name through PATH, so the
+whole state machine runs on a laptop against stubs. See
+tests/lte-watchdog-test.sh.
+
+SPDX-License-Identifier: MIT
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+import time
+
+CONF = "/etc/bench/lte.conf"
+
+DEFAULTS = {
+    "probe_host": "1.1.1.1",
+    "probe_iface": "wwan0",
+    "probe_interval": "60",
+    "probe_timeout": "3",
+    "failures_before_recovery": "3",
+    "nm_connection": "lte",
+    "pwrkey_off_ms": "3000",
+    "pwrkey_on_ms": "1200",
+    "pwrkey_gap_s": "10",
+    "settle_s": "60",
+    "settle_cold_s": "120",
+    "metrics_path": "/var/lib/lte/watchdog.prom",
+}
+
+MAX_LEVEL = 3
+
+
+def log(message: str) -> None:
+    """One line to stdout, which under systemd is the journal."""
+    print(f"lte-watchdog: {message}", flush=True)
+
+
+def read_config(path: str) -> dict[str, str]:
+    """key=value, '#' starts a comment. The same file lte-gpio(1) reads.
+
+    One file for both programs on purpose: the GPIO offsets belong to the
+    HAT revision, not to the language a program happens to be written in,
+    and two files would drift the moment someone rewires a jumper.
+    """
+    config = dict(DEFAULTS)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                line = line.split("#", 1)[0].strip()
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                if key in config and value:
+                    config[key] = value
+    except FileNotFoundError:
+        log(f"no {path}, using defaults")
+    return config
+
+
+def number(config: dict[str, str], key: str) -> float:
+    try:
+        return float(config[key])
+    except ValueError:
+        log(f"{key}={config[key]!r} is not a number, using {DEFAULTS[key]}")
+        return float(DEFAULTS[key])
+
+
+def run(command: list[str], timeout: float = 120.0) -> subprocess.CompletedProcess:
+    """Never raise. A watchdog that dies because a tool is missing is worse
+    than no watchdog, because it looks like one."""
+    try:
+        return subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        log(f"{command[0]}: {error}")
+        return subprocess.CompletedProcess(command, 127, "", str(error))
+
+
+class Counters:
+    """The numbers the exporter and the dashboard care about."""
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self.probe_failures = 0
+        self.recoveries = {1: 0, 2: 0, 3: 0}
+        self.state = "waitmodem"
+        self.level = 0
+
+    def render(self) -> str:
+        lines = [
+            "# HELP lte_probe_failures_total Probes that found no working bearer.",
+            "# TYPE lte_probe_failures_total counter",
+            f"lte_probe_failures_total {self.probe_failures}",
+            "# HELP lte_recoveries_total Recovery actions taken, by escalation level.",
+            "# TYPE lte_recoveries_total counter",
+        ]
+        for level in sorted(self.recoveries):
+            lines.append(
+                f'lte_recoveries_total{{level="{level}"}} {self.recoveries[level]}'
+            )
+        lines += [
+            "# HELP lte_watchdog_level Escalation level of the current incident.",
+            "# TYPE lte_watchdog_level gauge",
+            f"lte_watchdog_level {self.level}",
+            "# HELP lte_watchdog_state Watchdog state machine, one-hot.",
+            "# TYPE lte_watchdog_state gauge",
+        ]
+        for state in ("waitmodem", "connected", "failing", "recovering"):
+            value = 1 if state == self.state else 0
+            lines.append(f'lte_watchdog_state{{state="{state}"}} {value}')
+        return "\n".join(lines) + "\n"
+
+    def write(self) -> None:
+        """Write, then rename. A scrape that lands mid-write must not read
+        half a file, and rename within one filesystem is atomic."""
+        directory = os.path.dirname(self.path) or "."
+        try:
+            os.makedirs(directory, exist_ok=True)
+            temporary = self.path + ".new"
+            with open(temporary, "w", encoding="ascii") as handle:
+                handle.write(self.render())
+            os.replace(temporary, self.path)
+        except OSError as error:
+            log(f"cannot write {self.path}: {error}")
+
+
+def modem_present() -> bool:
+    result = run(["mmcli", "-L"], timeout=20)
+    return result.returncode == 0 and "/Modem/" in result.stdout
+
+
+def modem_state() -> str:
+    """The generic state from mmcli, or 'absent' if there is no modem.
+
+    The proper interface is ModemManager's D-Bus API through libmm-glib,
+    which also offers a signal rather than a poll. mmcli parsing is the
+    first version: its --output-keyvalue format is stable across releases
+    and it needs nothing in the image that is not there already.
+    """
+    result = run(["mmcli", "-m", "any", "--output-keyvalue"], timeout=20)
+    if result.returncode != 0:
+        return "absent"
+    for line in result.stdout.splitlines():
+        if line.startswith("modem.generic.state "):
+            return line.split(":", 1)[1].strip()
+    return "unknown"
+
+
+def probe(config: dict[str, str]) -> bool:
+    """Connected, and packets actually leave through the bearer.
+
+    Both halves are needed. ModemManager reports 'connected' from the
+    modem's own view of its bearer, which survives an APN that routes
+    nowhere and a carrier that has stopped forwarding; a ping bound to the
+    interface with -I proves the path rather than the paperwork.
+    """
+    if modem_state() != "connected":
+        return False
+    command = [
+        "ping",
+        "-I",
+        config["probe_iface"],
+        "-c",
+        "2",
+        "-W",
+        config["probe_timeout"],
+        config["probe_host"],
+    ]
+    return run(command, timeout=30).returncode == 0
+
+
+def power_cycle(config: dict[str, str]) -> None:
+    """Press PWRKEY the right number of times.
+
+    The pitfall this exists for: PWRKEY toggles. Pressing it on a module
+    that is already off turns the module on, so a watchdog that always
+    sends an off-then-on pair will switch a dead modem on and then
+    immediately off again, and report that it tried.
+    """
+    off_ms = str(int(number(config, "pwrkey_off_ms")))
+    on_ms = str(int(number(config, "pwrkey_on_ms")))
+    if modem_present():
+        log("power cycle: modem present, pressing off first")
+        run(["lte-gpio", "pwrkey", off_ms], timeout=30)
+        time.sleep(number(config, "pwrkey_gap_s"))
+    else:
+        log("power cycle: no modem enumerated, sending a single on press")
+    run(["lte-gpio", "pwrkey", on_ms], timeout=30)
+
+
+def recover(level: int, config: dict[str, str], counters: Counters) -> float:
+    """Perform one recovery action and return how long to wait afterwards."""
+    counters.recoveries[level] += 1
+    counters.state = "recovering"
+    counters.level = level
+
+    if level == 1:
+        log("level 1: rebuilding the bearer with nmcli")
+        run(["nmcli", "con", "up", config["nm_connection"]], timeout=90)
+        return number(config, "settle_s")
+    if level == 2:
+        log("level 2: resetting the modem with mmcli")
+        run(["mmcli", "-m", "any", "--reset"], timeout=60)
+        return number(config, "settle_s")
+
+    log("level 3: power cycling the module through PWRKEY")
+    power_cycle(config)
+    return number(config, "settle_cold_s")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Cellular bearer watchdog.")
+    parser.add_argument("--config", default=os.environ.get("BENCH_LTE_CONF", CONF))
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=0,
+        help="stop after this many probes; 0 means run for ever (the unit)",
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=None,
+        help="override the probe interval, for tests",
+    )
+    arguments = parser.parse_args(argv)
+
+    config = read_config(arguments.config)
+    interval = (
+        arguments.interval
+        if arguments.interval is not None
+        else number(config, "probe_interval")
+    )
+    threshold = int(number(config, "failures_before_recovery"))
+    counters = Counters(config["metrics_path"])
+    counters.write()
+
+    log(
+        f"probing {config['probe_host']} through {config['probe_iface']} "
+        f"every {interval:g} s, escalating after {threshold} failures"
+    )
+
+    failures = 0
+    level = 0
+    done = 0
+
+    while arguments.iterations == 0 or done < arguments.iterations:
+        done += 1
+
+        if probe(config):
+            if counters.state != "connected":
+                log("bearer is up")
+            failures = 0
+            level = 0
+            counters.state = "connected"
+            counters.level = 0
+            counters.write()
+            time.sleep(interval)
+            continue
+
+        failures += 1
+        counters.probe_failures += 1
+        counters.state = "failing"
+        log(f"probe failed ({failures} of {threshold} before escalating)")
+        counters.write()
+
+        if failures < threshold:
+            time.sleep(interval)
+            continue
+
+        level = min(level + 1, MAX_LEVEL)
+        settle = recover(level, config, counters)
+        failures = 0
+        counters.write()
+        time.sleep(settle)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,21 @@
+[Unit]
+Description=Hold the modem FLIGHT line out of flight mode
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+# Before ModemManager, so that the radio is already out of flight mode the
+# first time the modem is probed. A modem found in flight mode registers
+# with no operator and looks exactly like an antenna fault.
+Before=ModemManager.service
+DefaultDependencies=no
+After=sysinit.target
+
+[Service]
+# Type=exec, and the process stays: releasing the line returns it to an
+# input, and the HAT's pull-up then asserts flight mode again. The hold is
+# the feature.
+Type=exec
+ExecStart=/usr/bin/lte-gpio flight-hold
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+[Unit]
+Description=Serve the modem metrics directory over HTTP
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+After=NetworkManager.service
+
+[Service]
+EnvironmentFile=/etc/bench/lte-metrics.conf
+ExecStart=/usr/bin/python3 -m http.server ${METRICS_PORT} \
+    --bind ${METRICS_BIND} --directory ${METRICS_DIR}
+# The bind address belongs to the access point, which NetworkManager brings
+# up after this unit is first started, so the first few attempts fail. That
+# is what Restart is for; it is not a sign of anything wrong.
+Restart=always
+RestartSec=5
+DynamicUser=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+# It reads one directory of text files and serves them. Nothing it can be
+# talked into doing should be able to touch anything else.
+ReadOnlyPaths=/var/lib/lte
+
+[Install]
+WantedBy=multi-user.target

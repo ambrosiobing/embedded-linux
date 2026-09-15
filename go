@@ -7,6 +7,7 @@
 #   ./go build        build bench-image for the Raspberry Pi 4
 #   ./go dev          build the debugging variant
 #   ./go rpi3         build the same layer for a Raspberry Pi 3
+#   ./go router       build bench-router-image, the LTE router of Project 15
 #   ./go release      build with SBOM, CVE check and source archive
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
@@ -29,6 +30,7 @@ check)      exec sh ./scripts/host-check.sh ;;
 build)      exec sh ./scripts/build.sh bench-rpi4 ;;
 dev)        exec sh ./scripts/build.sh bench-dev ;;
 rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
+router)     exec sh ./scripts/build.sh bench-router ;;
 release)    exec sh ./scripts/build.sh bench-release ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
@@ -61,6 +63,6 @@ clean)
 	esac
 	;;
 *)
-	sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
 	;;
 esac

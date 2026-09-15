@@ -131,7 +131,7 @@ warns rather than breaking silently.
 ```
 require recipes-core/images/core-image-minimal.bb
 IMAGE_FEATURES += "ssh-server-openssh debug-tweaks"
-IMAGE_INSTALL:append = " libgpiod libgpiod-tools i2c-tools bench-status \n    bench-provision linux-firmware-rpidistro-bcm43455 \n    kernel-module-brcmfmac kernel-module-brcmfmac-wcc"
+IMAGE_INSTALL:append = " libgpiod libgpiod-tools i2c-tools bench-status \n    bench-provision bench-net-wifi linux-firmware-rpidistro-bcm43455 \n    kernel-module-brcmfmac kernel-module-brcmfmac-wcc"
 ```
 
 `IMAGE_FEATURES` are higher level than packages: `ssh-server-openssh` pulls

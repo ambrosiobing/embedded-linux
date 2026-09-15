@@ -13,7 +13,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SUT=$ROOT/meta-bench/recipes-bench/bench-provision/files/bench-wifi-setup
+SUT=$ROOT/meta-bench/recipes-bench/bench-net-wifi/files/bench-wifi-setup
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

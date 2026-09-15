@@ -1,0 +1,13 @@
+# Stable names for the two ports that get talked to by hand.
+#
+# ttyUSB0..4 are allocated in probe order, and probe order is not a promise.
+# The AT port is interface 2 and the NMEA port interface 1 in the 9001
+# composition; if AT+CUSBPIDSWITCH moved the module to another composition
+# these numbers move with it, which is one more reason the mode is recorded
+# in docs/usb-modes.md rather than remembered.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{ID_USB_INTERFACE_NUM}=="02", SYMLINK+="lte-at"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="9001", ENV{ID_USB_INTERFACE_NUM}=="01", SYMLINK+="lte-nmea"
+
+# Keep ModemManager off the Pi's own UARTs whatever its filter policy is.
+KERNEL=="ttyAMA[0-9]*", ENV{ID_MM_PORT_IGNORE}="1"
+KERNEL=="ttyS[0-9]*", ENV{ID_MM_PORT_IGNORE}="1"

@@ -48,6 +48,7 @@ embedded-linux-bench/
   kas/                 build configurations: machine, distro, layer pins
   projects/
     01-yocto-image/    what each project adds, how to run it, its evidence
+    15-lte-router/
   sdk/                 programs that prove the cross SDK works
   scripts/             build, flash, SDK, reproducibility, checks
   tests/               what can be tested without hardware
@@ -78,7 +79,7 @@ build stays a single coherent tree.
 | 12 | A sensor-hub D-Bus service over UART | Raspberry Pi 4 | CBOR wire protocols, sd-bus, polkit, socket activation | Planned |
 | 13 | A Wayland kiosk HMI on the 7 inch touchscreen | Raspberry Pi 4 | DRM/KMS, Wayland, libinput, LVGL or Qt | Planned |
 | 14 | The Pi as a USB gadget: Ethernet, serial and HID | Raspberry Pi 4 | USB gadget configfs, libcomposite, evdev to HID | Planned |
-| 15 | An LTE router with failover and GNSS | Raspberry Pi 4 | ModemManager, NetworkManager, QMI, nftables, gpsd | Planned |
+| 15 | [An LTE router with failover and GNSS](projects/15-lte-router) | Raspberry Pi 4 | ModemManager, NetworkManager, QMI, nftables, gpsd | **Software complete**: image, watchdog, exporter, firewall and four test suites; no board work yet |
 | 16 | A low-power Cat-M and NB-IoT tracker | Raspberry Pi 3 | AT state machines, CoAP/LwM2M, PSM/eDRX, current budget | Planned |
 | 17 | A BLE gateway for the STWIN.box with BlueZ | Raspberry Pi 3B+ | BLE central on Linux, BlueZ D-Bus GATT, pipelines | Planned |
 | 18 | Edge Wi-Fi access point with MQTT over TLS and a private PKI | Raspberry Pi 3 | hostapd, dnsmasq, Mosquitto, X.509 | Planned |
@@ -96,6 +97,7 @@ file.
 | `./go build` | `kas/bench-rpi4.yml` | `bench-image` for `raspberrypi4-64` |
 | `./go rpi3` | `kas/bench-rpi3.yml` | The same image for `raspberrypi3-64` |
 | `./go dev` | `kas/bench-dev.yml` | `bench-image-dev`, with gdbserver and perf |
+| `./go router` | `kas/bench-router.yml` | `bench-router-image`, the gateway of Project 15: two uplinks, NAT, a cellular watchdog |
 | `./go release` | `kas/bench-release.yml` | The same image plus an SPDX bill of materials, a CVE report and the corresponding source archive |
 
 Later projects that need a different kernel or a different image add their
@@ -118,7 +120,7 @@ silently. Each is one line, and each says where to change it.
 |---|---|---|
 | The console is the official 7 inch DSI panel | This bench has no micro-HDMI adapter and its USB/TTL cable is obsolete | `RPI_EXTRA_CONFIG` and `CMDLINE_CONSOLE` in `kas/bench-rpi4.yml` |
 | The console keymap is German | The boards are used with a German keyboard, and a US map makes a shell unusable | `vconsole.conf` in `meta-bench/recipes-bench/bench-provision/files/` |
-| Networking is wireless | There is no wired network within reach of the bench | `bench-provision`, plus the firmware named in `bench-image.bb` |
+| Networking is wireless | There is no wired network within reach of the bench | `bench-net-wifi`, plus the firmware named in `bench-image.bb` |
 | The Pi 4 radio firmware is proprietary | The radio does not initialise without it | `LICENSE_FLAGS_ACCEPTED` in `kas/bench-rpi4.yml` |
 | Root has no password | `debug-tweaks`, right for an isolated bench and wrong for anything else | `IMAGE_FEATURES` in `bench-image.bb` |
 
@@ -143,7 +145,11 @@ usually break can be:
 | Static layer checks | `./go lint` | Files in `SRC_URI` that are missing, units in `SYSTEMD_SERVICE` that are never installed, layer.conf completeness, ASCII and line length |
 | State machine | `sh tests/bench-state-test.sh` | The status logic, against a fake `systemctl` |
 | WiFi provisioning | `sh tests/bench-wifi-setup-test.sh` | Credentials parsed from a file written on Windows, including CRLF endings, missing fields and file permissions |
-| Host compile | `./go check` | The application built with `-Werror` against the host libgpiod v2, the same API the target uses |
+| Router provisioning | `sh tests/bench-router-setup-test.sh` | The same three Windows text traps for the router's SSID, passphrase and APN, plus file modes and partial input |
+| Cellular watchdog | `sh tests/lte-watchdog-test.sh` | The escalation ladder against stubbed `mmcli`, `ping`, `nmcli` and `lte-gpio` |
+| Modem metrics | `sh tests/lte-exporter-test.sh` | Parsing and Prometheus text format, with no modem present |
+| Firewall invariants | `sh tests/bench-router-nftables-test.sh` | Input policy drop, both uplinks masqueraded, the MSS clamp, no port opened towards an uplink |
+| Host compile | `./go check` | Both C programs built with `-Werror` against the host libgpiod v2, the same API the target uses, and both Python programs byte-compiled |
 
 CI runs all of these on every push, on a pinned `ubuntu-24.04` runner
 with libgpiod v2 built from a named tag, because no Ubuntu LTS image

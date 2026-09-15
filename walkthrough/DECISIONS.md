@@ -460,4 +460,137 @@ CI: name the exact commit, not a label that can be repointed.
 
 ---
 
+## 23. Bench configuration split again: identity and wireless client
+
+**Context.** Project 15's router runs an access point on `wlan0` under
+NetworkManager. `bench-provision` shipped the German keymap together with a
+systemd-networkd profile and a `wpa_supplicant` client setup for that same
+interface.
+
+**Decision.** Split into `bench-provision`, site identity only, and
+`bench-net-wifi`, the wireless client half. `bench-image` installs both;
+`bench-router-image` removes the second.
+
+**Rejected.** Keeping one recipe and masking the units the router does not
+want.
+
+**Why.** Masking leaves the files installed and inert, which is precisely
+the state that costs someone an afternoon six months later. Two network
+managers on one interface is not a conflict that resolves itself. Decision
+20 split bench policy out of the status daemon for the same reason; this is
+the same cut one level finer.
+
+**Consequence.** Project 1's package manifest gains one entry, so its
+recorded count of 112 now counts a differently sliced set.
+
+---
+
+## 24. The watchdog is two programs, and the GPIO half is not Python
+
+**Context.** The book's watchdog is one Python program that drives PWRKEY
+through libgpiod's Python bindings.
+
+**Decision.** `lte-gpio` in C owns the control lines; `lte-watchdog` in
+Python owns the probe and the escalation and reaches hardware only by
+running `lte-gpio`.
+
+**Rejected.** One program, as specified.
+
+**Why.** Three reasons. The escalation ladder becomes testable on a laptop
+against stubs, which it cannot be with in-process bindings. The C stays
+short enough to read in one sitting, which is Decision 6 applied again.
+And `python3-libgpiod` is a separate package whose name differs between
+OpenEmbedded releases: a recovery path that fails on an import is a
+recovery path that does not exist, and the one time it matters is the one
+time nobody is watching.
+
+**Consequence.** A `fork` and `exec` per PWRKEY press, on a path that runs
+at most once every few minutes.
+
+---
+
+## 25. The router firewall has an input chain
+
+**Context.** The specified ruleset has forward and postrouting chains only,
+leaving the input policy at accept.
+
+**Decision.** An input chain with policy drop: return traffic, loopback,
+ICMP, DHCP and DNS from the LAN, ssh from the LAN and the cable, and the
+metrics port from the LAN only. Everything else counted and dropped.
+
+**Rejected.** The ruleset as specified.
+
+**Why.** With an accept policy, every service on the box is reachable from
+the carrier network as soon as the bearer comes up, including an SSH server
+that `debug-tweaks` left with a passwordless root and a metrics endpoint
+that publishes the box's position. The bench assumptions that are harmless
+behind a home router stop being harmless the moment the box has a public
+address.
+
+**Consequence.** Adding a service to this image now means adding a line to
+the ruleset. That is the correct failure mode: forgetting produces a service
+nobody can reach, which is visible, rather than one everybody can.
+
+---
+
+## 26. Firewall invariants are asserted, not reviewed
+
+**Context.** `nft -c -f` checks syntax. It accepts an input policy of
+accept, a masquerade rule naming one uplink, and a forward chain with no MSS
+clamp, all of which work on a bench and fail in the field.
+
+**Decision.** `tests/bench-router-nftables-test.sh` asserts the properties
+themselves, and runs `nft -c` in addition where the tool exists.
+
+**Rejected.** Relying on the syntax check plus review.
+
+**Why.** The three mistakes above are invisible in a diff that is otherwise
+correct, and two of them produce a box that passes every test on the bench.
+This is Decision 17's principle, that checks find their own inputs, applied
+to meaning rather than to file lists.
+
+---
+
+## 27. The router kernel fragment is opt in
+
+**Context.** The router needs built-in USB modem drivers and a built-in
+netfilter stack. `bench.cfg` is shared by every image, including the one
+Project 3 measures boot time and kernel size with.
+
+**Decision.** A second fragment, `router.cfg`, added to `SRC_URI` only when
+`BENCH_ROUTER_KERNEL` is set, which `kas/bench-router.yml` does.
+
+**Rejected.** One fragment for every image.
+
+**Why.** Quietly changing a kernel another project has already measured
+invalidates that measurement without anyone noticing. The kas file is
+already where per-project build policy lives.
+
+**Consequence.** One line of BitBake whose quoting is dictated by
+`scripts/lint.py`, and is commented as such.
+
+---
+
+## 28. The modem drivers are built in, not modular
+
+**Context.** The obvious packaging is `kernel-module-option`,
+`kernel-module-qmi-wwan` and about six netfilter module packages in the
+image recipe.
+
+**Decision.** `=y` in the kernel fragment. No module packages named.
+
+**Rejected.** Modules, which is what a general-purpose distribution does.
+
+**Why.** `core-image-minimal` installs no kernel modules at all, so a driver
+built as a module is a driver that exists in the build tree and not in the
+image. That cost Project 1 two rounds of debugging on `wlan0`: once for the
+core driver and once for the vendor module modern brcmfmac requests by name
+at probe time. On a router the modem and the packet filter are not optional
+extras, so the class of failure is removed rather than managed.
+
+**Consequence.** A larger kernel image, on a mains-powered box with an SD
+card.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)

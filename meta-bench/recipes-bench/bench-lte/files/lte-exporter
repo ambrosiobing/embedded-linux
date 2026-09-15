@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""lte-exporter - the modem's state as Prometheus text.
+
+Runs once and exits. A systemd timer calls it every 30 s and a separate
+unit serves the directory over HTTP, so this program does nothing but
+collect and write; it does not listen on a socket, it does not loop, and it
+cannot be the thing that keeps the box awake.
+
+That split is deliberate. An exporter that is also a web server is a
+long-running network-facing process that has to be right about both jobs.
+Here the serving half is python3 -m http.server bound to the LAN address,
+and the collecting half is this, which runs for a second at a time. The
+same file is what the node_exporter textfile collector reads if a fuller
+exporter is added later, so nothing here has to be thrown away.
+
+What it exports, and why each one is worth a line on a dashboard:
+
+    lte_modem_state         registered but never connected is an APN typo
+    lte_signal_rsrp_dbm     antenna placement, in one number
+    lte_signal_rsrq_db      quality rather than strength: cell congestion
+    lte_signal_snr_db       the number that predicts throughput
+    lte_default_route_via   which uplink is actually carrying traffic now
+    lte_gnss_*              position, when the GNSS engine is enabled
+
+SPDX-License-Identifier: MIT
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+
+CONF = "/etc/bench/lte.conf"
+
+DEFAULTS = {
+    "metrics_dir": "/var/lib/lte",
+    "signal_refresh_s": "10",
+    "export_location": "0",
+    "uplinks": "eth0 wwan0",
+}
+
+# The states ModemManager reports, in the order a modem walks through them.
+# All of them are exported every time, as a one-hot gauge, so that a
+# dashboard query does not have to know which label values exist and a
+# transition does not leave a stale series behind.
+MODEM_STATES = (
+    "failed",
+    "unknown",
+    "initializing",
+    "locked",
+    "disabled",
+    "disabling",
+    "enabling",
+    "enabled",
+    "searching",
+    "registered",
+    "disconnecting",
+    "connecting",
+    "connected",
+)
+
+
+def read_config(path: str) -> dict[str, str]:
+    config = dict(DEFAULTS)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                line = line.split("#", 1)[0].strip()
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key, value = key.strip(), value.strip()
+                if key in config and value:
+                    config[key] = value
+    except FileNotFoundError:
+        pass
+    return config
+
+
+def run(command: list[str], timeout: float = 20.0) -> str:
+    """stdout, or an empty string. A missing tool must produce a metrics
+    file that says so, not a traceback and no file at all."""
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout if result.returncode == 0 else ""
+
+
+def keyvalue(text: str) -> dict[str, str]:
+    """Parse mmcli --output-keyvalue: 'key : value' per line."""
+    values = {}
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key, value = key.strip(), value.strip()
+        if value and value != "--":
+            values[key] = value
+    return values
+
+
+def as_float(values: dict[str, str], *keys: str) -> float | None:
+    for key in keys:
+        if key in values:
+            try:
+                return float(values[key])
+            except ValueError:
+                continue
+    return None
+
+
+def default_route_device() -> str | None:
+    """Which device the lowest-metric default route points at.
+
+    This is the one number that says what is really happening. Both
+    profiles can be up, both can show 'connected', and exactly one of them
+    is carrying the bench's traffic.
+    """
+    best_device = None
+    best_metric = None
+    for line in run(["ip", "-4", "route", "show", "default"]).splitlines():
+        fields = line.split()
+        device = None
+        metric = 0
+        for index, field in enumerate(fields):
+            if field == "dev" and index + 1 < len(fields):
+                device = fields[index + 1]
+            elif field == "metric" and index + 1 < len(fields):
+                try:
+                    metric = int(fields[index + 1])
+                except ValueError:
+                    metric = 0
+        if device and (best_metric is None or metric < best_metric):
+            best_device, best_metric = device, metric
+    return best_device
+
+
+def collect(config: dict[str, str]) -> list[str]:
+    lines: list[str] = []
+
+    def gauge(name: str, help_text: str) -> None:
+        lines.append(f"# HELP {name} {help_text}")
+        lines.append(f"# TYPE {name} gauge")
+
+    modem = keyvalue(run(["mmcli", "-m", "any", "--output-keyvalue"]))
+    state = modem.get("modem.generic.state", "absent")
+
+    gauge("lte_modem_present", "1 when ModemManager reports a modem at all.")
+    lines.append(f"lte_modem_present {1 if modem else 0}")
+
+    gauge("lte_modem_state", "ModemManager generic state, one-hot.")
+    for known in MODEM_STATES:
+        lines.append(f'lte_modem_state{{state="{known}"}} {1 if state == known else 0}')
+
+    # Signal statistics have to be switched on before they are reported.
+    # Asking for them every run is idempotent and costs one AT exchange;
+    # the alternative, a setup at service start, silently stops working
+    # the first time the modem resets.
+    run(["mmcli", "-m", "any", f"--signal-setup={config['signal_refresh_s']}"])
+    signal = keyvalue(run(["mmcli", "-m", "any", "--signal-get",
+                           "--output-keyvalue"]))
+
+    measurements = (
+        ("lte_signal_rsrp_dbm", "Reference signal received power.",
+         ("modem.signal.lte.rsrp", "modem.signal.5g.rsrp")),
+        ("lte_signal_rsrq_db", "Reference signal received quality.",
+         ("modem.signal.lte.rsrq", "modem.signal.5g.rsrq")),
+        ("lte_signal_snr_db", "Signal to noise ratio.",
+         ("modem.signal.lte.snr", "modem.signal.5g.snr")),
+    )
+    for name, help_text, keys in measurements:
+        value = as_float(signal, *keys)
+        if value is not None:
+            gauge(name, help_text)
+            lines.append(f"{name} {value:g}")
+
+    quality = as_float(modem, "modem.generic.signal-quality.value")
+    if quality is not None:
+        gauge("lte_signal_quality_ratio",
+              "ModemManager's coarse 0 to 100 quality, as a ratio.")
+        lines.append(f"lte_signal_quality_ratio {quality / 100:g}")
+
+    current = default_route_device()
+    gauge("lte_default_route_via", "1 on the uplink holding the default route.")
+    for uplink in config["uplinks"].split():
+        lines.append(
+            f'lte_default_route_via{{dev="{uplink}"}} {1 if uplink == current else 0}'
+        )
+
+    if config["export_location"] not in ("0", "", "no", "false"):
+        location = keyvalue(run(["mmcli", "-m", "any", "--location-get",
+                                 "--output-keyvalue"]))
+        latitude = as_float(location, "modem.location.gps.latitude")
+        longitude = as_float(location, "modem.location.gps.longitude")
+        altitude = as_float(location, "modem.location.gps.altitude")
+        gauge("lte_gnss_fix", "1 when the GNSS engine reports a position.")
+        has_fix = latitude is not None and longitude is not None
+        lines.append(f"lte_gnss_fix {1 if has_fix else 0}")
+        if has_fix:
+            gauge("lte_gnss_latitude_degrees", "Latitude of the last fix.")
+            lines.append(f"lte_gnss_latitude_degrees {latitude:g}")
+            gauge("lte_gnss_longitude_degrees", "Longitude of the last fix.")
+            lines.append(f"lte_gnss_longitude_degrees {longitude:g}")
+            if altitude is not None:
+                gauge("lte_gnss_altitude_meters", "Altitude of the last fix.")
+                lines.append(f"lte_gnss_altitude_meters {altitude:g}")
+
+    return lines
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Modem metrics collector.")
+    parser.add_argument("--config", default=os.environ.get("BENCH_LTE_CONF", CONF))
+    parser.add_argument("--output", default=None, help="write here instead")
+    parser.add_argument("--stdout", action="store_true", help="print, do not write")
+    arguments = parser.parse_args(argv)
+
+    config = read_config(arguments.config)
+    text = "\n".join(collect(config)) + "\n"
+
+    if arguments.stdout:
+        sys.stdout.write(text)
+        return 0
+
+    path = arguments.output or os.path.join(config["metrics_dir"], "lte.prom")
+    directory = os.path.dirname(path) or "."
+    try:
+        os.makedirs(directory, exist_ok=True)
+        temporary = path + ".new"
+        with open(temporary, "w", encoding="ascii") as handle:
+            handle.write(text)
+        # Rename rather than write in place: a scrape that arrives during a
+        # write must see the old file whole, never half of the new one.
+        os.replace(temporary, path)
+    except OSError as error:
+        print(f"lte-exporter: cannot write {path}: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

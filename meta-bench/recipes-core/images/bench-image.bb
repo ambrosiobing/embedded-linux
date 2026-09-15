@@ -21,6 +21,7 @@ IMAGE_INSTALL:append = " \
     libgpiod-tools \
     i2c-tools \
     bench-provision \
+    bench-net-wifi \
     linux-firmware-rpidistro-bcm43455 \
     kernel-module-brcmfmac \
     kernel-module-brcmfmac-wcc \

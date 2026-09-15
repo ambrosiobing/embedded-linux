@@ -60,8 +60,9 @@ decision was taken over its alternative.
 | `i2c-tools` | `i2cdetect` is the first command run against any new sensor board |
 | `bench-status` | This project's own application: the status LEDs and the state machine behind them |
 | `openssh-sshd`, via `ssh-server-openssh` | How later projects copy SDK-built binaries onto the board |
-| `bench-provision` | Bench site policy: the German console keymap, the `wlan0` network file, and the first-boot step that reads WiFi credentials from the boot partition |
-| `wpa-supplicant`, via `bench-provision` | Joins the wireless network. This bench has no wired network within reach |
+| `bench-provision` | Bench site identity: the German console keymap |
+| `bench-net-wifi` | The `wlan0` network file and the first-boot step that reads WiFi credentials from the boot partition. Split out of `bench-provision` by Project 15, whose image runs an access point on the same interface and must not also carry a client profile for it |
+| `wpa-supplicant`, via `bench-net-wifi` | Joins the wireless network. This bench has no wired network within reach |
 | `linux-firmware-rpidistro-bcm43455` | The Pi 4 radio does not initialise without it. Proprietary and binary-redistributable, so its licence must be accepted explicitly |
 | `kernel-module-brcmfmac` | The radio driver. `core-image-minimal` installs no kernel modules, so firmware alone gives a device that never probes |
 | `kernel-module-brcmfmac-wcc` | The vendor half of that driver. `brcmfmac` asks for it by name at probe time and fails to attach without it, after detecting the chip and finding its firmware |
@@ -316,6 +317,12 @@ keymaps. That was wrong for this bench. The console here is a touchscreen
 with a German keyboard attached, `bench-provision` depends on `keymaps` and
 `kbd` to set `KEYMAP=de`, and removing them would have broken the console
 this project is actually used through.
+
+The package count above was taken before Project 15 split `bench-provision`
+into site identity and wireless client. The image's contents are unchanged;
+one package became two, so the manifest is now 113 entries covering the
+same files. The manifest in `docs/evidence/` is the one from the build that
+was measured, and it is left as it was taken.
 
 ## Where this differs from the book
 

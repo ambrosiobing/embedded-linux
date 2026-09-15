@@ -1,0 +1,40 @@
+# Project 15: the LTE router.
+#
+#   kas build kas/bench-router.yml        or  ./go router
+#
+# A separate configuration rather than a change to bench-rpi4.yml, for the
+# reason stated in the repository README: a project that needs a different
+# kernel or a different image adds its own kas file next to the others. The
+# shared one stays the thing every project can still build.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+target: bench-router-image
+
+repos:
+  # ModemManager, NetworkManager, libqmi, dnsmasq and nftables all live in
+  # meta-networking. It is a second layer from the same repository that is
+  # already pinned in bench-rpi4.yml, so the branch is pinned there too and
+  # this file only names the layer.
+  meta-openembedded:
+    layers:
+      meta-oe:
+      meta-networking:
+      meta-python:
+
+local_conf_header:
+  router: |
+    # NetworkManager needs polkit to let a non-root caller change a
+    # connection, and the packages pull in a good deal of glib. Both are
+    # distro features rather than image contents, so they are set here.
+    DISTRO_FEATURES:append = " polkit"
+
+    # Turn on the router kernel fragment. See
+    # meta-bench/recipes-kernel/linux/linux-raspberrypi_%.bbappend.
+    BENCH_ROUTER_KERNEL = "1"
+
+    # The modem is debugged in the kernel log more often than anywhere
+    # else, so keep the sources of the driver that carries it.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-lte bench-router"

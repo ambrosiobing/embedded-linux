@@ -1,0 +1,31 @@
+# The bench LAN. A template: the SSID and the passphrase are filled in on
+# first boot from /boot/router.conf, so that no credential is ever committed.
+#
+# method=manual rather than NetworkManager's "shared" mode. Shared would add
+# its own NAT rules and its own dnsmasq, and the whole point of this project
+# is that the packet path is one readable nftables file.
+[connection]
+id=bench-ap
+type=wifi
+interface-name=wlan0
+autoconnect=true
+
+[wifi]
+mode=ap
+band=bg
+channel=6
+ssid=@AP_SSID@
+
+[wifi-security]
+key-mgmt=wpa-psk
+proto=rsn
+pairwise=ccmp
+group=ccmp
+psk=@AP_PSK@
+
+[ipv4]
+method=manual
+address1=10.20.0.1/24
+
+[ipv6]
+method=disabled

@@ -1,0 +1,18 @@
+[Unit]
+Description=Cellular bearer watchdog with escalating recovery
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+After=NetworkManager.service ModemManager.service
+Wants=NetworkManager.service ModemManager.service
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/lte-watchdog
+# Root: it runs nmcli, mmcli and lte-gpio, and lte-gpio needs the GPIO
+# character device. Dropping privilege here would mean a polkit rule for
+# NetworkManager plus a udev group for the gpiochip, which is the right
+# answer for a product and more moving parts than this bench earns.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -48,6 +48,25 @@ for f in $BENCH_SH; do
 	fi
 done
 
+step "python programs compile"
+# lte-watchdog and lte-exporter are Python and have no extension, so they
+# are found by their shebang the same way the shell files are. A syntax
+# error in either of them is a watchdog that dies on its first start, which
+# on a gateway means the box is offline and cannot be reached to be fixed.
+BENCH_PY=$( {
+	grep -rl --exclude-dir=.git --exclude=*.md "^#!/usr/bin/env python3" .
+	find . -path ./.git -prune -o -name "*.py" -print
+} | sed "s|^[.]/||" | sort -u)
+for f in $BENCH_PY; do
+	if python3 -m py_compile "$f"; then
+		echo "ok   $f"
+	else
+		echo "FAILED $f"
+		fail=1
+	fi
+done
+find . -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
+
 step "shell scripts"
 if command -v shellcheck >/dev/null 2>&1; then
 	# shellcheck disable=SC2086
@@ -98,6 +117,26 @@ else
 		echo "compiled clean with -Werror"
 		# No GPIO chip on most build hosts, so exit 1 is correct here.
 		if timeout 5 "$out"; then
+			echo "note: this host has a usable GPIO chip"
+		else
+			echo "runs and reports no usable chip, as expected off-target"
+		fi
+	else
+		fail=1
+	fi
+
+	step "compile lte-gpio against host libgpiod"
+	# Project 15's control-line tool, same treatment as the daemon: the
+	# compiler is the only thing on this host that can say anything about
+	# it, so it says it with -Werror.
+	out=$(mktemp -d)/lte-gpio
+	lte_src=meta-bench/recipes-bench/bench-lte/files/lte-gpio.c
+	# Word splitting on the pkg-config output is intended here too.
+	# shellcheck disable=SC2046
+	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \
+		"$lte_src" -o "$out" $(pkg-config --libs libgpiod); then
+		echo "compiled clean with -Werror"
+		if timeout 5 "$out" info; then
 			echo "note: this host has a usable GPIO chip"
 		else
 			echo "runs and reports no usable chip, as expected off-target"

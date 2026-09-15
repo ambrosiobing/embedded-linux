@@ -74,7 +74,7 @@ next to the line:
 
 A comment at the point of decision survives; a note in a wiki does not.
 
-**Projects:** 1, 5, 6, 7, 10, 11, 12, 13, 14.
+**Projects:** 1, 5, 6, 7, 10, 11, 12, 13, 14, 15.
 
 ## 3. Integration and test
 
@@ -88,6 +88,7 @@ numbers rather than opinions.
 | Interrupt latency | `cyclictest` under load, with a known instrument | 8 |
 | Functional correctness | Automated tests over a serial console, on real boards | 4 |
 | Driver behaviour | ptest, IIO buffer integrity, event counts | 5, 10 |
+| Failover and recovery | Missed replies during a forced outage, counted from a client | 15 |
 
 This is where the testing ladder from
 [07. Verification](07-verification.md) grows its top rung. Project 4 builds

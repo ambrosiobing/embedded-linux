@@ -1,0 +1,18 @@
+[Unit]
+Description=Bench router packet filter and NAT
+Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Before=network-pre.target
+Wants=network-pre.target
+ConditionPathExists=/etc/bench/nftables.conf
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/bench/nftables.conf
+ExecReload=/usr/sbin/nft -f /etc/bench/nftables.conf
+# Leaving a drop policy behind on stop would lock out the administrator
+# along with everyone else, so stopping the unit clears the ruleset.
+ExecStop=/usr/sbin/nft flush ruleset
+
+[Install]
+WantedBy=multi-user.target

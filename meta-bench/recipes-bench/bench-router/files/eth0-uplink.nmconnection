@@ -1,0 +1,21 @@
+# The primary uplink. Metric 100 beats the LTE profile's 700, so while this
+# link works the kernel sends everything through it.
+#
+# never-default=false is spelled out because it is the line someone changes
+# by accident when they want the cable for management only, and then wonders
+# why failover stopped working in both directions.
+[connection]
+id=eth0-uplink
+type=ethernet
+interface-name=eth0
+autoconnect=true
+
+[ethernet]
+
+[ipv4]
+method=auto
+route-metric=100
+never-default=false
+
+[ipv6]
+method=disabled

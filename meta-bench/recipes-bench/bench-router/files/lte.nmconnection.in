@@ -1,0 +1,26 @@
+# The failover uplink. A template: the APN is a property of the SIM, not of
+# the image, so bench-router-setup fills it in on first boot from
+# /boot/router.conf. See docs/BRINGUP.md in projects/15-lte-router.
+#
+# autoconnect-retries=0 means retry for ever. The default gives up after a
+# few attempts, which on a gateway means the box is offline until someone
+# walks over to it.
+#
+# No DHCP profile for wwan0 exists anywhere on purpose: qmi_wwan runs the
+# interface in raw-IP mode and ModemManager configures the address from the
+# bearer. A dhclient there finds nothing and looks like a dead modem.
+[connection]
+id=lte
+type=gsm
+autoconnect=true
+autoconnect-retries=0
+
+[gsm]
+apn=@APN@
+
+[ipv4]
+method=auto
+route-metric=700
+
+[ipv6]
+method=disabled

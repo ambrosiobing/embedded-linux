@@ -20,3 +20,7 @@ sdk/hello-gpiod/hello-gpiod
 .DS_Store
 
 # Evidence is committed on purpose, so nothing under projects/*/docs is here.
+
+# Byte code from running the Python programs out of the tree during tests.
+__pycache__/
+*.pyc
