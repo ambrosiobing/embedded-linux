@@ -853,6 +853,30 @@ Deferred with written reasons rather than open: the LED indication, because
 the LinkerKit modules cannot be connected with the cables available, and the
 serial console, which Project 2 makes mandatory.
 
+**A possible way out of the serial console deferral, found in Project 15.**
+The reason that console was never exercised is that this bench's USB/TTL
+cable is a PL2303HXA, a generation Windows refuses to drive, so there was no
+adapter rather than no interest.
+
+The SIM7600E-H HAT has two micro-USB sockets. One is the module's own USB
+interface, which is the data path; the other is a USB-to-serial bridge chip
+on the HAT itself, put there so a PC can send AT commands without a Pi.
+Those bridges are CP2102 or CH340 parts and Windows drives both without
+argument, so the bench now owns a bridge chip that works.
+
+Whether it can serve as a Pi console adapter is one look at the HAT's
+silkscreen. Out of the box the bridge is wired to the **modem's** UART, not
+to the header, so it is a PC-to-modem channel. It becomes a console adapter
+only if that HAT revision exposes the bridge's TX and RX as pins on its
+jumper block, which some Waveshare revisions do and others do not. If they
+are there, jumper them to the Pi's GPIO15 and GPIO14.
+
+Two things would still be needed after that: the Pi's console has to be
+freed from `serial0`, since `CMDLINE:append` now puts `console=tty1` there
+as well, and Project 15's `ModemManager.conf` strict filter plus the
+`ID_MM_PORT_IGNORE` udev rules exist precisely to keep ModemManager off that
+UART. Recorded rather than chased. Project 15's journal, entry 19.
+
 One loose end outside the repository: the build laptop's `git push` is
 refused by a token scope, so `packages.txt` was transcribed and committed
 from the other machine instead. `gh auth refresh -s repo` there, and a

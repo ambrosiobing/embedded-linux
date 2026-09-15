@@ -357,6 +357,16 @@ differently, each for a reason worth keeping:
    image; it is simply not the instrument here. Project 2 makes it
    mandatory, because a NanoPi NEO Air has no other console at all.
 
+   The reason it was never exercised is that this bench's USB/TTL cable is
+   a PL2303HXA, a generation Windows refuses to drive. Project 15 turned up
+   a possible replacement: the SIM7600E-H HAT carries its own USB-to-serial
+   bridge on a second micro-USB socket, and Windows drives those chips
+   without argument. Whether it can serve as a Pi console adapter depends on
+   whether that HAT revision exposes the bridge's TX and RX on its jumper
+   block, which is one look at the silkscreen. Out of the box the bridge is
+   wired to the modem, not to the header. See Project 15's journal, entry
+   19.
+
 One smaller thing: `S = "${WORKDIR}"` is correct on scarthgap and becomes
 `S = "${UNPACKDIR}"` on walnascar and later. It is the only line in the layer
 that has to move with that release.
