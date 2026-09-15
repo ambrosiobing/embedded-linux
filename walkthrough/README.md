@@ -51,13 +51,12 @@ build step, everything survives a diff, and `grep` finds it all.
 These documents distinguish between what has been verified and what has
 not, because that distinction is the whole point of the exercise.
 
-Verified so far: the application compiles clean against libgpiod v2 and its
-state machine passes its tests; the image builds from source in 194 minutes
-over 5095 tasks; and every option in the kernel fragment reached the built
-`.config`.
+Verified so far: the image builds from source in 194 minutes over 5095
+tasks and reproduces identically from the same commit; the board boots with
+no failed units; the status daemon runs and owns its three GPIO lines; every
+option in the kernel fragment reached the built `.config`; every package in
+the image is justified in writing; and the board joins a wireless network.
 
-Every package in the 95-package image can be justified, after tracing four
-X11 libraries to a dbus feature and removing it.
-
-Not yet: no board has booted, and the SDK has not been generated. Where a
-document describes something unproven, it says so.
+Not yet: the SDK has not been generated, and two items are deferred with
+written reasons, the LED indication and the serial console. Where a document
+describes something unproven, it says so.

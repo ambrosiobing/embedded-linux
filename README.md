@@ -64,7 +64,7 @@ build stays a single coherent tree.
 
 | # | Project | Board | Theme | State |
 |---|---|---|---|---|
-| 01 | [A Yocto image that owns the whole stack](projects/01-yocto-image) | Raspberry Pi 4 | Build systems, layers, recipes, SDK | Image builds, not yet booted |
+| 01 | [A Yocto image that owns the whole stack](projects/01-yocto-image) | Raspberry Pi 4 | Build systems, layers, recipes, SDK | Built, booted, reproducible; SDK pending |
 | 02 | NanoPi NEO Air on mainline: U-Boot, kernel, device tree, eMMC | NanoPi NEO Air | Board bring-up, bootloader, sunxi mainline | Planned |
 | 03 | Boot time and energy per boot, measured | NanoPi NEO Air + PPK2 | Boot-time optimisation, systemd-analyze, power | Planned |
 | 04 | A network-boot hardware-in-the-loop lab | Pi 4 server + Pi 3B+ DUT | TFTP/NFS root, udev, serial consoles, automated tests | Planned |
