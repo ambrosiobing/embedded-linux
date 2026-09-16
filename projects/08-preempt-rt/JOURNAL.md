@@ -841,3 +841,58 @@ what 6.6 lacks on arm64 is `ARCH_SUPPORTS_RT`. On a 6.6 tree `ksym` prints
 the failure it was partly written for. That is why the bring-up notes now
 read the kernel's own Makefile as a separate step and run `./go kconfig`
 before the build rather than after it.
+
+---
+
+## 25. The kernel check read the wrong kernel, and said so in a line nobody reads
+
+**What happened.** With 6.12.93 unpacked, the version pin confirmed by the
+kernel's own Makefile, and `./go ksym -f rt` reporting all 31 symbols real,
+`./go kconfig -f rt` returned six mismatches including the one that
+matters:
+
+```
+MISMATCH  CONFIG_PREEMPT_RT=y   (built: not set)
+MISMATCH  CONFIG_NO_HZ_FULL=y   (built: not set)
+```
+
+The obvious reading is that the fragment failed. It had not. Two lines
+above the verdict:
+
+```
+--- config   .../linux-raspberrypi/6.6.63+git/...-build/.config
+--- built    2026-09-15 17:56
+```
+
+It was checking yesterday's 6.6 kernel, from before this project existed.
+
+**What was done.** The search ended in `sort | tail -1` over the paths.
+That is a version sort done lexically, and kernel versions defeat it:
+
+```
+linux-raspberrypi/6.12.93+git/...   sorts first
+linux-raspberrypi/6.6.63+git/...    sorts last, because "6" > "1"
+```
+
+So the newest kernel sorted first and the oldest won. Ranking by
+modification time instead cannot get this wrong, and unlike the mtime
+*filter* that was removed from this script earlier it never excludes
+everything: there is always a newest.
+
+`tests/kernel-config-test.sh`, thirteen assertions, builds two trees named
+so that a lexical sort picks the wrong one and checks that the newer is
+used. Then it reverses their timestamps and checks that the verdict
+reverses too, because a check that cannot fail is not a check.
+
+**Why that and not the alternative.** The alternative was to parse the
+version out of the path and compare numerically, which is a version
+comparator nobody needs: the question is never "which kernel is newest" but
+"which build just ran".
+
+The line that saved this was `--- built 2026-09-15 17:56`, added to the
+script by someone in passing so a check passing against a week-old tree
+would be visible rather than implied. It was the only thing in the output
+that contradicted the verdict. Worth remembering when deciding whether a
+diagnostic line earns its place: this one cost two minutes to write and
+turned an hour of hunting a phantom kernel-configuration bug into reading
+one line.

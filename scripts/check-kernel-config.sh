@@ -11,7 +11,9 @@
 
 . "$(dirname "$0")/common.sh"
 
-FRAGMENT_DIR=$REPO_DIR/meta-bench/recipes-kernel/linux/files
+# Overridable so that tests/kernel-config-test.sh can point the fragments
+# and the build tree at a few hundred bytes of fake instead of a kernel.
+FRAGMENT_DIR=${BENCH_FRAGMENT_DIR:-$REPO_DIR/meta-bench/recipes-kernel/linux/files}
 
 # Which fragments to check. bench.cfg goes into every image; router.cfg and
 # rt.cfg are opt in, so asking for them is opt in too:
@@ -55,12 +57,28 @@ done
 # guard protected against nothing: a .config predating a fragment line is
 # a .config missing that line, which this script already reports as a
 # MISMATCH. An honest failure was being turned into a confusing absence.
+# When several kernels have been built, take the most recently written
+# .config, which is the one the last build produced.
+#
+# This used to be "sort | tail -1" over the paths, and that is a version
+# sort done lexically, which gets kernel versions exactly backwards:
+#
+#   linux-raspberrypi/6.12.93+git/...    sorts first
+#   linux-raspberrypi/6.6.63+git/...     sorts last, because "6" > "1"
+#
+# So after building the 6.12 real-time kernel it silently checked the 6.6
+# one from the day before, reported CONFIG_PREEMPT_RT as missing, and the
+# obvious reading of that is that the fragment failed. It had not; the
+# check was looking at another kernel. Ranking by modification time cannot
+# get this wrong, and unlike the mtime FILTER removed above it never
+# excludes everything: there is always a newest.
 if [ -n "${1:-}" ]; then
 	[ -r "$1" ] || die "cannot read $1"
 	config=$1
 else
 	config=$(find "$KAS_BUILD_DIR/tmp/work" -path "*linux-raspberrypi*" \
-		-name ".config" 2>/dev/null | sort | tail -1)
+		-name ".config" -printf '%T@ %p\n' 2>/dev/null |
+		sort -n | tail -1 | cut -d' ' -f2-)
 fi
 
 if [ -z "$config" ]; then
