@@ -146,7 +146,27 @@ STUB
 cat >"$WORK/bin/cyclictest" <<'STUB'
 #!/bin/sh
 echo "cyclictest $*" >>"$BENCH_TEST_DIR/calls"
-echo "T: 0 ( 1234) P:80 I:1000 C:  60000 Min:      6 Act:    8 Avg:    9 Max:     31"
+# What cyclictest actually prints under "-h 400 -q", which is how rt-run
+# invokes it: a histogram, then zero-padded summary lines. There is no T:
+# line in this mode.
+#
+# This stub used to emit the T: line, which cyclictest prints only WITHOUT
+# -h. So the fixture described an invocation rt-run does not make, the
+# parser was written to match the fixture, and all three cyc_* columns were
+# blank in every row on real hardware while these tests passed. Found by
+# reading a results row on the board, not here.
+cat <<'HIST'
+# /dev/cpu_dma_latency set to 0us
+# Histogram
+000004 000010
+000013 004413
+000100 000001
+# Total: 000010000
+# Min Latencies: 00004
+# Avg Latencies: 00013
+# Max Latencies: 00100
+# Histogram Overflows: 00000
+HIST
 STUB
 
 cat >"$WORK/bin/rt-analyze" <<'STUB'
@@ -328,9 +348,11 @@ check "clock offset"         "$(field ext_ppm)"       "6.000"
 check "internal mean"        "$(field int_mean_us)"   "4.500"
 check "internal maximum"     "$(field int_max_us)"    "29.000"
 check "internal p99.9"       "$(field int_p999_us)"   "14"
-check "cyclictest minimum"   "$(field cyc_min_us)"    "6"
-check "cyclictest average"   "$(field cyc_avg_us)"    "9"
-check "cyclictest maximum"   "$(field cyc_max_us)"    "31"
+# Parsed from "# Min/Avg/Max Latencies:", which is what -h mode prints,
+# and unpadded: 00004 has to arrive as 4 rather than as a string.
+check "cyclictest minimum"   "$(field cyc_min_us)"    "4"
+check "cyclictest average"   "$(field cyc_avg_us)"    "13"
+check "cyclictest maximum"   "$(field cyc_max_us)"    "100"
 check "throttle before"      "$(field throttled_before)" "0x0"
 check "throttle after"       "$(field throttled_after)"  "0x0"
 

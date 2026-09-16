@@ -404,13 +404,36 @@ int_mean=$(awk '/^# min_us/ { print $5 }' "$toggle_out")
 int_max=$(awk '/^# min_us/ { print $7 }' "$toggle_out")
 int_p999=$(awk '/^# p99_us/ { print $5 }' "$toggle_out")
 
-# cyclictest -q prints one summary line per thread.
-cyc_min=$(awk '/^T: 0/ { for (i = 1; i < NF; i++)
-	if ($i == "Min:") print $(i + 1) }' "$cyclic_out")
-cyc_avg=$(awk '/^T: 0/ { for (i = 1; i < NF; i++)
-	if ($i == "Avg:") print $(i + 1) }' "$cyclic_out")
-cyc_max=$(awk '/^T: 0/ { for (i = 1; i < NF; i++)
-	if ($i == "Max:") print $(i + 1) }' "$cyclic_out")
+# cyclictest is invoked with -h above, and that changes what it prints.
+#
+# THIS PARSER AND THAT INVOCATION MUST CHANGE TOGETHER. They did not, for
+# the life of this script.
+#
+# Without -h, cyclictest prints one summary line per thread:
+#
+#   T: 0 ( 1234) P:80 I:1000 C: 60000 Min: 6 Act: 8 Avg: 9 Max: 31
+#
+# With -h, which is what runs here, it prints a histogram and then:
+#
+#   # Min Latencies: 00004
+#   # Avg Latencies: 00013
+#   # Max Latencies: 00100
+#
+# There is no T: line at all. The old parser looked for one, found none,
+# and returned the empty string three times, so cyc_min_us, cyc_avg_us and
+# cyc_max_us were blank in every row ever written while the console printed
+# the same numbers correctly one line below, because rt-compare reads this
+# file itself and reads it the right way.
+#
+# Found on the board, not before: the test's cyclictest stub emitted the
+# T: line, so the fixture described an invocation this script does not make
+# and the assertions passed against a format that never occurs here.
+#
+# "+ 0" because the values are zero padded: 00004 is a string until
+# arithmetic makes it four.
+cyc_min=$(awk '/^# Min Latencies:/ { print $4 + 0 }' "$cyclic_out")
+cyc_avg=$(awk '/^# Avg Latencies:/ { print $4 + 0 }' "$cyclic_out")
+cyc_max=$(awk '/^# Max Latencies:/ { print $4 + 0 }' "$cyclic_out")
 
 # And from the external instrument. rt-analyze prints key=value pairs, so
 # eval on a filtered list is safe and the alternative is a JSON parser in
