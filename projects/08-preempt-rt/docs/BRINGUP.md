@@ -39,7 +39,7 @@ Flash one and boot it:
 ```sh
 uname -r                       # 6.12.x
 cat /sys/kernel/realtime       # 1 on the rt build, absent on the control
-gpiodetect                     # gpiochip0, pinctrl-bcm2711
+gpiodetect                     # gpiochip0, pinctrl-bcm2835 on a Pi 3
 ```
 
 **This step originally said `bench-rt-image` "carries the generic BSP

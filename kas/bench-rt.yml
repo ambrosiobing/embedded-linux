@@ -23,6 +23,28 @@ header:
 
 target: bench-rt-image
 
+# The Raspberry Pi 3, not the 4, and the reason is mechanical rather than
+# technical: the MCC 118 does not seat on a Pi 4. The 40-pin header is the
+# same, but the Pi 4 moved the Ethernet and USB stacks and the HAT fouls
+# them. It sits on a Pi 3 exactly as intended.
+#
+# Nothing in this project objects. Both boards are quad-core arm64, so
+# ARCH_SUPPORTS_RT and isolcpus=3 mean the same thing on either, and the
+# pin numbers in the wiring table are header positions rather than board
+# properties. rt-toggle opens /dev/gpiochip0 by path and never looks at the
+# SoC label, so the pinctrl-bcm2711 that Projects 1 and 15 match on does
+# not appear here.
+#
+# What does change is what the numbers will say. A Cortex-A53 at 1.4 GHz
+# with a shared USB and Ethernet bus is a harder real-time target than a
+# Cortex-A72, and the thermal limit is lower, so the throttle gate will
+# fire sooner under load. The acceptance thresholds written as absolute
+# microseconds were written for a Pi 4 and are recorded as such; the
+# relative criterion, that the generic kernel is several times worse than
+# the real-time one under the same load, is a property of the preemption
+# model and holds on either board.
+machine: raspberrypi3-64
+
 repos:
   # rt-tests (cyclictest) and stress-ng are in meta-oe, which is already
   # pinned by bench-rpi4.yml. numpy is in meta-python, from the same

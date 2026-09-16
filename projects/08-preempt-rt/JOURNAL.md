@@ -1238,12 +1238,36 @@ writes `raspberrypi4_64`. Written from the skill notes rather than from the
 tree, which is the same class of mistake as reading a makefile instead of
 building it.
 
+Then the size, from the same buildhistory:
+
+```
+484 KiB wayland      387 libegl-mesa   195 mesa-megadriver
+194 libxcb1          132 libgbm1       130 libxcb-randr0
+130 libdrm2          and nine more at 66 KiB each
+```
+
+2.2 MiB of graphics, plus `userland` itself at 920 KiB. **3.1 MiB in
+total.**
+
 **What was done.** Recorded, and deliberately not fixed yet. Nothing in
 that stack runs, nothing links against it at runtime, and it cannot affect
 a latency measurement. It is image size and tidiness, and changing it now
 means rebuilding an image that is about to be flashed for bring-up, where
 the question is whether the HAT enumerates rather than how large the rootfs
 is.
+
+**The number is the point of this entry.** "Sixteen packages of graphics
+stack in a headless latency lab" is how it was written in entry 30, and it
+reads like a problem. Measured, it is 3.1 MiB of a rootfs that carries a
+Python interpreter and numpy. The comparison worth making is with the
+`polkit` finding from Project 15, which sounded identical and was 50 MB of
+a 237 MB rootfs. Same shape of discovery, two orders of magnitude apart in
+consequence, and the only way to tell them apart was to look at
+`installed-package-sizes.txt` rather than at a package count.
+
+A package list tells you what is there. It does not tell you what it
+costs, and reasoning about cost from a count is how a 3 MiB tidiness item
+gets treated like a 50 MB defect.
 
 **What the fix will be.** `/sys/class/thermal/thermal_zone0/temp` and
 `/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq` need nothing
@@ -1260,3 +1284,56 @@ than quietly measuring less.
 image. A 16-package graphics stack in a build nobody has booted is a worse
 thing to spend a build cycle on than finding out whether the MCC 118
 answers at all.
+
+---
+
+## 32. The board is the one the HAT fits
+
+**What happened.** With the image built for `raspberrypi4-64` and about to
+be flashed, the HAT was stacked and did not seat on a Pi 4. It fits a Pi 3
+exactly. The 40-pin header is identical on both; what differs is that the
+Pi 4 moved the Ethernet and USB stacks, and the MCC 118 fouls them.
+
+**What was done.** `kas/bench-rt.yml` sets `machine: raspberrypi3-64`, and
+the board changed in the project README, the three figures in DESIGN.md,
+the bring-up notes and the repository's front-page table.
+
+The change is smaller than it sounds, and that is worth recording rather
+than assuming:
+
+| Concern | Why it does not move |
+|---|---|
+| `ARCH_SUPPORTS_RT` | a property of arm64, and both boards are arm64 |
+| `isolcpus=3` | both are quad-core |
+| the wiring table | header positions, not board properties |
+| `rt-toggle` | opens `/dev/gpiochip0` by path and never matches an SoC label |
+
+The `pinctrl-bcm2711` string that would have needed changing belongs to
+Projects 1 and 15, whose GPIO code looks the chip up by label. Project 8's
+does not, and that was a deliberate choice made for a different reason,
+which happened to make this a one-line change.
+
+**What does move is the numbers.** A Cortex-A53 at 1.4 GHz with Ethernet
+and USB on one shared controller is a harder real-time target than a
+Cortex-A72, and its thermal limit is lower, so the throttle gate will fire
+sooner under `stress-ng`.
+
+**Why the thresholds were not relaxed.** The acceptance table says a 99.9th
+percentile below 50 us and a maximum below 150 us. Those were written for a
+Pi 4. The temptation on changing board is to adjust them to what the new
+board is likely to manage, which converts a criterion into a prediction and
+guarantees it passes.
+
+They stay as written, marked as Pi 4 targets. If the Pi 3 misses them that
+is a measurement and the row says which board it was taken on.
+
+The criterion that carries the argument is relative anyway: the generic
+kernel several times worse than the real-time one, under the same load, on
+the same hardware, with the same userspace. That is a property of the
+preemption model and it holds on either board. It is also the reason the
+control kernel from entry 29 matters more than the absolute numbers do.
+
+**Consequence for the plan.** Two kernel builds, not one, because both the
+real-time and the control configurations now target a different machine
+than the one already built. The image on disk is for a board the HAT does
+not fit.

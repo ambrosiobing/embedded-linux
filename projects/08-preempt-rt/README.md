@@ -1,7 +1,7 @@
 # Project 8: a PREEMPT_RT latency lab with the MCC 118 as the instrument
 
-**Board:** Raspberry Pi 4. **Theme:** real-time kernel, cyclictest, IRQ
-affinity, jitter measurement.
+**Board:** Raspberry Pi 3 (see below). **Theme:** real-time kernel,
+cyclictest, IRQ affinity, jitter measurement.
 
 Real-time Linux is usually argued about with cyclictest numbers, and
 cyclictest measures the kernel from inside the task the kernel is
@@ -118,6 +118,36 @@ that flatters the result.
 
 [docs/BRINGUP.md](docs/BRINGUP.md) is the board work in order, from the
 first `daqhats_list_boards` to the sixteenth row.
+
+## The board is the one the HAT fits
+
+Originally scoped for a Raspberry Pi 4, and built on a Raspberry Pi 3,
+because the MCC 118 does not seat on a Pi 4: the 40-pin header is the same
+but the Pi 4 moved the Ethernet and USB stacks and the HAT fouls them.
+
+Nothing in the design objects. Both boards are quad-core arm64, so
+`ARCH_SUPPORTS_RT` and `isolcpus=3` mean the same thing on either, the pin
+numbers in the wiring table are header positions rather than board
+properties, and `rt-toggle` opens `/dev/gpiochip0` by path without ever
+matching the SoC label.
+
+What changes is what the numbers will say:
+
+| | Pi 4 (as scoped) | Pi 3 (as built) |
+|---|---|---|
+| Core | Cortex-A72, 1.5 GHz | Cortex-A53, 1.4 GHz |
+| Ethernet and USB | separate buses | shared USB bus, so more interrupt traffic on one controller |
+| Thermal limit | 80 C | lower, so the throttle gate fires sooner under `stress-ng` |
+
+The absolute thresholds in the acceptance table, a 99.9th percentile below
+50 us and a maximum below 150 us, were written for a Pi 4 and are kept as
+written rather than quietly relaxed. If the Pi 3 misses them that is a
+measurement, not a failure, and the row says which board it was taken on.
+
+The relative criterion is the one that carries the argument anyway: the
+generic kernel several times worse than the real-time one, under the same
+load, on the same hardware, with the same userspace. That is a property of
+the preemption model and it holds on either board.
 
 ## The one thing to check before building anything
 
