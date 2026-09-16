@@ -28,7 +28,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 mkdir -p "$WORK/bin" "$WORK/bench"
 CALLS=$WORK/calls
-export BENCH_TEST_DIR=$WORK
+export BENCH_TEST_DIR="$WORK"
 
 pass=0
 fail=0
@@ -71,7 +71,7 @@ chmod +x "$WORK/bin/kas"
 PATH=$WORK/bin:$PATH
 export PATH
 
-export BENCH_WORK=$WORK/bench
+export BENCH_WORK="$WORK/bench"
 
 run() {
 	: >"$CALLS"

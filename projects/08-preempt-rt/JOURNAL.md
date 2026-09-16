@@ -986,3 +986,60 @@ The lesson is not about this library. A vendor `install` target is a list
 of the things a build leaves undone, and a cross build has to do all of
 them or none. Reading it once and extracting one item is how this cost two
 build cycles instead of none.
+
+---
+
+## 27. Two red CI runs, one finding, and a check that could not have caught it
+
+**What happened.** Runs on `5265a88` and `e410bce` both failed. Not the
+recipes, not the tests: shellcheck, four times, all the same shape.
+
+```
+In tests/kas-run-test.sh line 31:
+export BENCH_TEST_DIR=$WORK
+                      ^---^ SC2086 (info): Double quote to prevent
+                            globbing and word splitting.
+```
+
+Two in `tests/kas-run-test.sh`, two in `tests/kernel-config-test.sh`. CI
+runs `shellcheck -s sh -e SC1090,SC1091` at default severity, where an
+`info` fails the build exactly as an error does.
+
+**What was done.** Quoted all four. A repo-wide scan for the same pattern
+found no others.
+
+Then the part that matters more than the fix. This is the *second* time
+this exact pattern has gone to CI: the `rt-*` tests had it, somebody else
+corrected them, and I wrote it again in two new files a day later. The
+reason is structural rather than careless. The authoring laptop has no
+shellcheck, so nothing between writing the line and pushing it can see
+SC2086, and both times I asked for shellcheck to be run and both times the
+build was more interesting.
+
+So `scripts/lint.py` gained one narrow rule: an `export` or `readonly`
+whose value contains an unquoted expansion. An assignment on its own is not
+subject to word splitting; an argument to a command is, which is the whole
+of SC2086 and the only part of it this repository keeps getting wrong.
+
+It was proven by reintroducing the defect in both file shapes, because the
+discovery has to match CI's:
+
+```
+tests/kas-run-test.sh: line 31: export with an unquoted expansion
+meta-bench/recipes-bench/bench-rt/files/rt-run: line 412: ...
+```
+
+The second is the important one. `rt-run` has a shebang and no extension,
+so a `*.sh` glob misses it and CI's own discovery does not. The rule reads
+37 files, the same set the runner does.
+
+**Why that and not the alternative.** Reimplementing shellcheck in Python
+would be foolish. One rule for the one finding that the authoring machine
+structurally cannot see is not: the alternative is asking a person to
+remember, twice already unsuccessfully, and discovering it in an email
+after a push.
+
+**What it does not fix.** Everything else shellcheck finds is still
+invisible here until CI runs. The general answer is to install shellcheck
+on the Windows machine or to stop pushing from it, and neither is a
+decision for a lint rule to make.

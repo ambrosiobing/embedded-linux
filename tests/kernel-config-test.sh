@@ -60,8 +60,8 @@ contains() {
 
 FRAGS=$WORK/files
 mkdir -p "$FRAGS"
-export BENCH_FRAGMENT_DIR=$FRAGS
-export BENCH_WORK=$WORK/bench
+export BENCH_FRAGMENT_DIR="$FRAGS"
+export BENCH_WORK="$WORK/bench"
 
 cat >"$FRAGS/bench.cfg" <<'EOF'
 CONFIG_GPIO_CDEV=y

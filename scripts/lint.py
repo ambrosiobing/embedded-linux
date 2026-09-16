@@ -226,6 +226,54 @@ def check_systemd_units() -> None:
                 fail(recipe, f"SYSTEMD_SERVICE lists {unit}, not in files/")
 
 
+def shell_files() -> list[Path]:
+    """Every file CI runs shellcheck over, found the way CI finds them.
+
+    Two sources, because common.sh is sourced and has no shebang while
+    bench-state, rt-run and their kind have a shebang and no extension.
+    """
+    found = {p for p in ROOT.rglob("*.sh") if ".git" not in p.parts}
+    for path in ROOT.rglob("*"):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        if path.suffix in {".md", ".png", ".jpg", ".pdf", ".pyc"}:
+            continue
+        try:
+            with open(path, "rb") as handle:
+                if handle.read(9) == b"#!/bin/sh":
+                    found.add(path)
+        except OSError:
+            continue
+    return sorted(found)
+
+
+# An assignment is not subject to word splitting; an argument to a command
+# is. So "VAR=$X" is safe and "export VAR=$X" is not, which is shellcheck's
+# SC2086. CI runs shellcheck at its default severity, where an "info" fails
+# the build exactly as an error does.
+EXPORT_SPLIT = re.compile(
+    r"^\s*(?:export|readonly)\s+[A-Za-z_][A-Za-z0-9_]*="
+    r"(?![\"'])[^\s\"']*\$"
+)
+
+
+def check_shell_exports() -> None:
+    """The one shellcheck finding this machine keeps shipping to CI.
+
+    The authoring laptop has no shellcheck, so the only thing that sees
+    SC2086 is the runner, and this exact pattern has now reached it twice:
+    once in the rt-* tests, fixed by somebody else, and once in kas-run and
+    kernel-config, four instances between them. A general reimplementation
+    of shellcheck here would be foolish; one rule for the one mistake that
+    structurally cannot be caught locally is not.
+    """
+    for path in shell_files():
+        for number, line in enumerate(text(path).splitlines(), 1):
+            if EXPORT_SPLIT.match(line):
+                fail(path, f"line {number}: export with an unquoted "
+                           f"expansion, which shellcheck rejects as SC2086")
+
+
 def check_license_headers() -> None:
     for path in list(ROOT.rglob("*.c")) + list(ROOT.rglob("*.sh")):
         if ".git" in path.parts:
@@ -364,6 +412,7 @@ def main() -> int:
         check_ascii,
         check_dashes,
         check_src_uri,
+        check_shell_exports,
         check_src_uri_installed,
         check_image_packages,
         check_systemd_units,
