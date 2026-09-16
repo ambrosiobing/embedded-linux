@@ -2714,3 +2714,112 @@ matrix exists to measure.
 It is also exactly the number most likely to be wrong for an uninteresting
 reason, which is why it is recorded here as an observation on two
 unmatched images rather than in the results table.
+
+## 54. One file instead of a pull, and two guards that cried wolf
+
+The cyclictest parser fix was sitting on origin/main inside 271eae4, along
+with Project 10's BENCH_IIO_KERNEL switch. Pulling would have taken both,
+and the second one moves a kernel variable, which on this host means about
+ninety minutes of rebuilding for a change that this project does not use.
+So the fix came across on its own:
+
+    git fetch origin
+    git checkout origin/main -- meta-bench/recipes-bench/bench-rt/files/rt-run
+
+The working tree is deliberately left dirty afterwards. Committing one file
+out of a commit that exists upstream would only make the eventual real pull
+into a merge for no benefit, and the "-dirty" suffix the archive writes is
+the honest description of what produced the image.
+
+The rebuild confirmed the intent. 97 percent sstate match, 11 missed,
+2863 setscene tasks, 6227 of 6258 tasks not rerun, 2 minutes 5 seconds
+wall clock, and no kernel compile anywhere in the log. That last absence is
+the evidence that the one-file checkout did what it was supposed to do; a
+kernel task appearing would have meant BENCH_IIO_KERNEL had come across
+after all. The archive landed at
+
+    proj08-bench-rt-generic/2026-09-16_5ec99fd-dirty
+
+so the project prefix added earlier works on a config whose "Project 8"
+line lives in its own header rather than in the file it includes.
+
+Then two guards fired that should not have.
+
+The first was in the archive. It printed
+
+    also 1 older image(s) ignored, newest wins:
+         bench-rt-image-raspberrypi4-64.rootfs-20260916175406.wic.bz2
+    image bench-rt-image-raspberrypi4-64.rootfs.wic.bz2
+
+The discarded rival is the file that the chosen symlink points at. They are
+one image. newest_path ranked a symlink against its own target, found a
+difference in mtime, and reported a loser that was never a competitor. The
+right image was archived and nothing was lost, but the message is false,
+and a false message of exactly this kind is the one that makes a person
+distrust a good archive at two in the morning. The fix is to resolve every
+candidate with readlink -f and drop duplicates before ranking.
+
+The second was in the build. ./go rt refused with
+
+    another BitBake run already owns this build directory.
+
+No build was running. BitBake keeps a memory-resident server alive after a
+build finishes so the next command can reuse it, and require_no_running_build
+is a bare pgrep -f 'bitbake/bin/bitbake' which cannot tell a running build
+from a server waiting out its timeout. The guard was written to prevent a
+real failure, the silent "Retrying server connection" loop, and in
+preventing it acquired the ability to invent one.
+
+Both of these are mine and both arrived as fixes to earlier problems, which
+is the part worth keeping. The second order failure of a guard is that it
+fires when it should not, and that is harder to catch than the failure it
+was built to prevent, because a guard refusing looks exactly like a guard
+working. Neither check says which process or which path it matched, and
+that omission is what turns a wrong answer into an unfalsifiable one. They
+belong beside the rest of chapter 7.
+
+Plotting the smoke run data rather than tabulating it moved one thing from
+suspicion to statement. On the generic kernel 4413 of 10000 cyclictest
+samples sit in the 11 microsecond bin and 99.6 percent are under 30, so the
+entire case for PREEMPT_RT on this board rests on 39 samples and four
+isolated ones at 44, 69, 76 and 100. A linear count axis hides all of them.
+The other thing the plot showed is that the external maximum agreed to
+within 0.04 microseconds across two different kernels, 30.180 against
+30.217, while the external standard deviation did not agree at all, 3.335
+against 2.295. A quantity that ignores the kernel is not being set by the
+kernel. The likely cause is the analogue path, the anti-alias filter group
+delay plus threshold crossing geometry at 100 kS/s, which is fixed hardware
+and identical in both runs. Until the RC filter of step 4 goes in and that
+offset can be calibrated, ext_sd_us is the external instrument's signal and
+ext_max_us should be read as a constant plus a latency, not as a latency.
+
+State at power off: the generic image is rebuilt and archived with the
+corrected cyclictest parser, the real-time image is not yet rebuilt,
+nothing has been flashed, and no measurement has been taken with the fixed
+parser. The campaign resumes at ./go rt.
+
+Added after the shutdown, because a third one turned up on the way out.
+
+    ./go bitbake rt -m
+    error: which configuration? For example:
+           ./go bitbake bench-rt -c unpack virtual/kernel
+
+A configuration was given. kas.sh matches the argument against the glob
+bench-* and treats anything else as absent, so "rt" is not a wrong
+configuration to it, it is no configuration at all, and the message asks
+for the thing it was handed. Meanwhile resolve_kas_config ends its own
+failure text with "Either spelling works: bench-rt or rt", and build.sh
+and archive.sh do honour both; ./go archive rt-generic resolved through
+the bench- prefix branch earlier in the same session. So the repository
+promises two spellings, two of the three entry points keep the promise,
+and the third refuses in a way that does not mention the prefix it wants.
+
+The fix is to move the prefix handling into resolve_kas_config, which
+already does it, and let kas.sh test for a leading dash instead: an
+argument that starts with "-" is BitBake's, anything else is a
+configuration name. That also removes the reason the glob existed.
+
+Three in one evening, all of them guards, all of them refusing on evidence
+they did not print. Chapter 7 was written about checks that select their
+own input. This is the same omission on the other side of the branch, and
+decision 82 now carries it.

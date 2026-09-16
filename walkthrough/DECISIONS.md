@@ -2333,3 +2333,30 @@ apply to telemetry sinks: Project 17's `stwin-gw` CSV and Project 10's
 `iio-rate` output are streams of sensor data, not logs of runs, and giving
 them a build stamp per sample would be provenance theatre. The test is
 whether a row is an attempt at something that could have gone differently.
+
+## 82. A guard names the process or path it matched
+
+A check that refuses has to say what it found. Two of this repository's
+guards refused on evidence they did not print, and both were wrong.
+
+require_no_running_build matches pgrep -f 'bitbake/bin/bitbake' and refuses.
+BitBake keeps a memory-resident server alive after a build so the next
+command can reuse it, so the pattern matches an idle server as readily as a
+running build, and the message says a build is running. newest_path ranks
+candidates by mtime and announces the ones it discarded, without resolving
+symlinks first, so a deploy symlink and the file it points at become a
+winner and a loser rather than one image.
+
+In both cases the fix to the logic is small, readlink -f before ranking and
+a tighter pattern with the matching pid printed. The rule that outlasts the
+fix is the one about the message. A guard that refuses without naming its
+evidence cannot be argued with: there is nothing to check, so the only
+options are to believe it or to disable it, and on a long build people
+disable it. Printing the pid, or the path, or the process line costs one
+line and turns a verdict into something falsifiable.
+
+This is the same rule as chapter 7's, arrived at from the other side. There
+the problem was a check that selected its own input and reported on what it
+selected. Here it is a check that rejects and does not report at all. Both
+are the same omission: the check knows something the reader needs and keeps
+it.
