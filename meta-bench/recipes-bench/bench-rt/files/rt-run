@@ -394,9 +394,23 @@ ext=$(rt-analyze --rate "$RT_DAQ_RATE" --threshold "$RT_THRESHOLD" \
 	--hist "$RT_RESULTS/$label-external-hist.txt" "$capture")
 note "external: $ext"
 
+# "head -n 1", not "head -1". The board runs BusyBox and its head rejects
+# the bare number:
+#
+#     head: invalid option -- '1'
+#
+# Every call failed, and as far as this script was concerned field() simply
+# returned the empty string. The row still went into results.csv with
+# ext_edges, ext_mean_us, ext_sd_us, ext_p999_us, ext_max_us, ext_ppm and
+# ext_subsample all blank, while the identical numbers printed correctly to
+# the console one line above. A results file is the only thing that outlives
+# the session, and it was the half that was wrong.
+#
+# The build host is GNU coreutils, where "head -1" works, so nothing short
+# of the board could have caught this.
 field() {
 	printf '%s\n' "$ext" | tr ' ' '\n' |
-		sed -n "s/^$1=//p" | head -1
+		sed -n "s/^$1=//p" | head -n 1
 }
 
 if [ ! -f "$CSV" ]; then
@@ -427,7 +441,10 @@ printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
 rm -f "$capture"
 
 note "row appended to $CSV"
-tail -1 "$CSV"
+# -n 1 for the same reason, even though BusyBox tail happens to accept the
+# bare number where its head does not. Relying on which of two coreutils
+# clones is lenient about which flag is not a plan.
+tail -n 1 "$CSV"
 
 # The comparison the whole project is for, while the run is still in front
 # of you. It is only arithmetic over the three histograms, so it costs

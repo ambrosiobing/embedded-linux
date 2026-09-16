@@ -357,6 +357,53 @@ def check_shell_unused_params() -> None:
                            f"nothing, which shellcheck rejects as SC2120")
 
 
+BUSYBOX_HEAD_TAIL = re.compile(r"\b(head|tail)\s+-\d+\b")
+
+
+def check_busybox_compat() -> None:
+    """Shipped scripts run under BusyBox, which the build host is not.
+
+    `head -1` is a GNU extension. BusyBox rejects it:
+
+        head: invalid option -- '1'
+
+    Every script under meta-bench/ is installed into an image and runs on a
+    board whose coreutils is BusyBox, while everything that could catch a
+    mistake first runs on a host with GNU coreutils, where `head -1` is
+    fine. So this class of error is invisible to the build, to CI, to the
+    linter's own host and to every test, and only appears on hardware.
+
+    It appeared on hardware. rt-run used `head -1` to pull each field out
+    of rt-analyze's output. All seven calls failed, field() returned the
+    empty string each time, and the row went into results.csv with every
+    external column blank, while the same numbers printed correctly to the
+    console one line above. The console was right and the file was wrong,
+    and the file is the only part that outlives the session.
+
+    Checked only under meta-bench/, because that is what gets installed.
+    scripts/ runs on the build host and may use GNU coreutils freely.
+
+    `tail -1` is included even though BusyBox tail happens to accept it.
+    Depending on which of two clones is lenient about which flag is not a
+    plan, and the POSIX spelling costs two characters.
+    """
+    for path in ROOT.glob("meta-bench/**/*"):
+        if not path.is_file() or ".git" in path.parts:
+            continue
+        try:
+            content = text(path)
+        except (UnicodeDecodeError, OSError):
+            continue
+        if not content.startswith("#!"):
+            continue
+        for number, line in enumerate(content.splitlines(), 1):
+            code = line.split("#", 1)[0]
+            match = BUSYBOX_HEAD_TAIL.search(code)
+            if match:
+                fail(path, f"line {number}: {match.group(0)!r} is a GNU "
+                           f"extension; BusyBox on the board needs -n")
+
+
 def check_license_headers() -> None:
     for path in list(ROOT.rglob("*.c")) + list(ROOT.rglob("*.sh")):
         if ".git" in path.parts:
@@ -547,6 +594,7 @@ def main() -> int:
         check_src_uri,
         check_shell_exports,
         check_shell_unused_params,
+        check_busybox_compat,
         check_src_uri_installed,
         check_image_packages,
         check_systemd_units,

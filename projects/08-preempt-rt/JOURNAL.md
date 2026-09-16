@@ -2430,3 +2430,97 @@ tool belongs in the image's package list and the step should say so. Where
 it depends on a behaviour, the behaviour belongs in a boot log or a
 datasheet, and the step should say which. Anything else is a prediction
 wearing an instruction's clothes.
+
+## 50. The first full run, and the results file was the half that was wrong
+
+**What happened.** `rt-run -d 10 smoke`, and it worked: the toggler ran,
+the capture took 1.3 million samples, cyclictest ran, `rt-analyze` produced
+a clean set of external numbers, and `rt-compare` refused to interpret them
+for the right reason. A complete measurement, ten seconds, on a real board.
+
+The console showed this:
+
+```
+external: edges=4999 periods=4998 mean_us=1999.806 expected_us=2000.000
+clock_offset_ppm=-97.039 sd_us=2.295 p99_us=10.179 p999_us=23.754
+max_abs_us=30.217 subsample_fraction=0.150 sample_us=10.000
+```
+
+The row that went into `results.csv` showed this:
+
+```
+...,10,1000,,,,,,,,6.320,7.592,41.487,35,,,,0x0,0x0
+```
+
+**Every external column blank.** `ext_edges`, `ext_mean_us`, `ext_sd_us`,
+`ext_p999_us`, `ext_max_us`, `ext_ppm`, `ext_subsample`, and all three
+`cyc_*` fields. The numbers existed, were correct, were printed, and did
+not reach the only artefact that outlives the session.
+
+**Why.** Seven of these, interleaved with the output:
+
+```
+head: invalid option -- '1'
+```
+
+`rt-run` pulls each field out of `rt-analyze`'s output with
+`sed -n "s/^$1=//p" | head -1`. **`head -1` is a GNU extension.** The board
+runs BusyBox, which rejects it. Each call failed, `field()` returned the
+empty string, and the row was assembled from nothing without any part of
+the script noticing.
+
+**Why nothing upstream could see it.** The build host is GNU coreutils,
+where `head -1` works. So does CI. So does the machine the linter runs on.
+So does every test, which exercises `rt-run` through stubs on a developer
+host. There is no layer between writing that line and running it on a
+board where the difference exists.
+
+That is the same structural gap as shellcheck, and it has the same answer:
+a narrow rule for the one class of mistake that cannot be caught locally.
+`check_busybox_compat` in `lint.py` now rejects `head -N` and `tail -N`
+under `meta-bench/`, which is what gets installed, and leaves `scripts/`
+alone, which runs on the host.
+
+`tail -1` was in the same file, two lines from the end, and worked, because
+BusyBox `tail` accepts the bare number where its `head` does not. It is
+fixed too. Depending on which of two clones is lenient about which flag is
+not a plan.
+
+**The aha, and it is the sharpest version of the pattern this project keeps
+finding.** The console output was complete and correct. A person reading
+the terminal would have seen a successful run and had no reason to look
+further. The failure was entirely confined to the file that the results
+table is built from, and it announced itself in seven lines of unrelated
+BusyBox usage text scrolling past between the numbers.
+
+Console and file disagreed, and the file was wrong. **Check the artefact,
+not the output.**
+
+**What the run itself says, which is worth recording separately.**
+
+| Instrument | n | mean | sd | max |
+|---|---|---|---|---|
+| internal, rt-toggle | 10000 | 7.49 us | 2.78 us | 41.5 us |
+| internal, cyclictest | 10000 | 5.37 us | 2.40 us | 47.5 us |
+| external, MCC 118 | 4998 | | 2.33 us | 31.0 us |
+
+- **4999 edges** against 5000 expected, and a period mean of 1999.806 us
+  against 2000.000. The toggler is doing what it claims.
+- **clock_offset_ppm = -97.039.** The MCC 118's crystal runs about 97 parts
+  per million slow against the Pi's clock. Two independent oscillators,
+  measured against each other, which is the whole reason the external
+  instrument is worth having.
+- **sd ratio 0.838**, below the sqrt(2) the algebra predicts for
+  independent latencies and a constant write cost. `rt-compare` refused to
+  interpret it and said why: consecutive latencies are correlated. That
+  refusal is the correction from entry 21 working on real data, on its
+  first contact with real data.
+- **subsample_fraction = 0.150**, so 15% of edges were interpolated and the
+  per-edge resolution is one sample period, 10 us. That is the regime the
+  optional RC filter in step 4 exists to change, and the quantisation is
+  visible in `p999_us=23.754` and `max_abs_us=30.217` being suspiciously
+  close to multiples of 10.
+
+None of those numbers mean anything yet: this is one unisolated, unloaded
+row on the real-time kernel, with no control to compare against. It is the
+instrument proving it works, not a result.
