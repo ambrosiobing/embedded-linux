@@ -61,6 +61,18 @@ contains() {
 }
 
 HR=$WORK/sys/kernel/config/iio/triggers/hrtimer
+
+# find rather than ls, because shellcheck is right that ls output is not a
+# list: SC2012. Only the count is wanted, and find gives it without caring
+# what the names contain.
+count_objects() {
+	find "$HR" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' '
+}
+
+object_names() {
+	find "$HR" -mindepth 1 -maxdepth 1 -exec basename {} ';'
+}
+
 DEVICES=$WORK/sys/bus/iio/devices
 
 reset_tree() {
@@ -124,7 +136,7 @@ contains "and says how to mount it" "$out" "mount -t configfs none"
 # what it says.
 contains "and says why the directory existing proves nothing" \
 	"$out" "CONFIG_CONFIGFS_FS"
-check "and creates no object" "$(ls "$HR" | wc -l)" "0"
+check "and creates no object" "$(count_objects)" "0"
 
 # ------------------------------------------- created, but never registered
 
@@ -133,7 +145,7 @@ check "a trigger the IIO core does not register is refused" \
 	"$(run_status add hrtimer t100 100)" "1"
 out=$(run add hrtimer t100 100)
 contains "and says it removed the object again" "$out" "has been removed again"
-check "and the configfs directory is gone" "$(ls "$HR" | wc -l)" "0"
+check "and the configfs directory is gone" "$(count_objects)" "0"
 
 # That cleanup is not tidiness. Without it the next attempt fails with
 # "already exists", which points at the name rather than at whatever went
@@ -150,7 +162,7 @@ reset_tree
 register_trigger 0 t100
 check "adding a hrtimer trigger succeeds" \
 	"$(run_status add hrtimer t100 100)" "0"
-check "the configfs object exists" "$(ls "$HR")" "t100"
+check "the configfs object exists" "$(object_names)" "t100"
 check "the rate is written to the trigger DEVICE, not the configfs dir" \
 	"$(cat "$DEVICES/trigger0/sampling_frequency")" "100"
 contains "and it says which device it used" \
@@ -197,7 +209,7 @@ reset_tree
 register_trigger 0 t100
 run add hrtimer t100 100 >/dev/null
 check "removing a hrtimer trigger succeeds" "$(run_status remove t100)" "0"
-check "and the configfs object is gone" "$(ls "$HR" | wc -l)" "0"
+check "and the configfs object is gone" "$(count_objects)" "0"
 check "removing one that does not exist is an error" \
 	"$(run_status remove t100)" "1"
 

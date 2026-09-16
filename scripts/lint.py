@@ -16,6 +16,7 @@ Exit status is non-zero if anything failed, so CI can use it directly.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -612,6 +613,22 @@ def main() -> int:
             print(problem)
         print(f"\n{len(PROBLEMS)} problem(s)")
         return 1
+
+    # Say what was not checked.
+    #
+    # This file carries two narrow rules for shellcheck findings, SC2086 and
+    # SC2120, because the authoring machine has no shellcheck and those two
+    # kept reaching CI. It does not carry the other several hundred, and
+    # "lint: clean" on a host without shellcheck has meant a red CI four
+    # times in one day: SC2015, SC2018, SC2019, SC2100 and SC2012 between
+    # them, none of which anything here can see.
+    #
+    # A clean result that does not say which questions were never asked is
+    # the failure this repository keeps finding in its own tools. So it
+    # says. One line, and it costs nothing on a host that has the tool.
+    if not shutil.which("shellcheck"):
+        print("note: no shellcheck on this host, so only SC2086 and SC2120")
+        print("      are checked here. CI runs the real thing.")
 
     print("lint: clean")
     return 0

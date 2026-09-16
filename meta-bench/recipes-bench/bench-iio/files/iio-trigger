@@ -107,7 +107,13 @@ cmd_list() {
 cmd_add() {
 	kind=${1:-}
 	name=${2:-}
-	[ -n "$kind" ] && [ -n "$name" ] || usage
+	# Written as an if rather than "A && B || usage". That form is not
+	# if-then-else: shellcheck calls it SC2015 and this repository has a
+	# comment about it in rt-run, because C runs whenever A && B is false
+	# for any reason at all, which is the intent here only by coincidence.
+	if [ -z "$kind" ] || [ -z "$name" ]; then
+		usage
+	fi
 
 	case $kind in
 	hrtimer)

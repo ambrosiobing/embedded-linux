@@ -128,7 +128,7 @@ answers() {
 i2c_dir() {
 	# 0x6a on bus 1 is the directory 1-006a: four lowercase hex digits,
 	# which is the kernel's format and not an arbitrary one.
-	_addr=$(printf '%s' "$1" | sed 's/^0x//' | tr 'A-Z' 'a-z')
+	_addr=$(printf '%s' "$1" | sed 's/^0x//' | tr '[:upper:]' '[:lower:]')
 	printf '%s/bus/i2c/devices/%s-00%s' "$SYS" "$BUS" "$_addr"
 }
 
@@ -233,20 +233,20 @@ printf '%s\n' "$PARTS" | while IFS='|' read -r addr part driver subsys why; do
 	# The status column is the judgement, and it is deliberately the only
 	# place a judgement is made. Everything left of it is observation.
 	if [ "$driver" = none ]; then
-		status=unsupported
+		status="unsupported"
 	elif [ -n "$devices" ]; then
-		status=working
+		status="working"
 	elif [ "$bound" = yes ]; then
 		# Bound and producing nothing is its own fault and a rare one:
 		# the driver matched and then failed to register a device, which
 		# means a probe error and a line in dmesg.
-		status=bound-no-device
+		status="bound-no-device"
 	elif [ "$mod_state" = missing ]; then
-		status=no-driver-in-image
+		status="no-driver-in-image"
 	elif [ "$bus_state" = absent ]; then
-		status=not-on-bus
+		status="not-on-bus"
 	else
-		status=not-bound
+		status="not-bound"
 	fi
 
 	if [ "$machine_readable" = yes ]; then
