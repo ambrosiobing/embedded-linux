@@ -31,6 +31,7 @@
 #   ./go shell [CFG]  a BitBake shell inside the kas environment
 #   ./go bitbake CFG ARGS   one BitBake command, right build directory
 #   ./go clean        delete the build tree, keep the caches
+#   ./go pull         git pull, refused while a build is running
 #
 # SPDX-License-Identifier: MIT
 cd "$(dirname "$0")" || exit 1
@@ -38,6 +39,7 @@ cd "$(dirname "$0")" || exit 1
 case "${1:-}" in
 setup)      exec sh ./scripts/host-setup.sh ;;
 check)      exec sh ./scripts/host-check.sh ;;
+pull)       shift; exec sh ./scripts/pull.sh "$@" ;;
 build)      exec sh ./scripts/build.sh bench-rpi4 ;;
 dev)        exec sh ./scripts/build.sh bench-dev ;;
 rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
