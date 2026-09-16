@@ -38,7 +38,7 @@ Flash one and boot it:
 
 ```sh
 uname -r                       # 6.12.x
-cat /sys/kernel/realtime       # 1 on the rt build, absent on the control
+uname -v                       # PREEMPT_RT on the rt build, not on the control
 gpiodetect                     # pinctrl-bcm2711 on a Pi 4, bcm2835 on a 3B
 cat /proc/cmdline              # which console= the firmware gave you
 ls /dev/ttyS0 /dev/ttyAMA0     # which UART is on pins 8 and 10
@@ -228,7 +228,7 @@ Console attached, because this is the boot that can fail.
 
 ```sh
 uname -v                       # contains PREEMPT_RT
-cat /sys/kernel/realtime       # 1
+zcat /proc/config.gz | grep -E '^CONFIG_PREEMPT|^# CONFIG_PREEMPT'
 cat /sys/devices/system/cpu/isolated    # 3
 cat /proc/cmdline
 zcat /proc/config.gz > /tmp/config

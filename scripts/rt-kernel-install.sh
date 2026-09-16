@@ -191,10 +191,15 @@ $(find "$deploy" -maxdepth 1 -name 'bcm*.dtb' ! -name '*+git0*' \
 	mkdir -p "$boot/rt"
 	printf '%s\n' "$dtb" >"$boot/rt/DTB"
 
+	# Named "each" and not "dtb": this loop used to reuse the variable
+	# holding the device tree chosen above, leaving it pointing at whatever
+	# file the glob ended on. Harmless today only because rt/DTB is written
+	# before the loop runs, which is the kind of "harmless" that stops being
+	# true the moment somebody adds a line below.
 	mkdir -p "$boot/rt/overlays"
-	for dtb in "$deploy"/*.dtb; do
-		[ -f "$dtb" ] || continue
-		cp "$dtb" "$boot/rt/"
+	for each in "$deploy"/*.dtb; do
+		[ -f "$each" ] || continue
+		cp "$each" "$boot/rt/"
 	done
 
 	# The overlays, from either layout this BSP produces.
@@ -268,7 +273,7 @@ $(find "$deploy" -maxdepth 1 -name 'bcm*.dtb' ! -name '*+git0*' \
 	write_block "$boot/config.txt" rt
 	note "config.txt now selects the real-time kernel"
 	note "Next: edit cmdline.txt for the isolation the run needs, then"
-	note "boot and check /sys/kernel/realtime and /proc/cmdline."
+	note "boot and check uname -v for PREEMPT_RT, and /proc/cmdline."
 }
 
 do_select() {

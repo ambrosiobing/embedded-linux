@@ -2022,3 +2022,104 @@ OP-TEE is running.
 
 **Cost.** One manual step in the bring-up, and a list of five unknowns
 that the next person starts from rather than rediscovers.
+
+## 74. The kernel's own version string is the authority on its preemption model
+
+**Decision.** `rt-run` decides `realtime=yes` from `uname -v` containing
+`PREEMPT_RT`. Where `/sys/kernel/realtime` also exists it must agree, and a
+disagreement refuses the run rather than choosing a winner.
+
+**Why the change.** `/sys/kernel/realtime` came from the out-of-tree RT
+patch series. `PREEMPT_RT` was merged into mainline for 6.12 and the sysfs
+file did not come with it, so on the kernel this project pinned itself to
+in order to get `PREEMPT_RT`, the file is absent on both kernels.
+
+The old code read absent as not-real-time. On the real-time board every row
+would have been written `realtime=no`, the run would have been labelled
+`generic`, and the table would have held two identically labelled arms of a
+one-variable experiment. Nothing in it would have looked wrong.
+
+**Why `uname -v` and not `/proc/config.gz`.** The config is the better
+evidence and it is what the acceptance criterion now quotes. But it needs
+`CONFIG_IKCONFIG_PROC`, which is a choice this project happens to have
+made and another kernel need not. `uname -v` is on every kernel, needs no
+filesystem, and cannot be missing. For a per-row label that must never be
+silently wrong, unconditional availability beats depth.
+
+**Why refuse on disagreement rather than prefer one.** Because there is no
+correct answer to prefer. A machine whose version string and whose sysfs
+file contradict each other is one where something is not what it claims,
+and a row labelled from either source would be a guess wearing a fact's
+clothes. Refusing costs one run. A mislabelled table costs every run in it,
+and is not detectable afterwards.
+
+**The general rule this is an instance of.** *Absent is not a value.* When
+a check reads a fact from a file, ask what it does when the file is not
+there. If it cannot distinguish "absent" from a real answer, it needs a
+second source that cannot be absent, or it needs to refuse.
+
+**Cost.** Four assertions, and one existing test which turned out to
+describe a kernel that cannot exist.
+
+## 75. A driver that is configured is not a driver that is installed
+
+**Decision.** An image that names a userspace bus interface must name the
+controller driver beside it, on the adjacent line.
+`kernel-module-spidev` and `kernel-module-spi-bcm2835` travel together.
+
+**Why.** The board found the HAT, read its name and address out of the ID
+EEPROM, and then could not open it. `/dev/spidev0.0` did not exist and
+`/sys/class/spi_master/` was empty, while `dtparam=spi=on` was in
+config.txt, the device tree node read `status = okay`, and the running
+kernel's own config had `CONFIG_SPI=y` and `CONFIG_SPI_BCM2835=m`.
+
+The driver was configured, compiled and deployed. Yocto packages one module
+per `.ko` and installs only what an image names, and the image named
+`spidev` alone. A `spidev` with no master registers nothing.
+
+**Why no check caught it, which is the part worth keeping.** `./go ksym`
+and `./go kconfig` both passed on all 31 fragment options, twice, on two
+machines. Both answer *did what I asked for arrive*. Neither can answer
+*did I ask for what I needed*. The fragment names the interface and leaves
+the controller to the BSP defconfig, which did supply it, as a module,
+which moves the problem from the kernel configuration to the image package
+list where no kernel check looks.
+
+**Why `check_image_packages` did not catch it either.** That rule exists
+because Project 1 lost a round to a wireless driver without its module
+package. It scans recipe comments for `kernel-module-*` names and requires
+them in `IMAGE_INSTALL`. It could not see this one because nobody had
+written the name down anywhere to be scanned. **A rule that checks what you
+mentioned is installed cannot catch what you never mentioned.**
+
+**Cost.** One line, and a rootfs rebuild rather than a kernel compile,
+because the module was already built.
+
+## 76. Unused hardware comes off the bench before anything is measured
+
+**Decision.** Anything attached to the board that the experiment does not
+need is physically removed before the first run: the DSI display, the USB
+wireless dongle, anything else that enumerates.
+
+**Why.** This project measures how late a real-time task is. Every attached
+device is a source of interrupts and DMA on the board being timed, and none
+of it is in the experiment. It lands in the numbers with nothing in the
+data to separate it from the preemption model, which is the one thing the
+project exists to isolate.
+
+The dongle made the case better than the screen did: it had bound to **no
+driver at all**, because the image ships no Realtek module. It was raising
+USB interrupts and providing not one interface. Unplugging it is the
+cheapest isolation available, and it happens before `isolcpus` and IRQ
+affinity rather than instead of them.
+
+**Why not add the missing driver so it works instead.** Because this image
+wants fewer interrupt sources, not more. Project 15 names
+`kernel-module-rtl8xxxu` and `linux-firmware-rtl8192eu` because a router
+needs a second radio. The same absent driver is a defect in one image and a
+correct decision in another, which is the argument for per-image package
+lists rather than one shared one.
+
+**Cost.** Nothing, and it must be recorded: a results table has to say what
+was attached, because "nothing else was running" is a claim about the
+hardware as much as about the software.

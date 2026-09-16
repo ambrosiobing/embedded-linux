@@ -1982,3 +1982,270 @@ be run here.
 it checks, before it is trusted. The cost is two extra commands and it has
 now caught three separate defects in one day, in a `find`, in a test and in
 the rule itself.
+
+## 43. The board booted, and two acceptance criteria were written against a file that does not exist
+
+**What happened.** First boot of a real-time kernel on real hardware, and
+line two of the console said it:
+
+```
+Linux version 6.12.93-v8 ... #1 SMP PREEMPT_RT
+Machine model: Raspberry Pi 4 Model B Rev 1.4
+```
+
+Then:
+
+```
+# cat /sys/kernel/realtime
+cat: can't open '/sys/kernel/realtime': No such file or directory
+```
+
+**The aha.** `/sys/kernel/realtime` came from the **out-of-tree RT patch
+series**. `PREEMPT_RT` was merged into mainline for 6.12, and that sysfs
+file did not come with it. On the kernel this project deliberately went to
+6.12 to get, the file is absent on the real-time build exactly as it is on
+the generic one.
+
+So acceptance criterion 1 was written against an interface that the
+project's own version pin removed. Every document in the project said to
+read it. It had never been read, because no board had ever booted.
+
+**What was used instead.** `uname -v` carries the preemption model and
+always has, and `CONFIG_IKCONFIG_PROC=y` is in `bench.cfg`, so the running
+kernel's own configuration is readable:
+
+```
+#1 SMP PREEMPT_RT
+CONFIG_PREEMPT_RT=y
+# CONFIG_PREEMPT_NONE is not set
+# CONFIG_PREEMPT_VOLUNTARY is not set
+# CONFIG_PREEMPT is not set
+```
+
+That is better evidence than the file would have been. All four members of
+the choice block, read from the kernel that is running, matching what
+`./go kconfig -f rt` verified against the build tree. Criterion 1 met, and
+the on-board half of criterion 7 with it.
+
+**Why the criterion was changed rather than marked unmet.** A criterion
+that cannot be satisfied because its interface no longer exists is a defect
+in the criterion. The question it was asking, "is this board running a
+preemptible kernel", is still the right question and now has a better
+answer. Lowering a bar would be different and is not what this is.
+
+**What changes as a result.** Every reference to `/sys/kernel/realtime` in
+BRINGUP, the project README, the results schema and
+`rt-kernel-install.sh` now names `uname -v` and `/proc/config.gz`. And one
+more thing, which is the next entry, because the file was not only in the
+documentation.
+
+## 44. Every real-time row would have been labelled generic
+
+**What happened.** `rt-run` reads that same vanished file to decide what
+every row of the results table means:
+
+```sh
+realtime=no
+if [ -r "$SYS/kernel/realtime" ]; then
+	if [ "$(cat "$SYS/kernel/realtime")" = "1" ]; then
+		realtime=yes
+	fi
+fi
+```
+
+It does not refuse when the file is missing. It writes `realtime=no`.
+
+**What that would have cost.** This project is one comparison between two
+kernels that differ in one symbol. On the real-time board, every row would
+have carried `realtime=no`; the auto-generated label would have been
+`generic` rather than `rt`; the result files would have been named to
+match; and the CSV would have contained two arms of an experiment labelled
+identically.
+
+Nothing in the output would have looked wrong. The numbers would have been
+real measurements of a real kernel. Only the column that gives them their
+meaning would have been false, and it would have been false in the
+direction that makes the whole table say nothing.
+
+**Why this is the worst one yet.** The earlier silent failures this session
+were wrong about their inputs: a `find` that read the wrong kernel tree, a
+linter handed no file, a `pgrep` that could not run. This one is not wrong
+about its input. Its input is genuinely absent, and it treats absence as a
+measurement. "The file is not there" and "the kernel is not real-time" are
+different statements and it collapses them.
+
+**What was done.** `uname -v` is the authority: the kernel puts its
+preemption model in the version string, on every kernel, with no filesystem
+involved and no way for it to be missing. Where the old interface does
+exist it has to agree, and a disagreement is a refusal rather than a
+choice:
+
+```
+the kernel disagrees with itself about its preemption model.
+uname -v says realtime=yes ... /sys/kernel/realtime says realtime=no.
+One of them is wrong and a row labelled from either would be a guess.
+```
+
+**And the test agreed with the bug.** `tests/rt-run-test.sh` created
+`/sys/kernel/realtime` in every fixture, so the case the board actually
+presents was never simulated. Worse, its generic-kernel fixture wrote 0 to
+that file while leaving the `uname` stub saying `PREEMPT_RT`: a machine
+whose version string and whose sysfs file contradict each other. No such
+kernel exists. It passed only because the code read one source and ignored
+the other, so an incoherent fixture could not be detected.
+
+Adding the disagreement check broke that test immediately, which is the
+test doing its job three months late.
+
+Four assertions added, and the generic half of the experiment is now
+simulated for the first time: absent file plus `PREEMPT_RT` in `uname`
+reads as real-time; absent file plus `PREEMPT_DYNAMIC` reads as generic;
+sources that disagree refuse; sources that agree still work. 59 passing.
+
+**What changes as a result.** When a check reads a fact from a file, ask
+what it does when the file is not there. "Absent" is not a value. If the
+code has no way to distinguish "absent" from a real answer, it needs a
+second source or it needs to refuse, and the second source should be one
+that cannot be absent.
+
+## 45. The instrument announced itself and could not be opened
+
+**What happened.** With the HAT stacked on the Pi 4:
+
+```
+# cat /proc/device-tree/hat/product
+MCC 118 Voltage Input HAT
+# daqhats_list_boards
+Found 1 board(s):
+  Address: 0
+  Type: MCC 118
+  Name: MCC 118 Voltage Input HAT
+Can't open device
+# ls /dev/spidev0.0
+ls: /dev/spidev0.0: No such file or directory
+```
+
+The firmware read the HAT's ID EEPROM at boot, so the board is seated and
+identified by name and address. The library then could not talk to it.
+
+That is the third row of this project's own failure table, written months
+ago: *"the library found the board and could not talk to it. That is SPI,
+not the EEPROM."* The table was right, and it sent the diagnosis straight
+at SPI instead of at the HAT, the wiring or the address links.
+
+**The diagnosis, in three questions.**
+
+| Question | Answer |
+|---|---|
+| Is the bus enabled in config.txt | `dtparam=spi=on` present |
+| Did the firmware apply it | `/proc/device-tree/soc/spi@7e204000/status` = **okay** |
+| Is the driver there | `/sys/class/spi_master/` **empty**, `dmesg` silent, `modinfo spi-bcm2835` **not found** |
+
+And then the one that settled it, from the running kernel's own config:
+
+```
+CONFIG_SPI=y
+CONFIG_SPI_MASTER=y
+CONFIG_SPI_BCM2835=m      <- built
+CONFIG_SPI_SPIDEV=m       <- built
+```
+
+`/lib/modules/6.12.93-v8/kernel/drivers/spi/` contained **`spidev.ko.xz`
+and nothing else.**
+
+**The aha.** The controller driver was configured, compiled and deployed,
+and is not in the image. Yocto packages one kernel module per `.ko` and
+installs only what an image names. `bench-rt-image.bb` asks for
+`kernel-module-spidev` and never asks for the controller that `spidev`
+attaches to.
+
+So: the bus was on, the driver existed, and the rootfs did not have it. A
+`spidev` with no master registers no device node, and the only symptom is a
+file that never appears.
+
+**Why nothing upstream caught it, and this is the part worth keeping.**
+`./go ksym -f rt` passed on all 31 fragment options. `./go kconfig -f rt`
+passed on all 31, twice, on two machines. Both were correct and both were
+answering the same question: **did what I asked for arrive?** Neither can
+answer **did I ask for what I needed?**
+
+`bench.cfg` asks for `CONFIG_SPI_SPIDEV=m`, the userspace interface, and
+never names a controller, because the BSP defconfig provides one. It did
+provide one. Providing it as a module moved the problem from the kernel
+configuration to the image package list, where no kernel check looks.
+
+**Second time in this repository.** Project 1 lost a round to a wireless
+driver without its module package, which is why `scripts/lint.py` has
+`check_image_packages` at all. That rule scans recipe comments for
+`kernel-module-*` names and requires them in `IMAGE_INSTALL`. It could not
+see this one: nobody had ever written the name down anywhere to be scanned.
+A rule that checks that what you mentioned is installed cannot catch what
+you never mentioned.
+
+**What was done.** `kernel-module-spi-bcm2835` added to
+`bench-rt-image.bb`, with the whole chain written beside it so the next
+reader does not have to rediscover which layer was at fault. The kernel is
+unchanged, so this is a rootfs rebuild and not a kernel compile.
+
+**What changes as a result.** When an image asks for a `spidev`, an
+`i2c-dev` or any other userspace interface to a bus, it has to ask for the
+controller too, and the two belong on adjacent lines. The general form: a
+kernel option and an image package are different things, and `=m` is the
+word that turns one into the other.
+
+## 46. A console deferred since Project 1, and the hardware that comes off the bench
+
+**The console.** Project 1's journal recorded a deferral: *"this bench's
+USB/TTL cable is a PL2303HXA, a generation Windows refuses to drive, so
+there was no serial console."* Project 2 then made a console mandatory, and
+it stayed unavailable.
+
+It worked today, and the fix had nothing to do with the cable. `usbipd list`
+names the device as Windows sees it:
+
+```
+2-1  067b:2303  PL2303HXA PHASED OUT SINCE 2012. PLEASE CONTACT YOUR SUPP...
+```
+
+That string is Prolific's **Windows driver** refusing to bind to an old or
+counterfeit chip. Linux has no such policy: the kernel's `pl2303` driver
+attaches to it without comment.
+
+```
+usbipd attach --wsl --busid 2-1
+pl2303 converter now attached to ttyUSB0
+picocom -b 115200 /dev/ttyUSB0
+```
+
+**The aha, and it generalises past this cable.** The blocker was a vendor
+policy in one operating system's driver, not a hardware fault, and the
+machine already had a second operating system with a different policy
+attached to the same USB port. Two projects' worth of "the console does not
+work here" was one `usbipd attach` away from working.
+
+Worth asking, when a device is declared unusable on this bench: unusable to
+which side of the machine? WSL is not only where the builds run.
+
+**And the hardware that came off.** Two things were removed before the
+first measurement, both for the same reason and neither of them broken:
+
+- the DSI touchscreen ribbon. A display pipeline means DMA moving
+  framebuffers and a touch controller polling, all of it work the system
+  under test performs while being timed. It leaves a mark in the boot log
+  even unplugged: `deferred probe pending: wait for supplier reg_display@45`
+- a TP-Link USB wireless dongle, which turned out to have bound to no
+  driver at all. `/sys/class/net` held only `eth0` on `bcmgenet` and
+  `wlan0` on `brcmfmac`, both onboard. The image ships no Realtek driver,
+  so it had enumerated, raised its interrupts, and provided nothing
+
+The dongle is the better illustration. It was contributing USB interrupt
+traffic to a board whose entire purpose is measuring interrupt latency,
+while delivering no interface. Unused hardware is not neutral on a bench
+like this, and the cheapest isolation available is unplugging something.
+
+**Why not simply add the Realtek driver so it works.** Because this image
+wants the fewest interrupt sources, not the most. Project 15 names
+`kernel-module-rtl8xxxu` and `linux-firmware-rtl8192eu` because a router
+needs a second radio. Project 8 does not. The same missing driver is a
+defect in one image and a correct decision in another, which is the
+argument for per-image package lists rather than one shared one.

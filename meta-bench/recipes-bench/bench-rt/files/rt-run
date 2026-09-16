@@ -129,13 +129,51 @@ shift $((OPTIND - 1))
 kernel_release=$(uname -r)
 kernel_version=$(uname -v)
 
+# Is this a real-time kernel? The whole results table is a comparison
+# between kernels that differ in one symbol, so this one fact decides what
+# every row means.
+#
+# THE FILE THIS USED TO READ DOES NOT EXIST ON THE KERNEL THIS PROJECT
+# TARGETS.
+#
+# /sys/kernel/realtime came from the out-of-tree RT patch series.
+# PREEMPT_RT was merged into mainline for 6.12, and the sysfs file did not
+# come with it. On the 6.12.93 kernel this project builds, the file is
+# absent on the real-time build exactly as it is on the generic one.
+#
+# The old code read "absent" as "not real-time" and carried on. So on the
+# real-time board every row would have been written realtime=no, the
+# auto-generated label would have been "generic", the files would have been
+# named to match, and nothing in the output would have looked wrong. An
+# experiment whose two arms are labelled identically is not a slower
+# experiment, it is no experiment. Found on the first boot.
+#
+# uname -v is the authority now, because the kernel puts its preemption
+# model in the version string and always has: a PREEMPT_RT build says so, a
+# generic one says PREEMPT_DYNAMIC or PREEMPT or nothing. It is available
+# on every kernel, needs no filesystem, and cannot be absent.
 realtime=no
+case $kernel_version in
+*PREEMPT_RT*) realtime=yes ;;
+esac
+
+# And where the old interface does exist, it has to agree. A machine that
+# has both and disagrees is one where something is not what it claims, and
+# guessing which source to believe is how a wrong row gets written
+# confidently. Refusing costs one run; a mislabelled table costs all of
+# them, and is not detectable afterwards.
 if [ -r "$SYS/kernel/realtime" ]; then
-	# The file exists only on a PREEMPT_RT kernel and contains 1. Both
-	# facts are checked: a future kernel that creates it and writes 0
-	# should read as not real-time rather than as real-time.
+	sysfs_rt=no
 	if [ "$(cat "$SYS/kernel/realtime")" = "1" ]; then
-		realtime=yes
+		sysfs_rt=yes
+	fi
+	if [ "$sysfs_rt" != "$realtime" ]; then
+		die "the kernel disagrees with itself about its preemption model.
+       uname -v says realtime=$realtime:
+           $kernel_version
+       $SYS/kernel/realtime says realtime=$sysfs_rt.
+       One of them is wrong and a row labelled from either would be a
+       guess. Refusing rather than writing it."
 	fi
 fi
 

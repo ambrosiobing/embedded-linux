@@ -322,3 +322,67 @@ fixed, tested and written up once. The fix went where the bug was. Four
 more copies of the same line were in the same directory, and the one with
 teeth was in the script that writes to a card. After fixing a bug that has
 a shape, grep for the shape.
+
+## A check answers the question it was given, not the question you meant
+
+Project 8 verified its kernel configuration twice, on two machines, with
+two different tools, and all 31 options passed every time. Then the board
+booted and the instrument could not be opened.
+
+`bench.cfg` asks for `CONFIG_SPI_SPIDEV=m`, the userspace interface to an
+SPI bus, and does not name a controller, because the BSP defconfig provides
+one. It did provide one, as a module. Yocto packages one kernel module per
+`.ko` and installs only what an image names, and the image named `spidev`
+alone.
+
+So on the board: `dtparam=spi=on` in `config.txt`, the device tree node
+reading `status = okay`, `CONFIG_SPI_BCM2835=m` in the running kernel's own
+config, and `/lib/modules/.../drivers/spi/` containing `spidev.ko.xz` and
+nothing else. The bus was on, the driver was built, and the rootfs did not
+have it.
+
+**`./go ksym` and `./go kconfig` were both right.** They answer *did what I
+asked for arrive*. Nothing they can do answers *did I ask for what I
+needed*. Thirty-one options verified is thirty-one options verified, and
+the missing one was never on the list to be checked.
+
+That is a limit worth stating rather than patching. A configuration checker
+reads a fragment and a `.config`; it cannot know that a userspace interface
+needs a controller behind it, or that a module needs a package. Those are
+facts about the system, and the place they get written down is a comment
+beside the line, which is what the image recipe now carries.
+
+### And absent is not a value
+
+The same day, `rt-run` was found reading `/sys/kernel/realtime` to label
+every row of the results table, with the file missing treated as "not
+real-time". That file came from the out-of-tree RT patches and did not
+survive the merge into mainline for 6.12, so it is absent on both of this
+project's kernels.
+
+Every real-time row would have been labelled `generic`. The numbers would
+have been real; the column that gives them meaning would have been false.
+
+When a check reads a fact from a file, ask what it does when the file is
+not there. If it cannot tell "absent" from a real answer, it needs a second
+source that cannot be absent, or it needs to refuse. `rt-run` now reads
+`uname -v`, which is on every kernel and cannot be missing, and refuses
+outright if the two sources disagree.
+
+### The pattern, collected
+
+Every silent failure found in this repository has the same shape: something
+chooses an input, and the tool then reports on what it chose without saying
+so.
+
+| Check | Reported | Had actually looked at |
+|---|---|---|
+| `./go kconfig` | fragment missing | another kernel version's `.config` |
+| `./go ksym` | 31 symbols, all real | the abandoned machine's tree |
+| `lint.py` | clean | every file except the new one |
+| `archive.sh` | filed | the right board, the wrong system |
+| `rt-run` | `realtime=no` | a file that does not exist |
+
+None reported an error. All reported success. So: **name the inputs you
+rejected, say when you could not look at all, and prove a new check by
+breaking the thing it checks.**

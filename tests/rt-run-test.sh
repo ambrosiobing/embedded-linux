@@ -78,11 +78,14 @@ absent() {
 
 # ---------------------------------------------------------------- stubs
 
+# uname -v is what decides realtime=yes, so the tests have to be able to
+# change it. It used to be hardcoded to PREEMPT_RT, which meant the generic
+# half of the experiment was never simulated at all.
 cat >"$WORK/bin/uname" <<'STUB'
 #!/bin/sh
 case ${1:-} in
--r) echo "6.12.93-v8-rt" ;;
--v) echo "#1 SMP PREEMPT_RT Mon Sep 15 00:00:00 UTC 2026" ;;
+-r) echo "${BENCH_TEST_UNAME_R:-6.12.93-v8-rt}" ;;
+-v) echo "${BENCH_TEST_UNAME_V:-#1 SMP PREEMPT_RT Mon Sep 15 00:00:00 UTC 2026}" ;;
 *) echo Linux ;;
 esac
 STUB
@@ -198,11 +201,22 @@ export RT_ROOT="$WORK"
 
 # A /sys as the kernel would present it: realtime either 1 or 0, an
 # isolated list that may be empty, and one cpufreq directory.
+# $1 is what /sys/kernel/realtime should contain, or the word "absent" to
+# leave the file out entirely.
+#
+# "absent" is the real hardware case and was not simulated until the board
+# arrived. /sys/kernel/realtime came from the out-of-tree RT patches;
+# PREEMPT_RT was merged into mainline for 6.12 without it, so on the kernel
+# this project builds the file does not exist on either kernel. Every
+# fixture here created it, so every test agreed with a version of the world
+# that no board would ever present.
 build_sys() {
 	rm -rf "$WORK/sys"
 	mkdir -p "$WORK/sys/devices/system/cpu/cpu0/cpufreq" \
 		"$WORK/sys/kernel"
-	echo "${1:-1}" >"$WORK/sys/kernel/realtime"
+	if [ "${1:-1}" != absent ]; then
+		echo "${1:-1}" >"$WORK/sys/kernel/realtime"
+	fi
 	echo "${2:-}" >"$WORK/sys/devices/system/cpu/isolated"
 	echo ondemand \
 		>"$WORK/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
@@ -343,9 +357,18 @@ sh "$SUT" -i >/dev/null 2>&1
 check "a range in the isolated list is accepted" \
 	"$(csv_exists)" "yes"
 
+# A generic kernel, described consistently.
+#
+# This used to be build_sys 0 with the uname stub left saying PREEMPT_RT,
+# which is a machine whose version string and whose sysfs file contradict
+# each other. No such kernel exists. It passed only because the old code
+# read the sysfs file and ignored uname, so the fixture could be incoherent
+# without anything noticing, and the generic half of the experiment was
+# never actually simulated.
 build_sys 0 ""
 reset
-out=$(sh "$SUT" 2>&1)
+out=$(BENCH_TEST_UNAME_V="#1 SMP PREEMPT_DYNAMIC Mon Sep 15 00:00:00 UTC 2026" \
+	sh "$SUT" 2>&1)
 contains "realtime=0 reads as a generic kernel" "$out" "realtime=no"
 contains "and the label says so" "$out" "label      generic"
 
@@ -375,6 +398,48 @@ contains "a dry run prints the plan" "$out" "dry run, nothing started"
 absent "and starts nothing" "$(cat "$CALLS")" "rt-toggle"
 check "and writes no row" \
 	"$(csv_exists)" "no"
+
+# --------------------------------- the kernel says what kind it is, or no row
+#
+# This whole table is one comparison between two kernels differing in one
+# symbol, so realtime= is the column that gives every row its meaning.
+#
+# It used to be read from /sys/kernel/realtime alone, with absent treated
+# as "not real-time". That file came from the out-of-tree RT patches and
+# did not survive the merge into mainline for 6.12. On the first boot of
+# the real board it was not there, and the old code would have written
+# realtime=no on a kernel whose own version string says PREEMPT_RT, called
+# the run "generic", and named the files to match. Two arms of an
+# experiment labelled identically is not a slower experiment.
+
+echo "== the preemption model is read from uname, not from a vanished file"
+
+reset
+build_sys absent
+out=$(sh "$SUT" -n 2>&1)
+contains "absent sysfs file, PREEMPT_RT in uname -v, reads as realtime" \
+	"$out" "realtime=yes"
+
+reset
+build_sys absent
+out=$(BENCH_TEST_UNAME_V="#1 SMP PREEMPT_DYNAMIC Mon Sep 15 00:00:00 UTC 2026" \
+	sh "$SUT" -n 2>&1)
+contains "a generic kernel reads as generic" "$out" "realtime=no"
+
+# The old interface, where it still exists, has to agree. A host with both
+# that disagrees is one where something is not what it claims, and picking
+# a winner is how a wrong row gets written with confidence.
+reset
+build_sys 0
+rc=0
+out=$(sh "$SUT" -n 2>&1) || rc=$?
+check "uname and sysfs disagreeing is a refusal, not a guess" "$rc" "1"
+contains "and it says both readings" "$out" "disagrees with itself"
+
+reset
+build_sys 1
+out=$(sh "$SUT" -n 2>&1)
+contains "agreeing sources still work" "$out" "realtime=yes"
 
 echo
 echo "$pass passed, $fail failed"

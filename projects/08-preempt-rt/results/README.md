@@ -18,7 +18,7 @@ the row rather than a person.
 | `label` | the configuration | Built from the flags, so the file names and the row agree |
 | `kernel` | `uname -r` | Release, which distinguishes 6.6 from 6.12 |
 | `kernel_version` | `uname -v` | Build string, which contains the preemption model |
-| `realtime` | `/sys/kernel/realtime` | yes only if the file exists and reads 1 |
+| `realtime` | `uname -v` contains `PREEMPT_RT` | The kernel's own statement about its preemption model. `/sys/kernel/realtime` came from the out-of-tree RT patches and did not survive the merge into mainline for 6.12, so it is absent on both kernels here. Where it does exist it must agree, and `rt-run` refuses the run if it does not |
 | `isolated` | the flag, **checked** against `/sys/devices/system/cpu/isolated` | A claim the kernel agreed with |
 | `affinity` | the flag | Whether every movable interrupt was moved before the run |
 | `governor` | read back after setting | What the board was actually running, not what was asked for. `fixed` means cpufreq had nothing to offer, which is what `force_turbo=1` looks like |

@@ -20,7 +20,34 @@ IMAGE_INSTALL:append = " \
     stress-ng \
     util-linux-taskset \
     kernel-module-spidev \
+    kernel-module-spi-bcm2835 \
 "
+
+# kernel-module-spi-bcm2835 is the SPI controller, and spidev is useless
+# without it. That pairing cost a flash and a boot.
+#
+# The symptom on the board: /dev/spidev0.0 absent, /sys/class/spi_master
+# empty, dmesg silent about SPI, and daqhats_list_boards reading the HAT's
+# identity out of its ID EEPROM and then saying "Can't open device". The
+# instrument announced itself and could not be talked to.
+#
+# Nothing upstream could have caught it. dtparam=spi=on was in config.txt
+# and the device tree node read status = okay, so the bus was enabled.
+# CONFIG_SPI=y and CONFIG_SPI_BCM2835=m were both in the running kernel's
+# own config, so the driver had been configured and compiled. ./go ksym and
+# ./go kconfig both passed on all 31 fragment options, because both answer
+# "did what I asked for arrive" and neither can answer "did I ask for what
+# I needed".
+#
+# Yocto packages one module per .ko and installs only what an image names,
+# so a driver can be configured, built, deployed and still absent from the
+# rootfs, with a device node that never appears as the only sign.
+#
+# Second time in this repository: Project 1 lost a round to a wireless
+# driver without its module package, which is why scripts/lint.py has
+# check_image_packages at all. That rule scans comments for kernel-module-*
+# names and could not see this one, because nobody had ever written the
+# name down anywhere to be scanned.
 
 # rt-tests is cyclictest and its relatives. It is the reference instrument,
 # and it is the one everybody else in the field quotes, which is exactly

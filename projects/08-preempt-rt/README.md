@@ -223,8 +223,8 @@ So a fragment containing `CONFIG_PREEMPT_RT=y` on the default BSP kernel
 asks for a symbol that has no prompt. kconfig drops it without a word, the
 build succeeds, and the board boots a kernel that is not preemptible. That
 is why `kas/bench-rt.yml` sets the kernel version as well as the switch,
-and why `/sys/kernel/realtime` and `./go kconfig -f rt` are both in the
-acceptance list rather than one of them.
+and why `uname -v` and `./go kconfig -f rt` are both in the acceptance
+list rather than one of them.
 
 ## What is in the image beyond Project 1, and why
 
