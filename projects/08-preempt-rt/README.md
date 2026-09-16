@@ -91,6 +91,45 @@ the places where this departs from the original scope on purpose.
 | `scripts/check-kernel-symbols.sh` | The check that runs before a build: is each fragment line a symbol the kernel can receive |
 | `tests/rt-analyze-test.sh` and two more | What can be proven without the instrument |
 
+## What a clone gives you
+
+**No image is published.** `bench-rt-image` was built here on 16 September
+2026, 78 MB compressed, and it is not downloadable from this repository:
+`.gitignore` excludes `*.wic*` on purpose. Nor would having it help much
+yet, because no board has run it, so nothing downstream of the boot has
+been observed.
+
+**If the software and the method are what interest you, no HAT is
+required.** Three test suites and two static checks run on any machine, and
+are listed under
+[what is tested without hardware](#what-is-tested-without-hardware).
+[docs/DESIGN.md](docs/DESIGN.md) derives the relationship between the two
+instruments, which is the part of this project most worth reading and needs
+no hardware at all: the external instrument measures an interval between
+two edges, so a constant output cost cancels and what survives is its
+variation. [docs/METHOD.md](docs/METHOD.md) is what each instrument can and
+cannot resolve, including the place where the usual recipe flatters the
+result.
+
+**If you want to boot it, this is not a small addition to Project 1.** It
+compiles its own kernel, and a different one: `CONFIG_PREEMPT_RT` needs
+`ARCH_SUPPORTS_RT`, which arm64 gained in 6.12, so this image is on 6.12
+where the rest of the bench is on 6.6. None of that kernel can come from
+Project 1's shared state. The wall clock for this build was not recorded,
+so no figure is given here; from the fact that it is a full kernel compile
+plus a vendor library, expect it to behave like a first build rather than a
+warm one. `./go rt-kernel install` exists so that you can put the RT kernel
+on a card beside the generic one, with a one-line way back, rather than
+committing a board to it.
+
+**Hardware, specifically.** The board is a Raspberry Pi 3 Model B v1.2 and
+not the Pi 4 originally scoped, because that is the board the MCC 118 is
+stacked on. The comparison this project makes needs the DAQ HAT: without it
+the internal instrument still runs and the external one has nothing to
+measure, which is half the point missing. `./go ksym -f rt` before the
+kernel compiles is the check that catches a fragment line the kernel cannot
+receive, and it is worth running even if you never flash anything.
+
 ## Running it
 
 ```sh

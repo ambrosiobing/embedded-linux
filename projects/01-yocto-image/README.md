@@ -34,6 +34,43 @@ better at, is [02. Build systems](../../walkthrough/02-build-systems.md).
 | `kas/bench-rpi4.yml` and siblings | Layer pins, machine, distro |
 | `sdk/hello-gpiod/` | Proves the cross SDK links against the target sysroot |
 
+## What a clone gives you
+
+**No image is published.** This directory carries the recipes, the
+narrative and the evidence; it does not carry a `.wic` you can write to a
+card, and `.gitignore` excludes those on purpose. `./go flash` on a fresh
+clone finds no build tree and refuses.
+
+**If the software is what interests you, stop here and read.** Nothing
+below needs a Raspberry Pi. `./go check` takes about two minutes and
+compiles `bench-status.c` with `-Werror` against the host's libgpiod v2,
+which is the same v2 API the target uses, then runs the state-machine and
+provisioning suites against a fake `systemctl`. The daemon, the shell
+policy, the image recipe, the kernel fragment and the units all read on
+their own.
+
+**If you want to boot it, the build is yours to run and it takes hours.**
+Measured on this bench: **194 minutes** for the first build on eight cores
+and 15 GiB, 5095 tasks, no failures, plus about 10 GB of downloads. Then
+**21 seconds** for a warm rebuild and 2 min 31 s after a one-recipe change.
+The first figure is the cost of compiling a cross toolchain, glibc and
+kernel 6.6.63 from source. It is not the cost of mistakes: that build
+succeeded on its first attempt, and its 36 warnings were all one class of
+fetch mirror fallback, checked rather than assumed.
+
+**Having the same board is not enough by itself.** This image expects the
+7 inch DSI panel as its console, a German console keymap, and wireless
+networking with no cable, and `debug-tweaks` leaves root without a
+password. The Wi-Fi SSID and passphrase are never in this repository: you
+write them to `wifi.conf` on the FAT boot partition after flashing, which
+is [the bring-up notes](docs/BRINGUP.md), step by step.
+
+What this project offers in place of a download is the reproducibility
+result in the verification table below: a clean build from the same commit,
+with its own sstate cache, produced the same 95 packages. That is a narrower
+claim than a bit-identical image and it is the one that was actually
+checked.
+
 ## Running it
 
 ```sh

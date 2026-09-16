@@ -70,6 +70,43 @@ turned out to be nothing.
 | `meta-bench/recipes-kernel/linux-firmware/` | A firmware package poky does not provide, for the second uplink's radio |
 | `tests/lte-watchdog-test.sh` and three more | What can be proven without a modem |
 
+## What a clone gives you
+
+**No image is published.** `bench-router-image` has been built twice and
+booted, and neither build is downloadable from here: this directory carries
+the recipes, the programs, the tests and the evidence, and `.gitignore`
+excludes `*.wic*` on purpose.
+
+**If the software is what interests you, no modem is required.** Four test
+suites run on any machine in seconds and are listed under
+[what is tested without hardware](#what-is-tested-without-hardware): the
+escalation ladder against stubbed `mmcli`, `ping`, `nmcli` and `lte-gpio`;
+the exporter's Prometheus output with no modem present; the firewall's
+invariants, which assert meaning rather than syntax, because `nft -c`
+accepts an input chain with policy accept; and the provisioning parser
+against the three ways a Windows text editor breaks a config file.
+`lte-watchdog`, `lte-exporter`, `lte-gpio` and the ruleset all read on
+their own, and [docs/DESIGN.md](docs/DESIGN.md) is the architecture,
+including the ownership table saying which component owns which interface.
+
+**If you want to boot it, expect a long build.** This image is not a small
+delta on Project 1: it pulls in ModemManager, NetworkManager, nftables and
+dnsmasq, and it compiles its own kernel because `router.cfg` builds the
+modem and netfilter drivers in rather than as modules. Measured here, with
+warm shared state from earlier builds: **178 min 30 s** for the first and
+**58 min 11 s** for the second, 5822 and 5686 tasks, all succeeded. A host
+with no shared state at all starts from Project 1's three hours and adds
+these on top.
+
+**The same board and the same HAT are still not enough.** The SIM, the APN
+and the access point's passphrase are yours and are never in this
+repository: they go into `router.conf` on the FAT boot partition after
+flashing, which is [the bring-up notes](docs/BRINGUP.md). Two things in
+this project are properties of a HAT revision rather than of a part, the
+PWRKEY and FLIGHT GPIO offsets, and the watchdog's power-cycle rung stays
+disabled behind `pwrkey_verified` until you have checked them against the
+schematic. A wrong offset does not fail safely.
+
 ## Running it
 
 ```sh

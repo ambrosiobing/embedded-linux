@@ -15,6 +15,53 @@ cross-compiles their code against the exact sysroot on the target.
 ./go build           # bench-image for the Raspberry Pi 4
 ```
 
+## What a clone gives you
+
+**Source, not images.** Nothing flashable is published here. There are no
+release assets, and `.gitignore` excludes `*.wic`, `*.wic.bz2` and
+`*.wic.bmap` deliberately, so `./go flash` on a fresh clone looks into a
+build tree that does not exist yet and refuses rather than writing
+something wrong to a card.
+
+**If you are interested in the software, you need no hardware and no
+build.** `./go check` runs everything provable without a board in about two
+minutes: both C programs compiled with `-Werror` against libgpiod v2, both
+Python programs byte-compiled, the static layer checks and every suite in
+`tests/`. CI runs the same set on every push. The applications, the
+recipes, the kernel fragments, the systemd units, the test suites and the
+whole `walkthrough/` read on any machine.
+
+**If you want a card that boots, you build one.** That is the honest cost
+and it is not a first-run penalty: Project 1's first build succeeded, 5095
+tasks, no failures, in **194 minutes** on eight cores, plus about 10 GB of
+downloads. A second build with nothing changed is **21 seconds** from
+shared state, and a one-recipe change is under three minutes. The three
+hours are a cross toolchain, glibc and a kernel compiled from source, and
+no amount of fixing this repository makes them shorter.
+
+**An identical board is not sufficient on its own.** These images are built
+for one bench and the assumptions are listed under
+[what this image assumes](#what-this-image-assumes-about-the-bench): the
+console is a 7 inch DSI panel, the console keymap is German, networking is
+wireless because no cable reaches the bench, and `debug-tweaks` leaves root
+without a password. Each row says where to change it. No credential is ever
+in this repository; SSIDs, passphrases and APNs are written to the FAT boot
+partition after flashing.
+
+**Why an image is not offered for download.** Two reasons, both
+substantive. The image has passwordless root, which is correct for an
+isolated bench and wrong on anyone else's network. And distributing a
+binary attaches a corresponding-source obligation that building it yourself
+does not; `./go release` exists to produce the licence manifest, the SPDX
+SBOM and the source archive that a published image would have to carry. If
+that changes, those four artefacts ship together or not at all.
+
+What is offered instead is the reproducibility claim, stated narrowly and
+backed by evidence: a clean build from the same commit produces the same
+package list. `./go reproduce` checks it with its own separate sstate
+cache, so it genuinely rebuilds and costs about as long as the first build
+again. Project 1's result is 95 packages and 95 packages, identical.
+
 ## Why it is built this way
 
 [walkthrough/](walkthrough) explains the reasoning end to end: what
