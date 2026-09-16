@@ -379,7 +379,7 @@ if [ -f "$(dirname "$stored")/$storedstem.wic.bmap" ]; then
 	ok "the bmap sits at \${image%.bz2}.bmap, where flash.sh looks"
 else
 	no "the bmap sits at \${image%.bz2}.bmap, where flash.sh looks"
-	ls -1 "$(dirname "$stored")" | sed 's/^/       /'
+	find "$(dirname "$stored")" -maxdepth 1 -type f -printf '       %f\n'
 fi
 
 # The symlink is the usual winner, so on a host with real symlinks the
