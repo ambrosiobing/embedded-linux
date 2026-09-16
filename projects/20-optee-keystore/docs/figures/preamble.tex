@@ -1,0 +1,56 @@
+% Shared styles for the Project 20 figures.
+%
+% Every figure in this directory is standalone: it inputs this file and
+% compiles on its own with
+%
+%     pdflatex arch.tex
+%
+% so a reader can render one drawing without building a book around it.
+% The palette separates the four things this project keeps confusing
+% when they are drawn in one colour: normal world, kernel, secure world
+% and the monitor between them.
+\usepackage{tikz}
+\usepackage[siunitx]{circuitikz}
+\usetikzlibrary{arrows.meta, backgrounds, calc, fit, positioning, shapes.geometric, shapes.misc}
+
+\definecolor{usercol}{RGB}{222, 235, 247}   % normal world, user space
+\definecolor{kerncol}{RGB}{198, 219, 239}   % normal world, kernel
+\definecolor{fwcol}{RGB}{252, 224, 210}     % secure world
+\definecolor{moncol}{RGB}{254, 217, 118}    % EL3, the monitor
+\definecolor{hwcol}{RGB}{229, 229, 229}     % hardware and files
+\definecolor{extcol}{RGB}{229, 245, 224}    % off the board
+\definecolor{linecol}{RGB}{70, 70, 70}
+\definecolor{badcol}{RGB}{200, 60, 60}
+
+\tikzset{
+  blk/.style   = {draw=linecol, rounded corners=2pt, align=center,
+                  font=\sffamily\small, inner sep=4pt, minimum height=9mm},
+  user/.style  = {blk, fill=usercol},
+  kern/.style  = {blk, fill=kerncol},
+  fw/.style    = {blk, fill=fwcol},
+  mon/.style   = {blk, fill=moncol},
+  hw/.style    = {blk, fill=hwcol},
+  ext/.style   = {blk, fill=extcol},
+  bad/.style   = {blk, fill=white, draw=badcol, thick, text=badcol},
+  layer/.style = {draw=linecol!40, dashed, rounded corners=3pt, inner sep=6pt},
+  layerlabel/.style = {font=\sffamily\scriptsize\bfseries, inner sep=2pt},
+  lbl/.style   = {font=\sffamily\scriptsize, fill=white, inner sep=1pt},
+  flow/.style  = {-{Stealth[length=2mm]}, draw=linecol, thick},
+  bus/.style   = {{Stealth[length=2mm]}-{Stealth[length=2mm]}, draw=linecol,
+                  thick},
+  % UML sequence
+  actor/.style = {blk, fill=usercol, font=\sffamily\scriptsize,
+                  minimum height=6mm},
+  lifeline/.style = {draw=linecol!50, dashed},
+  msg/.style   = {-{Stealth[length=1.6mm]}, draw=linecol},
+  reply/.style = {-{Stealth[length=1.6mm]}, draw=linecol, dashed},
+  umlnote/.style = {draw=linecol!60, fill=yellow!12, rounded corners=1pt,
+                    font=\sffamily\scriptsize, align=left, inner sep=3pt},
+  activation/.style = {draw=linecol, fill=usercol, minimum width=2mm},
+  % decision tree
+  qst/.style   = {draw=linecol, fill=white, diamond, aspect=2.6, align=center,
+                  font=\sffamily\scriptsize, inner sep=1pt},
+  ans/.style   = {font=\sffamily\scriptsize\itshape, inner sep=1pt},
+  fix/.style   = {blk, fill=extcol, font=\sffamily\scriptsize, align=left},
+  trans/.style = {-{Stealth[length=1.6mm]}, draw=linecol},
+}

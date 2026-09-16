@@ -1,0 +1,65 @@
+% Project 20: what is built where, and the one contract that spans two
+% machines.
+\documentclass[border=6pt]{standalone}
+\input{preamble}
+\begin{document}
+\begin{tikzpicture}[node distance=6mm and 10mm]
+
+% Built out of tree, by the OP-TEE build repository.
+\node[fw, text width=34mm] (tfa)
+  {Trusted Firmware-A 2.10\\{\scriptsize PLAT=rpi3 SPD=opteed}};
+\node[fw, text width=34mm, below=of tfa] (os)
+  {OP-TEE OS 4.1.0\\{\scriptsize PLAT=rpi3}};
+\node[fw, text width=34mm, below=of os] (ta)
+  {bench\_keystore TA\\{\scriptsize built against the dev kit}};
+\begin{scope}[on background layer]
+\node[layer, fit=(tfa)(os)(ta),
+      label={[layerlabel, anchor=north west]north west:secure world}] (sw) {};
+\end{scope}
+\draw[flow] (tfa) -- node[lbl, right]{BL32} (os);
+\draw[flow] (os) -- node[lbl, right]{export-ta\_arm64} (ta);
+
+% Built by bitbake.
+\node[kern, text width=36mm, right=22mm of tfa] (cfg)
+  {tee.cfg\\{\scriptsize CONFIG\_TEE, CONFIG\_OPTEE}};
+\node[user, text width=36mm, below=of cfg] (app)
+  {kas/bench-tee.yml\\{\scriptsize declares raspberrypi3-64}};
+\node[user, text width=36mm, below=of app] (rec)
+  {bench-keystore\\{\scriptsize TA, library, CLI, python}};
+\node[user, text width=36mm, below=of rec] (img) {bench-tee-image};
+\begin{scope}[on background layer]
+\node[layer, fit=(cfg)(app)(rec)(img),
+      label={[layerlabel, anchor=north west]north west:%
+             meta-bench, built by bitbake}] (yb) {};
+\end{scope}
+\draw[flow] (cfg) -- (app);
+\draw[flow] (app) -- (rec);
+\draw[flow] (rec) -- (img);
+\draw[flow, dashed] (ta.east) -- (rec.west);
+
+% On the board.
+\node[user, text width=32mm, right=22mm of cfg] (cli) {benchkey CLI};
+\node[user, text width=32mm, below=of cli] (lib) {libbenchkey};
+\node[user, text width=32mm, below=of lib] (py)
+  {benchkey.py\\{\scriptsize canonical()}};
+\node[user, text width=32mm, below=of py] (leds)
+  {benchkey-leds\\{\scriptsize a socket, not a library call}};
+\begin{scope}[on background layer]
+\node[layer, fit=(cli)(lib)(py)(leds),
+      label={[layerlabel, anchor=north west]north west:on the board}] (bd) {};
+\end{scope}
+\draw[flow] (cli) -- (lib);
+\draw[flow] (py) -- (lib);
+\draw[flow, dashed] (lib) --
+  node[lbl, right]{one byte, best effort} (leds);
+\draw[flow] (img.east) -- (bd.west);
+
+% On the host, and the contract between the two.
+\node[ext, text width=32mm, below=16mm of leds] (ver)
+  {verify.py\\{\scriptsize canonical()}};
+\draw[bus, draw=badcol, thick] (py.west) to[out=200, in=200, looseness=1.2]
+  node[lbl, left, text=badcol, align=center]
+  {the same bytes,\\or every record is BAD} (ver.west);
+
+\end{tikzpicture}
+\end{document}

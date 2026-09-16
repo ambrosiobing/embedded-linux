@@ -1,0 +1,56 @@
+% Project 20: what is on the table. The host builds two halves with two
+% different tools, which is the shape of this project.
+\documentclass[border=6pt]{standalone}
+\input{preamble}
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\scriptsize, node distance=8mm]
+
+% The board.
+\node[hw, text width=46mm, minimum height=22mm] (pi) at (0,0)
+  {\sffamily\bfseries\small Raspberry Pi 3\\[2pt]
+   BCM2837, 4 cores\\
+   microSD, micro-USB power};
+
+% Breadboard.
+\node[ext, text width=34mm, right=22mm of pi, yshift=14mm] (bb)
+  {breadboard\\[2pt]
+   green GPIO17, yellow GPIO27, red GPIO22\\
+   three 330\,$\Omega$ resistors to the ground rail};
+\draw[flow] (pi.east) -- node[lbl, above]{4 jumpers} (bb.west);
+
+% Console.
+\node[ext, text width=34mm, right=22mm of pi, yshift=-14mm] (ttl)
+  {USB/TTL cable\\[2pt]
+   pins 8, 10, 6\\
+   red lead left open};
+\draw[flow] (pi.east) -- node[lbl, below]{115200 8N1} (ttl.west);
+
+% The host, with two build paths.
+\node[user, text width=42mm, below=26mm of pi, xshift=-26mm] (repo)
+  {OP-TEE build repository\\{\scriptsize repo init -m rpi3.xml}\\[2pt]
+   TF-A + OP-TEE OS + U-Boot\\
+   $\rightarrow$ \texttt{armstub8.bin}};
+\node[user, text width=42mm, below=26mm of pi, xshift=26mm] (bb2)
+  {bitbake\\{\scriptsize kas/bench-tee.yml}\\[2pt]
+   kernel, dtb, rootfs, TA, benchkey\\
+   $\rightarrow$ \texttt{.wic.bz2}};
+\begin{scope}[on background layer]
+\node[layer, fit=(repo)(bb2),
+      label={[layerlabel, anchor=north west]north west:host (WSL2)}] (host) {};
+\end{scope}
+
+\draw[flow] (repo.north) -- node[lbl, left]{boot partition} (pi.south west);
+\draw[flow] (bb2.north) -- node[lbl, right]{card} (pi.south east);
+
+\node[ext, text width=42mm, below=10mm of host] (ver)
+  {verify.py\\
+   {\scriptsize subscribes to the broker, recomputes the HMAC}};
+\draw[flow] (host.south) -- (ver.north);
+
+\node[bad, text width=54mm, below=6mm of ver]
+  {One Pi 3, one card. Project 17's gateway builds for the same MACHINE,
+   so the telemetry-signing step needs the two images in sequence rather
+   than at once.};
+
+\end{tikzpicture}
+\end{document}

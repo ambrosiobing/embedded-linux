@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""benchkey-verify: check the signatures on records the board produced.
+
+    benchkey-verify --key device.key --file records.jsonl
+    benchkey-verify --key device.key --mqtt broker.bench.lan --topic 'bench/#'
+    echo '{"a":1,"mac":"..."}' | benchkey-verify --key device.key
+
+Runs on the host, and on the board, and in the test suite, which is the
+reason it reads from a file or a pipe as well as from a broker: the
+verifier is the thing that says whether the whole chain works, so it must
+not need the whole chain to run.
+
+It recomputes the HMAC over `canonical(record)`, from benchkey.py, which
+is the same function the signer used. That sharing is the point. A
+verifier with its own copy of the serialisation is a verifier that
+disagrees with the signer the first time either is edited, and the
+disagreement looks exactly like tampering.
+
+The key comes from `benchkey export-once`, run once on the console during
+provisioning. HMAC is symmetric, so the verifier holds the same secret
+the device does; docs/THREAT-MODEL.md says what that means and what the
+asymmetric version would look like.
+
+SPDX-License-Identifier: MIT
+"""
+
+import argparse
+import hashlib
+import hmac
+import json
+import sys
+
+try:
+    from benchkey import canonical
+except ImportError:  # running from the source directory
+    sys.path.insert(0, __file__.rsplit("/", 1)[0])
+    from benchkey import canonical
+
+OK = "OK "
+BAD = "BAD"
+NOMAC = "---"
+
+
+def read_key(path):
+    with open(path, encoding="ascii") as handle:
+        text = handle.read().strip()
+    key = bytes.fromhex(text)
+    if len(key) != 32:
+        raise SystemExit("benchkey-verify: %s holds %d bytes, expected 32"
+                         % (path, len(key)))
+    return key
+
+
+def check(key, record):
+    """Return (verdict, detail) for one record."""
+    mac_hex = record.get("mac")
+    if mac_hex is None:
+        return NOMAC, "no mac field"
+    try:
+        mac = bytes.fromhex(mac_hex)
+    except ValueError:
+        return BAD, "mac is not hex"
+    if len(mac) != 32:
+        return BAD, "mac is %d bytes, expected 32" % len(mac)
+
+    expect = hmac.new(key, canonical(record), hashlib.sha256).digest()
+    # compare_digest, not ==. The comparison is on a public value here, so
+    # the timing leak is theoretical, and using the right function in the
+    # small case is how it gets used in the case that matters.
+    if hmac.compare_digest(expect, mac):
+        return OK, ""
+    return BAD, "signature does not match"
+
+
+def describe(record):
+    """A short label, so a stream of verdicts is readable."""
+    for field in ("host_ts", "dev_ts", "ts", "id"):
+        if field in record:
+            return "%s=%s" % (field, record[field])
+    return next(iter(record), "")
+
+
+def run_stream(key, lines, label=""):
+    counts = {OK: 0, BAD: 0, NOMAC: 0}
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            print("%s %s not JSON" % (BAD, label))
+            counts[BAD] += 1
+            continue
+        verdict, detail = check(key, record)
+        counts[verdict] += 1
+        print("%s %s %s %s" % (verdict, label, describe(record), detail))
+    return counts
+
+
+def run_mqtt(key, args):
+    import paho.mqtt.client as mqtt
+
+    counts = {OK: 0, BAD: 0, NOMAC: 0}
+
+    def on_message(_client, _userdata, message):
+        try:
+            record = json.loads(message.payload)
+        except ValueError:
+            print("%s %s not JSON" % (BAD, message.topic))
+            counts[BAD] += 1
+            return
+        verdict, detail = check(key, record)
+        counts[verdict] += 1
+        print("%s %s %s %s" % (verdict, message.topic, describe(record),
+                               detail), flush=True)
+
+    # paho-mqtt 2.0 made the callback API version the first positional
+    # argument of Client() and raises ValueError without it. The same
+    # note is in Project 17's MQTT sink, and for the same reason: every
+    # example written before 2024 uses the other spelling.
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,
+                         client_id="benchkey-verify")
+    if args.ca:
+        client.tls_set(args.ca, args.cert, args.cert_key)
+    client.on_message = on_message
+    client.connect(args.mqtt, args.port, keepalive=60)
+    client.subscribe(args.topic)
+    try:
+        client.loop_forever()
+    except KeyboardInterrupt:
+        pass
+    return counts
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(
+        description="verify HMACs on records signed inside the TEE")
+    parser.add_argument("--key", required=True,
+                        help="hex key from 'benchkey export-once'")
+    parser.add_argument("--file", help="one JSON record per line, or - ")
+    parser.add_argument("--mqtt", help="broker host")
+    parser.add_argument("--port", type=int, default=1883)
+    parser.add_argument("--topic", default="bench/#")
+    parser.add_argument("--ca", help="CA certificate, for a TLS broker")
+    parser.add_argument("--cert")
+    parser.add_argument("--cert-key")
+    args = parser.parse_args(argv)
+
+    key = read_key(args.key)
+
+    if args.mqtt:
+        counts = run_mqtt(key, args)
+    elif args.file and args.file != "-":
+        with open(args.file, encoding="utf-8") as handle:
+            counts = run_stream(key, handle, args.file)
+    else:
+        counts = run_stream(key, sys.stdin, "stdin")
+
+    print("%d ok, %d bad, %d without a mac"
+          % (counts[OK], counts[BAD], counts[NOMAC]))
+    # Non-zero when anything failed to verify, so that a shell script or a
+    # CI job can use this directly.
+    return 1 if counts[BAD] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

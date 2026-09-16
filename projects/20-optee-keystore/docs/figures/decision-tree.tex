@@ -1,0 +1,79 @@
+% Project 20: where a failure lives.
+%
+% Four layers can each produce "the TEE does not work", and they are
+% distinguished by what you can see rather than by what you suspect. The
+% tree is ordered so that each question is cheaper than the one below it.
+\documentclass[border=6pt]{standalone}
+\input{preamble}
+\begin{document}
+\begin{tikzpicture}[node distance=9mm and 16mm]
+
+\node[qst, text width=34mm] (q1) {console shows the\\TF-A banner?};
+\node[fix, text width=46mm, right=26mm of q1] (f1)
+  {The secure world never ran.\\
+   armstub8.bin is missing from the boot\\
+   partition, or is not called that: the\\
+   firmware loads that exact name in\\
+   64-bit mode, with no line asking it to.};
+\draw[trans] (q1) -- node[ans, above]{no} (f1);
+
+\node[qst, text width=34mm, below=of q1] (q2)
+  {OP-TEE banner\\\texttt{I/TC:} follows?};
+\draw[trans] (q1) -- node[ans, left]{yes} (q2);
+\node[fix, text width=46mm, right=26mm of q2] (f2)
+  {TF-A ran without a BL32.\\
+   Built without \texttt{SPD=opteed} or\\
+   \texttt{NEED\_BL32}, or the OP-TEE binary\\
+   was not in the FIP.};
+\draw[trans] (q2) -- node[ans, above]{no} (f2);
+
+\node[qst, text width=34mm, below=of q2] (q3)
+  {\texttt{dmesg} mentions\\optee at all?};
+\draw[trans] (q2) -- node[ans, left]{yes} (q3);
+\node[fix, text width=46mm, right=26mm of q3] (f3)
+  {Linux never looked.\\
+   Either \texttt{CONFIG\_OPTEE} is not in the\\
+   kernel, or the device tree has no\\
+   \texttt{/firmware/optee} node. Check the\\
+   fragment first: \texttt{./go ksym -f tee}\\
+   is seconds.};
+\draw[trans] (q3) -- node[ans, above]{no} (f3);
+
+\node[qst, text width=34mm, below=of q3] (q4) {\texttt{/dev/tee0} exists?};
+\draw[trans] (q3) -- node[ans, left]{yes} (q4);
+\node[fix, text width=46mm, right=26mm of q4] (f4)
+  {The driver probed and refused.\\
+   Read the whole dmesg line: a version\\
+   mismatch between the kernel driver\\
+   and OP-TEE OS says so in words.};
+\draw[trans] (q4) -- node[ans, above]{no} (f4);
+
+\node[qst, text width=34mm, below=of q4] (q5)
+  {\texttt{TEEC\_OpenSession}\\succeeds?};
+\draw[trans] (q4) -- node[ans, left]{yes} (q5);
+\node[fix, text width=46mm, right=26mm of q5] (f5)
+  {Almost always the supplicant.\\
+   It is packaged as a \emph{template} unit,\\
+   \texttt{tee-supplicant@.service}, and a\\
+   template with no instance starts\\
+   nothing. Then: is the .ta file in\\
+   /lib/optee\_armtz, and is it signed\\
+   with a key this OP-TEE trusts?};
+\draw[trans] (q5) -- node[ans, above]{no} (f5);
+
+\node[fix, text width=34mm, below=of q5] (ok)
+  {The TEE works.\\
+   A failure past here is the TA or the\\
+   parameter types, and \texttt{origin} in\\
+   the return says which side.};
+\draw[trans] (q5) -- node[ans, left]{yes} (ok);
+
+\node[umlnote, text width=40mm, left=14mm of q3]
+  {Ordered by cost, not by likelihood.\\
+   The first two questions need only\\
+   the serial console, which is also\\
+   the only instrument that works\\
+   when the answer is "no".};
+
+\end{tikzpicture}
+\end{document}

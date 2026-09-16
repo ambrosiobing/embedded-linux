@@ -156,7 +156,7 @@ rather than pointing at where the original lives.
 | 17 | [A BLE gateway for the STWIN.box with BlueZ](projects/17-ble-gateway) | Raspberry Pi 3B+ | BLE central on Linux, BlueZ D-Bus GATT, pipelines | **Software complete**: kernel fragment, BlueZ configuration, the gateway and three test suites; no board work yet |
 | 18 | Edge Wi-Fi access point with MQTT over TLS and a private PKI | Raspberry Pi 3 | hostapd, dnsmasq, Mosquitto, X.509 | Planned |
 | 19 | A/B updates with RAUC, a watchdog and a read-only rootfs | Raspberry Pi 3 | OTA, U-Boot bootcount, overlayfs, dm-verity | Planned |
-| 20 | OP-TEE on the Pi 3: a trusted application for key storage | Raspberry Pi 3 | TrustZone, OP-TEE OS, TEE Client API, secure storage | Planned |
+| 20 | [OP-TEE on the Pi 3: a trusted application for key storage](projects/20-optee-keystore) | Raspberry Pi 3 | TrustZone, OP-TEE OS, TEE Client API, secure storage | **Software complete**: threat model, kernel fragment, trusted application, client, verifier and three test suites; the secure world is built out of tree and no board work yet |
 
 ## Building
 
@@ -173,6 +173,7 @@ file.
 | `./go release` | `kas/bench-release.yml` | The same image plus an SPDX bill of materials, a CVE report and the corresponding source archive |
 | `./go rt` | `kas/bench-rt.yml` | `bench-rt-image`, the latency lab of Project 8: a `PREEMPT_RT` kernel, cyclictest, stress-ng and an MCC 118 DAQ HAT |
 | `./go ble` | `kas/bench-ble.yml` | `bench-ble-image`, the BLE gateway of Project 17: BlueZ, the radio firmware, a Python BLE client and a local broker |
+| `./go tee` | `kas/bench-tee.yml` | `bench-tee-image`, the OP-TEE keystore of Project 20: the TEE subsystem, tee-supplicant, the conformance suite and a trusted application. The secure world itself is added to the card by `./go armstub` |
 | `./go hub` | `kas/bench-hub.yml` | `bench-hub-image`, the sensor hub of Project 12: the system bus, polkit, the D-Bus service and OpenOCD |
 
 Later projects that need a different kernel or a different image add their
@@ -255,6 +256,9 @@ usually break can be:
 
 | Check | Command | Covers |
 |---|---|---|
+| Signed-record contract | `sh tests/keystore-canonical-test.sh` | Project 20's canonical serialisation, which the signer on the board and the verifier on the host must agree on byte for byte |
+| Trusted application policy | `sh tests/keystore-policy-test.sh` | The four TA commands against a model written from the documented rules: provisioning, a reboot, and both ways to lose a key |
+| Cross-file constants | `sh tests/keystore-header-test.sh` | That a UUID written in five places, in two languages, a makefile and a recipe, has not drifted |
 | Static layer checks | `./go lint` | Files in `SRC_URI` that are missing, units in `SYSTEMD_SERVICE` that are never installed, layer.conf completeness, ASCII and line length |
 | State machine | `sh tests/bench-state-test.sh` | The status logic, against a fake `systemctl` |
 | WiFi provisioning | `sh tests/bench-wifi-setup-test.sh` | Credentials parsed from a file written on Windows, including CRLF endings, missing fields and file permissions |

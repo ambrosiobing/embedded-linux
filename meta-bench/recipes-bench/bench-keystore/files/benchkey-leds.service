@@ -1,0 +1,49 @@
+[Unit]
+Description=Link-state LEDs for the OP-TEE keystore
+Documentation=file:///usr/share/doc/bench-keystore/README
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/benchkey-leds
+Restart=always
+RestartSec=5
+
+# The socket lives in /run and is created by this process, not by
+# systemd. RuntimeDirectory gives it a directory that is removed when the
+# service stops, which is one fewer stale path to think about; the
+# program still unlinks its own socket first, because a crash does not
+# run the cleanup.
+RuntimeDirectory=benchkey
+User=benchkey
+Group=benchkey
+SupplementaryGroups=gpio
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# PrivateDevices=yes would give this service an empty /dev, and the LEDs
+# live there. So the policy is closed and one node is allowed back.
+PrivateDevices=no
+DevicePolicy=closed
+DeviceAllow=/dev/gpiochip0 rw
+
+# AF_UNIX only. This program listens on a datagram socket and talks to
+# nothing else; it has no business reaching the network, and saying so is
+# free.
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

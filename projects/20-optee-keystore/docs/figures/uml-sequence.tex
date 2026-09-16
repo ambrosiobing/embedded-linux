@@ -1,0 +1,54 @@
+% Project 20: one signing call, from the CLI to 32 bytes and back.
+% The two RPCs are the interesting part: the secure world asks the normal
+% world to read files for it, because it has no filesystem.
+\documentclass[border=6pt]{standalone}
+\input{preamble}
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\scriptsize]
+
+\foreach \x/\name/\id in {0/benchkey/cli, 3.1/libteec/lib,
+                          6.2/optee driver/drv, 9.3/tee-supplicant/sup,
+                          12.4/OP-TEE OS/os, 15.5/the TA/ta}{
+  \node[actor, text width=18mm] (\id) at (\x,0) {\name};
+  \draw[lifeline] (\id.south) -- ++(0,-13.2);
+}
+
+\draw[msg]   (0,-1.0)    -- node[above]{TEEC\_InitializeContext} (3.1,-1.0);
+\draw[msg]   (3.1,-1.5)  -- node[above]{open /dev/tee0} (6.2,-1.5);
+\draw[msg]   (0,-2.1)    -- node[above]{TEEC\_OpenSession(uuid)} (3.1,-2.1);
+\draw[msg]   (3.1,-2.6)  -- node[above]{ioctl OPEN\_SESSION} (6.2,-2.6);
+\draw[msg]   (6.2,-3.1)  -- node[above]{SMC, through BL31} (12.4,-3.1);
+\draw[reply] (12.4,-3.7) -- node[above]{RPC: load the TA} (9.3,-3.7);
+\draw[msg]   (9.3,-4.2)  --
+  node[above]{$\langle$uuid$\rangle$.ta from /lib/optee\_armtz} (12.4,-4.2);
+\draw[msg]   (12.4,-4.7) -- node[above]{TA\_OpenSessionEntryPoint} (15.5,-4.7);
+\draw[reply] (6.2,-5.3)  -- node[above]{session id} (0,-5.3);
+
+\node[umlnote, text width=34mm] at (3.4,-6.3)
+  {Opened once and held. Every session costs a TA load through the
+   supplicant; the per-signature cost should be one SMC round trip.};
+
+\draw[msg]   (0,-7.4)    --
+  node[above]{TEEC\_InvokeCommand(CMD\_SIGN)} (6.2,-7.4);
+\draw[msg]   (6.2,-7.9)  --
+  node[above]{SMC, buffers in shared memory} (12.4,-7.9);
+\draw[msg]   (12.4,-8.4) --
+  node[above]{TA\_InvokeCommandEntryPoint} (15.5,-8.4);
+\node[activation, minimum height=24mm] at (15.5,-9.8) {};
+\draw[reply] (12.4,-9.0) -- node[above]{RPC: read the key object} (9.3,-9.0);
+\draw[msg]   (9.3,-9.5)  --
+  node[above]{encrypted blob from /var/lib/tee} (12.4,-9.5);
+
+\node[umlnote, text width=30mm] at (13.6,-10.6)
+  {TEE\_MACComputeFinal, HMAC-SHA256. The key is loaded, used and freed
+   inside the secure world.};
+
+\draw[reply] (15.5,-11.9) -- node[above]{mac[32], TEE\_SUCCESS} (0,-11.9);
+
+\node[bad, text width=54mm, align=left] at (5.0,-13.0)
+  {Without tee-supplicant the failure is at the \emph{first session}, not
+   the first signature, and the error names neither the supplicant nor
+   the file it could not read.};
+
+\end{tikzpicture}
+\end{document}

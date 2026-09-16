@@ -1,0 +1,32 @@
+# The trusted application's makefile.
+#
+# Installed as ta/Makefile by the recipe. This is the shape every OP-TEE
+# TA uses, and almost all of it comes from the development kit: BINARY
+# names the output, and ta_dev_kit.mk supplies the rest.
+#
+# BINARY is the UUID, and it is the UUID because that is the file name
+# OP-TEE looks for when a client asks for that UUID. The value here, the
+# one in bench_keystore_ta.h and the one the client passes are three
+# copies of one number; tests/keystore-header-test.sh checks that they
+# have not drifted apart.
+BINARY = 7b53ed98-cbfb-42ec-92b6-fe56e7682c5c
+
+# Log level 2 is errors and warnings from the TA's own TEE_Panic and
+# trace calls. Level 3 and above print every entry point, which is what
+# docs/BRINGUP.md asks for when capturing a trace of one signing call,
+# and which is far too much for normal running.
+CFG_TEE_TA_LOG_LEVEL ?= 2
+
+-include $(TA_DEV_KIT_DIR)/mk/ta_dev_kit.mk
+
+# Without the dev kit there is no build and no clean either, and a make
+# that fails with "No rule to make target" hides which of the two is
+# missing. This says it.
+ifeq ($(wildcard $(TA_DEV_KIT_DIR)/mk/ta_dev_kit.mk),)
+all clean:
+	@echo "TA_DEV_KIT_DIR does not point at an OP-TEE dev kit."
+	@echo "TA_DEV_KIT_DIR=$(TA_DEV_KIT_DIR)"
+	@echo "In a bitbake build it comes from optee-os-tadevkit;"
+	@echo "out of tree it is <optee_os>/out/arm/export-ta_arm64."
+	@exit 1
+endif

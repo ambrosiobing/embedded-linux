@@ -1,0 +1,82 @@
+% Project 20: two worlds on one core.
+%
+% The point of the drawing is the inversion at the bottom: the secure
+% world is more privileged and less capable, so it asks the normal world
+% to read its own storage for it.
+\documentclass[border=6pt]{standalone}
+\input{preamble}
+\begin{document}
+\begin{tikzpicture}[node distance=5mm and 14mm]
+
+% ---- normal world, left column
+\node[user, text width=42mm] (cli)
+  {benchkey CLI, stwin-gw\\{\scriptsize record JSON, canonical()}};
+\node[user, text width=42mm, below=of cli] (lib)
+  {libbenchkey\\{\scriptsize one context, one session, held open}};
+\node[user, text width=42mm, below=of lib] (teec)
+  {libteec\\{\scriptsize TEEC\_OpenSession, TEEC\_InvokeCommand}};
+\node[kern, text width=42mm, below=of teec] (drv)
+  {tee core + optee driver\\{\scriptsize /dev/tee0, shared memory, SMC}};
+\node[user, text width=42mm, below=of drv] (sup)
+  {tee-supplicant\\{\scriptsize /dev/teepriv0, serves RPCs}};
+\node[hw, text width=42mm, below=of sup] (files)
+  {/lib/optee\_armtz/$\langle$uuid$\rangle$.ta\\
+   /var/lib/tee/ (encrypted objects)};
+
+\begin{scope}[on background layer]
+\node[layer, fit=(cli)(lib)(teec)(drv)(sup)(files),
+      label={[layerlabel, anchor=north west]north west:%
+             normal world (EL0 and EL1)}] (nw) {};
+\end{scope}
+
+\draw[flow] (cli) -- (lib);
+\draw[flow] (lib) -- (teec);
+\draw[flow] (teec) -- node[lbl, right]{ioctl} (drv);
+\draw[bus]  (drv) -- node[lbl, right]{RPC} (sup);
+\draw[bus]  (sup) -- (files);
+
+% ---- the monitor
+\node[mon, text width=24mm, right=of drv, minimum height=26mm] (bl31)
+  {TF-A BL31\\secure monitor\\(EL3)\\
+   {\scriptsize the only code that switches worlds}};
+\draw[bus] (drv.east) -- node[lbl, above]{SMC} (bl31.west);
+
+% ---- secure world, right column
+\node[fw, text width=42mm, right=of bl31, yshift=26mm] (ta)
+  {bench\_keystore TA (S-EL0)\\
+   {\scriptsize generate | sign | export-once | status}};
+\node[fw, text width=42mm, below=12mm of ta] (os)
+  {OP-TEE OS core (S-EL1)\\
+   {\scriptsize dispatch by UUID, crypto, secure storage}};
+\node[fw, text width=42mm, below=12mm of os] (ss)
+  {secure storage\\
+   {\scriptsize objects encrypted here, stored over there}};
+
+\begin{scope}[on background layer]
+\node[layer, fit=(ta)(os)(ss),
+      label={[layerlabel, anchor=north west]north west:%
+             secure world (TrustZone)}] (sw) {};
+\end{scope}
+
+\draw[bus] (bl31.east) -- (os.west);
+\draw[bus] (os) -- node[lbl, right]{TEE Internal Core API} (ta);
+\draw[bus] (os) -- (ss);
+
+% The inversion: the secure world's own storage is served by the normal
+% world, because the secure world has no filesystem.
+\draw[flow, dashed, draw=badcol] (ss.south) -- ++(0,-10mm) -| (files.east)
+  node[lbl, pos=0.25, below, text=badcol]{RPC: read and write the file};
+
+% ---- what loads all of it
+\node[hw, text width=52mm, below=22mm of bl31] (stub)
+  {armstub8.bin\\
+   {\scriptsize BL1 + FIP: BL2, BL31, OP-TEE (BL32), U-Boot (BL33)}};
+\draw[flow] (stub.north) --
+  node[lbl, right]{loaded by the GPU firmware} (bl31.south);
+
+\node[umlnote, text width=46mm, below=4mm of files, xshift=6mm]
+  {The key is generated in the secure world and never crosses the SMC
+   boundary. What crosses is a message and 32 bytes of MAC.};
+
+\end{tikzpicture}
+\end{document}

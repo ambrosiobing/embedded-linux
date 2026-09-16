@@ -119,16 +119,27 @@ def check_src_uri_installed() -> None:
     Source is exempt. A .c or .h file is consumed by do_compile and the
     thing that gets installed is a binary with a different name, so
     demanding it appear here would be asking a recipe to lie.
+
+    The search starts at the first build task rather than at do_install,
+    and that is a narrowing made for a real case rather than a
+    convenience. bench-keystore fetches a Makefile and a sub.mk that the
+    OP-TEE dev kit needs; do_configure arranges them into a build
+    directory and nothing installs them, because they are inputs to a
+    compile and not files the image wants. The defect this rule was
+    written for, a runtime file fetched and never installed, is still
+    caught: those files appear in no task at all.
     """
     compiled = {".c", ".h"}
+    tasks = ("do_configure", "do_compile", "do_install")
     for recipe in list(ROOT.rglob("*.bb")) + list(ROOT.rglob("*.bbappend")):
         if ".git" in recipe.parts:
             continue
         body = text(recipe)
-        start = body.find("do_install")
-        if start < 0:
+        starts = [body.find(task) for task in tasks]
+        starts = [s for s in starts if s >= 0]
+        if not starts or body.find("do_install") < 0:
             continue
-        install = body[start:]
+        install = body[min(starts):]
         wanted, _ = recipe_files(recipe)
         for name in sorted(wanted):
             if name.startswith("${") or Path(name).suffix in compiled:

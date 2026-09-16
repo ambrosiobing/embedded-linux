@@ -1,0 +1,59 @@
+% Project 20: the wiring. Three status LEDs and a console, and the
+% console is the only instrument that sees the secure world boot.
+\documentclass[border=6pt]{standalone}
+\input{preamble}
+\begin{document}
+\begin{circuitikz}[font=\sffamily\small, scale=0.95, transform shape]
+
+% The header block.
+\draw[rounded corners=2pt, fill=hwcol] (0,0) rectangle (3.6,5.4);
+\node[font=\sffamily\bfseries\small] at (1.8,5.0) {Raspberry Pi 3};
+\node[font=\sffamily\scriptsize] at (1.8,4.6) {40-pin header};
+
+\foreach \y/\pin/\name in {3.8/11/GPIO17, 2.8/13/GPIO27, 1.8/15/GPIO22,
+                           0.8/9/GND}{
+  \draw (3.6,\y) -- (4.2,\y);
+  \node[anchor=east, font=\sffamily\scriptsize] at (3.5,\y)
+    {pin \pin\ \ \name};
+}
+
+% Three LED branches.
+\draw (4.2,3.8) to[R, l=330$\Omega$, -] (6.4,3.8)
+                to[led, -] (8.2,3.8) -- (8.8,3.8);
+\draw (4.2,2.8) to[R, l=330$\Omega$, -] (6.4,2.8)
+                to[led, -] (8.2,2.8) -- (8.8,2.8);
+\draw (4.2,1.8) to[R, l=330$\Omega$, -] (6.4,1.8)
+                to[led, -] (8.2,1.8) -- (8.8,1.8);
+
+\node[font=\sffamily\scriptsize, anchor=west] at (9.0,3.8)
+  {green: TEE present, xtest passed};
+\node[font=\sffamily\scriptsize, anchor=west] at (9.0,2.8)
+  {yellow: one signature computed};
+\node[font=\sffamily\scriptsize, anchor=west] at (9.0,1.8)
+  {red: the TA returned an error};
+
+\draw (8.8,3.8) -- (8.8,0.8) -- (4.2,0.8);
+\node[ground] at (8.8,0.8) {};
+
+% The console.
+\draw[rounded corners=2pt, fill=extcol] (0,-3.0) rectangle (3.6,-0.6);
+\node[font=\sffamily\bfseries\small] at (1.8,-1.0) {USB/TTL cable};
+\node[font=\sffamily\scriptsize, align=left, anchor=west] at (0.15,-2.0)
+  {green: TX\\white: RX\\black: GND\\red: 5 V, left open};
+\draw (3.6,-1.4) -- (4.6,-1.4)
+  node[right, font=\sffamily\scriptsize] {pin 10 (GPIO15 RXD)};
+\draw (3.6,-1.9) -- (4.6,-1.9)
+  node[right, font=\sffamily\scriptsize] {pin 8 (GPIO14 TXD)};
+\draw (3.6,-2.4) -- (4.6,-2.4)
+  node[right, font=\sffamily\scriptsize] {pin 6 (GND)};
+
+\node[font=\sffamily\scriptsize, text=badcol, anchor=west, align=left]
+  at (7.6,-1.9)
+  {The mini UART carries TF-A, OP-TEE, U-Boot\\
+   and Linux. Its baud rate follows the core\\
+   clock, so \texttt{enable\_uart=1} matters more\\
+   here: the secure world prints before\\
+   anything has pinned that clock.};
+
+\end{circuitikz}
+\end{document}

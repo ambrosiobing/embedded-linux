@@ -1,0 +1,139 @@
+#!/bin/sh
+#
+# optee-selftest - is the secure world working, before anything blames
+# this project's own code for saying it is not.
+#
+#   optee-selftest          wait, run the conformance suite, set the LED
+#   optee-selftest --quick  the same, without xtest: presence only
+#
+# Ordered by what each step can rule out, and each one is cheaper than
+# the one after it:
+#
+#   1. /dev/tee0 exists            the boot chain and the driver
+#   2. TEEC_OpenSession works      tee-supplicant and the TA
+#   3. xtest passes                OP-TEE itself, against GlobalPlatform
+#
+# The order matters because failures at step 1 look exactly like failures
+# at step 3 from a distance, and step 1 takes no time.
+#
+# It waits for the supplicant rather than ordering itself after a unit
+# name, and that is deliberate: meta-arm packages the supplicant as a
+# template, tee-supplicant@.service, so "After=tee-supplicant.service"
+# names a unit that does not exist and orders against nothing at all.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+SOCKET=${BENCHKEY_LED_SOCKET:-/run/benchkey-leds.sock}
+TEE_DEV=${BENCH_TEE_DEV:-/dev/tee0}
+WAIT_SECONDS=${BENCH_TEE_WAIT:-30}
+QUICK=no
+
+for arg in "$@"; do
+	case $arg in
+	--quick) QUICK=yes ;;
+	-h | --help)
+		sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
+		exit 0
+		;;
+	*)
+		echo "optee-selftest: unknown argument: $arg" >&2
+		exit 2
+		;;
+	esac
+done
+
+# One byte at the LED daemon, and never a reason to fail. The daemon may
+# not be running, the socket may not exist, and neither is this script's
+# business: it reports on the TEE, not on the LEDs.
+led() {
+	if command -v socat >/dev/null 2>&1; then
+		printf '%s' "$1" | socat - "UNIX-SENDTO:$SOCKET" 2>/dev/null ||
+			true
+	elif command -v python3 >/dev/null 2>&1; then
+		python3 -c "
+import socket, sys
+try:
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    s.setblocking(False)
+    s.sendto(sys.argv[1].encode(), sys.argv[2])
+except OSError:
+    pass
+" "$1" "$SOCKET" 2>/dev/null || true
+	fi
+}
+
+note() {
+	echo "optee-selftest: $*"
+}
+
+fail() {
+	note "$*"
+	led g
+	exit 1
+}
+
+# ------------------------------------------------- 1. the device node
+
+waited=0
+while [ ! -e "$TEE_DEV" ]; do
+	if [ "$waited" -ge "$WAIT_SECONDS" ]; then
+		fail "no $TEE_DEV after ${WAIT_SECONDS}s.
+  The driver never probed. In order of likelihood: the device tree has no
+  /firmware/optee node, CONFIG_OPTEE is not in this kernel, or the board
+  booted without armstub8.bin so there is no secure world to find.
+  dmesg | grep -i optee  says which."
+	fi
+	sleep 1
+	waited=$((waited + 1))
+done
+note "$TEE_DEV present after ${waited}s"
+
+# ------------------------------------------------- 2. a session opens
+
+# benchkey status is the cheapest command that needs the whole path: it
+# opens a session, which loads the TA through the supplicant, and returns
+# two booleans. A failure here is the supplicant or the TA file, not the
+# TEE.
+if ! out=$(benchkey status 2>&1); then
+	fail "a session could not be opened.
+  $out
+  Almost always tee-supplicant. meta-arm packages it as a template unit,
+  so check 'systemctl status tee-supplicant@0' rather than
+  'tee-supplicant'. After that: is the .ta file in /lib/optee_armtz?"
+fi
+note "session opens; $(echo "$out" | tr '\n' ' ')"
+
+if [ "$QUICK" = yes ]; then
+	note "quick mode: xtest not run"
+	led G
+	exit 0
+fi
+
+# ------------------------------------------------- 3. conformance
+
+if ! command -v xtest >/dev/null 2>&1; then
+	# Not a failure. An image built without optee-test is a smaller
+	# image that cannot answer this question, which is a choice its
+	# builder made.
+	note "xtest is not installed; presence checked, conformance not"
+	led G
+	exit 0
+fi
+
+note "running xtest, which takes about a minute on this board"
+if xtest_out=$(xtest 2>&1); then
+	note "xtest passed"
+	# The last lines carry the counts, and they are the thing worth
+	# having in the journal rather than the several thousand above.
+	echo "$xtest_out" | tail -n 5
+	led G
+	exit 0
+fi
+
+note "xtest reported failures"
+echo "$xtest_out" | tail -n 20
+fail "conformance failed, so nothing this project reports about the TEE
+  can be trusted. Save the whole output before changing anything:
+  xtest > /var/lib/bench/tee/xtest-report.txt 2>&1"

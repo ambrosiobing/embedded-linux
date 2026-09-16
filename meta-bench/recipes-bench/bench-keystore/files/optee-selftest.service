@@ -1,0 +1,36 @@
+[Unit]
+Description=OP-TEE conformance check at boot
+Documentation=file:///usr/share/doc/bench-keystore/README
+After=tee-supplicant@0.service benchkey-leds.service
+Wants=benchkey-leds.service
+
+# Ordering only, and against an instance rather than a unit name.
+# meta-arm packages the supplicant as tee-supplicant@.service, a
+# template. "After=tee-supplicant.service" would name a unit that does
+# not exist, which systemd accepts silently and which orders against
+# nothing. The instance number is cosmetic in that unit (%i appears only
+# in its Description), so 0 is as good as any, and bench-keystore ships
+# the wants symlink that starts it.
+#
+# The script does not rely on this ordering anyway: it waits for
+# /dev/tee0 and then for a session to open. Ordering is a hint here and
+# the wait is the guarantee, because a template unit that somebody
+# disabled would otherwise turn a slow boot into a failed self-test.
+ConditionPathExists=/dev/tee0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/optee-selftest
+# Runs as root, and this is the one unit here that has to. xtest exercises
+# the whole GlobalPlatform surface, including operations that need
+# /dev/teepriv0 and the supplicant's own privileges, and a conformance
+# suite that ran with less than the daemon it is testing would be
+# answering a different question.
+User=root
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

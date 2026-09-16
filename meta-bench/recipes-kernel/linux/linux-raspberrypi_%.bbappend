@@ -51,3 +51,12 @@ SRC_URI += '${@"file://ble.cfg" if d.getVar("BENCH_BLE_KERNEL") == "1" else ""}'
 # 3 measures both.
 BENCH_NETBOOT_KERNEL ?= "0"
 SRC_URI += '${@"file://netboot.cfg" if d.getVar("BENCH_NETBOOT_KERNEL") == "1" else ""}'
+
+# And the TEE fragment. Project 20 boots a secure world underneath Linux,
+# and the kernel side of that is two symbols plus the device-tree node
+# that makes the driver probe. Opt in because the whole boot chain
+# changes with it: a board with this kernel and without armstub8.bin has
+# a driver looking for a secure world that is not there, which costs a
+# probe failure at every boot and buys nothing.
+BENCH_TEE_KERNEL ?= "0"
+SRC_URI += '${@"file://tee.cfg" if d.getVar("BENCH_TEE_KERNEL") == "1" else ""}'

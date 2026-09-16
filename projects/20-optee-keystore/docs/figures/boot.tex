@@ -1,0 +1,58 @@
+% Project 20: the boot chain, which is the part unlike every other
+% project in this repository. The kernel is no longer the first thing the
+% board runs, and three stages print on the console before Linux.
+\documentclass[border=6pt]{standalone}
+\input{preamble}
+\begin{document}
+\begin{tikzpicture}[node distance=7mm]
+
+\node[hw, text width=62mm] (gpu)
+  {GPU firmware: bootcode.bin, start.elf\\
+   {\scriptsize loads armstub8.bin by that name in 64-bit mode}};
+\node[hw, text width=62mm, below=of gpu] (stub)
+  {armstub8.bin\\{\scriptsize BL1, then the FIP it carries}};
+\node[mon, text width=62mm, below=of stub] (bl2)
+  {BL2\\{\scriptsize loads the rest of the FIP into place}};
+\node[mon, text width=62mm, below=of bl2] (bl31)
+  {BL31, the secure monitor at EL3\\
+   {\scriptsize resident for the life of the board; SPD=opteed}};
+\node[fw, text width=62mm, below=of bl31] (optee)
+  {BL32: OP-TEE OS at S-EL1\\
+   {\scriptsize prints I/TC: OP-TEE version: ...}};
+\node[user, text width=62mm, below=of optee] (uboot)
+  {BL33: U-Boot at EL1, normal world\\
+   {\scriptsize not optional: TF-A for rpi3 wants a BL33}};
+\node[user, text width=62mm, below=of uboot] (linux)
+  {Linux\\{\scriptsize loaded by U-Boot from kernel8.img on partition 1}};
+\node[kern, text width=62mm, below=of linux] (drv)
+  {optee driver probes\\
+   {\scriptsize needs /firmware/optee in the device tree}};
+
+\foreach \a/\b in {gpu/stub, stub/bl2, bl2/bl31, bl31/optee, optee/uboot,
+                   uboot/linux, linux/drv}
+  \draw[flow] (\a) -- (\b);
+
+% The three banners, which are the only instrument in this region.
+\node[umlnote, text width=44mm, right=10mm of bl31] (banners)
+  {Three banners on the console, in this order:\\[2pt]
+   \texttt{NOTICE:\ BL1:\ ...}\\
+   \texttt{I/TC:\ OP-TEE version:\ ...}\\
+   \texttt{U-Boot 20xx.xx}\\[2pt]
+   A board that fails above this line has no dmesg, no network and no
+   LED, because none of them exists yet.};
+\draw[flow, draw=linecol!50] (banners.west) -- (bl31.east);
+
+% The addresses that have to agree, and the one that looks like it does
+% and does not.
+\node[bad, text width=46mm, right=10mm of uboot, yshift=-12mm] (consts)
+  {config.txt and uboot.env must agree:\\[2pt]
+   \texttt{kernel\_address=0x02000000}\\
+   \texttt{device\_tree\_address=0x01000000}\\
+   \texttt{kernel\_addr\_r}, \texttt{fdt\_addr\_r}\\[2pt]
+   \texttt{RPI3\_PRELOADED\_DTB\_BASE} is \emph{not} one of them: it
+   applies only with \texttt{RPI3\_DIRECT\_LINUX\_BOOT=1}, which this
+   build does not use.};
+\draw[flow, draw=badcol, dashed] (consts.west) -- (uboot.east);
+
+\end{tikzpicture}
+\end{document}

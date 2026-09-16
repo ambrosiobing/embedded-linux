@@ -1,0 +1,102 @@
+# Project 20: the OP-TEE keystore.
+#
+#   kas build kas/bench-tee.yml        or  ./go tee
+#
+# A Raspberry Pi 3, because that is the board OP-TEE lists as a reference
+# platform and the only one on this bench where the whole stack can be
+# built from source. bench-rpi3.yml already sets the machine.
+#
+# This configuration builds the normal world and the trusted application.
+# It does not build the secure world's boot image: see the block below
+# BENCH_TEE_KERNEL for what does, and why that line has not been crossed
+# yet.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-tee-image
+
+repos:
+  # meta-arm carries optee-os, optee-client, optee-test and the TA dev
+  # kit. meta-arm-toolchain is not optional: meta-arm's layer.conf
+  # depends on it, and a build without it fails at parse time with a
+  # missing-dependency message rather than anywhere useful.
+  meta-arm:
+    url: https://git.yoctoproject.org/meta-arm
+    branch: scarthgap
+    layers:
+      meta-arm:
+      meta-arm-toolchain:
+
+local_conf_header:
+  tee: |
+    # CONFIG_TEE and CONFIG_OPTEE. See the bbappend for why it is opt in.
+    BENCH_TEE_KERNEL = "1"
+
+    # meta-arm's optee.inc opens with
+    #
+    #     COMPATIBLE_MACHINE ?= "invalid"
+    #     COMPATIBLE_MACHINE:qemuarm64 ?= "qemuarm64"
+    #     # Please add supported machines below or set it in .bbappend
+    #     #   or .conf
+    #
+    # so OP-TEE refuses to build for any machine nobody has vouched for,
+    # and the Raspberry Pi is not on its list. That is the layer being
+    # careful rather than the platform being unsupported: optee_os 4.1.0
+    # has core/arch/arm/plat-rpi3, and TF-A 2.10 has plat/rpi/rpi3.
+    #
+    # Vouching for it is these four lines, in the place optee.inc itself
+    # names. They are here rather than in three bbappends because the
+    # three recipes share one include, and because whether this bench
+    # builds OP-TEE is a property of this configuration and not of the
+    # layer.
+    COMPATIBLE_MACHINE:pn-optee-os = "raspberrypi3-64"
+    COMPATIBLE_MACHINE:pn-optee-os-tadevkit = "raspberrypi3-64"
+    COMPATIBLE_MACHINE:pn-optee-test = "raspberrypi3-64"
+
+    # OPTEEMACHINE defaults to ${MACHINE}, which would be passed to
+    # optee_os as PLATFORM=raspberrypi3-64 and fail, because the platform
+    # directory is called plat-rpi3. optee-client needs none of this: it
+    # has no COMPATIBLE_MACHINE and no platform of its own, which is the
+    # tell that it is ordinary normal-world userspace.
+    OPTEEMACHINE = "rpi3"
+
+    # The version that has to match, and the reason it is written here
+    # rather than left to float.
+    #
+    # This build produces the TA development kit, and the TA is compiled
+    # against it. The secure world that will *run* that TA comes from the
+    # OP-TEE build repository and is a separate checkout. If the two
+    # versions differ, the TA is built against one set of headers and
+    # dispatched by another, and nothing in either build says so; the
+    # symptom is a TA that loads and returns errors that make no sense.
+    #
+    # So: build the reference stack at the same tag, and check on the
+    # board that "xtest --version" and the recipe agree. The check is in
+    # docs/BRINGUP.md and it is one line.
+    PREFERRED_VERSION_optee-os = "4.1.0"
+    PREFERRED_VERSION_optee-os-tadevkit = "4.1.0"
+    PREFERRED_VERSION_optee-client = "4.1.0"
+    PREFERRED_VERSION_optee-test = "4.1.0"
+
+    # The secure world's boot image is not built here.
+    #
+    # armstub8.bin for the Pi 3 is Trusted Firmware-A built with
+    # PLAT=rpi3, SPD=opteed, BL32=the OP-TEE binaries and BL33=U-Boot,
+    # packed into a FIP. That is a different boot flow from every other
+    # image in this repository: the GPU stops loading kernel8.img
+    # directly and loads a firmware chain that ends in U-Boot, and two
+    # constants (RPI3_PRELOADED_DTB_BASE and CFG_TZDRAM_START) are
+    # compiled into it.
+    #
+    # Writing that as a recipe is a project in itself, and writing one
+    # that cannot be built here would be worse than not writing it. The
+    # OP-TEE build repository already does it with pinned versions, and
+    # scripts/optee-armstub.sh installs its output onto a flashed card.
+    # docs/BRINGUP.md names the exact unknowns that would have to be
+    # settled before the recipe is worth attempting.
+
+    # The kernel, the TEE stack and the keystore are what gets debugged
+    # here, so keep their work directories when rm_work runs.
+    RM_WORK_EXCLUDE += "linux-raspberrypi optee-os optee-client bench-keystore"

@@ -15,6 +15,8 @@
 #   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
 #   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
+#   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
+#   ./go armstub      put the secure world on a card the image is already on
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
 #   ./go sdk-check    cross-compile sdk/hello-gpiod with the installed SDK
@@ -51,6 +53,8 @@ rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
 ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
+tee)        exec sh ./scripts/build.sh bench-tee ;;
+armstub)    shift; exec sh ./scripts/optee-armstub.sh "$@" ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 archive)    shift; exec sh ./scripts/archive.sh "$@" ;;

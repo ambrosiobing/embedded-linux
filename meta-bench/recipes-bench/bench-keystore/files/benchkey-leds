@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+"""benchkey-leds: make the world switch visible.
+
+Listens on a datagram socket and drives three lines:
+
+    S   a signature was computed   pulse yellow
+    E   something returned an error latch red until cleared
+    G   the self-test passed        green on
+    g   the self-test failed        green off, red on
+    C   clear                       everything off
+
+A separate process from the library on purpose. The signing path writes
+one byte to a socket and does not wait for anything; if this daemon is
+dead, wrongly wired or not installed, the byte is discarded by the kernel
+and a signature still succeeds. A library that drove GPIO itself would
+make the key unavailable whenever the LEDs were wrong, which is the wrong
+way round for the two things involved.
+
+    benchkey-leds                       drive the GPIO lines
+    benchkey-leds --dry-run             print transitions, touch nothing
+
+--dry-run is what makes this testable: tests/keystore-leds-test.sh sends
+bytes at the socket and reads the transitions back.
+
+SPDX-License-Identifier: MIT
+"""
+
+import argparse
+import logging
+import os
+import socket
+import sys
+import time
+
+SOCKET_PATH = "/run/benchkey-leds.sock"
+
+GREEN = "green"
+YELLOW = "yellow"
+RED = "red"
+
+log = logging.getLogger("benchkey-leds")
+
+
+class DryRunLines:
+    """Prints what it would have done, one line per change."""
+
+    def __init__(self, stream=None):
+        self.stream = stream or sys.stdout
+        self.state = {GREEN: False, YELLOW: False, RED: False}
+
+    def set(self, states):
+        changed = {k: v for k, v in states.items() if self.state[k] != v}
+        self.state.update(states)
+        for name in (GREEN, YELLOW, RED):
+            if name in changed:
+                self.stream.write("%s %s\n"
+                                  % (name, "on" if changed[name] else "off"))
+        self.stream.flush()
+
+    def release(self):
+        pass
+
+
+class GpiodLines:
+    """The libgpiod v2 request, behind the same two methods.
+
+    Identical in shape to the wrapper in Project 17's sinks.py, and for
+    the same reason: everything gpiod-specific is created here, so the
+    logic above speaks in True and False and can be tested without a GPIO
+    chip or the bindings.
+    """
+
+    def __init__(self, chip, offsets, consumer="benchkey-leds"):
+        import gpiod
+        from gpiod.line import Direction, Value
+
+        self.offsets = offsets
+        self._active = Value.ACTIVE
+        self._inactive = Value.INACTIVE
+        settings = gpiod.LineSettings(direction=Direction.OUTPUT,
+                                      output_value=Value.INACTIVE)
+        self._request = gpiod.request_lines(
+            chip, consumer=consumer,
+            config={tuple(offsets.values()): settings})
+
+    def set(self, states):
+        self._request.set_values(
+            {self.offsets[name]: self._active if on else self._inactive
+             for name, on in states.items()})
+
+    def release(self):
+        self._request.release()
+
+
+class Panel:
+    """The three lines, and what each byte does to them.
+
+    Red latches and the others do not, which is the one piece of policy
+    here. A signature error that lit the LED for a moment would be a
+    signature error nobody saw; the point of the red line is that it is
+    still on when somebody walks past later. 'C' clears it, and so does
+    a restart of the service.
+    """
+
+    def __init__(self, lines, pulse=0.05):
+        self.lines = lines
+        self.pulse = pulse
+        self.green = False
+        self.red = False
+        self.apply(yellow=False)
+
+    def apply(self, yellow):
+        self.lines.set({GREEN: self.green, YELLOW: yellow, RED: self.red})
+
+    def event(self, byte):
+        if byte == b"S":
+            self.apply(yellow=True)
+            time.sleep(self.pulse)
+            self.apply(yellow=False)
+        elif byte == b"E":
+            self.red = True
+            self.apply(yellow=False)
+        elif byte == b"G":
+            self.green = True
+            self.apply(yellow=False)
+        elif byte == b"g":
+            self.green = False
+            self.red = True
+            self.apply(yellow=False)
+        elif byte == b"C":
+            self.green = False
+            self.red = False
+            self.apply(yellow=False)
+        else:
+            log.debug("ignoring %r", byte)
+
+
+def make_socket(path):
+    """A datagram socket at `path`, replacing a stale one.
+
+    A unix socket file outlives the process that made it, so a daemon
+    that was killed leaves a path that bind() then refuses with
+    EADDRINUSE. Removing it first is standard and is safe here because
+    the path is owned by this service and by nothing else; the unit's
+    RuntimeDirectory would remove it too, one restart later than this
+    does.
+    """
+    if os.path.exists(path):
+        os.unlink(path)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    sock.bind(path)
+    os.chmod(path, 0o666)
+    return sock
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description="link-state LEDs for the TEE")
+    parser.add_argument("--socket", default=SOCKET_PATH)
+    parser.add_argument("--chip", default="/dev/gpiochip0")
+    parser.add_argument("--green", type=int, default=17)
+    parser.add_argument("--yellow", type=int, default=27)
+    parser.add_argument("--red", type=int, default=22)
+    parser.add_argument("--pulse", type=float, default=0.05)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--count", type=int, default=0,
+                        help="stop after N events, for tests")
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    if args.dry_run:
+        lines = DryRunLines()
+    else:
+        lines = GpiodLines(args.chip, {GREEN: args.green,
+                                       YELLOW: args.yellow,
+                                       RED: args.red})
+
+    panel = Panel(lines, pulse=args.pulse)
+    sock = make_socket(args.socket)
+
+    seen = 0
+    try:
+        while True:
+            data, _addr = sock.recvfrom(16)
+            for i in range(len(data)):
+                panel.event(data[i:i + 1])
+                seen += 1
+            if args.count and seen >= args.count:
+                return 0
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        lines.release()
+        sock.close()
+        if os.path.exists(args.socket):
+            os.unlink(args.socket)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

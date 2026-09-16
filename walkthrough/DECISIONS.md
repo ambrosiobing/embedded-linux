@@ -1949,3 +1949,76 @@ error message rather than the presence of a result, and the rule itself,
 twice.
 
 **Cost.** Two commands per check.
+
+## 71. One function decides what gets signed, and both ends import it
+
+**Decision.** The bytes a signature covers are produced by one function,
+`canonical()`, which ships to the signer on the board and to the verifier
+on the host. Neither end serialises a record any other way.
+
+**Why not a documented format.** Because that is what was tried, and the
+two ends were written from it four paragraphs apart:
+`json.dumps(rec, sort_keys=True)` on one side and the same call with
+`separators=(",", ":")` on the other. Those differ by two spaces per
+field. Every record would have verified as BAD, with the data intact, the
+key correct and the HMAC correct, and nothing in any output pointing at
+the cause. The obvious reading of "every record is BAD" is tampering.
+
+**Why the rules are written next to the code rather than in a spec.**
+Five of them, each with the failure it prevents: drop the `mac` field, or
+the two ends sign different objects; sort the keys, or insertion order
+decides; no spaces, as above; escape non-ASCII, or an encoding choice is
+made twice; refuse NaN, because Python writes tokens that are not JSON
+and a non-Python verifier could never agree.
+
+**Cost.** One import that crosses a machine boundary, and a rule that
+floats are still a hazard for a verifier written in another language,
+which the docstring says rather than leaving to be discovered.
+
+## 72. A number restated in five files gets a test, not a comment
+
+**Decision.** Where one value has to appear in several languages, a test
+parses the authoritative file and compares. Project 20's TA UUID appears
+as eleven hex integers in a C macro, as a string beside it, as a
+makefile's `BINARY`, as a recipe variable and as a Python constant, and
+`tests/keystore-header-test.sh` reassembles it from the macro and checks
+all five.
+
+**Why not a comment saying "keep these in step".** The failure is silent
+and ambiguous. A TA built with one UUID and a client asking for another
+gives `ITEM_NOT_FOUND`, which is also what a missing TA file gives, and
+also what a TA whose signature is rejected gives. Three causes, one
+number, and only one of them visible from a shell.
+
+**Why the macro form specifically.** It is the one nobody proof-reads.
+The string form is read at a glance; eleven separate integers are not.
+
+**Cost.** A parser in a test, and the rule that the header is
+authoritative, so a change starts there.
+
+## 73. The secure world is installed, not built, and the reason is written down
+
+**Decision.** `bitbake` builds the normal world, the kernel and the
+trusted application. Trusted Firmware-A, OP-TEE OS and U-Boot come from
+the OP-TEE build repository, and `./go armstub` puts the resulting
+`armstub8.bin` onto a card the image is already on.
+
+**Why not a recipe.** Five things would have to be settled first, and
+they are listed in that project's bring-up notes rather than left as an
+absence: TF-A for this board emits a FIP rather than a kernel, BL33 is
+U-Boot so a second boot loader enters the picture, `uboot.env` is a
+generated artefact, `IMAGE_BOOT_FILES` cannot carry a file the build does
+not produce, and meta-raspberrypi already ships a different `armstub8.bin`.
+None of that can be written blind: a recipe that looks right and has never
+been booted is worse than a manual step that says it is one.
+
+**Why the version pin matters more than the recipe.** The trusted
+application is compiled against the dev kit one build produces and
+dispatched by the OP-TEE the other build carries. Different versions mean
+headers from one and a dispatcher from the other, and nothing in either
+build says so. The kas file pins both, and the check that settles it runs
+on the board, because the running OP-TEE is the only authority on which
+OP-TEE is running.
+
+**Cost.** One manual step in the bring-up, and a list of five unknowns
+that the next person starts from rather than rediscovers.
