@@ -1043,3 +1043,55 @@ after a push.
 invisible here until CI runs. The general answer is to install shellcheck
 on the Windows machine or to stop pushing from it, and neither is a
 decision for a lint rule to make.
+
+---
+
+## 28. The image builds, and the fourth vendor assumption was in the debug info
+
+**What happened.** With the unversioned library name in place, `./go rt`
+completed: 6258 tasks, 334 of them run, all succeeded, 11 min 44 s, and
+
+```
+bench-rt-image-raspberrypi4-64.rootfs-20260916061119.wic.bz2   78M
+```
+
+Four things that had never executed all worked first time: `do_install`
+for the vendor library, the `${PN}-tools` package split, `python3-daqhats`
+through `setuptools3`, and the image assembly, which is where a missing
+`RDEPENDS` would have shown up. `python3-ctypes` was reasoned about rather
+than tested and turned out right.
+
+One QA warning, and it was the staging directory from entry 26:
+
+```
+QA Issue: File /usr/bin/.debug/daqhats_list_boards in package
+          libdaqhats-dbg contains reference to TMPDIR [buildpaths]
+```
+
+**What was done.** Moved the staged headers from `${WORKDIR}/staged-include`
+to `${S}/staged-include`, one path.
+
+OE rewrites build paths out of debug information with prefix maps, and it
+has exactly three: `${S}`, `recipe-sysroot` and `recipe-sysroot-native`. A
+directory under `WORKDIR` but outside all three is covered by none of them,
+so the compiler command line that GCC records in the debug info kept an
+absolute path from this machine. Staging inside `${S}` puts it under a map
+that already exists.
+
+**Why that and not the alternative.** The alternative is a fourth
+prefix-map argument of my own, which works and adds a thing to keep in step
+with OE's. Using the map that is already there is one path change.
+
+**Why fix a warning at all.** Because of what it means rather than what it
+says. A shipped package carrying the builder's absolute paths is not
+byte-for-byte reproducible, and Project 1 has an acceptance criterion about
+reproducibility that this would quietly have broken for anyone who ran
+`./go reproduce` on this image.
+
+**The count, for the record.** Entry 5 said reading the vendor makefile
+found three assumptions about a native build. Entry 26 found a fourth, in
+the C rather than the makefile. This is a fifth, and it is in neither: it
+is in what the compiler writes into the binary. Three build cycles, each
+one step further, is what cross-compiling somebody else's build system
+actually costs, and it is the honest answer to how much a carefully written
+recipe proves before it has run. It proves nothing. It only fails faster.

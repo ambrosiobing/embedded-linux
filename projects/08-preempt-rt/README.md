@@ -35,10 +35,16 @@ first to change the kernel itself.
 
 ## State
 
-**The kernel configuration is proven; nothing has been built or run.** No
-image has been built, no kernel has been compiled, no board has been booted
-and the HAT has never been on the header. The results table below is empty
-on purpose; it has a schema and no rows.
+**The image builds. No board has run it.** The Raspberry Pi has not been
+booted with this image, the HAT has never been on the header, and the
+results table below is empty on purpose: it has a schema and no rows.
+
+`bench-rt-image` was built on 16 September 2026, 78 MB compressed, with
+`CONFIG_PREEMPT_RT=y` verified in the `.config` before the compile began.
+That settles everything a build host can settle, including the four things
+that had never executed until then: the vendor library's `do_install`, the
+`-tools` package split, `python3-daqhats` through `setuptools3`, and the
+image assembly, which is where a missing `RDEPENDS` would have surfaced.
 
 What changed on 16 September 2026 is the riskiest part of the project, and
 it was settled before the compile rather than after it: the 6.12 kernel is
@@ -63,6 +69,8 @@ What is proven today, on a laptop and in CI:
 | Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt` against the unpacked 6.12.93 tree, 21484 declarations indexed |
 | The version pin took: the tree is 6.12.93, not the BSP default 6.6 | the kernel's own `Makefile`, read after `kernel_configme` |
 | **Every option of both fragments reached the `.config`, `CONFIG_PREEMPT_RT=y` included** | `./go kconfig -f rt`, [evidence](docs/evidence/kconfig-check.txt) |
+| The image builds: 6258 tasks, all succeeded, 78 MB | `./go rt`, 16 Sep 2026 |
+| The vendor library cross-compiles, packages and installs | the same build, after three defects only building could find |
 
 What that does not prove is any latency number whatsoever. See
 [Acceptance criteria](#acceptance-criteria) for which rows are evidence and

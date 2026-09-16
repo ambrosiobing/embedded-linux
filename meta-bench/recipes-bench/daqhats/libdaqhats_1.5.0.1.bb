@@ -74,12 +74,28 @@ do_compile() {
     # exists and -I${S}/include cannot help: the compiler is looking for
     # a daqhats/ subdirectory, not for the files inside it.
     #
-    # Staging the same shape under WORKDIR costs two lines and leaves the
-    # vendor tree untouched. The alternative, a patch rewriting eleven
-    # include lines across the tools, would need rebasing at every version
-    # bump to fix something that is not broken upstream.
-    install -d ${WORKDIR}/staged-include/daqhats
-    install -m 0644 ${S}/include/*.h ${WORKDIR}/staged-include/daqhats/
+    # Staging the same shape costs two lines and leaves the vendor tree
+    # untouched. The alternative, a patch rewriting eleven include lines
+    # across the tools, would need rebasing at every version bump to fix
+    # something that is not broken upstream.
+    #
+    # Under ${S} rather than ${WORKDIR}, and that is not arbitrary. The
+    # first version staged into ${WORKDIR}/staged-include and the build
+    # succeeded with a QA warning:
+    #
+    #   File /usr/bin/.debug/daqhats_list_boards in package libdaqhats-dbg
+    #   contains reference to TMPDIR [buildpaths]
+    #
+    # OE rewrites build paths out of debug information with prefix maps for
+    # ${S}, recipe-sysroot and recipe-sysroot-native. A directory under
+    # WORKDIR but outside all three is covered by none of them, so the
+    # compiler command line recorded in the debug info kept an absolute
+    # path from this machine. That costs byte-for-byte reproducibility,
+    # which Project 1 has a criterion for, and leaks the builder's paths
+    # into a shipped package. Staging under ${S} puts it inside the map
+    # that already exists.
+    install -d ${S}/staged-include/daqhats
+    install -m 0644 ${S}/include/*.h ${S}/staged-include/daqhats/
 
     # Only the named tools. The makefile's "all" also recurses into
     # tools/applications, which builds the vendor's example programs and
@@ -87,7 +103,7 @@ do_compile() {
     # for an image not to build.
     oe_runmake -C ${S}/tools \
         CC="${CC}" \
-        CFLAGS="${CFLAGS} -I${WORKDIR}/staged-include -I${S}/include \
+        CFLAGS="${CFLAGS} -I${S}/staged-include -I${S}/include \
             -I${S}/lib" \
         OFLAGS="${LDFLAGS} -L${S}/lib/build -ldaqhats" \
         daqhats_list_boards mcc118_firmware_update
