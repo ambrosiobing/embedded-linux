@@ -72,6 +72,68 @@ The two dependency kinds matter and are often confused:
 A recipe that compiles but whose package is missing a runtime dependency
 builds cleanly and fails on the board. That is why both lists exist.
 
+### That list is not the whole graph
+
+The eight tasks above are the default chain. A class can add its own, and
+the kernel does, which matters the moment you want to inspect a kernel
+without building one:
+
+| Task | What it leaves behind |
+|---|---|
+| `do_unpack` | the git tree in `${WORKDIR}/git`, and `STAGING_KERNEL_DIR` **emptied**, because it is in `do_unpack[cleandirs]` |
+| `do_kernel_checkout` | that tree moved into `STAGING_KERNEL_DIR`, which is `tmp/work-shared/<machine>/kernel-source` |
+| `do_kernel_configme` | a real `.config`, with every fragment merged |
+| `do_compile` | most of an hour later, a kernel |
+
+Asking for `-c unpack` and expecting a kernel source tree gives an empty
+directory: the task that sounds like the one that unpacks the kernel is not
+the one that puts it where anything can read it. Asking for
+`-c kernel_configme` gives a `.config` in minutes, which is what makes
+[07. Verification](07-verification.md) able to check a kernel fragment
+before the compile rather than after it.
+
+## Cross-compiling somebody else's build system
+
+A vendor build system is written for a native build on the target:
+compile the library, `make install` it, then compile the tools against what
+was installed. A recipe installs nothing on the build host, so the install
+step never runs, and everything it would have done has to be done by hand.
+
+Reading the compile rules is the obvious move and it is not enough.
+`libdaqhats` cost three build cycles, one finding each:
+
+| Read | Found | Cost |
+|---|---|---|
+| `lib/makefile` | `CC = gcc`, `-I/usr/include`, `-I/opt/vc/include` | fixed before the first build |
+| nothing | the tools include `<daqhats/daqhats.h>`, a directory only `make install` creates | one cycle |
+| nothing | the tools link `-ldaqhats`, and only `make install` makes the unversioned symlink | one cycle |
+| nothing | the extra `-I` path leaked into the debug info as a `buildpaths` QA warning | one cycle |
+
+The first row came from reading the makefile. None of the other three is in
+it: two are in the `#include` and link lines of the C, and the last is in
+what the compiler writes into the binary.
+
+**The move that would have saved two of those cycles** is to read the
+`install` target as a checklist rather than the compile rules as a
+specification. It is a list of what a native build does between compiling
+the library and compiling the tools, and a cross build owes all of it:
+
+```
+install:
+        @cd ../include; make install; cd ../lib      <- headers, under a prefix
+        @install $(BUILD_DIR)/$(TARGET_LIB) $(INSTALL_DIR)
+        @ldconfig
+        @ln -frs .../$(TARGET_LIB) .../lib$(NAME).so <- the link name
+```
+
+**And on build paths.** OE rewrites absolute paths out of debug information
+with prefix maps, and it has exactly three: `${S}`, `recipe-sysroot` and
+`recipe-sysroot-native`. Anything staged under `WORKDIR` but outside all
+three is covered by none of them, and the compiler command line recorded in
+the debug info keeps the builder's absolute path. It is a warning rather
+than an error, and it quietly costs byte-for-byte reproducibility. Staging
+inside `${S}` puts it under a map that already exists.
+
 ## Shared state, and why the second build takes minutes
 
 Before running a task, BitBake hashes everything that could affect its

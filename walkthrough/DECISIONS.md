@@ -1261,4 +1261,163 @@ refuses that interpretation instead of computing a number from it.
 
 ---
 
+## 50. One place decides where a build happens
+
+**Context.** Every build directory in this repository is set by
+`scripts/common.sh`, which exports `KAS_WORK_DIR` and `KAS_BUILD_DIR`. kas
+reads both from the environment and, when they are absent, falls back to
+paths relative to the current directory.
+
+**Decision.** Everything that invokes kas goes through `scripts/kas.sh`,
+exposed as `./go shell [CONFIG]` and `./go bitbake CONFIG ARGS`.
+`warn_stray_build_tree` in `common.sh`, called from there and from
+`build.sh`, reports a `build/` directory inside the checkout.
+
+**Rejected.** Documenting the two variables and expecting them to be
+exported by hand, which is what a raw `kas shell` line in a bring-up
+document amounts to.
+
+**Why.** This failure does not look like a failure. A bare
+`kas shell kas/bench-rt.yml -c ...` from a checkout builds correctly, in
+`<checkout>/build`, with its own `downloads` and `sstate-cache`, re-fetching
+what the shared caches already hold. It cost 7.7 GB on a disk with 35 GB
+free, and then cost an hour, because the next command looked in the right
+place and read the previous project's kernel. Ten minutes of that went into
+suspecting a version pin that was correct.
+
+**Consequence.** One more script, and a warning that fires on a directory
+that is harmless in itself. The tell that would have caught it sooner is
+worth knowing: BitBake printed `Loaded 4389 entries from dependency cache`
+with no `Parsing recipes` bar, and a changed `local.conf` always forces a
+full reparse.
+
+---
+
+## 51. The kernel configuration is proven before the kernel is compiled
+
+**Context.** `./go kconfig` compares a fragment against a `.config`, and a
+`.config` exists only after `do_compile`. So the earliest a wrong fragment
+could be reported was at the end of an hour.
+
+**Decision.** `bitbake -c kernel_configme virtual/kernel` first. It runs
+fetch, checkout and patch and then merges the fragments into a real
+`.config`, in minutes. `./go ksym` and `./go kconfig` both run against
+that, before the build.
+
+**Rejected.** `-c unpack`, which sounds like the task that produces a
+kernel tree and is not: `do_unpack` puts the tree in `${WORKDIR}/git` and
+its `cleandirs` empties `STAGING_KERNEL_DIR` on the way past, leaving
+`kernel-source` present and empty. `do_kernel_checkout` fills it.
+
+**Why.** Project 8's whole kernel side rests on one symbol surviving into
+the `.config`, and the failure mode is silence. Moving that check ahead of
+the compile turned an acceptance criterion from something a board would
+eventually reveal into something proven in the first ten minutes.
+
+**Consequence.** Four checks before the compile rather than one after it,
+each answering a different question: the kernel's own Makefile for the
+version, `ksym` for whether a line names a real symbol, `kconfig` for
+whether the value arrived, and the build for whether any of it compiles.
+
+`ksym` cannot do `kconfig`'s job, which is worth stating because it looks
+as though it could. `CONFIG_PREEMPT_RT` is declared with a prompt in 6.6
+and 6.12 alike; what 6.6 lacks on arm64 is `ARCH_SUPPORTS_RT`, a
+dependency rather than a declaration. On a 6.6 tree `ksym` prints `ok` and
+tells you nothing.
+
+---
+
+## 52. A vendor install target is the list of what a cross build must do itself
+
+**Context.** Vendor build systems are written for a native build on the
+target, where you compile a library, `make install` it, then compile the
+tools against what was installed. A recipe installs nothing on the build
+host, so everything that install step did has to be done by hand.
+
+**Decision.** Read the `install` target as a checklist and replicate all of
+it, not the parts that look relevant.
+
+**Rejected.** Reading the compile rules, overriding `CC`, `CFLAGS` and
+`LDFLAGS`, and assuming that is the whole of it.
+
+**Why.** For `libdaqhats` that assumption cost three build cycles, one
+finding each, and none was visible in the file that had been read:
+
+| Cycle | Failure | Where it lived |
+|---|---|---|
+| 1 | `fatal error: daqhats/daqhats.h` | the `#include` lines of the C |
+| 2 | `ld: cannot find -ldaqhats` | the unversioned symlink `make install` creates |
+| 3 | `buildpaths` QA warning | what the compiler writes into the debug info |
+
+The makefile's own three assumptions, a hardcoded `gcc`, `-I/usr/include`
+and a 32-bit Broadcom userland path, were all found by reading and all
+fixed at once. Everything after that was somewhere else.
+
+**Consequence.** An honest statement about what a carefully written recipe
+proves before it has run: nothing. It only fails faster. That is why the
+project README listed the build as unproven while the recipe was being
+written, rather than treating care as evidence.
+
+---
+
+## 53. A comparison differs in one variable, or it is not a comparison
+
+**Context.** Project 8 measures a real-time kernel against a generic one.
+`kas/bench-rt.yml` pins `PREFERRED_VERSION_linux-raspberrypi = "6.12.%"`,
+because `PREEMPT_RT` needs `ARCH_SUPPORTS_RT` which arm64 gained in 6.12.
+`kas/bench-rpi4.yml` pins nothing and gets the BSP default, 6.6.
+
+**Decision.** A third configuration that pins 6.12 and leaves
+`BENCH_RT_KERNEL` at 0, so the two rows differ in one symbol.
+
+**Rejected.** Measuring what already builds and describing the rows as
+"6.6 generic" and "6.12 RT".
+
+**Why.** Six minor versions of scheduler, timer and driver work sit between
+those kernels. The numbers would be real and the headline claim would be
+uninterpretable: `PREEMPT_RT` is the loudest difference between them but
+not the only one, and a reader asking how much of the improvement is the
+preemption model would have no answer in the data.
+
+**Consequence.** One more kas file, one more kernel build, and a correction
+to two documents that had quietly become false. The project README said the
+two images "differ in the preemption model and in nothing else that anyone
+had to think about", written before the version pin existed. The bring-up
+notes said `bench-rt-image` "carries the generic BSP kernel", which it
+never did.
+
+Both are the shape this repository keeps producing: a claim written when it
+was true, left standing after the thing it described changed. No test holds
+a sentence like that. What caught it was reading the two kas files side by
+side while deciding what to flash.
+
+---
+
+## 54. The linter covers the one thing the authoring machine cannot see
+
+**Context.** The repository is edited and committed on a Windows laptop
+with no shellcheck, and CI runs `shellcheck -s sh -e SC1090,SC1091` at
+default severity, where an `info` fails the build exactly as an error does.
+
+**Decision.** One narrow rule in `scripts/lint.py`: an `export` or
+`readonly` whose value carries an unquoted expansion.
+
+**Rejected.** Reimplementing shellcheck in Python. Also rejected: relying
+on the operator to run shellcheck before pushing, which was asked for twice
+and happened neither time, because a build is always more interesting.
+
+**Why.** An assignment is not subject to word splitting; an argument to a
+command is. That is the whole of SC2086 and the only part of it this
+repository keeps getting wrong: once in the `rt-*` tests, fixed by somebody
+else, and again a day later in two new files, four instances, turning CI
+red twice.
+
+**Consequence.** One rule, proven by reintroducing the defect in both file
+shapes, `*.sh` and a shebang-only file, because the discovery has to match
+CI's 37 files rather than a glob. Everything else shellcheck finds is still
+invisible until CI runs; the real answer is shellcheck on that machine, and
+that is not a decision a lint rule can make.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)

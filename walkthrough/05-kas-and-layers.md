@@ -36,6 +36,36 @@ and runs BitBake.
 The build directory becomes disposable, because everything that shaped it is
 in the file.
 
+### Where that build directory is, and how it silently moves
+
+kas reads `KAS_WORK_DIR` and `KAS_BUILD_DIR` from the environment, and when
+they are absent it falls back to paths relative to the current directory.
+`scripts/common.sh` exports both, pointing at `$BENCH_WORK`; a bare
+`kas shell` inherits neither.
+
+So this, typed in a checkout, works:
+
+```sh
+kas shell kas/bench-rt.yml -c 'bitbake -c unpack virtual/kernel'
+```
+
+and builds in `<checkout>/build`, with its own `downloads` and
+`sstate-cache`, re-fetching what the shared caches already hold. Nothing
+fails. The result is correct and in a place nothing else looks, so the next
+command reads the previous project's kernel from the real build directory
+and reports the wrong version. Here that cost 7.7 GB on a disk with 35 GB
+free, and an hour, most of it spent suspecting a kernel version pin that
+was correct.
+
+Everything that invokes kas therefore goes through `scripts/kas.sh`, as
+`./go shell [CONFIG]` and `./go bitbake CONFIG ARGS`, and a `build/`
+directory inside the checkout is reported rather than used.
+
+**The tell, if it happens anyway.** BitBake prints `Loaded N entries from
+dependency cache` and no `Parsing recipes` bar. A changed `local.conf`
+always forces a full reparse, so an unchanged one means kas wrote its
+configuration somewhere else.
+
 ## Reading ours
 
 ```yaml

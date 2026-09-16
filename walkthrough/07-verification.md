@@ -226,6 +226,30 @@ behind an interface rather than accepting that the behaviour is untestable.
 The part that can only be proven on a board then becomes identifiable and
 small, which is also what the bring-up notes get organised around.
 
+## The blind spot of the machine you write on
+
+A check only helps where it can run. This repository is edited and
+committed on a Windows laptop that has no shellcheck, no gcc and no WSL, and
+CI runs `shellcheck -s sh -e SC1090,SC1091` at default severity, where an
+informational note fails the build exactly as an error does.
+
+That gap has a shape, and it repeats: `export VAR=$X`. An assignment is not
+subject to word splitting; an argument to a command is, so shellcheck calls
+that SC2086 and the runner rejects it. It reached CI once in the `rt-*`
+tests, was fixed by somebody else, and reached it again a day later in two
+new files, four instances, turning two runs red.
+
+Asking a person to remember is not a fix, and neither is reimplementing
+shellcheck in Python. What went into `scripts/lint.py` is one rule for the
+one finding that cannot be seen locally, and it was proven by putting the
+defect back in both file shapes, `*.sh` and a shebang-only script, because
+the discovery has to match CI's 37 files rather than a convenient glob.
+
+The general lesson is worth more than the rule. When a check cannot run
+where the work happens, either move the work, install the check, or write
+down the single case that keeps escaping. Doing none of those means the
+runner is your linter, and the feedback loop is a push and an email.
+
 ## Continuous integration
 
 CI runs rungs 1 to 3 on every push, so the layer is verified even when

@@ -1095,3 +1095,122 @@ is in what the compiler writes into the binary. Three build cycles, each
 one step further, is what cross-compiling somebody else's build system
 actually costs, and it is the honest answer to how much a carefully written
 recipe proves before it has run. It proves nothing. It only fails faster.
+
+---
+
+## 29. The control and the variable differ in two things, not one
+
+**What happened.** With the image built and the kernel configuration
+proven, the next step was the matrix. Reading the two kas files together
+before flashing anything:
+
+```
+kas/bench-rpi4.yml   no PREFERRED_VERSION      ->  6.6.63, PREEMPT
+kas/bench-rt.yml     6.12.%  + BENCH_RT_KERNEL ->  6.12.93, PREEMPT_RT
+```
+
+So the "generic" row and the "rt" row would differ in the preemption model
+**and** in six minor kernel versions of scheduler, timer and driver work.
+Any difference between their histograms is attributable to either, and
+nothing in the data separates them.
+
+This project's own README says the two images "differ in the preemption
+model and in nothing else that anyone had to think about". That sentence
+was written on the first day, before the version pin existed, and the pin
+made it false without anyone editing it.
+
+`docs/BRINGUP.md` carried the same fault more plainly: step 1 said to flash
+`bench-rt-image` and boot it "before installing the RT kernel. It carries
+the generic BSP kernel." It does not and never did. `BENCH_RT_KERNEL = "1"`
+is in the kas file, so that image always carries the real-time kernel.
+
+**What was done.** Recorded, and the matrix stopped until it is fixed. The
+fix is a third configuration that pins 6.12 and leaves `BENCH_RT_KERNEL` at
+0, so the control and the variable differ in exactly one symbol. That is
+also what makes `scripts/rt-kernel-install.sh` honest: two kernels of the
+same version on one card, chosen by one line of `config.txt`.
+
+**Why that and not the alternative.** The alternative is to measure what
+exists and describe the row as "6.6 generic against 6.12 RT". It would
+produce sixteen rows of real numbers, and the headline comparison would be
+uninterpretable: PREEMPT_RT is the loudest change between those kernels but
+it is not the only one, and a reader entitled to ask "how much of this is
+the preemption model" would have no answer.
+
+The other alternative, dropping the version pin and applying the
+out-of-tree patch series to 6.6, gets one kernel version and costs a
+rebase treadmill, for a comparison this way round already gives.
+
+**The pattern worth naming.** Both faults are the same shape as the ones in
+entries 21 and 25: a claim written when it was true, left standing after
+the thing it described changed. The algebra claim survived four documents.
+The "differ in nothing else" claim survived a kernel version pin added
+three entries later, in the same file, by the same hand. Neither was caught
+by a test, because neither is the sort of thing a test can hold.
+
+What did catch this one was reading the two kas files side by side while
+deciding what to flash, which is the same move that found the promptless
+symbol and the wrong `.config`: comparing the thing against the claim
+rather than against its own output.
+
+---
+
+## 30. What the image actually contains, and one thing nobody asked for
+
+**What happened.** `./go packages` against the built image, 185 packages.
+Every package reasoned about in the recipes is present:
+
+```
+kernel-6.12.93-v8            the pinned kernel, not the BSP default
+kernel-module-spidev         the module core-image-minimal would omit
+libdaqhats1, libdaqhats-tools, python3-daqhats
+python3-numpy, python3-ctypes
+rt-tests, stress-ng, util-linux-taskset
+bench-rt, libgpiod3, libgpiod-tools
+userland                     so vcgencmd exists for the throttle gate
+```
+
+`python3-ctypes` is worth singling out. The recipe names it because
+`hats.py` calls `cdll.LoadLibrary` and the OE python split puts ctypes in
+its own package; that was reasoned from reading the source rather than
+tested, and the manifest confirms it. Leaving it implicit would have given
+an image that boots and a capture script that dies on its first import.
+
+**The thing nobody asked for.** Also in the list:
+
+```
+mesa-megadriver  libgallium  libegl-mesa  libgbm1  libdrm2  wayland
+libx11-xcb1  libxau6  libxdmcp6  libxshmfence1  and five more libxcb*
+```
+
+Sixteen packages of graphics stack in an image whose entire purpose is to
+toggle a pin on an isolated core and read a voltage. Nothing in
+`bench-rt-image` asks for them.
+
+**What was done.** Recorded as an open question rather than guessed at. The
+likely source is `userland`, which this recipe added as an `RRECOMMENDS`
+for one binary, `vcgencmd`, and which carries the Raspberry Pi GL
+libraries. If that is where it comes from, the honest options are to drop
+`vcgencmd` and record the throttle columns as unknown, to find a lighter
+provider, or to keep it and justify the size in writing.
+
+Answering it needs the build's own evidence rather than an opinion:
+
+```
+buildhistory/images/raspberrypi4-64/glibc/bench-rt-image/
+    installed-package-sizes.txt
+    depends.dot
+```
+
+and the one query that settles it:
+
+```
+grep -E '\-> "(mesa-megadriver|libgallium|wayland)"' depends.dot | sort -u
+```
+
+**Why not just remove it.** Because "probably userland" is a guess, and
+this repository has a costed lesson about exactly that: one word of
+`DISTRO_FEATURES` added on a guess about NetworkManager cost 50 MB of a
+237 MB rootfs, and the chain was only visible in `depends.dot`. A package
+list is not a dependency graph, and the difference is what makes the answer
+checkable.
