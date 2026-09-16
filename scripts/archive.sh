@@ -86,6 +86,36 @@ kas_machine() {
 	done
 }
 
+# The image a configuration builds, following includes for the same reason
+# kas_machine does: bench-rt-generic.yml sets only a local_conf_header and
+# inherits its target from bench-rt.yml.
+#
+# One consequence worth knowing. bench-rt and bench-rt-generic resolve to
+# the SAME target, bench-rt-image, because the control differs from the
+# variable in one kernel symbol rather than in the image. So their output
+# files are named identically and the second build overwrites the first in
+# deploy/images. The target check below cannot tell them apart and does not
+# try; what keeps them apart is the store, which is one directory per
+# configuration, and the operator naming the file with BENCH_IMAGE when
+# both have been built.
+kas_target() {
+	_file=$1
+	_depth=0
+	while [ "$_depth" -lt 5 ]; do
+		_t=$(sed -n 's/^target:[[:space:]]*//p' "$_file" | head -1)
+		if [ -n "$_t" ]; then
+			printf '%s\n' "$_t"
+			return 0
+		fi
+		_inc=$(sed -n 's|^[[:space:]]*-[[:space:]]*\(.*\.yml\)$|\1|p' \
+			"$_file" | head -1)
+		[ -n "$_inc" ] || return 0
+		_file=$REPO_DIR/kas/$(basename "$_inc")
+		[ -f "$_file" ] || return 0
+		_depth=$(( _depth + 1 ))
+	done
+}
+
 # The companion file for an image, under either of the two names the same
 # artefact has in deploy/images. Prints nothing when neither exists, which
 # the caller reports rather than treating as fatal: an image without its
@@ -144,6 +174,76 @@ save() {
        BENCH_IMAGE=<path> scripts/archive.sh $config"
 	fi
 
+	# And the same question about the target, which the machine check
+	# cannot answer.
+	#
+	# deploy/images holds one directory per machine and every image for
+	# that machine inside it. So after building bench-rt and then wanting
+	# to archive the router image, "newest wins" returns bench-rt-image,
+	# the machine matches, the check above passes, and an RT image is
+	# filed under bench-router. It would flash, it would boot, and it
+	# would be the wrong system entirely: a card labelled "LTE router"
+	# carrying a real-time kernel and no ModemManager.
+	#
+	# That is worse than the wrong-board case it sits beneath. A wrong
+	# board does not boot and the symptom is immediate. A wrong target
+	# boots fine and the mislabelling is only discovered by whoever
+	# trusted the label.
+	#
+	# Matched against "<target>-<machine>.rootfs" rather than just the
+	# target, because bench-image is a prefix of bench-image-dev and a
+	# prefix match would file a dev image under the production
+	# configuration.
+	# Against BOTH names the artefact has, because the short one is a
+	# symlink written after the file it points at and therefore usually
+	# wins newest-by-mtime:
+	#
+	#   bench-image-raspberrypi4-64.rootfs-20260916.wic.bz2   the real file
+	#   bench-image-raspberrypi4-64.wic.bz2                   the symlink
+	#
+	# A first version of this check keyed on ".rootfs" being present and
+	# skipped everything else as "not a Yocto name". The symlink has no
+	# .rootfs in it, so the check quietly did nothing in the exact case it
+	# was written for. tests/archive-test.sh found that on its first run,
+	# which is the second time this file has been saved by a fixture
+	# shaped like the real deploy tree rather than like the happy path.
+	want_target=$(kas_target "$kasfile")
+	real=$(readlink -f "$image" 2>/dev/null || echo "$image")
+	if [ -n "$want_target" ]; then
+		matched=no
+		checked=no
+		for candidate in "$(basename "$image")" "$(basename "$real")"; do
+			case $candidate in
+			*.wic.bz2) checked=yes ;;
+			*) continue ;;
+			esac
+			case $candidate in
+			"$want_target-$machine".rootfs*.wic.bz2) matched=yes ;;
+			"$want_target-$machine".wic.bz2) matched=yes ;;
+			esac
+		done
+		if [ "$checked" = no ]; then
+			# A file named by hand from outside the build tree need not
+			# follow the Yocto convention, and refusing something the
+			# operator pointed at by name is second-guessing a deliberate
+			# act. Say what was not checked instead.
+			note "name is not <target>-<machine>[.rootfs].wic.bz2, target unchecked"
+		elif [ "$matched" = no ]; then
+			die "kas/$config.yml builds $want_target, but that image is
+       $(basename "$real")
+
+       Both are for $machine, so the board is right and the system is not.
+       deploy/images holds every image ever built for a machine, and
+       newest-wins returns the last one built rather than the one you asked
+       for. That mistake flashes and boots, and only the label is wrong,
+       which makes it worse than the wrong-board case.
+
+       Name the one you meant:
+       BENCH_IMAGE=<path> scripts/archive.sh $config
+       scripts/archive.sh available   lists what the tree holds"
+		fi
+	fi
+
 	commit=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
 	dirty=
 	if [ -n "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null)" ]; then
@@ -164,7 +264,7 @@ save() {
 	# a card written in full instead of in its used blocks and a lost
 	# package list, which is the kind of defect nobody notices until the
 	# tree it came from is gone.
-	real=$(readlink -f "$image" 2>/dev/null || echo "$image")
+	# real was resolved above, for the target check.
 	bmap=$(sibling "$image" "$real" .wic.bmap)
 	manifest=$(sibling "$image" "$real" .manifest)
 

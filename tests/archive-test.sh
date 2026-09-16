@@ -77,9 +77,27 @@ else
 	echo "      Yocto build host both make real symlinks."
 fi
 
+# A second image for the same machine, which is what deploy/images really
+# looks like after more than one build. Deliberately older, so newest-wins
+# still returns the one above and the tests that depend on that are
+# unaffected; this one exists to be chosen by name.
+devstem=bench-image-dev-raspberrypi4-64
+echo "dev image bytes" >"$deploy/$devstem.rootfs-20260915.wic.bz2"
+touch -d '2026-09-15 10:00:00' "$deploy/$devstem.rootfs-20260915.wic.bz2"
+touch -d '2026-09-16 10:00:00' "$deploy/$stem.rootfs-20260916.wic.bz2"
+
 store=$tmp/store
 run() {
 	BENCH_WORK=$tmp/work BENCH_IMAGE_DIR=$store \
+		sh "$repo/scripts/archive.sh" "$@" 2>&1
+}
+
+# The same, with an image named explicitly rather than found. This is the
+# escape hatch the refusals point at, so it needs to work.
+run_named() {
+	_img=$1
+	shift
+	BENCH_WORK=$tmp/work BENCH_IMAGE_DIR=$store BENCH_IMAGE=$_img \
 		sh "$repo/scripts/archive.sh" "$@" 2>&1
 }
 
@@ -151,10 +169,67 @@ case $out in
 	;;
 esac
 
+echo "== the wrong system is refused too, even on the right board"
+# The case the machine check cannot see. deploy/images holds every image
+# built for a machine, so after building bench-rt and then archiving under
+# bench-router, newest-wins returns bench-rt-image, the machine matches,
+# and an RT image is filed as an LTE router. It flashes, it boots, and it
+# is the wrong system: the label is the only thing that was ever wrong.
+#
+# Worse than the wrong-board case above, which at least fails loudly by
+# not booting.
+out=$(run bench-router || true)
+case $out in
+*"builds bench-router-image"*)
+	ok "a target mismatch is refused, naming both"
+	;;
+*)
+	no "a target mismatch is refused, naming both"
+	echo "$out" | sed 's/^/       /'
+	;;
+esac
+
+case $out in
+*BENCH_IMAGE=*) ok "and it says how to name the right one" ;;
+*) no "and it says how to name the right one" ;;
+esac
+
+# The refusal must be about the target and not a machine complaint in
+# disguise: bench-router builds for raspberrypi4-64, same as the fixture.
+case $out in
+*"builds raspberrypi"*)
+	no "the refusal is about the target, not the machine"
+	;;
+*) ok "the refusal is about the target, not the machine" ;;
+esac
+
+echo "== a prefix of another target is not a match"
+# bench-image is a prefix of bench-image-dev. Matching on the target alone
+# would file the dev image under the production configuration, so the
+# comparison includes the machine: <target>-<machine>.rootfs.
+out=$(run_named "$deploy/$devstem.rootfs-20260915.wic.bz2" bench-rpi4 || true)
+case $out in
+*"builds bench-image"*)
+	ok "a dev image is refused under the production configuration"
+	;;
+*)
+	no "a dev image is refused under the production configuration"
+	echo "$out" | sed 's/^/       /'
+	;;
+esac
+
 echo "== the machine is followed through an include"
 # bench-dev.yml sets only a target and inherits the machine, so a naive
 # read of that file finds no machine and would skip the check entirely.
-out=$(run bench-dev || echo "EXIT-FAILED")
+# Named explicitly, because the dev image is deliberately not the newest.
+#
+# This assertion used to run "run bench-dev" against the bench-image
+# fixture and accept anything that was not a machine complaint. When the
+# target check was added it began refusing, and the catch-all branch
+# reported that refusal as a pass. A test whose failure branch is "some
+# other error occurred" is not testing the thing it names.
+out=$(run_named "$deploy/$devstem.rootfs-20260915.wic.bz2" bench-dev ||
+	echo "EXIT-FAILED")
 case $out in
 *EXIT-FAILED*)
 	no "an inherited machine still matches"
@@ -162,6 +237,17 @@ case $out in
 	;;
 *) ok "an inherited machine still matches" ;;
 esac
+
+# Not a glob in [ ], which does not expand: the store path carries a dated
+# directory, so ask find. And assert the name, because "a file arrived" is
+# the assertion that would have passed before any of this was checked.
+stored=$(find "$store/bench-dev" -name "$devstem.rootfs-*.wic.bz2" 2>/dev/null)
+if [ -n "$stored" ]; then
+	ok "and the dev image itself was stored, under its own name"
+else
+	no "and the dev image itself was stored, under its own name"
+	find "$store/bench-dev" -type f 2>/dev/null | sed 's/^/       /'
+fi
 
 echo "== an unknown configuration is refused"
 out=$(run bench-nonesuch || true)
