@@ -116,20 +116,45 @@ threshold is wrong for the actual swing: measure it with
 First build it, and check the fragment before paying for the compile:
 
 ```sh
-kas shell kas/bench-rt.yml -c 'bitbake -c unpack virtual/kernel'
+./go bitbake bench-rt -c kernel_configme virtual/kernel
+head -4 $BENCH_WORK/build/tmp/work-shared/raspberrypi4-64/kernel-source/Makefile
 ./go ksym -f rt
+./go kconfig -f rt
 ./go rt
 ```
 
-`do_unpack` is minutes in; `do_compile` is most of an hour. `./go ksym`
-reads the unpacked tree and says whether every line of both fragments names
-a symbol this kernel actually has. Project 15 skipped that step because it
-did not exist, and found three lines that were never symbols at the end of
-a full build.
+Four checks before the compile, and each answers a different question. All
+of them together take minutes; `do_compile` is most of an hour.
 
-Expect two lines reported as consequences rather than requests, both
-already marked in `rt.cfg`: `IRQ_FORCED_THREADING`, which arm64 selects
-unconditionally, and `LOCKUP_DETECTOR`, which the two detectors select.
+| Step | Question | What a wrong answer looks like |
+|---|---|---|
+| `head -4 Makefile` | did the version pin take | `PATCHLEVEL = 6`, so `ARCH_SUPPORTS_RT` is absent and `PREEMPT_RT` can never be set |
+| `./go ksym -f rt` | does every fragment line name a real symbol | a line that is a typo or a module object rather than an option |
+| `./go kconfig -f rt` | did the fragment reach the `.config` | `PREEMPT_RT` requested and missing, which is the whole risk of this project |
+| `./go rt` | does it build | |
+
+Two things about that list are worth stating rather than assuming.
+
+**`kernel_configme`, not `unpack`.** `do_unpack` puts the git tree in
+`${WORKDIR}/git` and `do_unpack[cleandirs]` empties `STAGING_KERNEL_DIR`
+on the way past. What fills it is `do_kernel_checkout`, a separate task
+from `kernel-yocto.bbclass`. Stopping at `unpack` leaves an empty
+`kernel-source` directory and `./go ksym` with nothing to read.
+`kernel_configme` runs fetch, checkout and patch, and then merges the
+fragments into a real `.config`, which is what makes the third check
+possible before the build rather than after it.
+
+**`ksym` cannot catch a failed version pin**, which is why the Makefile is
+read separately. `CONFIG_PREEMPT_RT` is declared, with a prompt, in 6.6 as
+well as 6.12; what 6.6 lacks is `ARCH_SUPPORTS_RT` on arm64, and that is a
+dependency rather than a declaration. `ksym` checks that a symbol exists
+and is settable, not that its dependencies are met, so on a 6.6 tree it
+prints `ok CONFIG_PREEMPT_RT` and tells you nothing.
+
+From `ksym`, expect two lines reported as consequences rather than
+requests, both already marked in `rt.cfg`: `IRQ_FORCED_THREADING`, which
+arm64 selects unconditionally, and `LOCKUP_DETECTOR`, which the two
+detectors select.
 
 Then power off, card out, into a reader.
 

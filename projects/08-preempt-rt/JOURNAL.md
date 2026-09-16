@@ -777,3 +777,67 @@ times by then, because every one of those cases passed the tree in
 explicitly and none exercised the branch that goes looking for it. A test
 suite that only exercises the arguments you remember to pass is a suite
 with a hole in exactly the shape of the thing you assumed.
+
+---
+
+## 24. The first build went to the wrong directory, and stopped one task short
+
+**What happened.** The bring-up notes said to unpack the kernel with
+
+```
+kas shell kas/bench-rt.yml -c 'bitbake -c unpack virtual/kernel'
+```
+
+It ran, reported three tasks and all succeeded, and produced nothing this
+project could use. Two independent mistakes in one line.
+
+*Wrong directory.* Every build directory in this repository is decided by
+`scripts/common.sh`, which exports `KAS_WORK_DIR` and `KAS_BUILD_DIR`
+pointing at `$BENCH_WORK`. A bare `kas shell` inherits neither, and kas
+falls back to paths relative to the current directory. So it built in the
+checkout: `~/src/embedded-linux-bench/build`, with its own `downloads` and
+`sstate-cache`, 7.7 GB of it, on a machine with 35 GB of headroom. It did
+not fail. It produced a correct result in a place nothing else looks, and
+the next command read the previous project's kernel from `~/bench` and
+reported 6.6 where 6.12 was expected. Ten minutes went into suspecting the
+version pin, which was correct all along.
+
+The tell was in the log and was not read at the time: BitBake printed
+`Loaded 4389 entries from dependency cache` and no `Parsing recipes` bar. A
+changed `local.conf` forces a full reparse, so an unchanged one meant kas
+had written its configuration somewhere else entirely.
+
+*Wrong task.* `do_unpack` puts the git tree in `${WORKDIR}/git`, and its
+`cleandirs` empties `STAGING_KERNEL_DIR` on the way past. What fills that
+directory is `do_kernel_checkout`, a separate task from
+`kernel-yocto.bbclass`. So `kernel-source` existed, empty, and `./go ksym`
+would have had nothing to read.
+
+**What was done.** `scripts/kas.sh`, with `./go shell [CONFIG]` and
+`./go bitbake CONFIG ARGS`. Everything that invokes kas goes through one
+place that sets the build directory, and `warn_stray_build_tree` in
+`common.sh` reports a `build/` inside the checkout rather than letting a
+correct build happen in the wrong place again. Sixteen assertions in
+`tests/kas-run-test.sh`, including that the two variables reach kas.
+
+The bring-up step became `kernel_configme` rather than `unpack`, which is
+worth more than the correction: it runs fetch, checkout and patch, and then
+merges the fragments into a real `.config`. So `./go kconfig -f rt`, which
+the acceptance table had as needing a full build, now runs in minutes,
+before the compile.
+
+**Why that and not the alternative.** The alternative was to tell the
+operator to export two variables by hand, which is what I had effectively
+done by writing a raw `kas shell` into a document. A command that has to be
+run correctly by memory is a command that will be run wrongly, and this one
+fails by succeeding.
+
+**A correction to what entry 19 claims.** It says `./go ksym` catches a
+fragment line the kernel cannot honour. It catches a line that names no
+symbol; it does not catch a symbol whose dependencies are unmet.
+`CONFIG_PREEMPT_RT` is declared with a prompt in 6.6 and 6.12 alike, and
+what 6.6 lacks on arm64 is `ARCH_SUPPORTS_RT`. On a 6.6 tree `ksym` prints
+`ok CONFIG_PREEMPT_RT` and tells you nothing, so it could never have caught
+the failure it was partly written for. That is why the bring-up notes now
+read the kernel's own Makefile as a separate step and run `./go kconfig`
+before the build rather than after it.

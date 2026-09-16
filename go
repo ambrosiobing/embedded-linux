@@ -23,7 +23,8 @@
 #   ./go packages     the image package list, for the README table
 #   ./go lint         static checks that need no Yocto host
 #   ./go projects     list the projects and where each one lives
-#   ./go shell        a BitBake shell inside the kas environment
+#   ./go shell [CFG]  a BitBake shell inside the kas environment
+#   ./go bitbake CFG ARGS   one BitBake command, right build directory
 #   ./go clean        delete the build tree, keep the caches
 #
 # SPDX-License-Identifier: MIT
@@ -57,12 +58,8 @@ projects)
 ' "${d%/}" "$title"
 	done
 	;;
-shell)
-	KAS_WORK_DIR=${BENCH_WORK:-$HOME/bench}
-	KAS_BUILD_DIR=$KAS_WORK_DIR/build
-	export KAS_WORK_DIR KAS_BUILD_DIR
-	exec kas shell kas/bench-rpi4.yml
-	;;
+shell)      shift; exec sh ./scripts/kas.sh shell "$@" ;;
+bitbake)    shift; exec sh ./scripts/kas.sh bitbake "$@" ;;
 clean)
 	work=${BENCH_WORK:-$HOME/bench}
 	printf 'Delete %s/build? The caches stay. [y/N] ' "$work"

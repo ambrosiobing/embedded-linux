@@ -286,7 +286,10 @@ rc=0
 out=$(BENCH_WORK=$WORK/bench sh "$SUT" 2>&1) || rc=$?
 check "an unbuilt tree is an error, not an empty pass" "$rc" "1"
 contains "and it says where it looked" "$out" "work-shared"
-contains "and how to produce one" "$out" "bitbake -c unpack virtual/kernel"
+# kernel_configme, not unpack: do_unpack empties STAGING_KERNEL_DIR and
+# do_kernel_checkout is what fills it, so the advice has to name a task
+# that actually leaves a tree behind.
+contains "and how to produce one" "$out" "-c kernel_configme virtual/kernel"
 
 # ------------------------------------------------- not a kernel at all
 

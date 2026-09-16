@@ -89,3 +89,24 @@ require_tool() {
 	command -v "$1" >/dev/null 2>&1 ||
 		die "$1 is not installed. Run scripts/host-setup.sh."
 }
+
+# A build directory inside the checkout is not a build directory anyone
+# asked for. kas falls back to paths relative to the current directory when
+# KAS_WORK_DIR and KAS_BUILD_DIR are absent from the environment, so a bare
+# "kas shell kas/<config>.yml" run from a checkout builds there, with its
+# own downloads and sstate-cache, re-fetching what the shared caches
+# already hold.
+#
+# It is a warning rather than an error because the tree is harmless once
+# noticed, and deleting several gigabytes of somebody else's work is not a
+# decision a helper function should take. .gitignore already keeps it out
+# of commits; what it cannot do is say where the build actually went.
+warn_stray_build_tree() {
+	[ -d "$REPO_DIR/build" ] || return 0
+	echo "warning: there is a build tree inside the checkout at" >&2
+	echo "         $REPO_DIR/build" >&2
+	echo "         Something ran kas without KAS_BUILD_DIR set, so it built" >&2
+	echo "         there instead of in $BENCH_WORK, with its own caches." >&2
+	echo "         Nothing here uses it. Once you are sure, remove it and" >&2
+	echo "         its downloads and sstate-cache siblings." >&2
+}

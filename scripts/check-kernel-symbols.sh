@@ -14,8 +14,21 @@
 # CONFIG_NFT_RT and CONFIG_NFT_EXTHDR, none of which is a symbol, and the
 # bill was one build cycle.
 #
-# The kernel source is unpacked by do_unpack, minutes into a build rather
-# than hours, and it is all this needs.
+# The kernel source appears minutes into a build rather than hours, and it
+# is all this needs. The task to ask for is kernel_configme, not unpack:
+# do_unpack puts the tree in ${WORKDIR}/git and empties STAGING_KERNEL_DIR
+# on the way past, and what fills it is do_kernel_checkout. Stopping at
+# unpack leaves an empty kernel-source directory and this script with
+# nothing to read.
+#
+# WHAT THIS CANNOT TELL YOU
+#
+# That a symbol's dependencies are met. CONFIG_PREEMPT_RT is declared with
+# a prompt in 6.6 and in 6.12; what 6.6 lacks on arm64 is ARCH_SUPPORTS_RT,
+# which is a dependency. This script reports that symbol as ok on a kernel
+# that can never set it. Only ./go kconfig, against a .config that kconfig
+# actually produced, can see that, which is why the two checks are both in
+# the bring-up notes rather than one of them.
 #
 # Two things are checked, and they fail for different reasons.
 #
@@ -91,12 +104,13 @@ fi
 [ -n "${src:-}" ] || die "no unpacked kernel source found under
        $KAS_BUILD_DIR/tmp/work-shared or tmp/work.
 
-       It appears after do_unpack, which is minutes into a build rather
-       than hours:
+       It lands in tmp/work-shared/<machine>/kernel-source, minutes into a
+       build rather than hours:
 
-           kas shell kas/bench-rt.yml -c 'bitbake -c unpack virtual/kernel'
+           ./go bitbake bench-rt -c kernel_configme virtual/kernel
 
-       and lands in tmp/work-shared/<machine>/kernel-source. Or pass a tree
+       Ask for kernel_configme rather than unpack: do_unpack empties that
+       directory and do_kernel_checkout is what fills it. Or pass a tree
        directly:
 
            ./go ksym -f rt ~/linux"

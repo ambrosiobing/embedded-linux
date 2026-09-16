@@ -121,13 +121,27 @@ on disk minutes into a build:
 
 | Check | Question | Needs | Costs |
 |---|---|---|---|
-| `./go ksym` | Is this line a request the kernel can receive | `do_unpack` | seconds |
-| `./go kconfig` | Did the answer come back | `do_compile`, or a board | seconds, after hours |
+| `./go ksym` | Is this line a request the kernel can receive | `do_kernel_checkout` | seconds |
+| `./go kconfig` | Did the answer come back | `do_kernel_configme`, or a board | seconds |
 
 Neither substitutes for the other. A symbol can be real and still be
 dropped for an unmet dependency, which only the second check sees; a symbol
 can be absent entirely, which the second check cannot distinguish from a
 value that simply is not set.
+
+That first column is the one that was wrong here, twice, in a way worth
+recording. `do_unpack` looked like the task that produces a kernel tree and
+it is not: it unpacks into `${WORKDIR}/git` and its `cleandirs` empties
+`STAGING_KERNEL_DIR` on the way past, leaving `kernel-source` present and
+empty. `do_kernel_checkout` fills it. And the second check was described as
+needing `do_compile`, which is an hour, when it needs only
+`do_kernel_configme`, which is minutes and is where kconfig merges the
+fragments. Both checks can now run before a build rather than around it.
+
+The unmet-dependency case is not hypothetical. `CONFIG_PREEMPT_RT` is
+declared with a prompt in 6.6 and in 6.12 alike; what 6.6 lacks on arm64 is
+`ARCH_SUPPORTS_RT`. `./go ksym` reports that symbol as fine on a kernel
+that can never set it, and only the `.config` shows the truth.
 
 The second question `ksym` asks is subtler and it is the one that caught
 something here. A Kconfig symbol without a prompt cannot be set by a
