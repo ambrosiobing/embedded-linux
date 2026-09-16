@@ -291,6 +291,61 @@ contains "and it says where it looked" "$out" "work-shared"
 # that actually leaves a tree behind.
 contains "and how to produce one" "$out" "-c kernel_configme virtual/kernel"
 
+# ------------------------------------- two machines, one build directory
+#
+# The bug this reproduces happened on a real build host. The board turned
+# out to be a Pi 3, the machine changed from raspberrypi4-64 to
+# raspberrypi3-64, and tmp/work-shared then held a tree for each. The
+# autodetect sorted the paths by name and took the last one, and
+# "raspberrypi4-64" sorts after "raspberrypi3-64", so it read the
+# abandoned tree.
+#
+# It then printed exactly the right answer, because both trees were
+# 6.12.93 for arm64. A check that is right for the wrong reason teaches
+# you to trust it, which is worse than one that fails.
+#
+# So the trees below are named to make a lexical sort pick the wrong one,
+# and their timestamps are set the other way round.
+
+cat >"$FRAGS/bench.cfg" <<'EOF'
+CONFIG_SPARSE_IRQ=y
+EOF
+
+SHARED=$WORK/twomachines/build/tmp/work-shared
+for m in raspberrypi3-64 raspberrypi4-64; do
+	mkdir -p "$SHARED/$m"
+	cp -r "$SRC" "$SHARED/$m/kernel-source"
+done
+
+# The one that is lexically last is made the oldest.
+touch -d '2020-01-01 00:00:00' "$SHARED/raspberrypi4-64/kernel-source"
+touch -d '2026-09-16 09:20:00' "$SHARED/raspberrypi3-64/kernel-source"
+
+out=$(BENCH_WORK=$WORK/twomachines sh "$SUT" 2>&1) || true
+contains "the newest kernel tree wins, not the lexically last" \
+	"$out" "raspberrypi3-64/kernel-source"
+contains "and the tree it did not read is named rather than dropped" \
+	"$out" "raspberrypi4-64/kernel-source"
+
+# And the reverse, so the assertion above is about the timestamps rather
+# than about the digit 3.
+touch -d '2020-01-01 00:00:00' "$SHARED/raspberrypi3-64/kernel-source"
+touch -d '2026-09-16 09:20:00' "$SHARED/raspberrypi4-64/kernel-source"
+
+out=$(BENCH_WORK=$WORK/twomachines sh "$SUT" 2>&1) || true
+first=$(printf '%s\n' "$out" | grep '^--- kernel' | head -1)
+contains "timestamps reversed, the other tree wins" \
+	"$first" "raspberrypi4-64/kernel-source"
+
+# One tree and nothing to disambiguate: no note, because a tool that warns
+# when there is no choice to make trains you to ignore the warning.
+rm -rf "$SHARED/raspberrypi3-64"
+out=$(BENCH_WORK=$WORK/twomachines sh "$SUT" 2>&1) || true
+case $out in
+*"older tree"*) check "a single tree is chosen silently" "noted" "silent" ;;
+*)              check "a single tree is chosen silently" "silent" "silent" ;;
+esac
+
 # ------------------------------------------------- not a kernel at all
 
 cat >"$FRAGS/bench.cfg" <<'EOF'

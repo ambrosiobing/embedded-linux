@@ -110,3 +110,45 @@ warn_stray_build_tree() {
 	echo "         Nothing here uses it. Once you are sure, remove it and" >&2
 	echo "         its downloads and sstate-cache siblings." >&2
 }
+
+# Pick the newest of several candidate paths, and say what was not picked.
+#
+# Reads "<mtime> <path>" lines on stdin, which is what find -printf '%T@ %p\n'
+# produces, prints the newest path on stdout, and names the rest on stderr.
+#
+# THIS EXISTS BECAUSE THE SAME BUG WAS WRITTEN FOUR TIMES.
+#
+# Every script here that had to choose between build outputs ended in
+# "sort | tail -1", which sorts paths as text. Text order is not time order
+# and it is not version order:
+#
+#   6.12.93 sorts before 6.6.63          because "1" < "6"
+#   raspberrypi3-64 before raspberrypi4-64, so a Pi 4 image wins on a
+#                                        build host that has built for both
+#
+# The first cost a kernel check that read a kernel nobody was building. The
+# second was found in check-kernel-symbols.sh nine journal entries after
+# the identical bug had been fixed, tested and written up in
+# check-kernel-config.sh, because the fix was applied where it was found
+# rather than everywhere it lived. flash.sh had it too, where the
+# consequence is a card written with an image for the wrong board.
+#
+# Ranking by time cannot get this wrong, and unlike a filter it never
+# excludes everything: there is always a newest.
+#
+# The losers are named because a tool that silently chooses between its
+# inputs can be quietly wrong about which question it just answered. Both
+# kernel checks were, for a whole command, and printed the right answer
+# while doing it. Nothing is printed when there is only one candidate: a
+# warning that fires when there is no ambiguity teaches you to skip
+# warnings.
+newest_path() {
+	_what=${1:-candidate}
+	_all=$(sort -rn | cut -d' ' -f2-)
+	[ -n "$_all" ] || return 0
+	printf '%s\n' "$_all" | head -1
+	_rest=$(printf '%s\n' "$_all" | tail -n +2 | grep . || true)
+	[ -n "$_rest" ] || return 0
+	echo "--- also     $(printf '%s\n' "$_rest" | wc -l | tr -d ' ') older $_what(s) ignored, newest wins:" >&2
+	printf '%s\n' "$_rest" | sed 's/^/---          /' >&2
+}

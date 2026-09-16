@@ -92,13 +92,25 @@ done
 # path shape, which is also why this does not try to match
 # "linux-raspberrypi" anywhere: the name of the recipe is not the name of
 # the directory its source lands in.
+#
+# Ranked by modification time, and NOT by name. A lexical sort puts
+# raspberrypi4-64 after raspberrypi3-64, so on a build host that had built
+# for both machines this picked the one that had been abandoned, and named
+# it in a line nobody read. It reported the right answer anyway, because
+# both trees were 6.12.93 arm64, which is the worst way for a check like
+# this to be wrong.
+#
+# There is always a newest, so unlike a filter this cannot exclude
+# everything. And when there is more than one candidate the others are
+# named: a tool that silently chooses between its inputs can be quietly
+# wrong about which question it just answered.
 if [ -n "${1:-}" ]; then
 	src=$1
 else
 	src=$(find "$KAS_BUILD_DIR/tmp/work-shared" "$KAS_BUILD_DIR/tmp/work" \
 		-maxdepth 4 -type d -name kernel-source \
-		-exec test -f "{}/Kconfig" ";" -print 2>/dev/null |
-		sort | tail -1)
+		-exec test -f "{}/Kconfig" ";" -printf '%T@ %p\n' 2>/dev/null |
+		newest_path "kernel tree")
 fi
 
 [ -n "${src:-}" ] || die "no unpacked kernel source found under

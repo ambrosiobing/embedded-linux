@@ -17,9 +17,12 @@ require_tool kas
 require_no_running_build
 require_host_disk_gb 25
 
+# Newest, not lexically last. The SDK installer carries the distro version
+# and the machine in its name, so name order is version order only by
+# accident. See newest_path in common.sh.
 sdk_installer() {
-	find "$KAS_BUILD_DIR/tmp/deploy/sdk" -name '*.sh' -type f 2>/dev/null |
-		sort | tail -1
+	find "$KAS_BUILD_DIR/tmp/deploy/sdk" -name '*.sh' -type f \
+		-printf '%T@ %p\n' 2>/dev/null | newest_path "SDK installer"
 }
 
 case ${1:-build} in
@@ -35,8 +38,8 @@ install)
 	sh "$inst"
 	;;
 check)
-	env_script=$(find /opt/poky -maxdepth 2 -name 'environment-setup-*' 2>/dev/null |
-		sort | tail -1)
+	env_script=$(find /opt/poky -maxdepth 2 -name 'environment-setup-*' \
+		-printf '%T@ %p\n' 2>/dev/null | newest_path "SDK environment")
 	[ -n "$env_script" ] || die "no SDK environment found under /opt/poky."
 	note "using $env_script"
 	# shellcheck disable=SC1090

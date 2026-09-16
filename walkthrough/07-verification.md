@@ -287,3 +287,38 @@ reports. That is when CI can finally say something about the board.
 ---
 
 Previous: [06. Mechanism and policy](06-mechanism-policy.md) | Next: [08. Board bring-up](08-board-bringup.md)
+
+## When a check chooses its own input, make it say so
+
+Several checks here find their input rather than being handed it: the
+built `.config`, the unpacked kernel tree, the image to flash, the package
+manifest. Each was written as `find ... | sort | tail -1`, and each was
+wrong the moment the build host had produced two of the thing.
+
+Text order is not time order. `raspberrypi3-64` sorts before
+`raspberrypi4-64`, so after a machine change the abandoned build wins.
+
+The kernel symbol check read the wrong machine's tree for a whole command
+and **printed the right answer**, because both trees were the same kernel
+version. That is worse than failing. A check that is right for the wrong
+reason is a check you learn to trust.
+
+So the selection is now one function, `newest_path` in `scripts/common.sh`,
+and it does two things beyond picking:
+
+- it **names what it did not choose**, on stderr, so the ambiguity is
+  visible at the moment the choice is made rather than in a postmortem
+- it **says nothing when there is only one candidate**, because a warning
+  that fires with nothing at stake trains you to skip warnings
+
+`flash.sh` is the one that earns this. It erases a card, and it had the
+same bug: on a host that had built for two machines it would have chosen an
+image for the wrong board, which does not warn and does not boot. The
+ignored images are now listed directly above the prompt that asks you to
+type the device path back.
+
+**And the general point, which is not about sorting.** This bug was found,
+fixed, tested and written up once. The fix went where the bug was. Four
+more copies of the same line were in the same directory, and the one with
+teeth was in the script that writes to a card. After fixing a bug that has
+a shape, grep for the shape.

@@ -1539,3 +1539,50 @@ property of the preemption model. It survives a change of board, a change
 of governor and a change of silicon vendor, and it is usually the claim
 that was actually wanted. The absolute number is the one that has to be
 qualified; keep both, and be clear about which carries the argument.
+
+## 59. A picker is a function, not a line each script writes again
+
+**Decision.** Choosing the newest of several build outputs is
+`newest_path` in `scripts/common.sh`, with its own test suite. Five call
+sites use it and no script does the selection itself.
+
+**Why.** Every script that had to choose between build outputs ended in
+`sort | tail -1`, which orders paths as text. Text order is neither version
+order nor time order:
+
+```
+6.12.93          sorts before 6.6.63            because "1" < "6"
+raspberrypi3-64  sorts before raspberrypi4-64   because "3" < "4"
+```
+
+The first was found, fixed, tested and written up in
+`check-kernel-config.sh`. The identical line was still in
+`check-kernel-symbols.sh` nine journal entries later, where a machine
+change gave the build host two kernel trees and it read the abandoned one.
+Grepping for the shape then found three more, including `flash.sh`, which
+chooses the image that gets written to a card. On a host that has built for
+two machines, that one would have written a Pi 4 image to a Pi 3 card: no
+warning, no boot, and a symptom that reads as dead hardware.
+
+A fix applied where the bug was found is half a fix. Making it a function
+is the half that does not depend on anybody remembering.
+
+**The helper names what it did not choose.** Both kernel checks spent a
+whole command reporting on a file they had not read, and printed correct
+answers while doing it, because the two trees happened to be the same
+kernel version. A check that is right for the wrong reason teaches you to
+trust it. So the losers are printed, on stderr, above the confirmation
+prompt in the case of `flash.sh`, which is the last gate before a card is
+erased.
+
+It stays quiet when there is one candidate. A warning that fires when there
+is no ambiguity trains the reader to skip warnings, and then the one that
+mattered is skipped too.
+
+**What the helper deliberately does not do.** Report emptiness. The
+sentence belongs to the caller: `flash.sh` says to run `build.sh`, the
+kernel check says to run `kernel_configme`, and a helper that guesses
+between them is wrong in both.
+
+**Cost.** One shared function, eleven assertions, and five call sites that
+now read as what they mean rather than as how they do it.

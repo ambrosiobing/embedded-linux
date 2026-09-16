@@ -10,8 +10,11 @@
 
 . "$(dirname "$0")/common.sh"
 
-manifest=$(find "$KAS_BUILD_DIR/tmp/deploy/images" -name '*.manifest' 2>/dev/null |
-	sort | tail -1)
+# Newest, not lexically last: one directory per MACHINE and one manifest
+# per image, so on a host that has built more than one the name order is
+# not the order anybody means. See newest_path in common.sh.
+manifest=$(find "$KAS_BUILD_DIR/tmp/deploy/images" -name '*.manifest' \
+	-printf '%T@ %p\n' 2>/dev/null | newest_path manifest)
 
 if [ -n "$manifest" ]; then
 	note "manifest $manifest"

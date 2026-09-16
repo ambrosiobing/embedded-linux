@@ -21,8 +21,18 @@ case $dev in
 	;;
 esac
 
-image=$(find "$KAS_BUILD_DIR/tmp/deploy/images" -name '*.wic.bz2' 2>/dev/null |
-	sort | tail -1)
+# Newest, not lexically last. deploy/images holds one directory per
+# MACHINE, and a build host that has built for two of them has two images
+# here. "raspberrypi4-64" sorts after "raspberrypi3-64", so the old sort
+# would have written a Pi 4 image to a card for a Pi 3, which does not warn
+# and does not boot: the symptom is a dark board that reads as dead
+# hardware. See newest_path in common.sh.
+#
+# The ignored images are named rather than dropped, above the confirmation
+# prompt, because that prompt is the last gate before the card is erased
+# and the operator should be able to see that there was a choice at all.
+image=$(find "$KAS_BUILD_DIR/tmp/deploy/images" -name '*.wic.bz2' \
+	-printf '%T@ %p\n' 2>/dev/null | newest_path image)
 [ -n "$image" ] || die "no image found. Run scripts/build.sh first."
 
 bmap=${image%.bz2}.bmap

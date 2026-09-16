@@ -1461,3 +1461,123 @@ BRINGUP.md that carried the machine name has been corrected, because those
 are the commands that go stale silently: a `cp` from a directory that does
 not exist fails loudly, but a `cp` from the old one that still exists is
 worse.
+
+## 35. The same sort bug, in the sibling script, nine entries later
+
+**What happened.** The first command of the rebuild ran, and its two halves
+disagreed about which kernel they were reading:
+
+```
+--- kernel   .../work-shared/raspberrypi4-64/kernel-source     (./go ksym)
+--- config   .../work/raspberrypi3_64-poky-linux/...           (./go kconfig)
+```
+
+The machine is `raspberrypi3-64`. `kconfig` read the tree the build had
+just produced. `ksym` read the tree left over from the Pi 4, because
+`tmp/work-shared` now holds one per machine and its autodetect ended in
+`sort | tail -1`, a lexical sort in which `raspberrypi4-64` comes after
+`raspberrypi3-64`.
+
+**This is entry 25, again, in the script next to the one that was fixed.**
+Entry 25 found `sort | tail -1` picking 6.6.63 over 6.12.93, because "6" is
+greater than "1". It was fixed by ranking on modification time, a test was
+written that names two trees so a lexical sort picks the wrong one, and the
+whole thing was written up. What was not done was to grep for the same four
+characters anywhere else, and the same four characters were sitting in
+`check-kernel-symbols.sh` the entire time.
+
+A fix that is not propagated to its siblings is half a fix. The cost of
+looking was one `grep -rn "sort | tail -1" scripts/`.
+
+**The part that is worse than being wrong.** It printed the right answer.
+Both trees were 6.12.93 for arm64, so all 31 symbols resolved identically
+and the check said `31 symbols, all real`. Had the leftover been a 6.6
+tree, `CONFIG_PREEMPT_RT` would still have come back `ok`, because as this
+script's own header says, it checks that a symbol is declared and not that
+its dependencies are met. So the failure mode was: read the wrong kernel,
+report the right answer, and teach the reader that the check is
+trustworthy.
+
+**What was done.** Three things, and the third is the one that generalises.
+
+1. Ranked by modification time, like its sibling. There is always a newest,
+   so unlike a filter this cannot exclude everything.
+2. The trees it did **not** read are now named on stderr. A tool that
+   silently chooses between its inputs can be quietly wrong about which
+   question it just answered, and this one was, for a whole command.
+3. Four assertions in `tests/kernel-symbols-test.sh`: two machine trees
+   named so a lexical sort picks the wrong one, then the timestamps
+   reversed so the assertion is about the clock rather than about the digit,
+   and a single-tree case asserting that nothing is printed when there is
+   no choice to make. A warning that fires when there is no ambiguity
+   trains you to ignore warnings.
+
+The suite was then run against the pre-fix picker to check the test was
+worth having: 36 passed, 1 failed, and the failure was the assertion about
+the newest tree. A test that does not fail on the bug it was written for is
+decoration.
+
+**Where criterion 7 stands.** The `kconfig` half is good: it read
+`.../raspberrypi3_64-poky-linux/linux-raspberrypi/6.12.93+git/...`, which
+is the right machine, and reported `CONFIG_PREEMPT_RT=y` along with all 31
+lines of both fragments. The `ksym` half has to be run again, now that it
+will read the right tree and say what it ignored.
+
+**Aha, and it is the same one as entry 33 wearing different clothes.** In
+entry 33 an inference was written as an observation. Here a tool reported a
+fact about a file it had not read. Both are the same failure to ask which
+input a statement came from, once by a person and once by a script, and
+both were invisible because the answer happened to be right.
+
+**What changes as a result.** `grep -rn "sort | tail -1" scripts/` is now a
+thing to run after fixing any picker, and both pickers name their losers.
+The build host still has the `raspberrypi4-64` tree on it, deliberately: the
+rerun is better evidence with the ambiguity present than without it.
+
+### Then the grep was actually run, and it was not two scripts
+
+Written above as a resolution, run a minute later as a command. It found
+three more, in scripts nobody had been thinking about:
+
+| Script | What it chooses | What the wrong choice does |
+|---|---|---|
+| `flash.sh` | which `.wic.bz2` goes on the card | writes a Pi 4 image to a Pi 3 card. No warning, no boot, and the symptom is a dark board that reads as dead hardware |
+| `packages.sh` | which `.manifest` to list | the package table in a README describes the other image |
+| `sdk.sh` | the SDK installer, and the environment script under `/opt/poky` | builds against the wrong sysroot |
+
+`flash.sh` is the one that matters. `deploy/images` holds one directory per
+`MACHINE`, this host now has two, and `raspberrypi4-64` sorts last. The
+walkthrough has said for weeks that `./go flash` does not check the image
+against the card. It turned out not to check the image against the *build*
+either, and it was one `./go flash` away from being discovered on hardware,
+where it would have looked like a bad card, a bad HAT or a bad kernel.
+
+**So the fix stopped being a fix and became a function.** `newest_path` in
+`scripts/common.sh` reads `find -printf '%T@ %p\n'` lines, prints the
+newest, and names the rest on stderr. Five call sites now use it:
+`check-kernel-symbols.sh`, `check-kernel-config.sh`, `flash.sh`,
+`packages.sh` and `sdk.sh` twice. `grep -rn "sort | tail -1" scripts/`
+returns nothing but the comment explaining why.
+
+Its own suite is `tests/common-test.sh`, eleven assertions, and three of
+them are about things the inline versions had never been asked:
+
+- that **stdout carries exactly one line**. Every caller writes
+  `x=$(... | newest_path ...)`, so one stray line of commentary becomes
+  part of a path, and the script goes looking for a file whose name ends
+  in a sentence about warnings.
+- that an **empty input says nothing**. The sentence to print belongs to
+  the caller: `flash.sh` says run `build.sh`, the kernel check says run
+  `kernel_configme`, and a helper that guesses between them is wrong twice.
+- that a **path containing a space survives** `cut -d' ' -f2-`. Build
+  directories should not have spaces in them, and one day one will.
+
+CI globs `tests/*.sh`, so it runs from the next push without a change to
+the workflow.
+
+**The real lesson, and it is not about sorting.** Entry 25 fixed this bug
+where it was found. That felt like finishing. Four more copies were sitting
+in the same directory, and the one with teeth was in the script that
+erases a card. The question that was never asked in entry 25 was the cheap
+one: *where else did I write this?* Nine entries and one nearly dark board
+later, it is a step rather than an afterthought.
