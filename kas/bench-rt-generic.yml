@@ -1,0 +1,41 @@
+# Project 8: the control.
+#
+#   kas build kas/bench-rt-generic.yml    or  ./go rt-generic
+#
+# The same image as kas/bench-rt.yml, on the same kernel version, with the
+# preemption model left alone. These two configurations differ in one
+# symbol, CONFIG_PREEMPT_RT, and that is the entire point of this file.
+#
+# Without it the comparison is 6.6 generic against 6.12 real-time, because
+# PREEMPT_RT depends on ARCH_SUPPORTS_RT which arm64 gained in 6.12, and
+# meta-raspberrypi still defaults to 6.6. Six minor versions of scheduler,
+# timer and driver work would sit inside the headline number with nothing
+# in the data to separate them from the preemption model. The numbers would
+# be real and the claim would be uninterpretable.
+#
+# The image target is deliberately the same, so both kernels run an
+# identical userspace: the same instruments, the same libraries, the same
+# Python. Everything above the kernel is held constant by construction
+# rather than by care.
+header:
+  version: 14
+  includes:
+    - bench-rt.yml
+
+# BENCH_RT_KERNEL is not set here, and the bbappend defaults it to "0", so
+# rt.cfg is not added to SRC_URI at all. Everything else in bench-rt.yml
+# applies: the 6.12 kernel, SPI for the HAT, meta-python for numpy, and the
+# work directories kept for inspection.
+#
+# One consequence worth knowing before reading a results row. bench.cfg is
+# still applied, so this kernel has the same GPIO, IIO, spidev and ftrace
+# options as the real-time one. What it does not have is PREEMPT_RT, and
+# therefore also not NO_HZ_FULL, RCU_NOCB_CPU or the rest of rt.cfg. Those
+# are part of the configuration under test rather than incidental, which is
+# why they travel together in one fragment and not as separate switches.
+local_conf_header:
+  rt_generic: |
+    # Spelled out rather than left to the default, because a reader of a
+    # results table should be able to find the line that made the control
+    # a control.
+    BENCH_RT_KERNEL = "0"

@@ -1214,3 +1214,49 @@ this repository has a costed lesson about exactly that: one word of
 237 MB rootfs, and the chain was only visible in `depends.dot`. A package
 list is not a dependency graph, and the difference is what makes the answer
 checkable.
+
+---
+
+## 31. vcgencmd costs sixteen packages, and the answer was one line
+
+**What happened.** Entry 30 recorded a graphics stack in a headless latency
+lab as an open question with the query that would settle it. It settled it:
+
+```
+buildhistory/packages/cortexa72-poky-linux/userland/userland/latest
+RDEPENDS = bash glibc (>= 2.39+git0+be1e627cd7) libegl-mesa
+PKGSIZE  = 942691
+```
+
+`userland` hard-depends on `libegl-mesa`, and that pulls
+`mesa-megadriver`, `libgallium`, `libgbm`, `libdrm2`, `wayland` and nine
+X libraries behind it. This recipe asked for `userland` as an
+`RRECOMMENDS` to get one binary, `vcgencmd`, for the throttle gate.
+
+The path in entry 30 was also wrong, `raspberrypi4-64` where buildhistory
+writes `raspberrypi4_64`. Written from the skill notes rather than from the
+tree, which is the same class of mistake as reading a makefile instead of
+building it.
+
+**What was done.** Recorded, and deliberately not fixed yet. Nothing in
+that stack runs, nothing links against it at runtime, and it cannot affect
+a latency measurement. It is image size and tidiness, and changing it now
+means rebuilding an image that is about to be flashed for bring-up, where
+the question is whether the HAT enumerates rather than how large the rootfs
+is.
+
+**What the fix will be.** `/sys/class/thermal/thermal_zone0/temp` and
+`/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq` need nothing
+installed and are arguably the better instrument: a clock that drops
+mid-run is the thing that corrupts a measurement, and `get_throttled`
+reports a latched bitmask rather than the current frequency.
+
+What would be lost is the latched under-voltage bit, which catches a
+marginal supply that never shows up as heat. That is worth keeping in some
+form, and `dmesg` carries it, so the replacement should read both rather
+than quietly measuring less.
+
+**Why not now.** Because the ordering is: prove the hardware, then tidy the
+image. A 16-package graphics stack in a build nobody has booted is a worse
+thing to spend a build cycle on than finding out whether the MCC 118
+answers at all.

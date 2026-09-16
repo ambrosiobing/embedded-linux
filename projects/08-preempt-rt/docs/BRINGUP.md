@@ -23,20 +23,48 @@ Power off, HAT off.
 Count the pins twice. Pin 38 and pin 40 are adjacent, and pin 40 is
 GPIO21, which the vendor documentation names as the DAQ HAT interrupt line.
 
-## 1. Boot the generic kernel first
+## 1. Boot a kernel and prove the hardware, before caring which kernel
 
-Flash `bench-rt-image` and boot it **before** installing the RT kernel. It
-carries the generic BSP kernel, the HAT support and both instruments, and
-it is the fallback the whole install procedure depends on.
+Two images exist and their userspace is identical:
+
+| Build | Kernel | Use |
+|---|---|---|
+| `./go rt` | 6.12.93 with `PREEMPT_RT` | the variable |
+| `./go rt-generic` | 6.12.93 without it | the control |
+
+Either will do for this step and the three after it, because nothing in
+the HAT, the wiring or the threshold depends on the preemption model.
+Flash one and boot it:
 
 ```sh
-uname -r                       # 6.12.x, not -rt
-ls /sys/kernel/realtime        # absent, which is correct here
+uname -r                       # 6.12.x
+cat /sys/kernel/realtime       # 1 on the rt build, absent on the control
 gpiodetect                     # gpiochip0, pinctrl-bcm2711
 ```
 
-If `/sys/kernel/realtime` exists at this point, the image was built with
-`BENCH_RT_KERNEL=1` and the comparison has already lost its control.
+**This step originally said `bench-rt-image` "carries the generic BSP
+kernel".** It never did: `BENCH_RT_KERNEL = "1"` is in `kas/bench-rt.yml`,
+so that image has always carried the real-time kernel. The control is a
+separate build, `kas/bench-rt-generic.yml`, which exists because the
+original control, `bench-image`, is on 6.6 and would have put six kernel
+versions inside the comparison. See journal entry 29.
+
+**Keep the kernel you are not running.** Both builds write to the same
+deploy directory and the later one wins, so save the first before building
+the second:
+
+```sh
+mkdir -p ~/bench/kernel-rt
+cd ~/bench/build/tmp/deploy/images/raspberrypi4-64
+cp Image modules-*.tgz ~/bench/kernel-rt/
+cp *.dtb ~/bench/kernel-rt/ && cp -r overlays ~/bench/kernel-rt/
+```
+
+then later, against a card flashed with the other one:
+
+```sh
+./go rt-kernel install /mnt/boot /mnt/root ~/bench/kernel-rt
+```
 
 ## 2. The HAT has to be visible before anything else
 

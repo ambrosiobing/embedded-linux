@@ -4,10 +4,18 @@
 #
 # A separate configuration, for the reason in the repository README: a
 # project that needs a different kernel adds its own kas file rather than
-# changing the shared one. Here that rule earns its keep twice over,
-# because this image is the experiment's variable. bench-image built from
-# bench-rpi4.yml is the control, and the two differ in the preemption model
-# and in nothing else that anyone had to think about.
+# changing the shared one.
+#
+# This file is the experiment's variable. Its control is
+# kas/bench-rt-generic.yml, which includes this one and sets
+# BENCH_RT_KERNEL back to 0: same image, same kernel version, same
+# userspace, one symbol different.
+#
+# It is NOT bench-image from bench-rpi4.yml. That was the original plan and
+# it was wrong: bench-rpi4.yml pins no kernel version and gets the BSP
+# default 6.6, so comparing against it would put six minor versions of
+# scheduler and timer work inside the headline number with nothing in the
+# data to separate them from the preemption model.
 header:
   version: 14
   includes:

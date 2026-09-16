@@ -10,6 +10,7 @@
 #   ./go router       build bench-router-image, the LTE router of Project 15
 #   ./go release      build with SBOM, CVE check and source archive
 #   ./go rt           build bench-rt-image, the PREEMPT_RT lab of Project 8
+#   ./go rt-generic   the same image on the same kernel, without PREEMPT_RT
 #   ./go rt-kernel    install that kernel beside the generic one on a card
 #   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
@@ -39,6 +40,7 @@ rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
 router)     exec sh ./scripts/build.sh bench-router ;;
 release)    exec sh ./scripts/build.sh bench-release ;;
 rt)         exec sh ./scripts/build.sh bench-rt ;;
+rt-generic) exec sh ./scripts/build.sh bench-rt-generic ;;
 rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
 ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
