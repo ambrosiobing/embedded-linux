@@ -286,6 +286,64 @@ case $out in
 	;;
 esac
 
+# ------------------------------------------- the store says which project
+#
+# "bench-rt" does not say "Project 8" to somebody reading a folder in a
+# year, and the store outlives the build tree it came from by design. The
+# number comes from the kas file's own opening line rather than from a
+# second table that could disagree with the first.
+
+echo "== the store is named by project where there is one"
+
+rtstem=bench-rt-image-raspberrypi4-64
+echo "rt image bytes" >"$deploy/$rtstem.rootfs-20260916.wic.bz2"
+touch -d '2026-09-16 12:00:00' "$deploy/$rtstem.rootfs-20260916.wic.bz2"
+
+out=$(run_named "$deploy/$rtstem.rootfs-20260916.wic.bz2" bench-rt ||
+	echo EXIT-FAILED)
+case $out in
+*EXIT-FAILED*)
+	no "an image archives under a project configuration"
+	printf '%s\n' "$out" | sed 's/^/       /'
+	;;
+*) ok "an image archives under a project configuration" ;;
+esac
+
+if [ -d "$store/proj08-bench-rt" ]; then
+	ok "and the directory says which project, proj08-bench-rt"
+else
+	no "and the directory says which project, proj08-bench-rt"
+	find "$store" -maxdepth 1 -mindepth 1 -type d | sed 's/^/       /'
+fi
+
+# contains() in this file greps a FILE, so the provenance path goes in
+# directly rather than its contents. Getting that wrong is what made three
+# assertions here fail with "No such file or directory" wearing the costume
+# of a missing string.
+provfile=$(find "$store/proj08-bench-rt" -name PROVENANCE.txt | head -1)
+contains "the provenance records the project" "$provfile" "project   08"
+contains "and points at its directory" "$provfile" "projects/08-"
+
+out=$(run list || true)
+case $out in
+*proj08-bench-rt*) ok "the listing carries the project-named directory" ;;
+*)
+	no "the listing carries the project-named directory"
+	printf '%s\n' "$out" | sed 's/^/       /'
+	;;
+esac
+
+# A configuration that names no project keeps its own name. bench-rpi4 is
+# the shared base, not a project, and bench-rt includes it: following
+# includes for this would label every image with whatever the base
+# mentioned.
+if [ -d "$store/bench-rpi4" ]; then
+	ok "a configuration with no project is not given a number"
+else
+	no "a configuration with no project is not given a number"
+	find "$store" -maxdepth 1 -mindepth 1 -type d | sed 's/^/       /'
+fi
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

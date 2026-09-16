@@ -58,10 +58,37 @@ list_store() {
 		dir=$(dirname "$prov")
 		machine=$(sed -n 's/^machine  *//p' "$prov" | head -1)
 		commit=$(sed -n 's/^commit  *//p' "$prov" | head -1)
+		# Entries archived before the store carried project numbers have
+		# no project line. Printed as a dash rather than omitted, so the
+		# column stays aligned and the gap is visible rather than
+		# looking like the project is zero.
+		project=$(sed -n 's/^project  *\([0-9]*\).*/\1/p' "$prov" | head -1)
 		size=$(du -sh "$dir" | cut -f1)
-		printf '  %-46s %-18s %-12s %s\n' \
-			"${dir#"$STORE"/}" "$machine" "$commit" "$size"
+		printf '  %-4s %-46s %-18s %-12s %s\n' \
+			"${project:--}" "${dir#"$STORE"/}" "$machine" "$commit" "$size"
 	done
+}
+
+# The project a configuration belongs to, as a zero-padded number.
+#
+# "bench-rt" does not say "Project 8" to anybody reading a folder in a
+# year, and the store is meant to be readable long after the build tree it
+# came from is gone. Every project-specific kas file already states it in
+# its opening line, so this reads that rather than introducing a second
+# place for the same fact to be wrong.
+#
+# DELIBERATELY DOES NOT FOLLOW INCLUDES, unlike kas_machine and kas_target.
+# bench-rt.yml includes bench-rpi4.yml, which is the shared base rather
+# than a project; following the chain would find whatever the base happened
+# to mention and label every image with it. A configuration that names no
+# project has none, and the four that do are bench-rpi4, bench-dev,
+# bench-rpi3 and bench-release, which build the base image and its variants
+# rather than any one project's.
+kas_project() {
+	_n=$(sed -n '1,10p' "$1" | grep -o 'Project [0-9]\{1,2\}' | head -1 |
+		sed 's/Project //')
+	[ -n "$_n" ] || return 0
+	printf '%02d\n' "$_n"
 }
 
 # The machine a configuration builds for, following includes, because
@@ -250,7 +277,18 @@ save() {
 		dirty=-dirty
 	fi
 	stamp=$(date '+%Y-%m-%d')_$commit$dirty
-	dest=$STORE/$config/$stamp
+	# Named by project first, so the store sorts and reads as the twenty
+	# projects do: proj08-bench-rt, proj15-bench-router.
+	#
+	# "proj" spelled out rather than a bare number, because "08-bench-rt"
+	# reads as a date or a sequence position to anybody who does not
+	# already know the convention, and this store is meant to be legible
+	# long after the build tree is gone.
+	#
+	# A configuration with no project keeps its own name alone rather than
+	# being given a number that would be a guess.
+	project=$(kas_project "$kasfile")
+	dest=$STORE/${project:+proj$project-}$config/$stamp
 
 	# deploy/images offers each artefact under two names: the real
 	# bench-image-<machine>.rootfs-<timestamp>.wic.bz2 and a short
@@ -325,6 +363,9 @@ write_provenance() {
 		echo
 		printf 'archived  %s\n' "$(date '+%Y-%m-%d %H:%M:%S %z')"
 		printf 'config    kas/%s.yml\n' "$config"
+		if [ -n "$project" ]; then
+			printf 'project   %s  (projects/%s-*)\n' "$project" "$project"
+		fi
 		printf 'machine   %s\n' "$machine"
 		printf 'commit    %s\n' "$commit"
 		if [ -n "$dirty" ]; then
