@@ -107,6 +107,60 @@ PWRKEY and FLIGHT GPIO offsets, and the watchdog's power-cycle rung stays
 disabled behind `pwrkey_verified` until you have checked them against the
 schematic. A wrong offset does not fail safely.
 
+## Redeploying it without rebuilding
+
+The section above is for a visitor. This one is for whoever built it, and
+it is the difference between a three-hour rebuild and about a minute.
+
+Two things are needed to put this project back on a card, and they are
+deliberately kept apart:
+
+| Part | Where it lives | Why there |
+|---|---|---|
+| the image | `~/bench/images/bench-router/<date>_<commit>/` via `./go archive router` | build output, never in git, survives `./go clean` |
+| the identity | `/boot/router.conf` on the card | the repository must never see a passphrase |
+
+```sh
+./go archive available          # what the build tree still holds
+./go archive router             # keep it, with its bmap and provenance
+./go archive list               # what has been kept, by board and commit
+```
+
+Then, whenever the card is needed again:
+
+```sh
+./go flash /dev/sdX ~/bench/images/bench-router/<date>_<commit>/bench-router-image-raspberrypi4-64.rootfs-<stamp>.wic.bz2
+```
+
+and copy `router.conf` back onto the boot partition, which mounts as an
+ordinary FAT drive on any machine. `bench-router-setup` regenerates the
+NetworkManager profiles from it on the next boot. That is the whole
+restore: nothing else on the card was ever edited by hand, because the
+design does not require it.
+
+**`./go archive router` can refuse, and the refusal is the feature.**
+`deploy/images` holds one directory per machine and every image ever built
+for it, so after building another project the newest image there is not
+this one. The check compares both the machine and the target and names the
+file it will not accept. Pass the right one when that happens:
+
+```sh
+BENCH_IMAGE=<path from ./go archive available> ./go archive router
+```
+
+**Keep `router.conf` somewhere deliberate**, with restrictive permissions,
+and not in a directory named after this repository. It holds the access
+point passphrase, the uplink passphrase and the SIM PIN. `.gitignore` names
+`router.conf` and `wifi.conf` for the day a copied boot partition is moved
+into the tree by accident.
+
+An archived image plus that one file beats a disk image of the card in
+every respect that matters: 78 MB against the size of the card, a
+`PROVENANCE.txt` recording the board and the commit, a `.lock.yml` holding
+the layer revisions that make it rebuildable rather than merely
+re-flashable, and secrets you can read and rotate instead of a blob you
+cannot inspect.
+
 ## Running it
 
 ```sh
