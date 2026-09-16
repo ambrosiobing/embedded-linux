@@ -14,6 +14,7 @@
 #   ./go rt-kernel    install that kernel beside the generic one on a card
 #   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
+#   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
 #   ./go sdk-check    cross-compile sdk/hello-gpiod with the installed SDK
@@ -44,6 +45,7 @@ rt-generic) exec sh ./scripts/build.sh bench-rt-generic ;;
 rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
 ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
+netboot)    exec sh ./scripts/build.sh bench-netboot ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;

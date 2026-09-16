@@ -1,0 +1,21 @@
+%YAML 1.1
+---
+# One serial port, two consumers.
+#
+# The DUT's console is a single device node and both a person and the test
+# runner want it. ser2net owns the node and lends it out over TCP, so
+# "telnet localhost 4003" and the runner's socket:// URL are the same
+# console and neither has to know about the other.
+#
+# Bound to localhost on purpose. The lab network is an island, but the
+# server is also on somebody's phone hotspot, and a serial console with a
+# root shell behind it is not something to offer to a shared network.
+#
+# kickolduser means the newer connection wins. Without it, a forgotten
+# telnet session in another window makes the next test run hang with no
+# explanation, having read half the bytes.
+connection: &dut3
+  accepter: tcp,localhost,4003
+  connector: serialdev,/dev/tty-dut3,115200n81,local
+  options:
+    kickolduser: true

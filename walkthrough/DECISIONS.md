@@ -1487,6 +1487,86 @@ decision 53 matters more than any absolute number in the table.
 
 ---
 
+## 60. The instrument may be a distribution; the subject is ours
+
+**Context.** Project 4's product is a lab rather than a device. Its server
+needs dnsmasq, an NFS server, ser2net and pytest; its device under test
+boots an image this repository builds.
+
+**Decision.** The server runs Raspberry Pi OS Lite, configured by four files
+that live here and an installer that copies them. Only the DUT image is
+built by this repository.
+
+**Rejected.** A `bench-lab-image` carrying the whole lab, which is more in
+the spirit of every other project here.
+
+**Why.** The server is the instrument, not the product. Four configuration
+files and ten minutes of `apt` produce something that works; the same lab as
+a Yocto image is a week of `PACKAGECONFIG` for a result nobody measures. The
+thing worth being reproducible is the image under test, and that is exactly
+the half this repository does build.
+
+**Consequence.** A server rebuilt from a fresh card is `install.sh` plus two
+manual steps the script names rather than guesses at. The lab itself is not
+reproducible from source, which is recorded as a stretch goal and would
+matter the day somebody else has to stand one up.
+
+---
+
+## 61. A console gets framing, because it has none
+
+**Context.** A serial console is a byte stream. There is no end of message,
+and a shell prompt is only some characters that usually turn up last.
+
+**Decision.** Every command carries a unique end marker and returns its exit
+status attached to it: `cmd; echo __END_<pid>_<n>__ $?`, and the reader
+waits for that marker followed by digits.
+
+**Rejected.** Matching on the prompt, which every expect script starts with.
+
+**Why.** Prompt matching works until a command prints something that looks
+like a prompt, and then it truncates output silently rather than failing.
+The digits matter too: the console echoes the command before running it, so
+the marker appears twice, and the echoed one is followed by a literal `$?`
+rather than a number. Without that detail every command appears to finish
+instantly with no output.
+
+**Consequence.** Two things that look like details are load-bearing, and
+both are commented where they are rather than explained once here. The
+marker cannot be a timestamp: `time.monotonic_ns()` has about 15 ms of
+resolution on some hosts, so two quick commands collide and the second
+returns the first one's output. And the echo may only be stripped when it
+is actually found, because a console can be configured not to echo and then
+stripping unconditionally eats the first line of real output.
+
+---
+
+## 62. The kernel owns the interface the root filesystem is on
+
+**Context.** A netbooted board has its network configured by the kernel,
+before userspace, because the root filesystem is mounted over it. Then
+systemd-networkd starts and, by default, manages every interface it
+recognises.
+
+**Decision.** `KeepConfiguration=yes` on that interface, shipped as part of
+the DUT image rather than left to the operator.
+
+**Rejected.** Leaving the default, which works often enough to look fine.
+
+**Why.** Taking the interface over means dropping the address and acquiring
+a new one, and for the few hundred milliseconds in between the NFS server is
+unreachable. The process reading from the root filesystem at that moment is
+systemd-networkd itself. The symptom is a board that reaches userspace,
+prints a few lines and stops, with no shell to ask, and nothing about it
+points at a network configuration.
+
+**Consequence.** One more file in the image, and a class of intermittent
+failure that would have been blamed on the cable. It is the same shape as
+Decision 48 and as Project 15's ownership table: one resource, two managers,
+and a failure that looks like something else.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)
 
 ## 57. Captured evidence is annotated, never edited

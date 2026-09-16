@@ -42,3 +42,12 @@ SRC_URI += '${@"file://rt.cfg" if d.getVar("BENCH_RT_KERNEL") == "1" else ""}'
 # is not in bench.cfg.
 BENCH_BLE_KERNEL ?= "0"
 SRC_URI += '${@"file://ble.cfg" if d.getVar("BENCH_BLE_KERNEL") == "1" else ""}'
+
+# And the netboot fragment, same pattern again. Project 4's device under
+# test has no SD card at all and mounts its root over NFS, which needs the
+# NFS client, kernel IP autoconfiguration and the Ethernet driver all built
+# in rather than modular. None of that belongs in an image that boots from
+# a card: it is kernel size for a capability nothing else uses, and Project
+# 3 measures both.
+BENCH_NETBOOT_KERNEL ?= "0"
+SRC_URI += '${@"file://netboot.cfg" if d.getVar("BENCH_NETBOOT_KERNEL") == "1" else ""}'

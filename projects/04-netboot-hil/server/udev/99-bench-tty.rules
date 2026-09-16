@@ -1,0 +1,20 @@
+# A stable name for the DUT's console.
+#
+# Cheap USB/TTL adapters carry no serial number, so there is nothing unique
+# about the device to match on. What is stable is the physical USB port: as
+# long as the cable goes back into the same socket, KERNELS is the same
+# string. That makes the name a property of where you plugged it rather than
+# of the order things enumerated.
+#
+# KERNELS must be adapted to the port actually used. Find it with:
+#
+#   udevadm info -a -n /dev/ttyUSB0 | grep -m3 -E 'KERNELS|idVendor|idProduct'
+#
+# The value below is a placeholder and will not match anything until it is
+# edited. That is deliberate: a rule that matched every tty would name the
+# wrong device the first time a second adapter appeared.
+#
+# Everything downstream uses /dev/tty-dut3 and never ttyUSB0. Allocation
+# order is not a promise, and ser2net holding the wrong device node is a
+# lab that silently tests nothing.
+SUBSYSTEM=="tty", KERNELS=="1-1.3", SYMLINK+="tty-dut3", GROUP="dialout", MODE="0660"

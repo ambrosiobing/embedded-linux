@@ -1,0 +1,31 @@
+# Project 4: the device under test of the network-boot lab.
+#
+#   kas build kas/bench-netboot.yml      or  ./go netboot
+#
+# A Raspberry Pi 3B+ with no card in it, booting over TFTP and mounting its
+# root over NFS. The lab that serves it is not built here: the server runs
+# Raspberry Pi OS and its four configuration files live in
+# projects/04-netboot-hil/server/, because the server is the instrument
+# rather than the product.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-netboot-image
+
+local_conf_header:
+  netboot: |
+    # NFS client, kernel IP autoconfiguration and the 3B+ Ethernet driver,
+    # all built in. See meta-bench/recipes-kernel/linux/files/netboot.cfg
+    # for why three of those cannot be modules.
+    BENCH_NETBOOT_KERNEL = "1"
+
+    # A tarball rather than a disk image. Set here as well as in the image
+    # recipe because bench-rpi4.yml, which this inherits through
+    # bench-rpi3.yml, sets IMAGE_FSTYPES for the whole build.
+    IMAGE_FSTYPES = "tar.bz2"
+
+    # The kernel is the thing that gets debugged when a board will not
+    # netboot, so keep its work directory.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-netboot"

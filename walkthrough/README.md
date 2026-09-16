@@ -27,6 +27,8 @@ the stage of the project changes.
 | | [Decisions](DECISIONS.md) | A log of choices, each with the alternative that was rejected and why |
 | | [Design, Project 1](../projects/01-yocto-image/docs/DESIGN.md) | The four figures: architecture, schematic, bench layout, UML sequence, plus the software components |
 | | [Journal](../projects/01-yocto-image/JOURNAL.md) | What actually happened while building Project 1, in order, including the false starts |
+| | [Design, Project 04](../projects/04-netboot-hil/docs/DESIGN.md) | The network-boot lab: architecture, wiring, bench layout, the sequence of a test run, and who owns which device |
+| | [Journal, Project 04](../projects/04-netboot-hil/JOURNAL.md) | Two console-framing defects a fake board found, and a failure mode with no symptom |
 | | [Design, Project 15](../projects/15-lte-router/docs/DESIGN.md) | The LTE router: architecture, schematic, bench, the watchdog state machine, and who owns which interface |
 | | [Journal, Project 15](../projects/15-lte-router/JOURNAL.md) | Where this project departed from its own specification, and why |
 

@@ -140,7 +140,7 @@ rather than pointing at where the original lives.
 | 01 | [A Yocto image that owns the whole stack](projects/01-yocto-image) | Raspberry Pi 4 | Build systems, layers, recipes, SDK | **Complete**: built, booted, reproducible, SDK verified on the board |
 | 02 | NanoPi NEO Air on mainline: U-Boot, kernel, device tree, eMMC | NanoPi NEO Air | Board bring-up, bootloader, sunxi mainline | Planned |
 | 03 | Boot time and energy per boot, measured | NanoPi NEO Air + PPK2 | Boot-time optimisation, systemd-analyze, power | Planned |
-| 04 | A network-boot hardware-in-the-loop lab | Pi 4 server + Pi 3B+ DUT | TFTP/NFS root, udev, serial consoles, automated tests | Planned |
+| 04 | [A network-boot hardware-in-the-loop lab](projects/04-netboot-hil) | Pi 4 server + Pi 3B+ DUT | TFTP/NFS root, udev, serial consoles, automated tests | **Software complete**: server configuration, console framing, fixtures and the DUT image, with 47 assertions that need no boards. Nothing has netbooted yet |
 | 05 | An IIO driver for the ADXL345 written from scratch | Raspberry Pi 3 | Kernel driver model, regmap, threaded IRQ, IIO events | Planned |
 | 06 | Explorer 700: every peripheral in one device-tree overlay | Raspberry Pi 3 | Device tree composition, sysfs, hwmon, rtc, w1, input | Planned |
 | 07 | A 3.5 inch SPI display as a DRM panel with touch | Raspberry Pi 3B+ | DRM/KMS tiny drivers, input subsystem, fbcon | Planned |

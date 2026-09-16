@@ -1,0 +1,14 @@
+# The DUT's root filesystem.
+#
+# no_root_squash because the DUT boots as root and has to be able to write
+# to its own root filesystem. This is the line that would be wrong on any
+# machine reachable from a network with other people on it, and it is
+# correct here because 192.168.7.0/24 is a cable between two boards.
+#
+# sync rather than async: a crash mid-write leaves a consistent export. It
+# is slower, which does not matter for a test lab and does matter if
+# somebody benchmarks I/O over it, so do not.
+#
+# NFS version 3 is what the kernel's nfsroot handles best; the mount options
+# on the DUT side name it explicitly in cmdline.txt.
+/srv/nfs/dut3  192.168.7.0/24(rw,sync,no_subtree_check,no_root_squash)

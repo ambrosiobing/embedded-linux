@@ -1,0 +1,51 @@
+Twenty consecutive automated boots.
+
+Not yet run. This file is the shape of the evidence rather than the
+evidence, and it is committed empty on purpose: the acceptance criterion
+is twenty boots without manual intervention, and a file that guessed at
+the numbers would be the one thing in this project a reader could catch.
+
+How to produce it, once the lab is standing:
+
+    cd projects/04-netboot-hil/runner
+    for i in $(seq 1 20); do
+        echo "=== run $i  $(date -Is)"
+        pytest -q || echo "=== run $i FAILED"
+    done 2>&1 | tee ../docs/run-log-20-boots.txt
+
+What has to be recorded alongside the pass or fail, because it is the
+project's own stated limitation:
+
+  - how many of the twenty needed the plug pulled by hand. The bench has
+    no relay, no switched USB hub and no smart plug, so a DUT wedged badly
+    enough not to answer its own console is the one manual step in the
+    loop. conftest.py prints a line asking for it rather than hiding it.
+  - the wall-clock time of a run. The criterion is under three minutes
+    including the soft reboot.
+
+  run  result  seconds  manual power cycle
+  ---  ------  -------  ------------------
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+   10
+   11
+   12
+   13
+   14
+   15
+   16
+   17
+   18
+   19
+   20
+
+  passed:            of 20
+  needed a hand:     of 20
+  median seconds:

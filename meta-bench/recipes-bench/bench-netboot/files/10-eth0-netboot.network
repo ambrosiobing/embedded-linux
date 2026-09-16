@@ -1,0 +1,29 @@
+# The interface the root filesystem is on.
+#
+# KeepConfiguration=yes is the whole reason this file exists, and the
+# failure it prevents is one of the classic ways a netbooted board dies
+# halfway through its own boot.
+#
+# The kernel configured eth0 itself, before userspace, because ip=dhcp is
+# on the command line and the root filesystem is mounted over that address.
+# Then systemd-networkd starts, sees an interface it is willing to manage,
+# and by default takes it over: it will drop the address and acquire its
+# own. For the few hundred milliseconds in between, the NFS server is
+# unreachable, and the process trying to read from the root filesystem at
+# that moment is systemd-networkd itself.
+#
+# KeepConfiguration=yes tells networkd to leave what it found in place.
+# Without it the symptom is a board that reaches userspace, prints a few
+# lines, and stops, with "nfs: server not responding" and no shell to ask.
+[Match]
+Name=eth0
+
+[Network]
+DHCP=yes
+KeepConfiguration=yes
+
+[DHCP]
+# The kernel already has a lease for this interface. Asking for the same
+# address back keeps the NFS mount valid across the renewal.
+ClientIdentifier=mac
+UseDomains=no
