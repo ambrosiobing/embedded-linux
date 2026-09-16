@@ -16,7 +16,7 @@ Power off, HAT off.
 |---|---|
 | The HAT's address links are at 0 | `rt-capture --address 0` is the default, and `daqhats_list_boards` will say otherwise |
 | Nothing else is on the 40 pin header | The HAT owns SPI0, three address lines and the ID EEPROM pins |
-| The jumper from pin 38 goes to CH0 and the one from pin 39 goes to AGND | A signal without its ground reference reads as noise around an arbitrary offset |
+| The jumper from pin 38 goes to CH0 and the one from pin 39 goes to the GND terminal beside it | A signal without its ground reference reads as noise around an arbitrary offset. The board is single-ended and its terminal blocks are labelled GND, not AGND; there are five of them and they are one net. Use the nearest, for the shortest return path |
 | A heatsink or a fan is fitted | A bare Pi throttles inside a 60 s `stress-ng` run, and `rt-run` will refuse to start once it does. The 3B has less headroom than the 4 |
 | The USB/TTL cable is on pins 8, 10 and 6, red lead not connected | Under load, ssh is the first thing to stall. The console is how the run that went wrong gets diagnosed |
 
@@ -128,7 +128,7 @@ and look exactly like a broken jumper.
 
 ## 4. Optional, and only for the rows that need it: slow the edge
 
-Series 1 kohm from pin 38, 10 nF from CH0 to AGND. See
+Series 1 kohm from pin 38, 10 nF from CH0 to GND. See
 [METHOD.md](METHOD.md) for why. With it, `rt-analyze` reports
 `subsample_fraction` near 1; without it, near 0 and a warning on stderr.
 

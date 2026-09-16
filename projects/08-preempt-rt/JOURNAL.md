@@ -2315,3 +2315,36 @@ not the EEPROM."* Written months ago, from reasoning rather than from
 experience, and it sent the diagnosis straight at the bus instead of at the
 HAT, the address links or the wiring. A failure table written before the
 hardware arrives is worth the time it takes, and this is the evidence.
+
+## 48. A terminal that does not exist on the board
+
+**What happened.** Wiring the jumpers, the obvious question: there is no
+`AGND` on the MCC 118. The terminal blocks carry `GND`, five of them.
+
+Every document in this project said `AGND`: the schematic, the bench
+layout, the pre-power checklist, the RC filter note in METHOD. Four files,
+one label, and the board has never had it.
+
+**Where it came from.** Reasoning rather than observation, again. `AGND` is
+the conventional name on a mixed-signal board with separate analog and
+digital grounds, and it was written down because that is what a data
+acquisition board *ought* to call it. The MCC 118 is single-ended: every
+channel is measured against one ground, so the silkscreen says `GND` and
+means it.
+
+**Why it is only a small cost this time.** The right terminal is
+unambiguous once you are looking at the board, so it costs a question
+rather than a wrong connection. It would have been worse on a board that
+did have both: somebody looking for `AGND` and finding `AGND` and `DGND`
+would have picked one confidently.
+
+**What changes as a result.** Corrected in all four files, with the reason
+stated: the board is single-ended, the five GND terminals are one net, use
+the one nearest CH0 for the shortest return path.
+
+And the same rule as entries 32 and 33, now for the third time on this
+project's hardware: **a label on a diagram is a claim about a physical
+object.** Where it was not read off the object, it is a prediction. The
+pin numbers in the schematic came from the Pi's header, which is
+documented and standard; the terminal names came from what a board like
+this is usually called. Only one of those is evidence.

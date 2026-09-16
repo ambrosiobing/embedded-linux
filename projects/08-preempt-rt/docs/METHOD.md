@@ -68,7 +68,7 @@ fraction is (1.65 - 0) / 3.3 = 0.5 exactly, and the recovered edge time is
 one sample period, dressed up in decimals.
 
 **A slowed edge carries the information.** Put 1 kohm in series with the
-jumper and 10 nF from CH0 to AGND. The time constant is 10 us, the
+jumper and 10 nF from CH0 to GND. The time constant is 10 us, the
 transition spans two or three samples, and the sample that lands on the ramp
 records where in the interval the edge happened. The interpolation is then
 doing what its name says.

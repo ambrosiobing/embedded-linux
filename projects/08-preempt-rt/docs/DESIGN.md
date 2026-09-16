@@ -52,7 +52,7 @@ between them is information rather than an error.
   +-------------+--------------+                     |
                 |                                    |
                 |  jumper, pin 38 -> CH0             |
-                |  jumper, pin 39 -> AGND            |
+                |  jumper, pin 39 -> GND             |
                 v                                    |
   +-----------------------------------------+--------+
   | MCC 118 DAQ HAT                         |
@@ -92,7 +92,7 @@ run rather than quietly shortening it.
   |                              |        |  |                        |
   |                              |       ===C|                        |
   |                              |        |  |                        |
-  | pin 39  GND     o------------+--------+--+-o AGND                 |
+  | pin 39  GND     o------------+--------+--+-o GND    (nearest CH0) |
   |                              |           |                        |
   | pin 19  MOSI    o============+===========+=o                      |
   | pin 21  MISO    o============+===========+=o  used by the HAT,    |
@@ -137,7 +137,7 @@ beside it. That is the whole derivation.
           +-------------------------------------------+
           |  MCC 118 DAQ HAT                          |
           |  +-------------------------------------+  |
-          |  | CH0 CH1 CH2 ... CH7  AGND  (screws) |  |
+          |  | CH0 CH1 CH2 ... CH7  GND   (screws) |  |
           |  +--^-------------------^--------------+  |
           |     | orange               | black        |
           |     |                      |              |
