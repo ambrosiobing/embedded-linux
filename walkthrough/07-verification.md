@@ -430,3 +430,57 @@ parser names the flags that produce the format it reads. Adding or dropping
 today's cases. The file was wrong in both. A results file is the only part
 that outlives the session, and it is the half nobody looks at while a run
 is succeeding in front of them.
+
+## The other side of the branch: a guard that refuses without evidence
+
+Everything above is about a check that passes when it should not. The
+mirror image cost an evening on Project 8, and it is harder to see, because
+a guard refusing looks exactly like a guard working.
+
+Three of them fired in one session, all of them wrong, all of them on
+evidence they declined to print.
+
+| Guard | Refused with | What it had actually matched |
+|---|---|---|
+| `require_no_running_build` | another BitBake run already owns this build directory | a memory-resident server idling out its timeout |
+| `newest_path` | 1 older image ignored, newest wins | the chosen symlink's own target, one file counted twice |
+| `kas.sh` | which configuration? | a configuration name that did not begin with `bench-` |
+
+Each is a one line fix. `require_no_running_build` greps
+`bitbake/bin/bitbake`, which matches the server BitBake deliberately keeps
+alive after a build so the next command can reuse it, so the pattern cannot
+distinguish a build from the absence of one. `newest_path` ranks candidates
+by mtime without resolving symlinks, so a deploy link and its target become
+a winner and a loser. `kas.sh` matches the configuration argument against
+the glob `bench-*` and treats anything else as absent, while
+`resolve_kas_config` ends its own failure message with "Either spelling
+works: bench-rt or rt" and two of the three entry points honour that.
+
+The fixes matter less than what they share. **None of the three messages
+says what it matched.** Not the pid, not the path, not the pattern. And a
+refusal without evidence cannot be argued with: there is nothing to check,
+so the reader's only options are to believe it or to switch it off, and on
+a long build, at the end of a long day, people switch it off. A guard that
+trains you to bypass it has done more damage than the failure it prevents.
+
+> Name the evidence, or the refusal is unfalsifiable.
+
+Printing the matching process line, or the rejected path, or the prefix the
+argument lacked, costs one line each and converts a verdict into something
+the reader can test in five seconds.
+
+This is the same omission as the table above, arrived at from the other
+direction. There, a check selected its own input and reported on what it
+selected without saying so. Here, a check rejected an input and did not say
+which. In both cases the check knows something the reader needs and keeps
+it, and in both cases the cure is the same instruction: say what you looked
+at. Recorded as decision 82.
+
+One further note on the third row, because it is a different failure under
+the same symptom. `kas.sh` was not wrong about the world; it was wrong
+about the repository's own promise. Two entry points accepted `rt`, one did
+not, and the documentation in the shared helper asserted that all of them
+did. A convention that holds in two places out of three is not a convention,
+it is a coincidence with a counterexample, and the fix is to move the rule
+into the one function that already implements it rather than to restate it
+in each caller.

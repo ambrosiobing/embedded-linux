@@ -259,3 +259,59 @@ any of it matters on a bench. It is that stage 7 is impossible unless stage
 ---
 
 Previous: [08. Board bring-up](08-board-bringup.md) | Next: [10. Generalising](10-generalising.md)
+
+## Keeping a flashable image, and what its name has to carry
+
+A build you can reproduce and a build you can flash in two minutes are not
+the same asset. Reproducibility is a property of the commit; availability
+is a property of the artefact. Project 8 needed the second one, because a
+latency campaign is build, flash, measure, repeat, and the measuring is the
+only part that produces data.
+
+So `./go archive` keeps the image beside its `.bmap`, its `.manifest`, the
+kas lock file and a `PROVENANCE.txt`, under a directory named
+
+    $STORE/proj<NN>-<config>/<date>_<commit>[-dirty]
+
+Four questions, four fields. Which project, which configuration, when, and
+what source produced it. The project number came last and was the one most
+obviously missing: the store had become a list of configuration names, and
+nothing in `bench-rt` says Project 8 to somebody opening the folder six
+weeks later.
+
+The `-dirty` suffix earned its keep on 16 September. A parser fix existed
+upstream inside a commit that also moved a kernel variable, so it was taken
+on its own with `git checkout origin/main -- <path>` rather than by pulling,
+which left the tree dirty on purpose. Two images had already been archived
+that afternoon from the clean tree. The two built that evening went to
+`<date>_<commit>-dirty`, and the store ended up with exactly the right
+shape without anyone deciding on it:
+
+    proj08-bench-rt-generic/2026-09-16_5ec99fd/        pre-fix
+    proj08-bench-rt-generic/2026-09-16_5ec99fd-dirty/  post-fix
+    proj08-bench-rt/2026-09-16_5ec99fd/                pre-fix
+    proj08-bench-rt/2026-09-16_5ec99fd-dirty/          post-fix
+
+That is the suffix doing real work rather than decorating. The pre-fix pair
+is not deleted: it is the provenance of the measurements already written
+into the journal, and deleting it would orphan them.
+
+**The gap that did not bite.** Date plus commit plus dirty flag is not
+unique. A second dirty rebuild on the same day at the same commit lands in
+the directory the first one is already in. The evening above was saved only
+by the clean-to-dirty transition happening to fall between the two pairs.
+The image's own build timestamp is already inside its filename, and it
+belongs in the directory name too.
+
+**Keep a copy off the build host.** The second build took two minutes
+because sstate was intact, and sstate lives in the same virtual disk as
+everything else that could go wrong. A 78 MB image copied to ordinary
+storage is insurance against the one failure mode that turns a two minute
+rebuild into an afternoon.
+
+**A per-image stamp is not a comparability claim.** The results file
+carries an `image_build` column read from `/etc/timestamp`, so two
+separately built images can never share it, not even a matched pair built
+ten minutes apart from the same source. The column answers which rootfs
+produced this row. What makes two rows comparable is the commit, and that
+lives in the store path and in `PROVENANCE.txt`, not in the CSV.

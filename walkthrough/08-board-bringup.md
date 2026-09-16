@@ -275,3 +275,41 @@ is why Project 1 comes first.
 ---
 
 Previous: [07. Verification](07-verification.md) | Next: [09. Lifecycle](09-lifecycle.md)
+
+## Powering down, which is part of bring-up
+
+A card that is pulled from a running board is a card that replays its
+journal on the next boot, and occasionally does not. On a bench where the
+same card is reflashed several times a day, that is not a rare event, it is
+a routine one, and it is worth the twenty seconds.
+
+    poweroff
+
+Then read the console rather than the LED. The lines that matter are these,
+in this order:
+
+    systemd-shutdown[1]: Unmounting file systems.
+    (sd-remount)[3872]: Remounting '/' read-only with options ''.
+    EXT4-fs (mmcblk0p2): re-mounted <uuid> ro.
+    systemd-shutdown[1]: All filesystems unmounted.
+    systemd-shutdown[1]: Syncing filesystems and block devices.
+    systemd-shutdown[1]: Powering off.
+    reboot: Power down
+
+`All filesystems unmounted` followed by `Power down` is the statement that
+the rootfs was flushed and marked clean. Only then is it safe to remove
+power. This is also the argument for keeping the serial console attached
+even after ssh works: over ssh the connection dies partway through the
+shutdown and you see none of the above, so you are back to guessing from a
+blinking LED.
+
+One line in that sequence is worth recording rather than ignoring:
+
+    kvm: exiting hardware virtualization
+
+It means this kernel has KVM enabled and the board booted into EL2 rather
+than EL1, which is the normal Raspberry Pi 4 arm64 path and not a fault. It
+is noted here because a latency lab should know which exception level its
+numbers were taken at, and that is the kind of environmental fact that is
+easy to discover late and awkward to retrofit into a results table. Capture
+it with the rest of the evidence rather than remembering it.
