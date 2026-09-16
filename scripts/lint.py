@@ -274,6 +274,78 @@ def check_shell_exports() -> None:
                            f"expansion, which shellcheck rejects as SC2086")
 
 
+def check_shell_unused_params() -> None:
+    """The second shellcheck finding this machine keeps shipping to CI.
+
+    A helper written as
+
+        run() { sh "$sut" "$@" 2>&1; }
+
+    and then called everywhere as a bare `run` is SC2120, with an SC2119 at
+    every call site. It is the natural shape for a test harness wrapper and
+    I have now written it twice, so it reaches the runner rather than the
+    linter for the same structural reason SC2086 did: there is no
+    shellcheck here.
+
+    Deliberately narrow, and it errs towards silence:
+
+      - only functions whose body forwards "$@"
+      - only when the function is called at least once
+      - only when NO call site passes anything
+
+    So a helper used both ways is not flagged, and neither is one that is
+    defined for callers elsewhere. Reimplementing shellcheck would be
+    foolish; two rules for the two mistakes that cannot be caught locally
+    are not.
+    """
+    define = re.compile(r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{')
+    for path in shell_files():
+        lines = text(path).splitlines()
+        bodies: dict[str, list[str]] = {}
+        current = None
+        for line in lines:
+            match = define.match(line)
+            if match:
+                current = match.group(1)
+                bodies[current] = []
+                continue
+            if current is not None:
+                if line.startswith("}"):
+                    current = None
+                else:
+                    bodies[current].append(line)
+
+        for name, body in bodies.items():
+            if not any('"$@"' in line for line in body):
+                continue
+            called_bare = 0
+            called_with_args = 0
+            call = re.compile(r'(^|[\s;(`]|\$\()' + re.escape(name) + r'(\s|$|\)|;|\|)')
+            for line in lines:
+                if define.match(line):
+                    continue
+                # Comments, and the comment half of a line, are prose. The
+                # first version of this did not strip them, and the word
+                # "run" in a sentence about running something counted as a
+                # call with arguments, which silenced the rule on the very
+                # file it was written for. Found by reintroducing the bug
+                # and watching nothing happen.
+                code = line.split("#", 1)[0]
+                if not code.strip():
+                    continue
+                match = call.search(code)
+                if not match:
+                    continue
+                rest = code[match.end(0) - len(match.group(2)):].strip()
+                if rest and rest[0] not in ")|;&":
+                    called_with_args += 1
+                else:
+                    called_bare += 1
+            if called_bare and not called_with_args:
+                fail(path, f"{name}() forwards \"$@\" but every call passes "
+                           f"nothing, which shellcheck rejects as SC2120")
+
+
 def check_license_headers() -> None:
     for path in list(ROOT.rglob("*.c")) + list(ROOT.rglob("*.sh")):
         if ".git" in path.parts:
@@ -463,6 +535,7 @@ def main() -> int:
         check_dashes,
         check_src_uri,
         check_shell_exports,
+        check_shell_unused_params,
         check_src_uri_installed,
         check_image_packages,
         check_systemd_units,

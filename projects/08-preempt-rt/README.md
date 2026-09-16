@@ -1,6 +1,6 @@
 # Project 8: a PREEMPT_RT latency lab with the MCC 118 as the instrument
 
-**Board:** Raspberry Pi 3 Model B v1.2 (see below). **Theme:** real-time kernel,
+**Boards:** Raspberry Pi 4 Model B, and a Pi 3 Model B v1.2 as the second board (see below). **Theme:** real-time kernel,
 cyclictest, IRQ affinity, jitter measurement.
 
 Real-time Linux is usually argued about with cyclictest numbers, and
@@ -68,7 +68,7 @@ What is proven today, on a laptop and in CI:
 | The fragment check catches a kernel built without it | `./go kconfig -f rt` against a deliberately broken config |
 | Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt` against the unpacked 6.12.93 tree, 21484 declarations indexed |
 | The version pin took: the tree is 6.12.93, not the BSP default 6.6 | the kernel's own `Makefile`, read after `kernel_configme` |
-| **Every option of both fragments reached the `.config`, `CONFIG_PREEMPT_RT=y` included** | `./go kconfig -f rt`, [evidence](docs/evidence/kconfig-check.txt) |
+| **Every option of both fragments reached the `.config`, `CONFIG_PREEMPT_RT=y` included** | `./go kconfig -f rt`, evidence for [the Pi 4](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [the Pi 3B](docs/evidence/kconfig-check-raspberrypi3-64.txt) |
 | The image builds: 6258 tasks, all succeeded, 78 MB | `./go rt`, 16 Sep 2026 |
 | The vendor library cross-compiles, packages and installs | the same build, after three defects only building could find |
 
@@ -122,9 +122,9 @@ warm one. `./go rt-kernel install` exists so that you can put the RT kernel
 on a card beside the generic one, with a one-line way back, rather than
 committing a board to it.
 
-**Hardware, specifically.** The board is a Raspberry Pi 3 Model B v1.2 and
-not the Pi 4 originally scoped, because that is the board the MCC 118 is
-stacked on. The comparison this project makes needs the DAQ HAT: without it
+**Hardware, specifically.** A Raspberry Pi 4 Model B, with a Pi 3 Model B
+v1.2 as a second board, and an adapter so the MCC 118 stacks on either.
+The comparison this project makes needs the DAQ HAT: without it
 the internal instrument still runs and the external one has nothing to
 measure, which is half the point missing. `./go ksym -f rt` before the
 kernel compiles is the check that catches a fragment line the kernel cannot
@@ -158,43 +158,50 @@ that flatters the result.
 [docs/BRINGUP.md](docs/BRINGUP.md) is the board work in order, from the
 first `daqhats_list_boards` to the sixteenth row.
 
-## The board is the one the HAT fits
+## Two boards, and which one the thresholds belong to
 
-Originally scoped for a Raspberry Pi 4, and built on a Raspberry Pi 3
-Model B v1.2, because that is the board the MCC 118 is stacked on and
-seated. The Pi 4 was the plan; the HAT was not fitted to it. Why not is
-not recorded, because it was not observed, and an earlier draft of this
-paragraph invented a reason and had to be withdrawn: see journal entries
-32 to 34.
+This settled in three moves, and the journal has the account in entries 32
+to 37. Scoped for a Pi 4. Moved to a Pi 3B v1.2 when the MCC 118 would not
+stack on the Pi 4 with the parts to hand. Moved back when an adapter
+arrived, because keeping the absolute thresholds honest was worth more than
+the rebuild.
 
-The machine is `raspberrypi3-64`. meta-raspberrypi uses that name for the
-whole BCM2837 family, so the same image covers a 3B and a 3B+, and the 64
-bit build is what `ARCH_SUPPORTS_RT` requires.
+**The Pi 4 is the primary board.** `machine: raspberrypi4-64` in
+`kas/bench-rt.yml`, and it is the board the acceptance thresholds were
+written for, so a number measured there is a criterion rather than a
+criterion with an asterisk.
 
-Nothing in the design objects. Both boards are quad-core arm64, so
-`ARCH_SUPPORTS_RT` and `isolcpus=3` mean the same thing on either, the pin
+**The Pi 3B is the second board, not the fallback.** Its image is built,
+verified and archived. `raspberrypi3-64` covers the 3B and the 3B+ alike,
+because meta-raspberrypi names the whole BCM2837 family that way, and the
+64 bit build is what `ARCH_SUPPORTS_RT` requires. To build for it, change
+one line.
+
+Nothing in the design objects to either. Both are quad-core arm64, so
+`ARCH_SUPPORTS_RT` and `isolcpus=3` mean the same thing on each, the pin
 numbers in the wiring table are header positions rather than board
 properties, and `rt-toggle` opens `/dev/gpiochip0` by path without ever
 matching the SoC label.
 
-What changes is what the numbers will say:
+What differs is what the numbers will say:
 
-| | Pi 4 (as scoped) | Pi 3B v1.2 (as built) |
+| | Pi 4 Model B | Pi 3B v1.2 |
 |---|---|---|
 | Core | Cortex-A72, 1.5 GHz | Cortex-A53, 1.2 GHz |
 | Memory | 2 to 8 GB | 1 GB |
 | Ethernet and USB | separate buses | 100 Mbit Ethernet behind the same USB hub, so more interrupt traffic on one controller |
-| Thermal limit | 80 C | the same trip point, less headroom, so the throttle gate fires sooner under `stress-ng` |
+| GPIO label | `pinctrl-bcm2711` | `pinctrl-bcm2835` |
+| Thermal headroom | more | less, so the throttle gate fires sooner under `stress-ng` |
 
-That is a slower core and a busier interrupt controller, which is to say a
-harder real-time target. It is also the more interesting one to measure:
-if the preemption model shows up anywhere, it shows up where the machine
-is under pressure.
+The 3B is the harder real-time target, which makes it the more interesting
+half rather than the weaker one: if the preemption model shows up anywhere
+it shows up where the machine is under pressure.
 
-The absolute thresholds in the acceptance table, a 99.9th percentile below
-50 us and a maximum below 150 us, were written for a Pi 4 and are kept as
-written rather than quietly relaxed. If the Pi 3 misses them that is a
-measurement, not a failure, and the row says which board it was taken on.
+**The thresholds do not move with the board.** A 99.9th percentile below
+50 us and a maximum below 150 us were written for the Pi 4 and stay as
+written. If the 3B misses them that is a measurement, and every results row
+records which board it was taken on. A threshold chosen after seeing the
+hardware is not a threshold, it is a description.
 
 The relative criterion is the one that carries the argument anyway: the
 generic kernel several times worse than the real-time one, under the same
@@ -249,7 +256,7 @@ each, and where that stands today.
 | 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **not started** |
 | 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **not started**. The original wording, "agrees to within the system-call cost", was not measurable: that cost cancels in an interval measurement |
 | 6 | Every row names kernel, isolation, affinity, governor, load and the throttle status before and after | the CSV header has 27 columns and `rt-run` fills all of them | **met in the code**, proven by `tests/rt-run-test.sh`, unproven on a board |
-| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host for `raspberrypi3-64`**, 16 Sep 2026: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them and the other three members of its choice block excluded. [Evidence](docs/evidence/kconfig-check.txt), and the superseded `raspberrypi4-64` capture [beside it](docs/evidence/kconfig-check-raspberrypi4-64.txt). Not yet confirmed against a running kernel |
+| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host for both machines**, 16 Sep 2026: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them and the other three members of its choice block excluded. Evidence for [`raspberrypi4-64`](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [`raspberrypi3-64`](docs/evidence/kconfig-check-raspberrypi3-64.txt), each named for the machine it was captured on. Not yet confirmed against a running kernel |
 | 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
 
 Criterion 4 is the one with a caveat attached, and it is in

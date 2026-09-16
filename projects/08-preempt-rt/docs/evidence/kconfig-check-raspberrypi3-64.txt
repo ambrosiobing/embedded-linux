@@ -203,3 +203,35 @@ To confirm it against the running kernel, once the board is up:
 That is better evidence than this file, because a .config in a work
 directory is what kconfig produced and /proc/config.gz is what the board
 is running.
+
+
+CONFIRMED AGAINST THE BUILD'S OWN .config, 16 September 2026
+-------------------------------------------------------------
+
+Everything above was captured from bitbake -c kernel_configme, before the
+kernel was compiled. The full image build then ran and produced its own
+.config at 10:06, and ./go kconfig -f rt was run again against that one:
+
+  --- also     1 older .config(s) ignored, newest wins:
+  ---          .../raspberrypi4_64-poky-linux/.../linux-raspberrypi4_64-standard-build/.config
+  --- config   .../raspberrypi3_64-poky-linux/.../linux-raspberrypi3_64-standard-build/.config
+  --- built    2026-09-16 10:06
+  ...
+  ok        CONFIG_PREEMPT_RT=y
+  --- every option in every checked fragment is in the built .config
+
+Same 31 lines. This mattered more than a routine repeat, because that build
+exited non-zero: a git pull three hours in changed the kernel bbappend
+under BitBake, five kernel tasks reparsed to different basehashes, and 327
+errors were printed. Every task still succeeded, 6258 of them, and the
+image was written at 13:13.
+
+The netboot expression the pull added expands to nothing when
+BENCH_NETBOOT_KERNEL is 0, so the effective configuration was identical on
+both sides of the change and only the hash moved. That is a reason to
+believe the image is sound. It is not evidence, which is why the check was
+run rather than the reasoning written down and trusted. See journal entries
+38 and 39.
+
+The machine is now raspberrypi4-64 again, and this file keeps its own
+machine in its name so that neither capture is "the current one".

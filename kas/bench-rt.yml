@@ -23,34 +23,35 @@ header:
 
 target: bench-rt-image
 
-# A Raspberry Pi 3 Model B v1.2, 2015, and the reason is mechanical rather
-# than technical: that is the board the MCC 118 is physically stacked on
-# and seated. The Pi 4 in the drawer was the original plan and the HAT was
-# not fitted to it. Why it was not is not recorded here, because it was not
-# observed; see journal entries 32 to 34 for what happened when it was
-# guessed at instead.
+# The Raspberry Pi 4 Model B, which is what the acceptance thresholds in
+# the project README were written for.
 #
-# raspberrypi3-64 is the machine for it. meta-raspberrypi uses that name
-# for the whole BCM2837 family, so it covers the 3B and the 3B+ alike, and
-# the 64 bit build is what ARCH_SUPPORTS_RT needs.
+# This moved twice before settling, and the journal has the full account in
+# entries 32 to 37. The short version: the MCC 118 would not stack on the
+# Pi 4 with the parts to hand, so the machine was changed to
+# raspberrypi3-64 and an image was built and verified there. An adapter
+# then arrived and the Pi 4 became available again, at which point keeping
+# the absolute thresholds honest was worth more than the rebuild.
 #
-# Nothing in this project objects. Both boards are quad-core arm64, so
-# ARCH_SUPPORTS_RT and isolcpus=3 mean the same thing on either, and the
-# pin numbers in the wiring table are header positions rather than board
-# properties. rt-toggle opens /dev/gpiochip0 by path and never looks at the
-# SoC label, so the pinctrl-bcm2711 that Projects 1 and 15 match on does
-# not appear here; on this board it is pinctrl-bcm2835.
+# The Pi 3B build is not wasted and is not the fallback. It is the second
+# board: same kernel, same userspace, a 1.2 GHz Cortex-A53 with 1 GB and
+# its Ethernet behind the USB hub. If the preemption model shows up
+# anywhere it shows up where the machine is under pressure, so the pair is
+# a stronger result than either alone. Its image is archived under
+# bench-rt, and raspberrypi3-64 covers the 3B and the 3B+ alike because
+# meta-raspberrypi names the whole BCM2837 family that way.
 #
-# What does change is what the numbers will say. A Cortex-A53 at 1.2 GHz
-# with 1 GB of memory, and with Ethernet hanging off the same USB hub as
-# everything else, is a harder real-time target than a Cortex-A72 at
-# 1.5 GHz, and there is less thermal headroom, so the throttle gate will
-# fire sooner under load. The acceptance thresholds written as absolute
-# microseconds were written for a Pi 4 and are recorded as such; the
-# relative criterion, that the generic kernel is several times worse than
-# the real-time one under the same load, is a property of the preemption
-# model and holds on either board.
-machine: raspberrypi3-64
+# Nothing in the design objects to either. Both are quad-core arm64, so
+# ARCH_SUPPORTS_RT and isolcpus=3 mean the same thing on each, the pin
+# numbers in the wiring table are header positions rather than board
+# properties, and rt-toggle opens /dev/gpiochip0 by path without ever
+# matching the SoC label.
+#
+# To build for the 3B instead, change this one line. Everything downstream
+# follows it, and ./go archive refuses to file an image under a
+# configuration whose machine does not match, so a card cannot be
+# mislabelled by accident.
+machine: raspberrypi4-64
 
 repos:
   # rt-tests (cyclictest) and stress-ng are in meta-oe, which is already

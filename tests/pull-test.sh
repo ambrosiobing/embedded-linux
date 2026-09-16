@@ -84,8 +84,11 @@ git checkout -q -B main origin/main 2>/dev/null || true
 # are really used: the checkout under test is the checkout they live in.
 mkdir -p "$clone/scripts"
 cp "$ROOT/scripts/common.sh" "$ROOT/scripts/pull.sh" "$clone/scripts/"
+# No "$@". pull.sh forwards its arguments to git pull, but nothing here
+# passes any, and a parameter that is never supplied is one shellcheck
+# flags as SC2120 rather than one a reader learns anything from.
 run() {
-	BENCH_WORK=$WORK/bench sh "$clone/scripts/pull.sh" "$@" 2>&1
+	BENCH_WORK=$WORK/bench sh "$clone/scripts/pull.sh" 2>&1
 }
 
 echo "== with no build running"
