@@ -2249,3 +2249,69 @@ wants the fewest interrupt sources, not the most. Project 15 names
 needs a second radio. Project 8 does not. The same missing driver is a
 defect in one image and a correct decision in another, which is the
 argument for per-image package lists rather than one shared one.
+
+## 47. One line in an image recipe, and the instrument answered
+
+**What happened.** `kernel-module-spi-bcm2835` added to
+`bench-rt-image.bb`, rebuilt, reflashed, booted:
+
+```
+/dev/spidev0.0
+spidev        24576  0
+spi_bcm2835   20480  0
+spi0
+Found 1 board(s):
+  Address: 0
+  Type: MCC 118
+  Hardware version: 1
+  Name: MCC 118 Voltage Input HAT
+  Firmware version:   1.03
+  Bootloader version: 1.01
+```
+
+**The two lines that prove it rather than suggest it.** Firmware 1.03 and
+bootloader 1.01 were not in this morning's output. They cannot be: the ID
+EEPROM carries the vendor, product and UUID, and nothing else. Those two
+numbers come off the board over SPI. So the library is no longer merely
+finding the HAT, it is holding a conversation with it.
+
+That distinction is worth keeping. This morning's failure printed the
+board's name and address and looked most of the way to working. The
+difference between "found" and "opened" was one module, and the only way to
+see it in the output is to know which fields come from where.
+
+**What it cost, and what it did not.** A one-line change to an image
+recipe. The kernel was never wrong. `dtparam=spi=on` was never wrong. The
+device tree node read `status = okay` from the first boot. `./go ksym` and
+`./go kconfig` passed on all 31 options every time they were run, on two
+machines, because they answer whether what was asked for arrived, and this
+was never asked for.
+
+The rebuild was 48 minutes, nearly all of it kernel, and none of that was
+needed for this fix: the TEE bbappend from Project 20 had landed in the
+same pull and moved the kernel's basehash. The fix itself was a rootfs
+rebuild. Two unrelated things travelled together because they arrived in
+one `git pull`, which is the ordinary cost of a shared repository and not a
+fault.
+
+**Where this leaves the project.**
+
+| Criterion | State |
+|---|---|
+| 1, a real-time kernel on the board | **met**, `uname -v` and `/proc/config.gz` |
+| 7, the fragment reached the kernel | **met on both machines**, now confirmed against the running kernel |
+| the HAT is visible and open | **met**, firmware version read over SPI |
+| the wire | blocked, two jumper wires not yet to hand |
+
+Steps 1 and 2 of the bring-up notes are done. Step 3 proves that the pin
+the software drives is the pin the instrument reads, and it needs a jumper
+from header pin 38 to CH0 and one from pin 39 to AGND. Until then the
+external instrument has nothing to measure and the internal one has nothing
+to be compared against.
+
+**What changes as a result.** The bring-up notes' failure table earns its
+keep: *"the library found the board and could not talk to it. That is SPI,
+not the EEPROM."* Written months ago, from reasoning rather than from
+experience, and it sent the diagnosis straight at the bus instead of at the
+HAT, the address links or the wiring. A failure table written before the
+hardware arrives is worth the time it takes, and this is the evidence.

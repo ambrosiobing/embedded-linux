@@ -310,21 +310,44 @@ save() {
 	note "image   $image"
 	note "store   $dest"
 
-	# -L because the useful names in deploy/images are symlinks to the
-	# timestamped real files, and a symlink into a build tree that is
-	# about to be deleted archives nothing at all.
-	cp -L "$image" "$dest/"
+	# Everything is stored under ONE base name, the resolved real one.
+	#
+	# This used to copy each file under whatever basename it was found by,
+	# and those differ. The image is usually found as the short symlink,
+	# because the link is written last and therefore wins newest-by-mtime;
+	# the .bmap is found by resolving that link first, so it arrives under
+	# the timestamped name. The store then held:
+	#
+	#   bench-rt-image-raspberrypi4-64.rootfs.wic.bz2
+	#   bench-rt-image-raspberrypi4-64.rootfs-20260916142705.wic.bmap
+	#
+	# flash.sh looks for ${image%.bz2}.bmap, which is not that. So it
+	# printed "no bmap given, copy entire image" and wrote all 1.1 GiB
+	# instead of the 274 MiB actually used: 1m 33s rather than 25s.
+	#
+	# Silent again. archive.sh reported success because both files
+	# arrived, and flash.sh reported what it was doing in a line that
+	# reads like information rather than like a fault.
+	#
+	# -L because the useful names in deploy/images are symlinks, and a
+	# symlink into a build tree that is about to be deleted archives
+	# nothing at all.
+	base=$(basename "$real")
+	cp -L "$image" "$dest/$base"
 	# Written as if/else rather than "test && cp || note", which is not
 	# an if/else: when the copy itself fails the note runs and the exit
 	# status is the note's. Shellcheck calls this SC2015 and it has
 	# already cost this repository a CI run.
+	# Renamed onto the image's base, not copied under their own, so that
+	# flash.sh's ${image%.bz2}.bmap finds it. See the note above.
+	stem=${base%.wic.bz2}
 	if [ -f "$bmap" ]; then
-		cp -L "$bmap" "$dest/"
+		cp -L "$bmap" "$dest/$stem.wic.bmap"
 	else
 		note "no .bmap beside the image, the whole card will be written"
 	fi
 	if [ -f "$manifest" ]; then
-		cp -L "$manifest" "$dest/"
+		cp -L "$manifest" "$dest/$stem.manifest"
 	else
 		note "no .manifest beside the image"
 	fi

@@ -295,12 +295,24 @@ esac
 
 echo "== the store is named by project where there is one"
 
+# Shaped exactly like deploy/images after a real build, including the short
+# symlink written last. That ordering is the whole point: the link wins
+# newest-by-mtime, so it is what newest_path returns, and archiving it
+# under its own basename is what split the image from its bmap.
 rtstem=bench-rt-image-raspberrypi4-64
-echo "rt image bytes" >"$deploy/$rtstem.rootfs-20260916.wic.bz2"
-touch -d '2026-09-16 12:00:00' "$deploy/$rtstem.rootfs-20260916.wic.bz2"
+for suffix in wic.bz2 wic.bmap manifest; do
+	echo "rt $suffix" >"$deploy/$rtstem.rootfs-20260916.$suffix"
+	ln -sf "$rtstem.rootfs-20260916.$suffix" "$deploy/$rtstem.$suffix"
+done
+# The RT link has to be the newest thing in the tree, since the earlier
+# fixtures' links were created with the current time. Touched with no date
+# so it is newer than all of them, which is also what a fresh build leaves
+# behind.
+touch -h "$deploy/$rtstem.wic.bz2" 2>/dev/null ||
+	touch "$deploy/$rtstem.wic.bz2"
 
-out=$(run_named "$deploy/$rtstem.rootfs-20260916.wic.bz2" bench-rt ||
-	echo EXIT-FAILED)
+# No BENCH_IMAGE: let newest-wins pick, which is how it happens in use.
+out=$(run bench-rt || echo EXIT-FAILED)
 case $out in
 *EXIT-FAILED*)
 	no "an image archives under a project configuration"
@@ -342,6 +354,52 @@ if [ -d "$store/bench-rpi4" ]; then
 else
 	no "a configuration with no project is not given a number"
 	find "$store" -maxdepth 1 -mindepth 1 -type d | sed 's/^/       /'
+fi
+
+# ------------------------------ the image and its bmap share one base name
+#
+# flash.sh derives the block map as ${image%.bz2}.bmap. If the store holds
+# them under different bases, bmaptool falls back to writing the whole card
+# and says so in a line that reads like information:
+#
+#   bmaptool: info: no bmap given, copy entire image to '/dev/sde'
+#
+# That cost 1m 33s instead of 25s on a real flash. The cause: the image is
+# usually found as the short symlink, because the link is written last and
+# wins newest-by-mtime, while the bmap is found by resolving that link, so
+# the two arrived under different names and nothing complained.
+
+echo "== every stored file shares the image's base name"
+
+stored=$(find "$store/proj08-bench-rt" -name '*.wic.bz2' | head -1)
+storedbase=$(basename "$stored")
+storedstem=${storedbase%.wic.bz2}
+
+if [ -f "$(dirname "$stored")/$storedstem.wic.bmap" ]; then
+	ok "the bmap sits at \${image%.bz2}.bmap, where flash.sh looks"
+else
+	no "the bmap sits at \${image%.bz2}.bmap, where flash.sh looks"
+	ls -1 "$(dirname "$stored")" | sed 's/^/       /'
+fi
+
+# The symlink is the usual winner, so on a host with real symlinks the
+# stored name should be the resolved one rather than the short one.
+#
+# Only assertable where ln -s actually made a link. On Git Bash it makes a
+# copy, so readlink -f returns the file itself and the resolved name IS the
+# short name: the assertion would be false for a reason that has nothing to
+# do with the code. The assertion above, that the bmap sits where flash.sh
+# looks, holds on both and is the one that matters.
+if [ "$symlinks" = real ]; then
+	case $storedbase in
+	*.rootfs-*.wic.bz2) ok "and the stored name is the resolved one" ;;
+	*)
+		no "and the stored name is the resolved one"
+		echo "       got: $storedbase"
+		;;
+	esac
+else
+	echo "skip     resolved-name check needs real symlinks (CI has them)"
 fi
 
 echo
