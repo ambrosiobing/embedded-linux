@@ -105,7 +105,7 @@ check "the configuration names the directory" \
 	"$(basename "$(dirname "$dir")")" "bench-rpi4"
 
 for f in wic.bz2 wic.bmap manifest; do
-	if ls "$dir" | grep -q "$f\$"; then
+	if [ -n "$(find "$dir" -maxdepth 1 -name "*.$f" -print 2>/dev/null)" ]; then
 		ok "the $f was copied"
 	else
 		no "the $f was copied"
