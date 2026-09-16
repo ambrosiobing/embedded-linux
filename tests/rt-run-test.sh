@@ -212,6 +212,12 @@ export RT_ROOT="$WORK"
 # that no board would ever present.
 build_sys() {
 	rm -rf "$WORK/sys"
+	# poky writes /etc/timestamp during rootfs assembly, unique per build.
+	# rt-run reads it so every row says which image produced it: two images
+	# can carry the same kernel and differ in everything else, which
+	# happened twice in one day on this project.
+	mkdir -p "$WORK/etc"
+	echo "20260916142705" >"$WORK/etc/timestamp"
 	mkdir -p "$WORK/sys/devices/system/cpu/cpu0/cpufreq" \
 		"$WORK/sys/kernel"
 	if [ "${1:-1}" != absent ]; then
@@ -288,15 +294,24 @@ contains "affinity was applied and then verified" "$calls" \
 
 row=$(tail -1 "$WORK/results/results.csv")
 header=$(head -1 "$WORK/results/results.csv")
-check "the header has 27 columns" \
-	"$(echo "$header" | awk -F, '{print NF}')" "27"
-check "so does the row" "$(echo "$row" | awk -F, '{print NF}')" "27"
+check "the header has 28 columns" \
+	"$(echo "$header" | awk -F, '{print NF}')" "28"
+check "so does the row" "$(echo "$row" | awk -F, '{print NF}')" "28"
 
 field() {
 	n=$(echo "$header" | tr ',' '\n' | grep -n "^$1$" | cut -d: -f1)
 	echo "$row" | cut -d, -f"$n"
 }
 
+# Which image produced this row. Two images can carry the same kernel and
+# differ in everything else, so without this a reflash mid-matrix leaves
+# rows that are indistinguishable except by wall-clock time.
+#
+# Asserted here rather than beside the column count above, because
+# field() is defined below that point and calling it earlier returns an
+# empty string with no error under set -e.
+check "the row says which image produced it" \
+	"$(field image_build)" "20260916142705"
 check "kernel column"        "$(field kernel)"        "6.12.93-v8-rt"
 contains "the uname -v string is in the row" "$row" "SMP PREEMPT_RT"
 check "measurement quality column" "$(field ext_subsample)" "0.980"

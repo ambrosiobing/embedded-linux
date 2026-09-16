@@ -16,6 +16,7 @@ the row rather than a person.
 |---|---|---|
 | `timestamp` | `date -u` | When the run finished, UTC |
 | `label` | the configuration | Built from the flags, so the file names and the row agree |
+| `image_build` | `/etc/timestamp` | Which image produced this row. poky writes it during rootfs assembly and it is unique per build. **The kernel columns do not answer this:** two images can carry the same kernel and differ in everything else, and on this project they did, twice in one day. A row without it can only be placed in time, not attributed. `./go archive list` maps a build to its commit |
 | `kernel` | `uname -r` | Release, which distinguishes 6.6 from 6.12 |
 | `kernel_version` | `uname -v` | Build string, which contains the preemption model |
 | `realtime` | `uname -v` contains `PREEMPT_RT` | The kernel's own statement about its preemption model. `/sys/kernel/realtime` came from the out-of-tree RT patches and did not survive the merge into mainline for 6.12, so it is absent on both kernels here. Where it does exist it must agree, and `rt-run` refuses the run if it does not |
@@ -90,3 +91,30 @@ kernels is in the last three decades of the tail.
 
 The capture itself is not kept. It is 24 MB per run in tmpfs, and a run
 worth re-examining is cheaper to repeat than to store.
+
+## Rows are not deleted for being unflattering
+
+Every attempt is recorded, planned or not, and stays recorded until it is
+superseded rather than removed. A run that produced a bad number, a run
+taken on an image that turned out to have a defect, a run interrupted by a
+throttle: all of them are part of how the number that ends up quoted was
+arrived at, and a table that contains only the acceptable attempts is a
+table that has been edited into agreement with its conclusion.
+
+This is what `image_build` is for. When an image is rebuilt mid-matrix,
+which happened twice on the first day of bring-up, the earlier rows are not
+wrong: they are measurements of a different system. Marked by their build
+stamp, they can be read as such, compared against the later ones, and left
+in place. Without that column the only honest option would be to delete
+them, and deleting a measurement because a later one is better is the
+habit this whole project is arranged against.
+
+Two things follow:
+
+- **A row is deleted only when it is not a measurement at all.** The first
+  row ever written here was removed because a BusyBox incompatibility left
+  every external column empty; it recorded nothing. That is different from
+  recording something inconvenient, and journal entry 50 says so at length
+  precisely because the distinction is easy to blur after the fact.
+- **The discussion says which rows were superseded and why.** Not the CSV,
+  which stays a log, and not by removal.

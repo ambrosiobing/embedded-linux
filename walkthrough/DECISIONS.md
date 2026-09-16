@@ -2280,3 +2280,56 @@ is pitch and roll within 2 degrees flat and 3 degrees after a 90 degree
 rotation, which this answers directly, and the yaw drift demonstration the
 specification asks for still works: turn the magnetometer off and yaw is
 the integrated gyroscope, drifting.
+
+## 81. Every attempt is recorded, and each row says which system produced it
+
+**Decision.** A results table logs every run, planned or not, and no row is
+removed for being unflattering. Each row carries the identity of the system
+that produced it, so that superseded attempts can be read as superseded
+rather than deleted. In Project 8 that is the `image_build` column, read
+from `/etc/timestamp`.
+
+**Why a column and not two columns in a markdown table.** The obvious
+version of this is to add "first attempt" and "second attempt" columns to
+the table by hand. That fails three ways: it has to be maintained by a
+person on every reflash, it cannot be derived from the data, and the CSV
+remains ambiguous when read on its own, which is how it will be read.
+
+**Why the kernel columns do not already answer it.** `kernel` and
+`kernel_version` describe the kernel. Two images can carry the same kernel
+and differ in everything else, and on the first day of Project 8's bring-up
+they did, twice: once to add the SPI controller module the image had never
+named, once to fix a field extractor that was writing blank columns. Rows
+from before and after would have been separable only by wall-clock time.
+
+**Why `/etc/timestamp` rather than a git commit.** A commit is the better
+identifier and nothing in the image carries one. Adding a recipe to stamp
+it would mean this column could not be read on images already built, and
+one of those was on the bench. poky writes `/etc/timestamp` during rootfs
+assembly, it is unique per build, and `./go archive` records the commit
+beside each stored image: stamp plus store gives the commit, and the row
+alone gives the ability to group. That is enough, and it works today.
+
+**Why empty rather than refusing when the file is absent.** A run that
+produced good numbers should not be discarded over provenance. It should be
+visibly missing it, which an empty column is and a missing row is not.
+
+**The rule this exists to serve.** *Every attempt is a learning experience
+and needs to be recorded, planned or unplanned, until the results become
+acceptable.* A table containing only the acceptable attempts is a table
+edited into agreement with its own conclusion. The unflattering rows are
+how the quoted number was arrived at, and removing them removes the
+evidence that it was arrived at rather than chosen.
+
+**The one case where a row is deleted.** When it is not a measurement at
+all. Project 8's first row was removed because a BusyBox incompatibility
+left every external column empty: it recorded nothing. That is a different
+act from removing an inconvenient number, and journal entry 50 says so at
+length precisely because the two are easy to blur afterwards.
+
+**Where this does and does not apply.** It applies to a results table whose
+rows are experimental attempts, which today is Project 8 alone. It does not
+apply to telemetry sinks: Project 17's `stwin-gw` CSV and Project 10's
+`iio-rate` output are streams of sensor data, not logs of runs, and giving
+them a build stamp per sample would be provenance theatre. The test is
+whether a row is an attempt at something that could have gone differently.
