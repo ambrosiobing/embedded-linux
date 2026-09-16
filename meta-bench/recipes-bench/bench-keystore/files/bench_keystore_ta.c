@@ -185,7 +185,22 @@ static TEE_Result cmd_export_once(uint32_t types, TEE_Param params[4])
 						TEE_PARAM_TYPE_NONE);
 	TEE_ObjectHandle key = TEE_HANDLE_NULL;
 	TEE_ObjectHandle lock = TEE_HANDLE_NULL;
-	uint32_t size;
+	/*
+	 * size_t, not uint32_t, and the difference is not cosmetic.
+	 *
+	 * In OP-TEE 4.x the GlobalPlatform 1.2 types are the default, so
+	 * TEE_Param.memref.size is size_t and TEE_GetObjectBufferAttribute
+	 * takes a size_t *. On aarch64 that is eight bytes. Passing the
+	 * address of a uint32_t is an incompatible pointer type, and if a
+	 * compiler let it through the callee would write eight bytes into
+	 * a four-byte object and corrupt the stack next to it.
+	 *
+	 * The 1.1 types, with uint32_t, are still available behind
+	 * CFG_TA_OPTEE_CORE_API_COMPAT_1_1, which the examples set and
+	 * this TA does not. Code copied from an example built that way
+	 * compiles there and not here.
+	 */
+	size_t size;
 	TEE_Result res;
 
 	if (types != expect)

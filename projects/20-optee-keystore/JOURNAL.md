@@ -410,3 +410,68 @@ unproven on a TEE", which is a different thing from proven.
 - **No PKCS#11 token.** OP-TEE ships a TA for it and `libckteec` to talk
   to it, which would make openssl use the TEE. That is a larger and more
   useful project than this one and deserves its own.
+
+---
+
+## 14. A four-byte variable where the API writes eight
+
+**What happened.** The commit was pushed and CI went green, which proves
+less about this project than about most: CI compiles `bench-status.c`,
+`lte-gpio.c` and `rt-toggle.c`, and it does not compile any of the three C
+files added here, because two of them need `libteec` and the third needs
+the OP-TEE development kit. So a green run meant the shell, the Python and
+the lint were checked and the C had still never been near a compiler.
+
+Reading the headers afterwards found this, in `cmd_export_once`:
+
+```c
+uint32_t size;
+...
+res = TEE_GetObjectBufferAttribute(key, TEE_ATTR_SECRET_VALUE,
+                                   params[0].memref.buffer, &size);
+```
+
+and in `lib/libutee/include/tee_internal_api.h` at 4.1.0:
+
+```c
+TEE_Result TEE_GetObjectBufferAttribute(TEE_ObjectHandle object,
+                                        uint32_t attributeID, void *buffer,
+                                        size_t *size);
+```
+
+**What was done.** `size_t size;`. On aarch64 that is the difference
+between four bytes and eight: passing a `uint32_t *` is an incompatible
+pointer type, and a compiler that allowed it would have the callee write
+eight bytes into a four-byte object and corrupt whatever the stack put
+next to it. The comment now says which types are in play and why.
+
+The cause is worth naming. OP-TEE 4.x defaults to the GlobalPlatform 1.2
+types, where `TEE_Param.memref.size` is `size_t`. The 1.1 types, with
+`uint32_t`, are still there behind `CFG_TA_OPTEE_CORE_API_COMPAT_1_1`,
+which the OP-TEE example TAs set in their makefiles and this one does not.
+Code adapted from an example built that way compiles there and not here,
+and the header that says so is two directories away from the example.
+
+Checked at the same time and not defects: `bool` is available, because
+`tee_api_types.h` includes `<stdbool.h>`; `TEE_OpenPersistentObject` and
+`TEE_CreatePersistentObject` take `size_t` lengths and receive `strlen`
+and `sizeof`; `TEE_MACComputeFinal` takes `size_t` and `size_t *` and is
+handed `memref.size` and its address; and the whole client side is clean,
+because `TEEC_TempMemoryReference.size` is `size_t` and `benchkey.c` uses
+`size_t` throughout.
+
+**Why that and not the alternative.** The alternative was to leave it for
+the first build on a Yocto host, which is where it would have appeared as
+a compile error with a clear message, so nothing would have been lost
+except an afternoon and the rebuild. What made it worth finding now is
+what it says about the green tick: a suite that compiles three of six C
+files reports on three of six, and the report does not mention the other
+three. A check that selects its own inputs has to say what it selected,
+and the acceptance table should not read as though CI covered this.
+
+The repair for the class, rather than the instance, is a CI step that
+compiles `benchkey.c` against the real `libteec` headers from a pinned
+tag, exactly as the existing job builds libgpiod v2 from a pinned tag to
+compile the GPIO daemon. That is the same shape of fix and the same
+precedent; it is not in this commit because it is a change to the shared
+workflow rather than to this project.
