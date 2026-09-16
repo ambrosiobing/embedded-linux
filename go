@@ -18,7 +18,10 @@
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
 #   ./go sdk-check    cross-compile sdk/hello-gpiod with the installed SDK
-#   ./go flash /dev/sdX   write the image to a card
+#   ./go archive [CFG]    keep a flashable copy of the image just built
+#   ./go archive list     what has been kept, with board and commit
+#   ./go archive available   what the build tree still holds, before it goes
+#   ./go flash /dev/sdX [IMAGE]   write an image to a card
 #   ./go ksym         check the fragment names real symbols, before a build
 #   ./go kconfig      check that the kernel fragment reached the .config
 #   ./go reproduce    build the same commit again and diff the package lists
@@ -48,6 +51,7 @@ hub)        exec sh ./scripts/build.sh bench-hub ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
+archive)    shift; exec sh ./scripts/archive.sh "$@" ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
 ksym)       shift; exec sh ./scripts/check-kernel-symbols.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;

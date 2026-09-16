@@ -190,6 +190,40 @@ hours into a build is expensive.
 [docs/BUILD-HOST.md](docs/BUILD-HOST.md) covers the host in full, including a
 table of every package `./go setup` installs and why each one is needed.
 
+## Keeping a flashable copy
+
+The build tree is disposable by design, which means the image in it is too:
+`./go clean` deletes it, and so does anything else reclaiming disk. Losing
+it costs nothing except the ability to put that exact state back on a card
+without paying the hours again.
+
+```sh
+./go archive              # keep the image just built, with its provenance
+./go archive router       # the same, for another configuration
+./go archive list         # what has been kept, with board and commit
+./go archive available    # what the build tree still holds, before it goes
+./go flash /dev/sdX IMAGE.wic.bz2     # write a kept image back
+```
+
+The store is `~/bench/images` by default, outside the repository and beside
+the caches, so it survives `./go clean`. Set `BENCH_IMAGE_DIR` to put it on
+an external drive instead. Nothing in it is ever committed: these are build
+outputs, and the compressed images are 48 to 79 MB each.
+
+**Each saved image comes with a `PROVENANCE.txt`, and that is the point.**
+An image on its own is a mystery card: it boots, and nothing about it says
+which commit produced it, which layer revisions were pinned, or which board
+it is for. The record carries the date, the kas configuration, the machine,
+the commit, a `sha256` of each file, the command to flash it and the command
+to rebuild it, and it says plainly when the working tree was dirty at build
+time. `kas dump --lock` output is saved next to it, so the image can be
+rebuilt rather than only re-flashed.
+
+Archiving under a configuration you did not just build is refused rather
+than filed, because the newest image in the tree may be for another board.
+A Pi 4 image written to a card for a Pi 3 does not warn and does not boot:
+the symptom is a dark board that reads as dead hardware.
+
 ## What this image assumes about the bench
 
 These are choices about one workshop, not defaults anyone should inherit

@@ -1707,3 +1707,57 @@ an error would turn ordinary work into a lint failure and teach people to
 skip the linter, which costs more than the bug.
 
 **Cost.** One function, and an ordering that has to be remembered once.
+
+---
+
+## 61. A built image is archived with its provenance, or not archived at all
+
+**Context.** A build is one to three hours and the build tree is disposable
+on purpose: `./go clean` deletes it, and so does any reclaim of disk. The
+image in it is the only artefact that cannot be regenerated cheaply, and
+keeping a copy is the difference between reflashing a board in a minute and
+rebuilding for an afternoon.
+
+**Decision.** `./go archive` copies the image, its `.bmap` and its
+`.manifest` into a store outside the repository, together with a
+`PROVENANCE.txt` and the output of `kas dump --lock`. The record carries the
+date, the configuration, the machine, the commit, a `sha256` per file, the
+command that flashes it and the command that rebuilds it, and it states
+plainly when the working tree was dirty.
+
+**Rejected.** Three alternatives. Copying the `.wic.bz2` somewhere by hand,
+which is what everyone does and which produces a directory of files nobody
+can later identify. Committing images to the repository, which git is the
+wrong tool for and which `.gitignore` already forbids. And archiving the
+image alone without the record, on the grounds that the filename says
+enough.
+
+**Why.** The filename says the image name and the machine. It does not say
+the commit, the layer revisions, or whether the tree was clean, and those
+are exactly the facts needed to decide whether a stored image is the one you
+want on the card in front of you. This repository refuses to build without
+pinned layers for the same reason; an archived artefact with no record of
+its inputs is that same defect one stage later. Saving the lock file beside
+it means the image can be rebuilt rather than only re-flashed, which is what
+turns a stored card into a supportable version.
+
+The machine check earns its place separately. "Newest wins" is correct
+immediately after a build and wrong the moment you archive under a
+configuration you did not just build, where it would file a Pi 4 image under
+`bench-rpi3`. That card does not warn and does not boot, and the symptom is
+a dark board that reads as dead hardware. So the machine in the kas file has
+to agree with the machine in the deploy path, following `include:` because
+`bench-dev.yml` sets only a target and inherits the rest.
+
+**Consequence.** About 50 to 80 MB per kept image, and one command to
+remember after a build that mattered. `./go flash` takes an optional image
+path so a kept image can be written back, and prints that image's machine
+and commit above the confirmation prompt, which is the last moment before
+the card is erased and the only moment those two facts matter.
+
+**What it found immediately.** `tests/archive-test.sh` failed on its first
+run: the `.bmap` and `.manifest` were being derived from whichever of an
+artefact's two names the search returned, and the short symlink's companions
+are not guaranteed to exist. The fixture was shaped like a real deploy tree
+rather than like the happy path, which is the only reason it was caught
+before a real archive quietly lost its block map.
