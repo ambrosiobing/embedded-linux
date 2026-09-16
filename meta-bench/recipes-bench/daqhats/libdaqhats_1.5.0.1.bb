@@ -52,6 +52,16 @@ do_compile() {
         LDFLAGS="${LDFLAGS} -shared -pthread -Wl,-z,defs \
             -Wl,-soname,${DAQHATS_SONAME}"
 
+    # The tools are linked with -ldaqhats, and that makes the linker look
+    # for a file named exactly libdaqhats.so. What the build produces is
+    # libdaqhats.so.1.5.0.1; the unversioned name is created by the same
+    # vendor install step as the headers below:
+    #
+    #     ln -frs $(INSTALL_DIR)/$(TARGET_LIB) $(INSTALL_DIR)/lib$(NAME).so
+    #
+    # so it is missing here for the same reason and is made the same way.
+    ln -sf libdaqhats.so.${PV} ${S}/lib/build/libdaqhats.so
+
     # The tools include their headers with a directory prefix:
     #
     #     daqhats_list_boards.c:3:  #include <daqhats/daqhats.h>

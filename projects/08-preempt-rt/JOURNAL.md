@@ -953,3 +953,36 @@ taken over the recipe.
 draining four running tasks, one of them the 6.12 kernel `do_compile` eight
 minutes in. Letting it finish writes that stamp; a Ctrl-C would have thrown
 the kernel compile away and charged for it again on the next run.
+
+**The same omission, one step further on.** With the headers staged, the
+next run compiled both tools and failed at the link:
+
+```
+ld: cannot find -ldaqhats: No such file or directory
+```
+
+`-ldaqhats` makes the linker look for a file named exactly
+`libdaqhats.so`. The build produces `libdaqhats.so.1.5.0.1`. The
+unversioned name comes from the same vendor install step as the headers:
+
+```
+install:
+        @cd ../include; make install; cd ../lib      <- the headers
+        @install $(BUILD_DIR)/$(TARGET_LIB) $(INSTALL_DIR)
+        @ldconfig
+        @ln -frs .../$(TARGET_LIB) .../lib$(NAME).so <- the link name
+```
+
+That target does three things a cross build has to do for itself, and the
+first fix replicated one of them. The second fix adds the symlink.
+
+Reading the two tools settled that there is no third: `daqhats_list_boards.c`
+includes `<daqhats/daqhats.h>`, which needs the staged prefix, while
+`mcc118_firmware_update.c` includes `"daqhats.h"` and `"mcc118_update.h"`,
+which need the flat `include/` and `lib/` directories that were already on
+the command line. Both compiled; only the link was missing.
+
+The lesson is not about this library. A vendor `install` target is a list
+of the things a build leaves undone, and a cross build has to do all of
+them or none. Reading it once and extracting one item is how this cost two
+build cycles instead of none.
