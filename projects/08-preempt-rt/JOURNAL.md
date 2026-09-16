@@ -896,3 +896,60 @@ that contradicted the verdict. Worth remembering when deciding whether a
 diagnostic line earns its place: this one cost two minutes to write and
 turned an hour of hunting a phantom kernel-configuration bug into reading
 one line.
+
+---
+
+## 26. The vendor library built, its tools did not
+
+**What happened.** The first `./go rt` failed in `libdaqhats do_compile`,
+and it failed in the half I had said to watch:
+
+```
+daqhats_list_boards.c:3:10: fatal error: daqhats/daqhats.h:
+                            No such file or directory
+    3 | #include <daqhats/daqhats.h>
+```
+
+The library itself was fine. It compiled twelve objects with the cross
+compiler, selected `gpio_v2.c` from `pkg-config --modversion libgpiod`
+reporting 2.1.3 in the target sysroot, and linked
+`libdaqhats.so.1.5.0.1` with `-Wl,-z,defs` satisfied. The three overrides
+of the vendor makefile all worked.
+
+The tools are built from the same tree and include their headers with a
+directory prefix that the tree does not have. The headers live flat in
+`include/`; the tools ask for `<daqhats/daqhats.h>`. That prefix exists
+only after the vendor's own `make install` has copied them into
+`/usr/local/include/daqhats`, because natively you build the library,
+install it, then build the tools against what was installed.
+`-I${S}/include` cannot substitute: the compiler is looking for a
+`daqhats/` directory, not for the files inside it.
+
+**What was done.** Stage the same shape under `WORKDIR` before the tools
+are built, two lines, and add it to their include path:
+
+```
+install -d ${WORKDIR}/staged-include/daqhats
+install -m 0644 ${S}/include/*.h ${WORKDIR}/staged-include/daqhats/
+```
+
+**Why that and not the alternative.** A patch against the vendor tree
+would rewrite eleven include lines to fix something that is not broken
+upstream, and would need rebasing at every version bump. Installing the
+headers into the recipe sysroot first and splitting the tools into a second
+recipe would also work and is three times the machinery for two programs.
+
+**What this says about the earlier claim.** Entry 5 recorded that reading
+the vendor makefile had found three assumptions about a native build, and
+that overriding them on the make command line handled it. Three were found;
+there were four. The fourth is not in the makefile at all, it is in the
+include lines of the C, and reading a makefile was never going to show it.
+The honest version is that reading the build system finds what the build
+system says, and only building finds the rest. That is why the build itself
+was still listed as unproven in the README rather than implied by the care
+taken over the recipe.
+
+**On not interrupting.** BitBake had already stopped scheduling and was
+draining four running tasks, one of them the 6.12 kernel `do_compile` eight
+minutes in. Letting it finish writes that stamp; a Ctrl-C would have thrown
+the kernel compile away and charged for it again on the next run.

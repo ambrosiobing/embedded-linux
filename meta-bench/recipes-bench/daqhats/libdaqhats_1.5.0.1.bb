@@ -52,13 +52,33 @@ do_compile() {
         LDFLAGS="${LDFLAGS} -shared -pthread -Wl,-z,defs \
             -Wl,-soname,${DAQHATS_SONAME}"
 
+    # The tools include their headers with a directory prefix:
+    #
+    #     daqhats_list_boards.c:3:  #include <daqhats/daqhats.h>
+    #
+    # and the headers live flat in include/. That prefix only resolves
+    # after the vendor's own "make install" has copied them into
+    # /usr/local/include/daqhats, because natively you build the library,
+    # install it, and then build the tools against what was installed. A
+    # recipe installs nothing on the build host, so that directory never
+    # exists and -I${S}/include cannot help: the compiler is looking for
+    # a daqhats/ subdirectory, not for the files inside it.
+    #
+    # Staging the same shape under WORKDIR costs two lines and leaves the
+    # vendor tree untouched. The alternative, a patch rewriting eleven
+    # include lines across the tools, would need rebasing at every version
+    # bump to fix something that is not broken upstream.
+    install -d ${WORKDIR}/staged-include/daqhats
+    install -m 0644 ${S}/include/*.h ${WORKDIR}/staged-include/daqhats/
+
     # Only the named tools. The makefile's "all" also recurses into
     # tools/applications, which builds the vendor's example programs and
     # their GUI; an example that fails to cross-compile is not a reason
     # for an image not to build.
     oe_runmake -C ${S}/tools \
         CC="${CC}" \
-        CFLAGS="${CFLAGS} -I${S}/include -I${S}/lib" \
+        CFLAGS="${CFLAGS} -I${WORKDIR}/staged-include -I${S}/include \
+            -I${S}/lib" \
         OFLAGS="${LDFLAGS} -L${S}/lib/build -ldaqhats" \
         daqhats_list_boards mcc118_firmware_update
 }
