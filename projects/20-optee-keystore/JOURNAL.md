@@ -475,3 +475,50 @@ tag, exactly as the existing job builds libgpiod v2 from a pinned tag to
 compile the GPIO daemon. That is the same shape of fix and the same
 precedent; it is not in this commit because it is a change to the shared
 workflow rather than to this project.
+
+---
+
+## 15. A second wrong constant, and the one a compiler could never catch
+
+**What happened.** Checking every libteec symbol in `benchkey.c` and
+`benchkey-cli.c` against `tee_client_api.h` at 4.1.0 found all twenty-one
+present and correctly spelled, and then found this:
+
+```c
+if (origin == 2 /* TEEC_ORIGIN_TEE */)
+```
+
+```
+#define TEEC_ORIGIN_API          0x00000001
+#define TEEC_ORIGIN_COMMS        0x00000002
+#define TEEC_ORIGIN_TEE          0x00000003
+```
+
+Two is `COMMS`. So `benchkey sign` against a missing or unsigned TA, which
+returns `ITEM_NOT_FOUND` with origin `TEE`, would have printed "no key.
+Run: benchkey generate" instead of the line about `/lib/optee_armtz` and
+tee-supplicant. A wrong diagnosis pointing at a wrong fix, which is the
+same shape as entry 5 and the second instance of it.
+
+**What was done.** Not `2` to `3`. `benchkey-cli.c` now includes
+`<tee_client_api.h>`, which it already links against, and every one of
+the five values in that block is a symbol: `TEEC_ERROR_ACCESS_DENIED`,
+`TEEC_ERROR_ACCESS_CONFLICT`, `TEEC_ERROR_ITEM_NOT_FOUND`,
+`TEEC_ERROR_OUT_OF_MEMORY` and `TEEC_ORIGIN_TEE`. All five are in that
+header; none had to be invented.
+
+**Why that and not the alternative.** Correcting the number would have
+left four other literals that were also recalled from memory, one of
+which was already known to have been wrong once.
+
+The wider point is the one worth keeping, because it answers a question
+that was asked directly: would a CI step that compiles this file have
+caught it? No. `origin == 2` is valid C, and so is `0xffff000c`. The
+type defect in entry 14 is exactly what a compiler catches; these two are
+exactly what it does not. Both were found the same way, by reading the
+header the code claims to speak.
+
+So the compile step is still worth having, and it is not the guard for
+this class. The guard is refusing to write a literal where a symbol
+exists, which converts a value error into a name error, and a name error
+is one the compiler does see.

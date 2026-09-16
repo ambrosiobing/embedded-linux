@@ -17,6 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <tee_client_api.h>
+
 #include "benchkey.h"
 #include "bench_keystore_ta.h"
 
@@ -46,24 +48,29 @@ static void report(const char *what)
 	 * The four results worth translating, because each one sends you to
 	 * a different place and the numbers are not memorable.
 	 *
-	 * The values are from lib/libutee/include/tee_api_defines.h in
-	 * optee_os, read rather than recalled. The first version of this
-	 * table had ACCESS_CONFLICT as 0xffff000c, which is
-	 * TEE_ERROR_OUT_OF_MEMORY: a full TA heap would have been reported
-	 * as "a key already exists", which is a wrong diagnosis pointing at
-	 * a wrong fix, and the real conflict would have printed nothing.
+	 * Symbols, not literals, and that is the whole point of this block
+	 * rather than a detail of it. Every value here was first written as
+	 * a hex constant recalled from memory, and two of the five were
+	 * wrong: ACCESS_CONFLICT was given as 0xffff000c, which is
+	 * OUT_OF_MEMORY, and TEEC_ORIGIN_TEE as 2, which is
+	 * TEEC_ORIGIN_COMMS. Both produce a confident wrong diagnosis
+	 * pointing at the wrong fix, and neither is something a compiler
+	 * can see: 0xffff000c and 2 are perfectly good integers.
+	 *
+	 * Including the header the file already links against turns that
+	 * class of mistake into one the compiler resolves.
 	 */
 	switch (result) {
-	case 0xffff0001: /* TEE_ERROR_ACCESS_DENIED */
+	case TEEC_ERROR_ACCESS_DENIED:
 		fprintf(stderr, "  the export lock is set: this device has "
 				"already exported its key, once.\n");
 		break;
-	case 0xffff0003: /* TEE_ERROR_ACCESS_CONFLICT */
+	case TEEC_ERROR_ACCESS_CONFLICT:
 		fprintf(stderr, "  a key already exists, and this command "
 				"will not replace one.\n");
 		break;
-	case 0xffff0008: /* TEE_ERROR_ITEM_NOT_FOUND */
-		if (origin == 2 /* TEEC_ORIGIN_TEE */)
+	case TEEC_ERROR_ITEM_NOT_FOUND:
+		if (origin == TEEC_ORIGIN_TEE)
 			fprintf(stderr, "  OP-TEE could not load the TA. Is "
 					"%s.ta in /lib/optee_armtz, and is "
 					"tee-supplicant running?\n",
@@ -71,7 +78,7 @@ static void report(const char *what)
 		else
 			fprintf(stderr, "  no key. Run: benchkey generate\n");
 		break;
-	case 0xffff000c: /* TEE_ERROR_OUT_OF_MEMORY */
+	case TEEC_ERROR_OUT_OF_MEMORY:
 		fprintf(stderr, "  the TA ran out of heap. TA_DATA_SIZE in "
 				"user_ta_header_defines.h is the number to "
 				"raise.\n");
