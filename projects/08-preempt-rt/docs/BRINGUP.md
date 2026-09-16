@@ -40,7 +40,25 @@ Flash one and boot it:
 uname -r                       # 6.12.x
 cat /sys/kernel/realtime       # 1 on the rt build, absent on the control
 gpiodetect                     # gpiochip0, pinctrl-bcm2835 on a Pi 3B
+cat /proc/cmdline              # which console= the firmware gave you
+ls /dev/ttyS0 /dev/ttyAMA0     # which UART is on pins 8 and 10
 ```
+
+**Check which UART the console is on, before the governor rows.** On the
+Pi 3 the PL011 (`ttyAMA0`) is wired to the Bluetooth module by default and
+pins 8 and 10 get the mini-UART (`ttyS0`). The mini-UART derives its baud
+rate from the VPU core clock, which is why `ENABLE_UART = "1"` in
+`kas/bench-rpi4.yml` makes the firmware pin `core_freq`.
+
+This project changes CPU governors between rows and sets `force_turbo=1`
+for two of them, so it is worth knowing which UART is carrying the console
+before a row produces garbage on the wire and the garbage gets read as a
+crash. If the console is on `ttyS0` and the output is unstable across a
+governor change, `dtoverlay=disable-bt` in `config.txt` gives the header
+the PL011 instead, at the cost of Bluetooth, which nothing here uses.
+
+Record what was actually observed. The paragraph above is the reason for
+looking, not a prediction of what you will see.
 
 **This step originally said `bench-rt-image` "carries the generic BSP
 kernel".** It never did: `BENCH_RT_KERNEL = "1"` is in `kas/bench-rt.yml`,
