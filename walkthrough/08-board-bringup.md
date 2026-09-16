@@ -26,6 +26,22 @@ a 3B v1.2 from 2015: same core at 1.2 GHz, 1 GB of memory, 100 Mbit
 Ethernet behind the USB hub. It had been on the desk the whole time with
 its model and revision printed on it.
 
+**The board then moved a third time, and the reason is worth keeping.** An
+adapter arrived, the HAT fitted the Pi 4 after all, and the machine went
+back. Not because the Pi 4 is better, but because the acceptance thresholds
+had been written for it: measured on the board they were written for they
+are criteria, and measured on another they are criteria with an asterisk in
+every row. The alternative, relaxing the thresholds to suit the board in
+hand, turns a criterion into a description of what happened.
+
+The churn is paid once. A footnote in a results table is paid by every
+reader, forever. That is the whole trade, and it is why the numbers did not
+move when the board did.
+
+The first board is not wasted: it becomes the second board. Same kernel,
+same userspace, slower core, busier interrupt controller. A relative claim
+that holds on both is stronger than an absolute one that holds on one.
+
 One thing did survive that, by luck rather than by care.
 meta-raspberrypi's `raspberrypi3-64` covers the whole BCM2837 family, so a
 3B and a 3B+ take the same image and the machine setting happened to be

@@ -219,3 +219,98 @@ it is what `./go packages` prints.
 ---
 
 Previous: [03. Workflow](03-workflow.md) | Next: [05. kas and layers](05-kas-and-layers.md)
+
+## What a basehash covers, and why a git pull can stop a build
+
+BitBake computes a signature for every task from the metadata that task
+depends on, and reparses during the build to check that the signature has
+not moved. When it has, you get this, once per affected task and then
+repeatedly:
+
+```
+ERROR: When reparsing .../linux-raspberrypi_6.12.bb:do_fetch, the basehash
+value changed from 657647e2... to 1b9f07b4... The metadata is not
+deterministic and this needs to be fixed.
+```
+
+The message blames the metadata. Usually the metadata is innocent and
+something replaced it mid-flight, because **kas registers your checkout as
+a layer in place**. BitBake reads recipes out of it for the whole build, so
+a `git pull` three hours in is not an operation on a source tree beside the
+build. It is an edit to the build's inputs.
+
+That happened here. The pull added two lines to the kernel bbappend for an
+unrelated project:
+
+```
+BENCH_NETBOOT_KERNEL ?= "0"
+SRC_URI += '${@"file://netboot.cfg" if d.getVar("BENCH_NETBOOT_KERNEL") == "1" else ""}'
+```
+
+Both inert: the switch was off, the expression expanded to nothing, the
+resulting `SRC_URI` was identical. Five kernel tasks changed signature
+anyway.
+
+**That is the thing worth learning.** A basehash covers the expression and
+what it depends on, not the value it evaluated to. "It expands to nothing
+so it cannot matter" is true of the build and false of the hash.
+
+### What to do when you see it
+
+Three questions, in order, and two of them are usually already answered on
+the screen:
+
+1. **Did any task actually fail?** Read the summary, not the error count.
+   `Attempted 6258 tasks ... and all succeeded` alongside
+   `There were 327 ERROR messages` means the errors were reparse
+   complaints repeated, and nothing was built wrongly.
+2. **Does the artefact exist?** `ls tmp/deploy/images/<machine>/*.wic.bz2`.
+   A non-zero exit is a reason to look rather than a conclusion.
+3. **Does it check out?** `./go kconfig -f rt` against the `.config` that
+   build produced. Reasoning about why the change was harmless is a reason
+   to believe; the check is evidence.
+
+If the build did stop short, the cheap recovery is to restore only the
+changed recipe file to the commit the build started from, which is printed
+in its opening lines:
+
+```sh
+git checkout <commit> -- path/to/changed.bbappend
+./go rt
+git checkout HEAD -- path/to/changed.bbappend     # afterwards
+```
+
+The basehashes return, the existing stamps match, and BitBake resumes
+instead of recompiling. The expensive recovery is to keep the new metadata
+and let the kernel rebuild, which is correct and costs about two hours.
+
+### The guard
+
+`./go pull` refuses while a `bitbake` is running, says so in terms of the
+layer, and prints the commit it started from so the recovery above is
+possible without digging through a scrollback. Use it instead of
+`git pull` in this checkout.
+
+## Reading the sstate summary before you believe a change is small
+
+The first screen of a build carries the number that tells you what you have
+just asked for:
+
+```
+Sstate summary: Wanted 1921 Local 200 Mirrors 0 Missed 1721 Current 942
+(10% match, 39% complete)
+```
+
+A 10% match means almost nothing was reused. Here that came from one word:
+changing `machine:` from `raspberrypi4-64` to `raspberrypi3-64` changed
+`TUNE_FEATURES` from `cortexa72` to `cortexa53`, and **sstate is keyed on
+the tune**. Every package was compiled again. Not a kernel rebuild for
+another board, a rebuild of the distribution: four hours and 28 GB of host
+disk.
+
+The same change between two boards that share a tune, a 3B and a 3B+ under
+`raspberrypi3-64`, costs nothing at all.
+
+So before a configuration change, ask what it does to the tune, and read
+that line rather than assuming. It is the difference between a build you
+can run over lunch and one that needs the afternoon and the disk.

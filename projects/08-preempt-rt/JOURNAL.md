@@ -1653,3 +1653,332 @@ given is a decision made somewhere else, by `git ls-files`, by a `find`, by
 a glob. Three times in one session that decision was the actual bug, and in
 none of them did the tool say what it had looked at. So both pickers now
 name their inputs, and the linter names what it could not see.
+
+## 37. An adapter, and the board moves for the third and last time
+
+**What happened.** An adapter arrived that lets the MCC 118 stack on a 4B
+and a 3B+ as well as the 3B. The Pi 4 was free, Project 15 finished with it,
+and the constraint that had forced the previous two moves was gone.
+
+So the machine went back to `raspberrypi4-64`, four hours after it had been
+changed away from it.
+
+**Why, and not "leave it, the 3B works".** The acceptance thresholds are a
+99.9th percentile below 50 us and a maximum below 150 us, and they were
+written for a Pi 4. Measured on a Pi 4 they are a criterion. Measured on a
+3B they are a criterion with an asterisk in every row of the results table,
+and the asterisk has to be explained every time the table is read.
+
+The alternative was to relax the thresholds to suit the 3B. That is worse
+than it sounds: a threshold chosen after seeing the hardware is not a
+threshold, it is a description, and the whole value of writing one down in
+advance is that the hardware can miss it.
+
+**Why the 3B build is not wasted, and is not the fallback.** Its image is
+built, verified against its own `.config`, and archived. It is the second
+board: same kernel, same userspace, a 1.2 GHz Cortex-A53 with 1 GB and its
+Ethernet behind the USB hub. That is the harder real-time target, so the
+pair says more than either alone, and `METHOD.md`'s stretch-goal row now
+reads as a second set of runs rather than a second build.
+
+**What it cost, honestly.** Two kernel builds for a board that is now the
+second one, about four hours of machine time, 28 GB of disk at peak, and
+three rounds of documentation churn. None of that would have happened if
+the question in entry 33 had been asked before the machine was changed:
+*is the other board free, and does the HAT fit it with anything you have?*
+
+**The trade-off that was actually made.** Doing it a third time cost a day
+of churn. Not doing it would have cost every future reader of the results
+table a footnote. The churn is paid once; the footnote is paid forever. The
+same reasoning is why the thresholds did not move.
+
+**What changes as a result.** `kas/bench-rt.yml` carries the reasoning at
+the `machine:` line rather than in a commit message, including how to build
+for the 3B instead, which is one line. And `./go archive` refuses to file an
+image under a configuration whose machine does not match, so the two boards
+cannot be confused in the store.
+
+## 38. A pull three hours into a build, and what a basehash covers
+
+**What happened.** I told the operator to run `git pull && ./go archive
+available` while a `bench-rt-image` build had been running for three hours.
+I knew it was running. I had been watching its disk usage.
+
+kas does not copy the checkout into the build directory. It registers it as
+a layer, in place, and BitBake reads recipes from there for the whole of a
+build. The pull brought in Project 4 and added two lines to
+`linux-raspberrypi_%.bbappend`:
+
+```
+BENCH_NETBOOT_KERNEL ?= "0"
+SRC_URI += '${@"file://netboot.cfg" if d.getVar("BENCH_NETBOOT_KERNEL") == "1" else ""}'
+```
+
+Both inert for that build: the switch was off and the expression expanded
+to the empty string. The build stopped with 327 errors anyway:
+
+```
+ERROR: When reparsing .../linux-raspberrypi_6.12.bb:do_fetch, the basehash
+value changed from 657647e2... to 1b9f07b4... The metadata is not
+deterministic and this needs to be fixed.
+```
+
+**The aha, and it is about hashing rather than about git.** A basehash
+covers the expression and what it depends on, not what the expression
+evaluated to. Adding a conditional that contributes nothing still changes
+the recipe's signature, because the signature is computed from the metadata
+and not from the result. Five kernel tasks moved: `do_fetch`, `do_unpack`,
+`do_populate_lic`, `do_create_spdx`, `do_recipe_qa`.
+
+That is also why the message blames "the metadata", which is the one thing
+that was not at fault. The metadata was deterministic. It was replaced
+mid-flight.
+
+**Why the obvious recovery was not the right one.** The obvious move is to
+accept the new metadata and let the kernel rebuild, which is correct and
+costs about two hours. The cheaper one is to restore only the changed
+recipe file to the commit the build started from: the basehashes return,
+the existing stamps match, and BitBake resumes. That needs the starting
+commit, which is in the build's own opening lines and nowhere else once the
+scrollback is gone.
+
+In the end neither was needed, for the reason in the next entry.
+
+**What was done.** `scripts/pull.sh` and `./go pull`, which refuse while
+`pgrep` finds a `bitbake`, explain it in terms of the layer rather than the
+build directory, print the commit they started from before pulling, and
+list which incoming files were under `meta-bench` or `kas`, since only
+those can move a basehash and prose cannot.
+
+**Why a guard and not a note in the documentation.** Because the
+documentation would have been written by the person who already knew, and
+read by the person who already knew. The failure was not ignorance of the
+rule; it was applying attention elsewhere while a three-hour process ran
+unattended. That is what a guard is for.
+
+**Why it also says when it cannot check.** `pgrep` does not exist on Git
+Bash, where `pgrep ... >/dev/null 2>&1` is simply false and the guard waves
+everything through. No build runs on that host, so nothing is at risk, but
+a check that reports success without having looked is the exact failure
+this repository had already found twice that day. It now says which of the
+two it did.
+
+## 39. 327 errors, 6258 successes, and one correct image
+
+**What happened.** The build from entry 38 kept going. It printed its
+errors, carried on scheduling tasks, and ended:
+
+```
+NOTE: Tasks Summary: Attempted 6258 tasks of which 2805 didn't need to be
+rerun and all succeeded.
+Summary: There were 327 ERROR messages, returning a non-zero exit code.
+```
+
+**All succeeded.** The 327 errors were the same five reparse complaints
+repeated as BitBake reparsed. No task failed. The image was written at
+13:13 and is 78 MB.
+
+**Where I was wrong twice in an hour, and it is worth recording both.**
+
+First I said BitBake had stopped scheduling new work and would exit
+shortly. It had not: the count went 6201, then 6232, and `gcc` moved from
+`do_compile` to `do_package`. I had read "327 errors" as "stopped" because
+that is what errors usually mean.
+
+Then the operator ran `ls .../raspberrypi3-64/*.wic.bz2`, got nothing, and
+I concluded the image had not been produced and prepared the whole restore
+path. The image appeared two minutes later, at 13:13. The check was right;
+my reading of a single negative result as a settled fact was not.
+
+**The trade-off in how the failure was handled.** Letting it run to its
+own end preserved every completed task's sstate, at the cost of waiting.
+Killing it would have been faster and would have thrown away a 28 minute
+`gcc do_compile` that was in flight. Waiting was right, and it turned out
+to be much more than right, because what it produced was the artefact.
+
+**Why the image was not simply trusted.** The reasoning for trusting it is
+sound: the netboot expression expands to nothing when the switch is off, so
+the effective `SRC_URI` and kernel configuration were identical on both
+sides of the change, and only the hash moved. That is a reason to believe.
+It is not evidence.
+
+So `./go kconfig -f rt` was run against the `.config` that build produced
+at 10:06. All 31 options, `CONFIG_PREEMPT_RT=y`, the other three members of
+its choice block excluded. Criterion 7, on the machine that was actually
+built. The result is appended to the evidence file with the reason it was
+worth repeating.
+
+**What changes as a result.** A non-zero exit is a reason to look, not a
+conclusion. The three questions, in order, are: did any task fail, does the
+artefact exist, and does it check out. Here the answers were no, yes and
+yes, and two of the three had already been answered by output that was on
+the screen.
+
+## 40. Twenty-eight gigabytes for one word, and a disk that does not come back
+
+**What happened.** Changing `machine:` from `raspberrypi4-64` to
+`raspberrypi3-64` cost 28 GB of host disk and about four hours. The build
+said why in one line, in a place nobody reads:
+
+```
+Sstate summary: Wanted 1921 Local 200 Mirrors 0 Missed 1721 Current 942
+(10% match, 39% complete)
+```
+
+**The aha.** sstate is keyed on the tune, not on the machine name. The Pi 4
+is `cortexa72`, the Pi 3 is `cortexa53`, so changing the board changed the
+compiler flags for every package, and 1721 of 1921 wanted objects missed.
+It was not "a rebuild of the kernel for another board". It was a rebuild of
+the distribution.
+
+A 10% sstate match is the number to read when deciding whether a
+configuration change is small. Nothing else on the screen says so.
+
+**Then the disk would not come back.** Deleting 4.5 GB of stale work trees
+inside WSL moved the host free space not at all, and neither did
+`fstrim -av` reporting 21.6 GiB trimmed. The VHDX is a growing file: freeing
+blocks inside it makes them reusable, and returns nothing to Windows.
+
+Three options, and two are wrong:
+
+| Option | Verdict |
+|---|---|
+| `wsl --manage Ubuntu --set-sparse true` | Refused by WSL itself: disabled due to data corruption. It offers `--allow-unsafe`. Declined: the VHDX holds the build tree, the archives and a git checkout |
+| `Optimize-VHD` | Hyper-V only, and this is Windows Home |
+| `diskpart` `compact vdisk` | Supported, non-destructive, works on Home |
+
+`compact vdisk` on a stopped VHDX returned 9.3 GB the first time, 69.6 to
+60.3, and C: went 11 to 19.4 GB. Less than the 21.6 GiB trimmed, because
+compaction reclaims whole free extents and not interior slack.
+
+**Why that was still not enough, and what actually fixed it.**
+`require_host_disk_gb 25` blocks a build below 25 GB, so 19.4 was still a
+refusal. The fix was `./go clean`, which deletes `~/bench/build` and keeps
+the caches. The layout was checked before running it rather than trusted:
+
+| Path | Size | Fate |
+|---|---|---|
+| `build` | 15 G | deleted |
+| `downloads` | 16 G | kept |
+| `sstate-cache` | 13 G | kept |
+| `images` | 233 M | kept |
+| `kernel-rt` | 70 M | kept |
+
+Then `fstrim` reported 968 GiB and a second compaction took the VHDX from
+60.3 to 44.8 GB, leaving 34.7 GB on C:. Keeping `sstate-cache` is what
+makes the next build cheap; deleting it would have turned a one hour
+control build back into a four hour one.
+
+**The guard's real defect, which is not its threshold.** It checks once, at
+the start, before it can know what the build will cost. 38 GB passed a 25 GB
+test and the build peaked at 28 GB with a floor of 9.8 GB. It was right by
+13 GB of luck. A machine change is not an ordinary build and nothing in the
+guard can tell the difference.
+
+**What changes as a result.** Before a build that changes `MACHINE`, expect
+a near-total sstate miss and budget for a full build rather than an
+incremental one. `Sstate summary` in the first screen of output is the
+number that says which you are getting. And on WSL, freeing disk is three
+steps rather than one: delete, `fstrim`, compact the VHDX with `diskpart`
+while WSL is shut down. Never `--allow-unsafe`.
+
+## 41. The right board is not the right system, and three more silent checks
+
+**What happened.** Writing out the command to archive Project 15's image, I
+read `scripts/archive.sh` and found that `save()` checked the image's
+machine against the kas file and not its target.
+
+`deploy/images` holds one directory per machine and every image ever built
+for that machine inside it. So after building `bench-rt` and then archiving
+under `bench-router`, newest-wins returns `bench-rt-image`, the machine
+matches, the check passes, and a real-time image is filed as an LTE router.
+
+**Why that is worse than the wrong-board case sitting directly above it.**
+A wrong board does not boot. The symptom is immediate and the card is
+obviously wrong. A wrong target flashes, boots, runs, and is only
+discovered by whoever trusted the label. The check that existed guarded the
+loud failure and not the quiet one.
+
+**What was done, and the two things the fix got wrong first.**
+
+`kas_target()`, following includes for the same reason `kas_machine()`
+does. Matched against `<target>-<machine>` rather than the target alone,
+because `bench-image` is a prefix of `bench-image-dev` and a prefix match
+would file a dev image under the production configuration.
+
+Then the first version keyed on `.rootfs` being in the filename and treated
+everything else as "not a Yocto name, skip". The short name in
+`deploy/images` is a symlink without `.rootfs` in it, written after the file
+it points at and therefore usually the newest, so the check silently did
+nothing in exactly the case it was written for. The test found it on the
+first run after the assertions were strengthened.
+
+And the suite itself had a test passing for the wrong reason: "an inherited
+machine still matches" ran `bench-dev` against a `bench-image` fixture and
+accepted anything that was not a machine complaint, so when the new target
+check began refusing it, the catch-all branch reported the refusal as a
+pass. A test whose failure branch is "some other error occurred" is not
+testing what it names.
+
+**Two more of the same shape, the same day.**
+
+`.gitignore` covers `build/`, `tmp/`, `sstate-cache/` and `downloads/` under
+the heading "these are the strays". It did not cover the layer clones kas
+leaves in the checkout when `KAS_WORK_DIR` is unset, because they are named
+after real things. 469 MB of them had sat there for weeks. Disk is not what
+surfaced them: `archive.sh` appends `-dirty` when `git status` is not clean,
+so every image archived on that host was recorded as `6126444-dirty`. The
+tree was not modified. A provenance record that is wrong about the commit is
+worse than none, because it is believed.
+
+And `./go archive rt` failed with `no such configuration: kas/rt.yml`. True,
+and it names a file nobody had in mind: every build verb is the short name,
+so `rt` is what a hand types. `resolve_kas_config` now tries the name, then
+the `bench-` prefix, and lists the ten configurations when neither fits.
+
+**The pattern, and this is the fifth and sixth instance.** Entry 25:
+`kconfig` read another kernel's `.config`. Entry 35: `ksym` read the
+abandoned machine's tree. Entry 36: the linter passed a file it had never
+been given. Here: an archive check that guards the loud failure, a `.gitignore`
+that is right about everything it names, and a resolver that answers the
+question it was asked rather than the one that was meant.
+
+None of them reported an error. All of them reported success.
+
+## 42. A lint rule that took three attempts, and both failures were the theme
+
+**What happened.** CI went red on SC2120: a `run()` helper in
+`tests/pull-test.sh` forwarding `"$@"` that every call site invokes bare.
+Second shellcheck finding in a day that this host structurally cannot see,
+since there is no shellcheck on it, so it earned a narrow rule in
+`lint.py` beside the SC2086 one.
+
+**Attempt one: written, and never called.** The function was defined and
+not added to `main()`'s tuple of checks. It reported nothing. `lint: clean`.
+A check that is not registered is indistinguishable from a check that
+passes, which is the same sentence this journal has now written about a
+`find`, a `git ls-files` and a `pgrep`.
+
+**Attempt two: defeated by its own file's comments.** The call-site regex
+matched the bare word `run` in the sentence `# and run from there, which is
+also how they`, counted prose as a call with arguments, and therefore
+concluded the helper was used both ways. It silenced itself on the one file
+it had been written for.
+
+**Attempt three: strip comments, then verify by breaking it on purpose.**
+Reintroduce `"$@"`, run the linter, watch it fire, restore, watch it go
+quiet. Both directions, because a rule that fires is only half of what was
+wanted; the other half is that it does not fire otherwise.
+
+**Why a narrow rule and not shellcheck locally.** Installing shellcheck on
+the authoring machine would fix the class rather than the instance and is
+the better answer. It is not available there, and the gap is structural
+rather than a matter of discipline, so the choice is between one rule per
+recurring mistake and shipping them to CI. Two rules for two mistakes is
+not a reimplementation of shellcheck; it is a note that the compiler cannot
+be run here.
+
+**What changes as a result.** A new check is verified by breaking the thing
+it checks, before it is trusted. The cost is two extra commands and it has
+now caught three separate defects in one day, in a `find`, in a test and in
+the rule itself.

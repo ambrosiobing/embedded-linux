@@ -1487,88 +1487,6 @@ decision 53 matters more than any absolute number in the table.
 
 ---
 
-## 60. The instrument may be a distribution; the subject is ours
-
-**Context.** Project 4's product is a lab rather than a device. Its server
-needs dnsmasq, an NFS server, ser2net and pytest; its device under test
-boots an image this repository builds.
-
-**Decision.** The server runs Raspberry Pi OS Lite, configured by four files
-that live here and an installer that copies them. Only the DUT image is
-built by this repository.
-
-**Rejected.** A `bench-lab-image` carrying the whole lab, which is more in
-the spirit of every other project here.
-
-**Why.** The server is the instrument, not the product. Four configuration
-files and ten minutes of `apt` produce something that works; the same lab as
-a Yocto image is a week of `PACKAGECONFIG` for a result nobody measures. The
-thing worth being reproducible is the image under test, and that is exactly
-the half this repository does build.
-
-**Consequence.** A server rebuilt from a fresh card is `install.sh` plus two
-manual steps the script names rather than guesses at. The lab itself is not
-reproducible from source, which is recorded as a stretch goal and would
-matter the day somebody else has to stand one up.
-
----
-
-## 61. A console gets framing, because it has none
-
-**Context.** A serial console is a byte stream. There is no end of message,
-and a shell prompt is only some characters that usually turn up last.
-
-**Decision.** Every command carries a unique end marker and returns its exit
-status attached to it: `cmd; echo __END_<pid>_<n>__ $?`, and the reader
-waits for that marker followed by digits.
-
-**Rejected.** Matching on the prompt, which every expect script starts with.
-
-**Why.** Prompt matching works until a command prints something that looks
-like a prompt, and then it truncates output silently rather than failing.
-The digits matter too: the console echoes the command before running it, so
-the marker appears twice, and the echoed one is followed by a literal `$?`
-rather than a number. Without that detail every command appears to finish
-instantly with no output.
-
-**Consequence.** Two things that look like details are load-bearing, and
-both are commented where they are rather than explained once here. The
-marker cannot be a timestamp: `time.monotonic_ns()` has about 15 ms of
-resolution on some hosts, so two quick commands collide and the second
-returns the first one's output. And the echo may only be stripped when it
-is actually found, because a console can be configured not to echo and then
-stripping unconditionally eats the first line of real output.
-
----
-
-## 62. The kernel owns the interface the root filesystem is on
-
-**Context.** A netbooted board has its network configured by the kernel,
-before userspace, because the root filesystem is mounted over it. Then
-systemd-networkd starts and, by default, manages every interface it
-recognises.
-
-**Decision.** `KeepConfiguration=yes` on that interface, shipped as part of
-the DUT image rather than left to the operator.
-
-**Rejected.** Leaving the default, which works often enough to look fine.
-
-**Why.** Taking the interface over means dropping the address and acquiring
-a new one, and for the few hundred milliseconds in between the NFS server is
-unreachable. The process reading from the root filesystem at that moment is
-systemd-networkd itself. The symptom is a board that reaches userspace,
-prints a few lines and stops, with no shell to ask, and nothing about it
-points at a network configuration.
-
-**Consequence.** One more file in the image, and a class of intermittent
-failure that would have been blamed on the cable. It is the same shape as
-Decision 48 and as Project 15's ownership table: one resource, two managers,
-and a failure that looks like something else.
-
----
-
-Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)
-
 ## 57. Captured evidence is annotated, never edited
 
 **Decision.** When a file in `docs/evidence/` is contradicted by something
@@ -1667,7 +1585,89 @@ between them is wrong in both.
 **Cost.** One shared function, eleven assertions, and five call sites that
 now read as what they mean rather than as how they do it.
 
-## 60. Lint runs after `git add`, and says what it could not see
+## 60. The instrument may be a distribution; the subject is ours
+
+**Context.** Project 4's product is a lab rather than a device. Its server
+needs dnsmasq, an NFS server, ser2net and pytest; its device under test
+boots an image this repository builds.
+
+**Decision.** The server runs Raspberry Pi OS Lite, configured by four files
+that live here and an installer that copies them. Only the DUT image is
+built by this repository.
+
+**Rejected.** A `bench-lab-image` carrying the whole lab, which is more in
+the spirit of every other project here.
+
+**Why.** The server is the instrument, not the product. Four configuration
+files and ten minutes of `apt` produce something that works; the same lab as
+a Yocto image is a week of `PACKAGECONFIG` for a result nobody measures. The
+thing worth being reproducible is the image under test, and that is exactly
+the half this repository does build.
+
+**Consequence.** A server rebuilt from a fresh card is `install.sh` plus two
+manual steps the script names rather than guesses at. The lab itself is not
+reproducible from source, which is recorded as a stretch goal and would
+matter the day somebody else has to stand one up.
+
+---
+
+## 61. A console gets framing, because it has none
+
+**Context.** A serial console is a byte stream. There is no end of message,
+and a shell prompt is only some characters that usually turn up last.
+
+**Decision.** Every command carries a unique end marker and returns its exit
+status attached to it: `cmd; echo __END_<pid>_<n>__ $?`, and the reader
+waits for that marker followed by digits.
+
+**Rejected.** Matching on the prompt, which every expect script starts with.
+
+**Why.** Prompt matching works until a command prints something that looks
+like a prompt, and then it truncates output silently rather than failing.
+The digits matter too: the console echoes the command before running it, so
+the marker appears twice, and the echoed one is followed by a literal `$?`
+rather than a number. Without that detail every command appears to finish
+instantly with no output.
+
+**Consequence.** Two things that look like details are load-bearing, and
+both are commented where they are rather than explained once here. The
+marker cannot be a timestamp: `time.monotonic_ns()` has about 15 ms of
+resolution on some hosts, so two quick commands collide and the second
+returns the first one's output. And the echo may only be stripped when it
+is actually found, because a console can be configured not to echo and then
+stripping unconditionally eats the first line of real output.
+
+---
+
+## 62. The kernel owns the interface the root filesystem is on
+
+**Context.** A netbooted board has its network configured by the kernel,
+before userspace, because the root filesystem is mounted over it. Then
+systemd-networkd starts and, by default, manages every interface it
+recognises.
+
+**Decision.** `KeepConfiguration=yes` on that interface, shipped as part of
+the DUT image rather than left to the operator.
+
+**Rejected.** Leaving the default, which works often enough to look fine.
+
+**Why.** Taking the interface over means dropping the address and acquiring
+a new one, and for the few hundred milliseconds in between the NFS server is
+unreachable. The process reading from the root filesystem at that moment is
+systemd-networkd itself. The symptom is a board that reaches userspace,
+prints a few lines and stops, with no shell to ask, and nothing about it
+points at a network configuration.
+
+**Consequence.** One more file in the image, and a class of intermittent
+failure that would have been blamed on the cable. It is the same shape as
+Decision 48 and as Project 15's ownership table: one resource, two managers,
+and a failure that looks like something else.
+
+---
+
+Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)
+
+## 63. Lint runs after `git add`, and says what it could not see
 
 **Decision.** The pre-commit sequence is `git add -A`, then
 `python scripts/lint.py`, then commit. Not the other way round. And
@@ -1710,7 +1710,7 @@ skip the linter, which costs more than the bug.
 
 ---
 
-## 61. A built image is archived with its provenance, or not archived at all
+## 64. A built image is archived with its provenance, or not archived at all
 
 **Context.** A build is one to three hours and the build tree is disposable
 on purpose: `./go clean` deletes it, and so does any reclaim of disk. The
@@ -1761,3 +1761,191 @@ artefact's two names the search returned, and the short symlink's companions
 are not guaranteed to exist. The fixture was shaped like a real deploy tree
 rather than like the happy path, which is the only reason it was caught
 before a real archive quietly lost its block map.
+
+## 65. A pull is an input to the running build, so it is refused
+
+**Decision.** `./go pull` refuses while a `bitbake` process exists. Plain
+`git pull` during a build is treated as an error rather than a habit to
+avoid.
+
+**Why.** kas registers this checkout as a layer in place. BitBake reads
+recipes from it for the whole of a build and reparses as it goes, comparing
+each task's basehash against the one it started with. A pull is therefore
+not an operation on a source tree beside a build; it is an edit to the
+running build's inputs.
+
+It cost a build here. Two inert lines added to
+`linux-raspberrypi_%.bbappend` for an unrelated project moved five kernel
+basehashes and produced 327 errors at 6201 of 6258 tasks. Inert, because
+the switch guarding them was off and the expression expanded to nothing:
+**a basehash covers the expression and its dependencies, not the value it
+evaluated to.**
+
+**Why a guard rather than a line in the documentation.** The documentation
+would be written by somebody who already knew and read by somebody who
+already knew. The failure was not ignorance of the rule. It was attention
+elsewhere during a three hour unattended process. That is the situation a
+guard exists for and a paragraph does not.
+
+**Why it prints the commit before pulling.** Because the cheap recovery
+needs it. Restoring only the changed recipe file to the pre-pull commit
+restores the basehashes and BitBake resumes from its stamps instead of
+recompiling a kernel, and that commit appears in the build's opening lines
+and nowhere else once the scrollback is gone. The expensive recovery, which
+is to accept the new metadata and rebuild, is always available and costs
+about two hours.
+
+**Why it says when it could not check.** `pgrep` is absent on Git Bash,
+where the test is simply false and everything is waved through. No build
+runs on that host, so nothing is at risk, but a check reporting success
+without having looked is the failure this repository found three times in
+one day. Two lines to say which.
+
+**Cost.** One script, one verb, and a test suite. The alternative cost was
+measured: about two hours, or a delicate restore that has to be explained
+each time.
+
+## 66. An archive is refused unless the board and the system both match
+
+**Decision.** `scripts/archive.sh` checks the image's machine *and* its
+target against the kas configuration, and refuses rather than filing
+something that does not match.
+
+**Why both.** `deploy/images` holds one directory per machine and every
+image ever built for that machine inside it. The machine check alone
+catches a Pi 4 image filed under a Pi 3 configuration, which is the loud
+failure: the card does not boot and the symptom is immediate.
+
+It does not catch a `bench-rt-image` filed under `bench-router`, which is
+the quiet one. Same machine, so the check passes. That card flashes, boots,
+runs, and is wrong only in its label, which means it is discovered by
+whoever trusted the label rather than by the person who made the mistake.
+
+**Why `<target>-<machine>` and not the target alone.** `bench-image` is a
+prefix of `bench-image-dev`. A prefix match would file a debugging image
+under the production configuration, which is the same class of error one
+step smaller.
+
+**What the check deliberately cannot do.** `bench-rt` and
+`bench-rt-generic` resolve to the same target, because the control differs
+from the variable in one kernel symbol rather than in the image. Their
+output files are named identically and the second build overwrites the
+first in `deploy/images`. No check can separate them; what separates them
+is the store, one directory per configuration, and the operator naming the
+file with `BENCH_IMAGE` when both exist. Saying so in the code is better
+than a check that appears to handle it.
+
+**Cost.** A refusal the operator answers with `BENCH_IMAGE=<path>`, which
+is one line and lists its options.
+
+## 67. A stray is gitignored and warned about, not one or the other
+
+**Decision.** The layer clones kas leaves in the checkout are named in
+`.gitignore`, and `warn_stray_build_tree` names them and prints the `rm`
+for each.
+
+**Why both halves.** Ignoring alone hides a real problem: 469 MB of unread
+duplicates that every build silently steps around, announcing it each time
+as "Falling back to file-relative addressing" in a warning nobody reads.
+
+Warning alone leaves them making `git status` dirty, which is not cosmetic.
+`archive.sh` stamps each stored image with the commit and appends `-dirty`
+when the tree is not clean, so every image archived on that host claimed to
+have come from a modified tree. It had not. **A provenance record that is
+wrong about the commit is worse than none, because it is believed.**
+
+**Why they were missed for weeks.** `.gitignore` already covered `build/`,
+`tmp/`, `sstate-cache/` and `downloads/` under a comment reading "these are
+the strays". The layers were not added because they are named after real
+things: `poky` and `meta-raspberrypi` look like content rather than
+accident.
+
+**Why not just fix the kas invocation instead.** That was already done:
+`scripts/kas.sh` exports `KAS_WORK_DIR` and `KAS_BUILD_DIR`. The clones
+predate it. A fix applied forward does not clean up behind itself, which is
+the same lesson as Decision 59 in a different costume.
+
+**Cost.** Three lines of ignore, fifteen of warning.
+
+## 68. A configuration answers to both of its names
+
+**Decision.** `resolve_kas_config` accepts `rt` and `bench-rt` alike, and
+lists the configurations when neither exists.
+
+**Why.** Every build verb is the short name: `./go rt`, `./go ble`,
+`./go router`. After months of that, `./go archive rt` is what a hand
+types, and it answered `no such configuration: kas/rt.yml`, which is true and
+naming a file nobody had in mind.
+
+**Why not make the verbs long instead.** `./go bench-rt` reads worse and
+would break every documented command in four project READMEs. The
+inconsistency was in the scripts that take a configuration as data, not in
+the verbs.
+
+**Why an exact match wins.** A file that exists is never a guess. Only when
+the name as given does not resolve is the prefix tried.
+
+**Why it lists the options.** A configuration name is a closed set of files
+in one directory. There is no reason to send somebody to go and look.
+
+**Cost.** One function in `common.sh`, three call sites, seven assertions.
+
+## 69. Build outputs leave the VHDX before the build tree is deleted
+
+**Decision.** Everything worth keeping is archived with `./go archive`, and
+then copied out of WSL onto the host filesystem, before `./go clean` runs.
+
+**Why archive rather than copy the image alone.** An image on its own is a
+mystery card. The store keeps the `.bmap`, without which a flash writes the
+whole card instead of its used blocks; the `.manifest`; a `.lock.yml` with
+the layer revisions that make it rebuildable rather than only reflashable;
+and a `PROVENANCE.txt` naming the board and the commit. Those are the facts
+that decide whether a stored image is the one you want on the card in front
+of you.
+
+**Why out of the VHDX as well.** The archive store survives `./go clean`,
+because it lives beside the caches rather than inside the build tree. It
+does not survive the VHDX, and the VHDX is a single file whose sparse
+conversion WSL currently refuses on grounds of data corruption. One file,
+three images, two projects.
+
+**Why not a disk image of the card instead.** That was asked directly, and
+the archive wins on every axis that matters: 78 MB against the size of the
+card, a provenance record against a mystery blob, layer revisions against
+none, and secrets held separately and rotatable rather than baked in.
+
+The one thing a card image captures that an archive does not is hand edits
+made on the running board, and this bench is built so that there are none.
+The image carries the capability, the card carries the identity, in two
+files on a FAT partition that any laptop can read. That design decision,
+made for secrecy, turns out to be what makes a card disposable.
+
+**Cost.** 233 MB on the host, and one command before any cleanup.
+
+## 70. A new check is verified by breaking the thing it checks
+
+**Decision.** A newly written check is proved by reintroducing the defect,
+watching it fire, restoring, and watching it go quiet. Both directions,
+before it is trusted.
+
+**Why.** A check that does not fire on the bug it was written for is
+decoration, and there is no way to tell decoration from vigilance by
+reading it. The SC2120 rule took three attempts and the first two were
+silent for different reasons: once because it was defined and never added
+to `main()`, once because its own regex matched the word `run` inside a
+comment and counted prose as a call site.
+
+Both would have been committed as working. Both were caught in seconds by
+breaking the file on purpose.
+
+**Why both directions and not only the failing one.** A rule that fires is
+half of what was wanted. A rule that fires on everything is worse than
+none, because it gets silenced rather than fixed, and this repository has
+already had to narrow one rule for exactly that reason.
+
+**Why this is not paranoia.** It caught three defects in a single day: a
+`find` that read the wrong kernel tree, a test asserting the absence of one
+error message rather than the presence of a result, and the rule itself,
+twice.
+
+**Cost.** Two commands per check.
