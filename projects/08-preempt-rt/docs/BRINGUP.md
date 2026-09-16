@@ -107,24 +107,53 @@ Before any automation, prove that the pin the software will drive is the
 pin the instrument is reading.
 
 ```sh
-# Hold GPIO20 high in the background, for as long as timeout allows
-timeout 20 gpioset -c gpiochip0 20=1 &
-python3 -c "from daqhats import mcc118; print(mcc118(0).a_in_read(0))"
-# expect about 3.3
+# Hold GPIO20 high in the background, then drive it low. Two runs, not one
+# release: see below for why releasing proves nothing on this BSP.
+gpioset -c gpiochip0 20=1 & GPID=$!
+sleep 1
+python3 -c "from daqhats import mcc118; print('high:', mcc118(0).a_in_read(0))"
+kill $GPID
 
-wait                            # the line is released here
-python3 -c "from daqhats import mcc118; print(mcc118(0).a_in_read(0))"
-# expect about 0.0
+gpioset -c gpiochip0 20=0 & GPID=$!
+sleep 1
+python3 -c "from daqhats import mcc118; print('low: ', mcc118(0).a_in_read(0))"
+kill $GPID
 ```
+
+Measured on a Pi 4 with an MCC 118: **3.2977 V** high, **0.00113 V** low.
+Undriven, before either command, the same input read **0.078 to 0.083 V**,
+and that third number is worth knowing: actively driven low is a
+millivolt, merely undriven is eighty. A disconnected jumper looks like the
+latter.
 
 About 3.3 and about 0.0. Anything in between, or a reading that does not
 change, is a wiring fault, and every later number would be noise.
 
-The background job and the `timeout` are not decoration. In libgpiod v2 a
-line is only driven while the process holding it is alive, and the kernel
-returns the line to its default the moment that process exits. A `gpioset`
-run in the foreground and then read afterwards would read 0 V both times
-and look exactly like a broken jumper.
+**Two things here were wrong until hardware said so.**
+
+`timeout` is **not in this image**. The original version of this step used
+it to bound the background `gpioset`, and on the board it fails with
+`timeout: command not found`, so `gpioset` never runs at all and both reads
+return the undriven baseline. That looks exactly like a broken jumper and
+is not one. `kill $GPID` does the same job with nothing extra installed.
+
+**Releasing the line does not pull it low on this BSP.** The boot log says
+so:
+
+```
+pinctrl-bcm2835 fe200000.gpio: GPIO_OUT persistence: yes
+```
+
+Stock libgpiod v2 drives a line only while the requesting process lives,
+and the kernel returns it to its default when that process exits. The
+Raspberry Pi pinctrl driver keeps the output state instead. So killing
+`gpioset` left the pin at 3.3 V, and the second read returned exactly the
+same value to sixteen decimal places, which is one unchanged ADC code and
+not a stuck instrument.
+
+Hence two `gpioset` runs rather than one release. Drive high, read, drive
+low, read. That tests the thing the measurement actually depends on, which
+is that the pin follows what the software asks of it.
 
 ## 4. Optional, and only for the rows that need it: slow the edge
 

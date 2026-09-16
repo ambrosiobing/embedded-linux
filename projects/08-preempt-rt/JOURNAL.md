@@ -2348,3 +2348,85 @@ object.** Where it was not read off the object, it is a prediction. The
 pin numbers in the schematic came from the Pi's header, which is
 documented and standard; the terminal names came from what a board like
 this is usually called. Only one of those is evidence.
+
+## 49. The wire, proven, and two more instructions that did not survive contact
+
+**What happened.** The first numbers this project has produced from
+hardware:
+
+| State | CH0 reads |
+|---|---|
+| GPIO20 driven high | 3.2977 V |
+| GPIO20 driven low | 0.00113 V |
+| undriven | 0.078 to 0.083 V |
+
+The pin the software drives is the pin the instrument reads. Acceptance
+step 3, and every number after this rests on it.
+
+**The third row is the one worth keeping.** Actively driven low reads a
+millivolt; merely undriven reads eighty. A disconnected jumper looks like
+the undriven case, so those two numbers are what separates "the wire is
+there and low" from "the wire is not there". Neither was in the bring-up
+notes, because neither can be predicted.
+
+**First instruction that failed: `timeout` is not in the image.**
+
+```
+-sh: timeout: command not found
+```
+
+The step was written as `timeout 20 gpioset ... &`, to bound a background
+job. `timeout` is coreutils and this image does not install it, so
+`gpioset` never ran, and both reads returned the undriven baseline of about
+0.08 V. That looks exactly like a broken jumper.
+
+It cost a minute, because the shell said what was wrong. It would have cost
+much more had the reads been taken without noticing the error line: two
+identical low readings on a correctly wired board, and every instinct
+pointing at the wiring.
+
+**Second: releasing a line does not pull it low here.** The corrected test
+drove the pin high, killed `gpioset`, and read 3.2977454973788123 again,
+identical to sixteen decimal places. The bring-up notes said the opposite,
+at length and confidently:
+
+> In libgpiod v2 a line is only driven while the process holding it is
+> alive, and the kernel returns the line to its default the moment that
+> process exits.
+
+True of stock libgpiod. Not true here, and the board says so in its own
+boot log:
+
+```
+pinctrl-bcm2835 fe200000.gpio: GPIO_OUT persistence: yes
+```
+
+The Raspberry Pi pinctrl driver keeps the output state when the requesting
+process goes away. That line had been printed on every boot all day and
+nobody had read it.
+
+**The aha, and it is about where the answer was.** Both corrections were
+available before the test was written. `timeout` could have been checked
+against the image's package list; the persistence line is in every boot
+log. The bring-up notes were written from how libgpiod behaves in general,
+which is the same move as `AGND` in entry 48 and `/sys/kernel/realtime` in
+entry 43: a fact about the class of thing, written down as a fact about
+this thing.
+
+Three times in two days, on three different layers: a terminal label, a
+sysfs interface, and a driver's release semantics. The pattern is not
+carelessness about any one of them. It is that **general knowledge reads
+exactly like specific knowledge once it is written down**, and nothing in
+the sentence marks which it was.
+
+**What was done.** Step 3 rewritten to drive high and then drive low, two
+`gpioset` runs rather than one release, with `kill $GPID` instead of
+`timeout`. The measured values are in the document now, including the
+undriven baseline, because a number somebody else measured is worth more
+than an expectation.
+
+**What changes as a result.** Where a bring-up step depends on a tool, the
+tool belongs in the image's package list and the step should say so. Where
+it depends on a behaviour, the behaviour belongs in a boot log or a
+datasheet, and the step should say which. Anything else is a prediction
+wearing an instruction's clothes.
