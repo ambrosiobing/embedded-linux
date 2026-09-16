@@ -15,8 +15,8 @@
 . "$(dirname "$0")/common.sh"
 
 config=${1:-bench-rpi4}
-kasfile=$REPO_DIR/kas/$config.yml
-[ -f "$kasfile" ] || die "no such configuration: kas/$config.yml"
+kasfile=$(resolve_kas_config "$config")
+config=$(basename "$kasfile" .yml)
 
 require_tool kas
 require_no_running_build

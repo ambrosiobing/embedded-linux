@@ -127,6 +127,38 @@ out=$(printf '1700000000 /deploy/my images/bench.wic.bz2\n' |
 	newest_path image 2>/dev/null)
 check "a path with a space is not truncated" "$out" "/deploy/my images/bench.wic.bz2"
 
+# ------------------------------------------- both names for one config
+#
+# ./go rt builds bench-rt, so "./go archive rt" is the thing a hand types
+# after months of the former. It used to answer "no such configuration:
+# kas/rt.yml", which is true and names a file nobody had in mind.
+#
+# build.sh resolves through here too, so this is not only about ergonomics
+# any more: a regression would break every build verb.
+
+out=$(resolve_kas_config bench-rt)
+check "the full name resolves" "$(basename "$out")" "bench-rt.yml"
+
+out=$(resolve_kas_config rt)
+check "the short name resolves to the same file" \
+	"$(basename "$out")" "bench-rt.yml"
+
+out=$(resolve_kas_config rt-generic)
+check "and a short name with its own hyphen is not confused" \
+	"$(basename "$out")" "bench-rt-generic.yml"
+
+# The full name wins when both could match, because a file that exists is
+# never a guess.
+out=$(resolve_kas_config bench-rpi4)
+check "an exact match is preferred" "$(basename "$out")" "bench-rpi4.yml"
+
+rc=0
+out=$( (resolve_kas_config nonesuch) 2>&1 ) || rc=$?
+check "an unknown name fails" "$rc" "1"
+contains "and names both spellings it tried" "$out" "no kas/bench-nonesuch.yml"
+contains "and lists what does exist" "$out" "bench-router"
+contains "and says either spelling works" "$out" "Either spelling works"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

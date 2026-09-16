@@ -85,6 +85,42 @@ require_host_disk_gb() {
 	fi
 }
 
+# Turn whatever the operator typed into a kas file, and accept both
+# vocabularies.
+#
+# ./go rt builds bench-rt. ./go ble builds bench-ble. Every build verb is
+# the short name with the bench- prefix dropped, so after months of typing
+# "./go rt" the natural thing to type is "./go archive rt", and that used
+# to fail with:
+#
+#   error: no such configuration: kas/rt.yml
+#
+# which is true, unhelpful, and names a file nobody was thinking about. The
+# scripts that take a configuration by name wanted "bench-rt"; the scripts
+# that take it as a verb wanted "rt"; nothing said so at the point of use.
+#
+# So try the name as given, then with the prefix, and when neither exists
+# list what does. A configuration name is a closed set of nine files: there
+# is no reason to make somebody go and look.
+resolve_kas_config() {
+	_name=$1
+	if [ -f "$REPO_DIR/kas/$_name.yml" ]; then
+		printf '%s\n' "$REPO_DIR/kas/$_name.yml"
+		return 0
+	fi
+	if [ -f "$REPO_DIR/kas/bench-$_name.yml" ]; then
+		printf '%s\n' "$REPO_DIR/kas/bench-$_name.yml"
+		return 0
+	fi
+	die "no such configuration: kas/$_name.yml, and no kas/bench-$_name.yml
+
+       The configurations are:
+$(find "$REPO_DIR/kas" -maxdepth 1 -name '*.yml' 2>/dev/null | sort |
+		sed 's|.*/||; s|\.yml$||; s|^|           |')
+
+       Either spelling works: bench-rt or rt."
+}
+
 require_tool() {
 	command -v "$1" >/dev/null 2>&1 ||
 		die "$1 is not installed. Run scripts/host-setup.sh."

@@ -134,8 +134,8 @@ sibling() {
 
 save() {
 	config=$1
-	kasfile=$REPO_DIR/kas/$config.yml
-	[ -f "$kasfile" ] || die "no such configuration: kas/$config.yml"
+	kasfile=$(resolve_kas_config "$config")
+	config=$(basename "$kasfile" .yml)
 	[ -d "$DEPLOY" ] || die "no build tree at $DEPLOY. Build first."
 
 	if [ -n "${BENCH_IMAGE:-}" ]; then
