@@ -4,6 +4,23 @@ build/
 tmp/
 sstate-cache/
 downloads/
+
+# And the layers themselves. kas clones poky, meta-openembedded and
+# meta-raspberrypi into KAS_WORK_DIR, which is ~/bench; run without that
+# variable set it falls back to paths relative to the kas file and clones a
+# second set in here, 469 MB of them, which nothing then uses.
+#
+# Ignored rather than merely warned about because of what they were
+# actually costing: scripts/archive.sh stamps each stored image with the
+# commit and appends -dirty when git status is not clean, so every archive
+# taken on that host claimed to come from a modified tree. It did not. The
+# record was wrong about the one thing it exists to get right.
+#
+# scripts/common.sh warns when they are present, since ignoring a stray is
+# not the same as wanting one.
+poky/
+meta-openembedded/
+meta-raspberrypi/
 *.wic
 *.wic.bz2
 *.wic.bmap

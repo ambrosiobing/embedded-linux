@@ -138,13 +138,43 @@ require_tool() {
 # decision a helper function should take. .gitignore already keeps it out
 # of commits; what it cannot do is say where the build actually went.
 warn_stray_build_tree() {
-	[ -d "$REPO_DIR/build" ] || return 0
-	echo "warning: there is a build tree inside the checkout at" >&2
-	echo "         $REPO_DIR/build" >&2
-	echo "         Something ran kas without KAS_BUILD_DIR set, so it built" >&2
-	echo "         there instead of in $BENCH_WORK, with its own caches." >&2
-	echo "         Nothing here uses it. Once you are sure, remove it and" >&2
-	echo "         its downloads and sstate-cache siblings." >&2
+	if [ -d "$REPO_DIR/build" ]; then
+		echo "warning: there is a build tree inside the checkout at" >&2
+		echo "         $REPO_DIR/build" >&2
+		echo "         Something ran kas without KAS_BUILD_DIR set, so it built" >&2
+		echo "         there instead of in $BENCH_WORK, with its own caches." >&2
+		echo "         Nothing here uses it. Once you are sure, remove it and" >&2
+		echo "         its downloads and sstate-cache siblings." >&2
+	fi
+
+	# And the layers, which are the same accident one level up. Without
+	# KAS_WORK_DIR, kas addresses local includes relative to the kas file
+	# and clones poky, meta-openembedded and meta-raspberrypi in here
+	# rather than into $BENCH_WORK. Every build then prints "Falling back
+	# to file-relative addressing" and carries on using the right ones,
+	# so the duplicates sit there unnoticed.
+	#
+	# 469 MB of them sat in this checkout for weeks. What surfaced them
+	# was not disk: archive.sh appends -dirty to a stored image's commit
+	# when git status is not clean, and every image archived on that host
+	# claimed to come from a modified tree. It did not. A provenance
+	# record that is wrong about the commit is worse than none, because
+	# it is believed.
+	_strays=
+	for _layer in poky meta-openembedded meta-raspberrypi; do
+		[ -d "$REPO_DIR/$_layer" ] || continue
+		_strays="$_strays $_layer"
+	done
+	[ -n "$_strays" ] || return 0
+
+	echo "warning: layer clones inside the checkout:$_strays" >&2
+	echo "         kas put these here rather than in $BENCH_WORK, and the" >&2
+	echo "         build uses the ones in $BENCH_WORK. These are copies." >&2
+	echo "         They are gitignored, so they no longer make archives" >&2
+	echo "         say -dirty, but nothing reads them. To remove:" >&2
+	for _layer in $_strays; do
+		echo "             rm -rf $REPO_DIR/$_layer" >&2
+	done
 }
 
 # Pick the newest of several candidate paths, and say what was not picked.
