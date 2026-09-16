@@ -161,7 +161,7 @@ overflow counter. Three consequences:
 | The cause of a late wake-up | needs a trace, not a histogram | Project 9: ftrace, `trace-cmd`, `sched_switch` |
 | Worst case rather than observed maximum | needs static analysis or a far longer run; 60 s at 1 kHz is 60000 samples and says nothing about the hour you did not measure | stated as a limit, not fixed |
 | Energy cost of PREEMPT_RT | needs the PPK2 from Project 3 | a row in Project 3's table |
-| The same matrix on a Pi 3B+ | different interrupt routing and memory bandwidth | a stretch goal |
+| The same matrix on a Pi 4 | a faster core, separate Ethernet and USB buses, more memory bandwidth | a stretch goal, and the board these thresholds were written for |
 
 The third row is the one to say out loud in an interview. A 60 s run
 produces an observed maximum, and an observed maximum is not a guarantee.
@@ -175,7 +175,7 @@ between configurations.
 
 | Choice | Reason | What would change it |
 |---|---|---|
-| 60 s per run | 30000 rising edges makes a 99.9th percentile mean something; longer and a bare Pi 4 under `stress-ng` starts throttling mid-run | a heatsink, and then 300 s runs for the rows that matter |
+| 60 s per run | 30000 rising edges makes a 99.9th percentile mean something; longer and a bare Pi 3B under `stress-ng` starts throttling mid-run | a heatsink, and then 300 s runs for the rows that matter |
 | 1 kHz toggling | one edge per millisecond is the classic control loop rate, and it is the rate cyclictest is usually quoted at, so the two are comparable | a 10 kHz row would show where the system call cost starts to dominate |
 | SCHED_FIFO 80 | above everything ordinary, below the 99 that kernel threads such as the timer softirq use. Going above them is a good way to hang the board | nothing, unless the application under study has its own priority scheme |
 | Priority 80 for cyclictest too | the same priority on the same core, so the comparison is between instruments and not between priorities | nothing |

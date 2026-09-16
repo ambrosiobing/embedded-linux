@@ -1,5 +1,47 @@
 # 08. Board bring-up
 
+## Which board, and why it is not a free choice
+
+An image is built for one `MACHINE`. The kernel, the device tree, the tune
+flags and `config.txt` are all baked in, and `./go flash` does not compare
+the image against the card it is writing to. A `raspberrypi4-64` image on a
+card for a Pi 3 does not warn, it simply does not boot, and the symptom is
+a board that looks dead.
+
+So the board is decided before the build, and on this bench it is often
+decided by the hardware rather than by preference. A HAT either seats on a
+board or it does not: the 40-pin header is standard but the surrounding
+ports are not, and a HAT with screw terminals can foul a connector that
+moved between models. Project 8 changed machine after the DAQ HAT had been
+stacked, which cost a rebuild of a kernel and an image.
+
+**The order that avoids it:** stack the HAT on the board you intend to use,
+confirm it seats, then set `machine:` and build. Not the other way round.
+
+**And read the board's own label before writing anything about it.**
+Project 8 spent two days reasoning about which Raspberry Pi the HAT was on,
+invented a mechanism for why it did not fit another one, and wrote
+"Cortex-A53 at 1.4 GHz" into a comparison table. The board turned out to be
+a 3B v1.2 from 2015: same core at 1.2 GHz, 1 GB of memory, 100 Mbit
+Ethernet behind the USB hub. It had been on the desk the whole time with
+its model and revision printed on it.
+
+One thing did survive that, by luck rather than by care.
+meta-raspberrypi's `raspberrypi3-64` covers the whole BCM2837 family, so a
+3B and a 3B+ take the same image and the machine setting happened to be
+right. Machine names are coarser than board names, which is convenient
+here and misleading in general: `raspberrypi4-64` and `raspberrypi3-64` are
+not interchangeable, and neither tells you which revision is under the HAT.
+
+**And when the board changes, the thresholds do not.** Acceptance criteria
+written as absolute numbers were written for a particular piece of silicon.
+Moving them to suit a slower board turns a criterion into a prediction.
+Keep them, mark which board they were written for, and record which board
+produced each row. Where a criterion can be expressed relatively, one
+configuration against another on the same hardware, prefer that: it
+survives a change of board and it is usually the claim you actually wanted
+to make.
+
 ## Flashing
 
 ```sh

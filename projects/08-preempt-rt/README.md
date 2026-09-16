@@ -1,6 +1,6 @@
 # Project 8: a PREEMPT_RT latency lab with the MCC 118 as the instrument
 
-**Board:** Raspberry Pi 3 (see below). **Theme:** real-time kernel,
+**Board:** Raspberry Pi 3 Model B v1.2 (see below). **Theme:** real-time kernel,
 cyclictest, IRQ affinity, jitter measurement.
 
 Real-time Linux is usually argued about with cyclictest numbers, and
@@ -121,9 +121,16 @@ first `daqhats_list_boards` to the sixteenth row.
 
 ## The board is the one the HAT fits
 
-Originally scoped for a Raspberry Pi 4, and built on a Raspberry Pi 3,
-because the MCC 118 does not seat on a Pi 4: the 40-pin header is the same
-but the Pi 4 moved the Ethernet and USB stacks and the HAT fouls them.
+Originally scoped for a Raspberry Pi 4, and built on a Raspberry Pi 3
+Model B v1.2, because that is the board the MCC 118 is stacked on and
+seated. The Pi 4 was the plan; the HAT was not fitted to it. Why not is
+not recorded, because it was not observed, and an earlier draft of this
+paragraph invented a reason and had to be withdrawn: see journal entries
+32 to 34.
+
+The machine is `raspberrypi3-64`. meta-raspberrypi uses that name for the
+whole BCM2837 family, so the same image covers a 3B and a 3B+, and the 64
+bit build is what `ARCH_SUPPORTS_RT` requires.
 
 Nothing in the design objects. Both boards are quad-core arm64, so
 `ARCH_SUPPORTS_RT` and `isolcpus=3` mean the same thing on either, the pin
@@ -133,11 +140,17 @@ matching the SoC label.
 
 What changes is what the numbers will say:
 
-| | Pi 4 (as scoped) | Pi 3 (as built) |
+| | Pi 4 (as scoped) | Pi 3B v1.2 (as built) |
 |---|---|---|
-| Core | Cortex-A72, 1.5 GHz | Cortex-A53, 1.4 GHz |
-| Ethernet and USB | separate buses | shared USB bus, so more interrupt traffic on one controller |
-| Thermal limit | 80 C | lower, so the throttle gate fires sooner under `stress-ng` |
+| Core | Cortex-A72, 1.5 GHz | Cortex-A53, 1.2 GHz |
+| Memory | 2 to 8 GB | 1 GB |
+| Ethernet and USB | separate buses | 100 Mbit Ethernet behind the same USB hub, so more interrupt traffic on one controller |
+| Thermal limit | 80 C | the same trip point, less headroom, so the throttle gate fires sooner under `stress-ng` |
+
+That is a slower core and a busier interrupt controller, which is to say a
+harder real-time target. It is also the more interesting one to measure:
+if the preemption model shows up anywhere, it shows up where the machine
+is under pressure.
 
 The absolute thresholds in the acceptance table, a 99.9th percentile below
 50 us and a maximum below 150 us, were written for a Pi 4 and are kept as

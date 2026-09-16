@@ -93,3 +93,27 @@ What this does not prove:
 It proves that the configuration the board will be given is the
 configuration that was asked for. Everything after this is the build, the
 card and the wire.
+
+
+NOTE ADDED 16 September 2026, after the board was confirmed
+-----------------------------------------------------------
+
+Everything above was captured for MACHINE raspberrypi4-64 and is left
+exactly as captured, because evidence that is edited afterwards is not
+evidence. The board the MCC 118 is actually stacked on turned out to be a
+Raspberry Pi 3 Model B v1.2, so the machine is now raspberrypi3-64 and
+this check has to be run again against that tree.
+
+What the rerun is expected to change and what it is not:
+
+  changes    the paths, which carry the machine name, and the defconfig
+             the fragments are merged on top of
+  unchanged  the kernel version, because PREFERRED_VERSION_linux-
+             raspberrypi is set in kas/bench-rt.yml and is not a machine
+             property
+  unchanged  ARCH_SUPPORTS_RT, which arch/arm64/Kconfig selects for the
+             architecture and not for the SoC
+
+So the expected outcome is the same 31 lines, from a different directory.
+If it is not, that is the finding, and it goes in the journal before
+anything else is built.

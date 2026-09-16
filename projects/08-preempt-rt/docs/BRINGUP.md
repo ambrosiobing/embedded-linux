@@ -17,7 +17,7 @@ Power off, HAT off.
 | The HAT's address links are at 0 | `rt-capture --address 0` is the default, and `daqhats_list_boards` will say otherwise |
 | Nothing else is on the 40 pin header | The HAT owns SPI0, three address lines and the ID EEPROM pins |
 | The jumper from pin 38 goes to CH0 and the one from pin 39 goes to AGND | A signal without its ground reference reads as noise around an arbitrary offset |
-| A heatsink or a fan is fitted | A bare Pi 4 throttles inside a 60 s `stress-ng` run, and `rt-run` will refuse to start once it does |
+| A heatsink or a fan is fitted | A bare Pi 3B throttles inside a 60 s `stress-ng` run, and `rt-run` will refuse to start once it does |
 | The USB/TTL cable is on pins 8, 10 and 6, red lead not connected | Under load, ssh is the first thing to stall. The console is how the run that went wrong gets diagnosed |
 
 Count the pins twice. Pin 38 and pin 40 are adjacent, and pin 40 is
@@ -39,7 +39,7 @@ Flash one and boot it:
 ```sh
 uname -r                       # 6.12.x
 cat /sys/kernel/realtime       # 1 on the rt build, absent on the control
-gpiodetect                     # gpiochip0, pinctrl-bcm2835 on a Pi 3
+gpiodetect                     # gpiochip0, pinctrl-bcm2835 on a Pi 3B
 ```
 
 **This step originally said `bench-rt-image` "carries the generic BSP
@@ -55,7 +55,7 @@ the second:
 
 ```sh
 mkdir -p ~/bench/kernel-rt
-cd ~/bench/build/tmp/deploy/images/raspberrypi4-64
+cd ~/bench/build/tmp/deploy/images/raspberrypi3-64
 cp Image modules-*.tgz ~/bench/kernel-rt/
 cp *.dtb ~/bench/kernel-rt/ && cp -r overlays ~/bench/kernel-rt/
 ```
@@ -145,7 +145,7 @@ First build it, and check the fragment before paying for the compile:
 
 ```sh
 ./go bitbake bench-rt -c kernel_configme virtual/kernel
-head -4 $BENCH_WORK/build/tmp/work-shared/raspberrypi4-64/kernel-source/Makefile
+head -4 $BENCH_WORK/build/tmp/work-shared/raspberrypi3-64/kernel-source/Makefile
 ./go ksym -f rt
 ./go kconfig -f rt
 ./go rt

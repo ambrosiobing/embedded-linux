@@ -22,7 +22,7 @@ instrument watches it from outside, on its own clock. Any disagreement
 between them is information rather than an error.
 
 ```
-                      SYSTEM UNDER TEST (Raspberry Pi 3)
+                    SYSTEM UNDER TEST (Raspberry Pi 3B v1.2)
   +----------------------------+  +------------------------------------+
   | isolated CPU3              |  | CPUs 0 to 2, normal priority       |
   |                            |  |                                    |
@@ -85,7 +85,7 @@ run rather than quietly shortening it.
 ## Schematic
 
 ```
-   Raspberry Pi 3 (40 pin header)              MCC 118 DAQ HAT
+   Raspberry Pi 3B (40 pin header)             MCC 118 DAQ HAT
   +------------------------------+           +------------------------+
   |                              |           |                        |
   | pin 38  GPIO20  o------------+---[R]--+--+-o CH0   (+/-10 V, SE)  |
@@ -149,14 +149,14 @@ beside it. That is the whole derivation.
           +-----|----------------------|--------------+
           |  [40 pin header]                          |
           |                                           |
-          |  Raspberry Pi 3                    [ETH]  |
+          |  Raspberry Pi 3B                   [ETH]  |
           |                                    [USB]--+---> USB/TTL ---> host PC
           |  [microSD]                                |     115200 8N1
           |  [USB-C 5 V]                              |
           +-------------------------------------------+
                         ^
                         |
-                heatsink or fan: a bare Pi 4 under stress-ng
+                heatsink or fan: a bare Pi 3B under stress-ng
                 starts throttling inside a 60 s run, and a clock
                 that changes mid-measurement changes the histogram
                 without saying so

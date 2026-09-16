@@ -1290,9 +1290,19 @@ answers at all.
 ## 32. The board is the one the HAT fits
 
 **What happened.** With the image built for `raspberrypi4-64` and about to
-be flashed, the HAT was stacked and did not seat on a Pi 4. It fits a Pi 3
-exactly. The 40-pin header is identical on both; what differs is that the
-Pi 4 moved the Ethernet and USB stacks, and the MCC 118 fouls them.
+be flashed, the HAT was stacked on a Pi 3 and fitted.
+
+**Correction, written the same day.** The sentence that stood here said the
+HAT "did not seat on a Pi 4", with an explanation about the Pi 4 having
+moved its Ethernet and USB stacks. Nobody observed that. What was observed
+was that the HAT fits a Pi 3; the rest was inferred, written as though it
+had been seen, and committed. Told afterwards that the HAT seats on a 4B
+and a 3B+ and not on a plain 3, which contradicts it.
+
+What is actually known: the HAT is on a Pi 3 class board, and
+`raspberrypi3-64` covers both the 3B and the 3B+, so the machine line is
+correct either way. Why the Pi 4 was not used is **not** settled and no
+longer claimed here. See entry 33.
 
 **What was done.** `kas/bench-rt.yml` sets `machine: raspberrypi3-64`, and
 the board changed in the project README, the three figures in DESIGN.md,
@@ -1337,3 +1347,117 @@ control kernel from entry 29 matters more than the absolute numbers do.
 real-time and the control configurations now target a different machine
 than the one already built. The image on disk is for a board the HAT does
 not fit.
+
+---
+
+## 33. An inference written down as an observation
+
+**What happened.** Told "I can't stack the MCC 118 on the Pi 4, it fits
+almost exactly on the Pi 3", I changed the machine, rewrote three figures,
+the README, the bring-up notes and the front-page table, and wrote entry 32
+saying the HAT "did not seat on a Pi 4" because the Pi 4 moved its Ethernet
+and USB stacks.
+
+The observation was that it fits a Pi 3. The mechanism was invented to
+explain it. Both went into a journal entry and a commit message in the same
+voice, and nothing in either distinguished the part that was seen from the
+part that was reasoned.
+
+The correction came one message later: it seats on a 4B and a 3B+, not on a
+plain 3. So the invented mechanism was not just unverified, it was wrong,
+and it is now in the pushed history of a portfolio repository.
+
+**What was done.** Entry 32 corrected in place rather than edited quietly,
+which is the house rule, and the mechanism removed rather than replaced
+with a better guess. The open question is left open.
+
+**Why that and not the alternative.** The alternative is to find a
+plausible reason the 4B might not fit and write that instead. It would read
+better and be worth nothing.
+
+**The pattern, fourth instance.** This repository has now recorded four
+versions of the same fault, and they are worth listing together because
+the shape is clearer than any one of them:
+
+| Entry | The claim | What it actually was |
+|---|---|---|
+| 21 | the instruments differ by the GPIO write cost | algebra nobody had done |
+| 25 | the fragment did not reach the kernel | the wrong `.config`, said so in a line nobody read |
+| 29 | the two images differ in the preemption model alone | true when written, false after a version pin |
+| 33 | the HAT does not fit a Pi 4 | an inference from "it fits a Pi 3" |
+
+Entries 21 and 29 were claims that decayed. Entry 25 was a tool reporting
+faithfully about the wrong input. This one is different and worse: there
+was no decay and no wrong input, only a gap of one question, and the answer
+would have cost a sentence.
+
+**What changes as a result.** A journal entry records what happened.
+Where something was inferred rather than seen, it says so, in the same
+sentence rather than in a later correction. "The HAT fits a Pi 3" and "the
+HAT does not fit a Pi 4" are different statements and only one of them was
+ever true here.
+
+The cheapest guard is the one that was skipped: when a fact would change a
+build, a document or a claim, ask. One question against a machine change,
+three figures, four documents and a commit.
+
+## 34. The board named, and three numbers that were wrong with it
+
+**What happened.** The question left open at the end of entry 33 was
+answered in five words: a Raspberry Pi 3 Model B v1.2, 2015.
+
+That is not the 3B+. It is the original BCM2837 board, and it settles
+three things at once.
+
+**The machine setting was already right, for a reason that had not been
+checked.** `machine: raspberrypi3-64` had been set on the strength of "it
+fits a Pi 3". It survives, because meta-raspberrypi uses `raspberrypi3-64`
+for the whole BCM2837 family and a 3B and a 3B+ take the same image. Being
+right by accident is not the same as being right, and the only reason it
+did not cost a rebuild is that the two boards happen to share a machine
+name.
+
+**Three numbers written for the wrong board.** The comparison table in the
+project README described the board as built as a Cortex-A53 at 1.4 GHz.
+That is the 3B+. The 3B v1.2 is the same core at 1.2 GHz, with 1 GB of
+memory rather than up to 8, and 100 Mbit Ethernet behind the same USB hub
+as everything else rather than the 3B+'s gigabit. Corrected, along with
+"a bare Pi 4 throttles" in two documents, which was written when the board
+was still going to be a Pi 4.
+
+**Where the numbers were not touched.** The absolute acceptance
+thresholds, 99.9th percentile below 50 us and maximum below 150 us, stay
+exactly as written. They were written for a Pi 4 and they are labelled as
+such. A slower core with a busier interrupt controller is more likely to
+miss them, and if it does, that is the measurement. Moving a threshold
+after seeing the hardware is how a results table stops meaning anything.
+
+The relative criterion is unaffected and always was: generic several times
+worse than real-time, same load, same board, same userspace. That is a
+property of the preemption model.
+
+**The evidence file, and why it was annotated rather than edited.**
+`docs/evidence/kconfig-check.txt` is verbatim `./go kconfig -f rt` output
+and it says `MACHINE raspberrypi4-64`, because that is what the machine was
+when the check ran. It is left exactly as captured, with a dated note
+appended saying what changed and what the rerun is expected to show: the
+same 31 lines from a different directory, because the kernel version comes
+from `PREFERRED_VERSION_linux-raspberrypi` and `ARCH_SUPPORTS_RT` is
+selected by the architecture, neither of which is a machine property.
+
+Editing a captured output to match a later belief would have been quick,
+undetectable, and the end of the file's usefulness. Criterion 7 is now
+provisional again until that rerun.
+
+**The aha, and it is a small one.** The thing that resolved two days of
+wrong assumptions was the board's own silkscreen. Everything upstream of
+that, the mechanism about the Pi 4, the 1.4 GHz, the choice of machine,
+was reasoning about hardware that was sitting on the desk the whole time.
+Read the label.
+
+**What changes as a result.** `./go rt` and `./go rt-generic` have to be
+built again for `raspberrypi3-64`, and every copy-and-paste path in
+BRINGUP.md that carried the machine name has been corrected, because those
+are the commands that go stale silently: a `cp` from a directory that does
+not exist fails loudly, but a `cp` from the old one that still exists is
+worse.

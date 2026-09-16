@@ -1420,4 +1420,122 @@ that is not a decision a lint rule can make.
 
 ---
 
+## 55. An observation and an inference are written differently
+
+**Context.** Told that a DAQ HAT fits a Raspberry Pi 3, a journal entry was
+written saying it "did not seat on a Pi 4", with a mechanism about the
+Pi 4 having moved its Ethernet and USB stacks. Only the first half was
+observed. The mechanism was invented to explain it, written in the same
+voice, and committed. It was wrong, and it is in the pushed history.
+
+**Decision.** Where something was inferred rather than seen, the sentence
+says so, at the point of the claim rather than in a later correction. When
+an unverified fact would change a build, a document or a claim, ask before
+acting on it.
+
+**Rejected.** Replacing a wrong mechanism with a more plausible one. It
+reads better and is worth nothing.
+
+**Why.** The repository has recorded four instances of one family now, and
+the differences matter:
+
+| Fault | Shape |
+|---|---|
+| The instruments differ by the system call cost | a claim nobody had done the algebra for |
+| The fragment did not reach the kernel | a tool reporting faithfully about the wrong input |
+| The two images differ only in the preemption model | true when written, false after a later change |
+| The HAT does not fit a Pi 4 | an inference recorded as an observation |
+
+The first three decayed or misfired. The fourth had no decay and no wrong
+input, only a missing question, and the answer would have cost a sentence
+against a machine change, three figures, four documents and a commit.
+
+**Consequence.** Journal entries get longer in one specific way: "measured"
+and "inferred" are separate words, and a correction says what was actually
+seen rather than substituting a better guess. The acceptance tables already
+made this distinction between what a file says and what a board did; this
+extends it to the prose.
+
+---
+
+## 56. The board is what the hardware allows, and thresholds do not move with it
+
+**Context.** Project 8 was scoped for a Raspberry Pi 4 and its acceptance
+criteria name absolute figures: a 99.9th percentile below 50 us and a
+maximum below 150 us under load. Which board the DAQ HAT physically seats
+on decided where it would run.
+
+**Decision.** The machine follows the hardware. The thresholds do not. They
+stay as written and are marked as the board they were written for, and a
+row records which board produced it.
+
+**Rejected.** Adjusting the numbers to what the board in hand is likely to
+manage.
+
+**Why.** A threshold moved to fit the hardware is a prediction wearing a
+criterion's clothes, and it will pass. A Cortex-A53 with Ethernet and USB
+on one shared controller is a harder real-time target than a Cortex-A72; if
+it misses a Pi 4 threshold that is a measurement worth reporting, not a
+failure worth hiding by moving the line.
+
+**Consequence.** The argument rests on the relative criterion instead, and
+it is stronger for it: the generic kernel several times worse than the
+real-time one, under the same load, on the same hardware, with the same
+userspace. That is a property of the preemption model rather than of the
+silicon, it holds on either board, and it is why the control kernel from
+decision 53 matters more than any absolute number in the table.
+
+---
+
 Previous: [10. Generalising](10-generalising.md) | Index: [Walkthrough](README.md)
+
+## 57. Captured evidence is annotated, never edited
+
+**Decision.** When a file in `docs/evidence/` is contradicted by something
+learned later, the captured text stays byte for byte as captured and a
+dated note is appended saying what changed and what a rerun is expected to
+show. The acceptance criterion it supported goes back to provisional until
+that rerun happens.
+
+**Why.** `projects/08-preempt-rt/docs/evidence/kconfig-check.txt` is
+verbatim `./go kconfig -f rt` output and its header says
+`MACHINE raspberrypi4-64`, because that is what the machine was at 06:56 on
+16 September 2026. The board was later confirmed to be a Pi 3B, the machine
+changed, and that header became wrong.
+
+Editing it would have taken one substitution and been undetectable. It
+would also have converted the only file in the project whose value is that
+nobody wrote it into a file somebody wrote. Evidence that gets tidied to
+match the current belief is no longer capable of contradicting the current
+belief, which is the entire job.
+
+The note says what is expected to change on the rerun (the paths, which
+carry the machine name) and what is not (the kernel version, pinned in the
+kas file, and `ARCH_SUPPORTS_RT`, selected by the architecture). Writing
+the prediction down before the rerun is what makes the rerun worth doing.
+
+**Cost.** Criterion 7 is unproven again until the kernel is reconfigured
+for `raspberrypi3-64`. That is the honest state and it is cheap to fix:
+`kernel_configme` is minutes.
+
+## 58. Absolute thresholds do not move to meet the hardware
+
+**Decision.** The Project 8 acceptance thresholds, a 99.9th percentile
+below 50 us and a maximum below 150 us, stay as written after the board
+changed from a Pi 4 to a slower Pi 3B. They are labelled with the board
+they were written for, and each results row records the board it was taken
+on.
+
+**Why.** A threshold chosen after seeing the hardware is not a threshold,
+it is a description. The value of writing one down in advance is precisely
+that the hardware can miss it, and a miss on a 1.2 GHz core with its
+Ethernet behind a shared USB hub is a result worth reporting rather than an
+embarrassment worth hiding.
+
+**The general form.** Prefer a relative criterion where the project allows
+one. "The generic kernel is several times worse than the real-time kernel,
+under the same load, on the same board, with the same userspace" is a
+property of the preemption model. It survives a change of board, a change
+of governor and a change of silicon vendor, and it is usually the claim
+that was actually wanted. The absolute number is the one that has to be
+qualified; keep both, and be clear about which carries the argument.
