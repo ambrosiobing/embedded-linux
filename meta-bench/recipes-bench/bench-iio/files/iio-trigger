@@ -1,0 +1,217 @@
+#!/bin/sh
+#
+# iio-trigger - create, list and remove the software triggers.
+#
+#   iio-trigger list
+#   iio-trigger add hrtimer NAME HZ
+#   iio-trigger add sysfs NAME
+#   iio-trigger fire NAME              a sysfs trigger, once
+#   iio-trigger remove NAME
+#
+# Two kinds of software trigger, created two different ways, which is the
+# first thing about them that costs time.
+#
+# A hrtimer trigger is a configfs object: it exists because a directory was
+# created under /sys/kernel/config/iio/triggers/hrtimer/, and it is removed
+# by rmdir. If configfs is not mounted there is no error message worth
+# reading, only an empty directory, because the mount point is present in
+# any image with CONFIG_CONFIGFS_FS and says nothing about whether anything
+# was mounted on it.
+#
+# A sysfs trigger is not a configfs object at all. It is created by writing
+# a number to /sys/bus/iio/devices/iio_sysfs_trigger/add_trigger, and it
+# fires when something writes to its trigger_now attribute. It is the right
+# tool when an event in an application, rather than time, should drive the
+# capture.
+#
+# Neither is the IMU's trigger. The LSM6DSV16X has a hardware FIFO and its
+# own interrupt, so st_lsm6dsx registers a trigger of its own and the
+# buffered path uses that. Pointing a hrtimer trigger at the accelerometer
+# would work and would measure the wrong thing: the point of the FIFO is
+# that the sensor decides when a sample is taken.
+#
+# BENCH_IIO_ROOT relocates /sys for tests/iio-trigger-test.sh.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+ROOT=${BENCH_IIO_ROOT:-}
+SYS=$ROOT/sys
+PROC=$ROOT/proc
+CONFIGFS=$SYS/kernel/config
+HRTIMER=$CONFIGFS/iio/triggers/hrtimer
+SYSFS_TRIG=$SYS/bus/iio/devices/iio_sysfs_trigger
+
+die() {
+	echo "iio-trigger: $*" >&2
+	exit 1
+}
+
+note() {
+	echo "--- $*"
+}
+
+usage() {
+	sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
+	exit 2
+}
+
+# configfs being mounted is a different fact from the directory existing,
+# and only one of them can be checked by looking for the directory. An
+# unmounted configfs leaves /sys/kernel/config present and empty, so a
+# mkdir there succeeds, creates an ordinary directory, and produces a
+# trigger that does not exist as far as the kernel is concerned.
+#
+# That failure is silent all the way to an empty buffer, so it is worth one
+# grep of /proc/mounts to turn it into a sentence.
+require_configfs() {
+	# The mounts file is relocatable for the same reason everything else
+	# here is. An earlier version skipped this check entirely whenever
+	# BENCH_IIO_ROOT was set, on the grounds that a test root has no
+	# /proc/mounts, which made the most valuable branch in this function
+	# the one branch no test could reach. A check that disables itself
+	# under test is a check nobody has ever seen work.
+	if ! grep -q " $CONFIGFS configfs " "$PROC/mounts" 2>/dev/null; then
+		die "configfs is not mounted at $CONFIGFS.
+       mount -t configfs none $CONFIGFS
+       Without it the mkdir below succeeds, creates an ordinary directory,
+       and the trigger silently does not exist: /sys/kernel/config is
+       present in any image built with CONFIG_CONFIGFS_FS and says nothing
+       about whether anything was mounted on it."
+	fi
+	[ -d "$HRTIMER" ] || die "no $HRTIMER.
+       The hrtimer trigger module is not loaded. It is
+       kernel-module-iio-trig-hrtimer in the image, and a module that is
+       configured in the kernel is not a module that is installed."
+}
+
+cmd_list() {
+	note "hrtimer triggers (configfs)"
+	if [ -d "$HRTIMER" ]; then
+		for t in "$HRTIMER"/*; do
+			[ -d "$t" ] || continue
+			printf '    %s\n' "$(basename "$t")"
+		done
+	else
+		printf '    none, %s does not exist\n' "$HRTIMER"
+	fi
+
+	note "triggers the IIO core knows about"
+	for t in "$SYS"/bus/iio/devices/trigger*; do
+		[ -e "$t/name" ] || continue
+		printf '    %s  %s\n' "$(basename "$t")" "$(cat "$t/name")"
+	done
+}
+
+cmd_add() {
+	kind=${1:-}
+	name=${2:-}
+	[ -n "$kind" ] && [ -n "$name" ] || usage
+
+	case $kind in
+	hrtimer)
+		hz=${3:-}
+		[ -n "$hz" ] || die "hrtimer needs a rate in Hz"
+		require_configfs
+		[ -d "$HRTIMER/$name" ] && die "$name already exists"
+		mkdir "$HRTIMER/$name"
+
+		# The rate is set on the trigger's IIO device, not on the
+		# configfs directory. Two objects, one name, and the configfs
+		# one has no sampling_frequency attribute at all.
+		_dev=$(trigger_device_of "$name")
+		if [ -z "$_dev" ]; then
+			# Undo the mkdir. A configfs object that exists and has
+			# no IIO trigger behind it is worse than no object: the
+			# next "add" with the same name fails with "already
+			# exists", which points at the name rather than at
+			# whatever actually went wrong the first time.
+			rmdir "$HRTIMER/$name" 2>/dev/null || true
+			die "created $name and the IIO core registered no
+       trigger for it, so it has been removed again. Either the hrtimer
+       trigger module is not loaded, or something else already answers to
+       that name."
+		fi
+		echo "$hz" >"$_dev/sampling_frequency"
+		note "hrtimer $name at $hz Hz, as $(basename "$_dev")"
+		;;
+	sysfs)
+		[ -w "$SYSFS_TRIG/add_trigger" ] ||
+			die "no $SYSFS_TRIG/add_trigger.
+       CONFIG_IIO_SYSFS_TRIGGER is in bench.cfg, so if this is missing the
+       module is not in the image rather than absent from the kernel."
+		# The sysfs trigger interface takes a number, not a name, and
+		# then calls the result trigger<N>. The name argument here is
+		# the number, and saying so is cheaper than pretending
+		# otherwise.
+		case $name in
+		''|*[!0-9]*) die "a sysfs trigger is identified by a number, not a name" ;;
+		esac
+		echo "$name" >"$SYSFS_TRIG/add_trigger"
+		note "sysfs trigger $name added"
+		;;
+	*)
+		die "unknown trigger kind: $kind"
+		;;
+	esac
+}
+
+# The IIO core registers a trigger device for each configfs object, and the
+# link between them is the name, not the index: trigger0 is not necessarily
+# the first one created, and the numbering changes when one is removed.
+# Matching on the name is the only stable way.
+trigger_device_of() {
+	_want=$1
+	for t in "$SYS"/bus/iio/devices/trigger*; do
+		[ -e "$t/name" ] || continue
+		[ "$(cat "$t/name")" = "$_want" ] || continue
+		printf '%s' "$t"
+		return 0
+	done
+	return 0
+}
+
+cmd_fire() {
+	name=${1:-}
+	[ -n "$name" ] || usage
+	_dev=$(trigger_device_of "$name")
+	[ -n "$_dev" ] || die "no trigger named $name"
+	[ -w "$_dev/trigger_now" ] ||
+		die "$name has no trigger_now: it is not a sysfs trigger.
+       A hrtimer trigger fires from the kernel and cannot be fired by hand."
+	echo 1 >"$_dev/trigger_now"
+}
+
+cmd_remove() {
+	name=${1:-}
+	[ -n "$name" ] || usage
+	if [ -d "$HRTIMER/$name" ]; then
+		# rmdir, not rm -r. configfs objects are removed by removing
+		# the directory, and rm -r on one tries to unlink attributes
+		# that cannot be unlinked, fails halfway, and leaves the object
+		# in place with a confusing error.
+		rmdir "$HRTIMER/$name"
+		note "removed hrtimer trigger $name"
+		return 0
+	fi
+	case $name in
+	''|*[!0-9]*) ;;
+	*)
+		if [ -w "$SYSFS_TRIG/remove_trigger" ]; then
+			echo "$name" >"$SYSFS_TRIG/remove_trigger"
+			note "removed sysfs trigger $name"
+			return 0
+		fi
+		;;
+	esac
+	die "no trigger named $name"
+}
+
+case ${1:-} in
+list) cmd_list ;;
+add) shift; cmd_add "$@" ;;
+fire) shift; cmd_fire "$@" ;;
+remove) shift; cmd_remove "$@" ;;
+*) usage ;;
+esac

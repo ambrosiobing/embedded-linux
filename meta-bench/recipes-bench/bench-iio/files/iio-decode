@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""iio-decode - turn a raw IIO buffer into CSV, using the layout the kernel
+declares rather than the layout you remember.
+
+    iio-decode DEVICE_DIR < buffer.bin > samples.csv
+    iio-decode DEVICE_DIR --layout          print the layout and stop
+
+DEVICE_DIR is a device under /sys/bus/iio/devices, for example
+/sys/bus/iio/devices/iio:device0. The channel layout is read from its
+scan_elements directory, which is the only place it is true.
+
+WHY THIS EXISTS RATHER THAN THREE STRUCT.UNPACK CALLS
+
+The obvious way to read an accelerometer buffer is to know that it is three
+signed 16-bit values and a 64-bit timestamp, and to unpack at offsets 0, 2,
+4 and 8. That is correct for exactly one configuration. Disable a channel,
+enable the gyroscope instead, read a different sensor, or meet a driver
+that reports 12 bits in 16 and the offsets move. Nothing raises an error:
+the numbers come out plausible and wrong, which is the failure mode this
+whole project is about.
+
+The kernel publishes the layout per channel:
+
+    scan_elements/in_accel_x_en       1 if this channel is in the scan
+    scan_elements/in_accel_x_index    its position in the scan
+    scan_elements/in_accel_x_type     le:s12/16>>4
+
+The type string is endianness, sign, real bits, storage bits, and a right
+shift. A channel occupies its storage bits; a scan is laid out in index
+order with each element aligned to its own storage size; and the whole scan
+is padded to the alignment of its largest element. That is the algorithm
+below, and it is thirty lines rather than three.
+
+SPDX-License-Identifier: MIT
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import struct
+import sys
+from pathlib import Path
+
+# le:s12/16>>4 and its relatives. The shift is optional in the sense that
+# it is always written but sometimes zero, and the real bits and the
+# storage bits differ whenever a sensor's resolution is not a whole number
+# of bytes, which is most of the interesting ones.
+TYPE_RE = re.compile(
+    r"^(?P<endian>be|le):(?P<sign>[su])(?P<bits>\d+)/(?P<storage>\d+)"
+    r"(?:>>(?P<shift>\d+))?$"
+)
+
+
+class Channel:
+    def __init__(self, name: str, index: int, spec: str):
+        match = TYPE_RE.match(spec)
+        if not match:
+            raise ValueError(f"{name}: cannot parse type {spec!r}")
+        self.name = name
+        self.index = index
+        self.endian = match.group("endian")
+        self.signed = match.group("sign") == "s"
+        self.bits = int(match.group("bits"))
+        self.storage = int(match.group("storage"))
+        self.shift = int(match.group("shift") or 0)
+        if self.storage % 8:
+            raise ValueError(f"{name}: storage {self.storage} is not whole bytes")
+        self.size = self.storage // 8
+        self.offset = -1  # filled in by layout()
+
+    @property
+    def fmt(self) -> str:
+        code = {1: "b", 2: "h", 4: "i", 8: "q"}[self.size]
+        if not self.signed:
+            code = code.upper()
+        return ("<" if self.endian == "le" else ">") + code
+
+    def decode(self, raw: bytes) -> int:
+        value = struct.unpack(self.fmt, raw)[0]
+        # The shift comes first: the sensor's bits are not necessarily at
+        # the bottom of the storage word.
+        value >>= self.shift
+        if self.signed:
+            # And sign extension is ours to do, because unpacking a 16-bit
+            # signed word and then shifting right by 4 leaves a 12-bit
+            # value that is already correct, while an unsigned storage with
+            # a signed type is not.
+            sign_bit = 1 << (self.bits - 1)
+            value &= (1 << self.bits) - 1
+            if value & sign_bit:
+                value -= 1 << self.bits
+        else:
+            value &= (1 << self.bits) - 1
+        return value
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.name} index={self.index} {self.endian}:"
+            f"{'s' if self.signed else 'u'}{self.bits}/{self.storage}"
+            f">>{self.shift} at {self.offset}"
+        )
+
+
+def read_channels(device: Path) -> list[Channel]:
+    """Every enabled channel of a device, in scan order."""
+    scan = device / "scan_elements"
+    if not scan.is_dir():
+        raise SystemExit(f"{scan} does not exist; is this an IIO device?")
+
+    channels = []
+    for en in sorted(scan.glob("*_en")):
+        if en.read_text().strip() != "1":
+            continue
+        base = en.name[: -len("_en")]
+        index_file = scan / f"{base}_index"
+        type_file = scan / f"{base}_type"
+        if not index_file.exists() or not type_file.exists():
+            raise SystemExit(f"{base}: enabled but has no index or type")
+        channels.append(
+            Channel(
+                name=base,
+                index=int(index_file.read_text().strip()),
+                spec=type_file.read_text().strip(),
+            )
+        )
+    if not channels:
+        raise SystemExit(
+            f"no enabled channels in {scan}.\n"
+            "Nothing was captured, so there is nothing to decode. Enable "
+            "them before enabling the buffer, not after."
+        )
+    return channels
+
+
+def layout(channels: list[Channel]) -> int:
+    """Assign offsets and return the size of one scan.
+
+    The rule the kernel uses, and the reason offsets cannot be guessed:
+    channels appear in index order, each is aligned to its own storage
+    size, and the scan as a whole is padded to the largest alignment. So a
+    64-bit timestamp after three 16-bit values sits at 8 and not at 6, and
+    the scan is 16 bytes and not 14.
+    """
+    channels.sort(key=lambda c: c.index)
+    offset = 0
+    largest = 1
+    for channel in channels:
+        largest = max(largest, channel.size)
+        if offset % channel.size:
+            offset += channel.size - (offset % channel.size)
+        channel.offset = offset
+        offset += channel.size
+    if offset % largest:
+        offset += largest - (offset % largest)
+    return offset
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("device", help="a directory under /sys/bus/iio/devices")
+    parser.add_argument(
+        "--layout",
+        action="store_true",
+        help="print the scan layout and exit, without reading any data",
+    )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="print raw counts rather than applying scale and offset",
+    )
+    args = parser.parse_args()
+
+    device = Path(args.device)
+    channels = read_channels(device)
+    scan_size = layout(channels)
+
+    if args.layout:
+        print(f"scan size {scan_size} bytes")
+        for channel in channels:
+            print(f"  {channel!r}")
+        return 0
+
+    # scale and offset are per channel and are attributes of the device
+    # rather than of the scan, so they are read once here. A channel
+    # without them is reported in counts, which is honest: the alternative
+    # is inventing a scale of 1.0 and printing counts labelled as volts.
+    scales = {}
+    for channel in channels:
+        if args.raw:
+            continue
+        scale_file = device / f"{channel.name}_scale"
+        if scale_file.exists():
+            scales[channel.name] = float(scale_file.read_text().strip())
+
+    data = sys.stdin.buffer.read()
+    if len(data) % scan_size:
+        print(
+            f"warning: {len(data)} bytes is not a whole number of "
+            f"{scan_size}-byte scans; the last partial scan is dropped",
+            file=sys.stderr,
+        )
+
+    print(",".join(c.name for c in channels))
+    for start in range(0, len(data) - scan_size + 1, scan_size):
+        scan = data[start : start + scan_size]
+        row = []
+        for channel in channels:
+            raw = scan[channel.offset : channel.offset + channel.size]
+            value = channel.decode(raw)
+            scale = scales.get(channel.name)
+            # A timestamp is nanoseconds and must never be scaled, however
+            # helpfully a scale attribute might appear beside it.
+            if scale is not None and "timestamp" not in channel.name:
+                row.append(f"{value * scale:.6f}")
+            else:
+                row.append(str(value))
+        print(",".join(row))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

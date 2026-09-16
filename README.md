@@ -135,6 +135,22 @@ rather than pointing at where the original lives.
 
 ## The twenty projects
 
+The state column is a ladder, and each rung is a claim about evidence
+rather than about effort:
+
+| State | What it means |
+|---|---|
+| **Planned** | Not started. The row names the board and the theme, nothing more |
+| **Software complete** | It builds and its tests pass on a machine with no board attached. Nothing has been powered on. A project whose work is split across two processors says which half is done, so Project 12 reads "Linux side complete" |
+| **Built and running on the board** | The image was flashed, the hardware works and the thing does its job. Named measurements are still outstanding, and the row says which |
+| **Complete** | Every acceptance criterion in that project's README is met, each with evidence in its `docs/evidence/`, or deferred with a written reason |
+
+The gap between the last two rungs is deliberate. A router that routes
+traffic is not the same as a router whose failover has been timed, and only
+the second is what the project was specified to produce. Each project's
+README carries the full criteria table, marked criterion by criterion, so
+the claim can be checked rather than taken.
+
 | # | Project | Board | Theme | State |
 |---|---|---|---|---|
 | 01 | [A Yocto image that owns the whole stack](projects/01-yocto-image) | Raspberry Pi 4 | Build systems, layers, recipes, SDK | **Complete**: built, booted, reproducible, SDK verified on the board |
@@ -146,7 +162,7 @@ rather than pointing at where the original lives.
 | 07 | A 3.5 inch SPI display as a DRM panel with touch | Raspberry Pi 3B+ | DRM/KMS tiny drivers, input subsystem, fbcon | Planned |
 | 08 | [PREEMPT_RT latency lab with the MCC 118 as instrument](projects/08-preempt-rt) | Raspberry Pi 4, and a 3B v1.2 as second board | Real-time kernel, cyclictest, IRQ affinity, jitter | **Software complete**: RT kernel fragment, both instruments, the run protocol and three test suites; no board work yet |
 | 09 | Kernel debugging lab: kgdb, ftrace, perf, pstore | Raspberry Pi 3B+ | Debugging and tracing over the serial console | Planned |
-| 10 | IIO in depth with the X-NUCLEO-IKS4A1 | Raspberry Pi 3B+ | IIO buffers and triggers, libiio, iiod, AHRS | Planned |
+| 10 | [IIO in depth with the X-NUCLEO-IKS4A1](projects/10-iio-iks4a1) | Raspberry Pi 3B+ | IIO buffers and triggers, libiio, iiod, AHRS | **In progress**: design, kernel fragment, overlay, the inventory and rate tools, a scan decoder and a libiio client; no board work yet |
 | 11 | VL53L8CX: porting and packaging a vendor userspace driver | Raspberry Pi 4 | i2c-dev and spidev, shared libraries, packaging | Planned |
 | 12 | [A sensor-hub D-Bus service over UART](projects/12-sensor-hub) | Raspberry Pi 4 | CBOR wire protocols, sd-bus, polkit, socket activation | **Linux side complete**: wire protocol, daemon, policy, activation, client and three test suites; firmware specified, no board work yet |
 | 13 | A Wayland kiosk HMI on the 7 inch touchscreen | Raspberry Pi 4 | DRM/KMS, Wayland, libinput, LVGL or Qt | Planned |
@@ -175,6 +191,7 @@ file.
 | `./go ble` | `kas/bench-ble.yml` | `bench-ble-image`, the BLE gateway of Project 17: BlueZ, the radio firmware, a Python BLE client and a local broker |
 | `./go tee` | `kas/bench-tee.yml` | `bench-tee-image`, the OP-TEE keystore of Project 20: the TEE subsystem, tee-supplicant, the conformance suite and a trusted application. The secure world itself is added to the card by `./go armstub` |
 | `./go hub` | `kas/bench-hub.yml` | `bench-hub-image`, the sensor hub of Project 12: the system bus, polkit, the D-Bus service and OpenOCD |
+| `./go iio` | `kas/bench-iio.yml` | `bench-iio-image`, the IIO sensor lab of Project 10: four in-tree sensor drivers, the software triggers, libiio with its network daemon, and the three-path rate comparison |
 
 Later projects that need a different kernel or a different image add their
 own kas file next to these rather than changing the shared one. Project 8

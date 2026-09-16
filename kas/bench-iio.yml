@@ -1,0 +1,68 @@
+# Project 10: IIO in depth, with the X-NUCLEO-IKS4A1 sensor shield.
+#
+#   kas build kas/bench-iio.yml        or  ./go iio
+#
+# A separate configuration for the reason in the repository README: a
+# project that needs a different kernel adds its own kas file rather than
+# changing the shared one. Here the kernel needs four sensor drivers, a
+# trigger type and configfs that no other image wants.
+#
+# It includes bench-rpi3.yml rather than bench-rpi4.yml, because the
+# specification puts this project on a Raspberry Pi 3B+ and that file
+# already exists to say so. raspberrypi3-64 is the whole BCM2837 family in
+# meta-raspberrypi, so it covers the 3B and the 3B+ alike; Project 8's
+# journal has the account of finding that out the expensive way.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-iio-image
+
+repos:
+  # libiio comes from meta-oe, and numpy from meta-python, which is the
+  # same repository and therefore the same pin. numpy is on the board and
+  # not only on the PC because the AHRS has to be runnable in both places:
+  # the claim this project makes is that the URI is the only difference
+  # between a local and a remote client, and that claim is not testable if
+  # one side cannot run the program.
+  meta-openembedded:
+    layers:
+      meta-oe:
+      meta-python:
+
+local_conf_header:
+  iio: |
+    # The switch that adds recipes-kernel/linux/files/iio.cfg. See the
+    # bbappend for why it is opt in.
+    BENCH_IIO_KERNEL = "1"
+
+    # The sensors are on I2C1. meta-raspberrypi turns this into
+    # "dtparam=i2c_arm=on" in config.txt.
+    ENABLE_I2C = "1"
+
+    # And the rest of config.txt, which is a deliberate REPLACEMENT of the
+    # line in bench-rpi4.yml rather than an addition to it.
+    #
+    # Two changes from the shared base, both of them removals as much as
+    # additions:
+    #
+    # The DSI panel overlay is gone. This board has a sensor shield on the
+    # header and no display, and Project 8 measured what an overlay for an
+    # absent panel costs: a deferred probe retrying forever, logged once
+    # per attempt, on a board whose whole purpose is to be quiet enough to
+    # measure. An overlay for hardware that is not attached is not free.
+    #
+    # The bus speed is 400 kHz, which is what the shield's parts and the
+    # sample rates in this project need. It is also the documented limit
+    # over loose jumper wire: above it the errors are NACKs that read like
+    # driver bugs, and the first debugging step is to drop back to 100 kHz
+    # and see whether they go away.
+    RPI_EXTRA_CONFIG = "dtparam=i2c_arm_baudrate=400000\ndtoverlay=bench-iks4a1"
+
+    # The kernel's work directory has to survive, because ./go kconfig
+    # reads the .config it produced and that is how the driver symbols in
+    # iio.cfg are shown to have arrived. bench-iks4a1 is kept for the same
+    # reason one step down: the compiled overlay is worth inspecting with
+    # dtc -I dtb when a node does not probe.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-iks4a1 bench-iio"

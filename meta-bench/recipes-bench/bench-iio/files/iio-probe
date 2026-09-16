@@ -1,0 +1,290 @@
+#!/bin/sh
+#
+# iio-probe - what is on the bus, what has a driver, and what does not.
+#
+#   iio-probe            the inventory table
+#   iio-probe -m         the same as CSV, for the README
+#   iio-probe -v         and the raw evidence each row came from
+#
+# THE POINT OF THIS PROGRAM IS THAT THOSE ARE THREE DIFFERENT QUESTIONS.
+#
+# A part can answer on I2C and have no driver. A driver can be configured
+# in the kernel and absent from the rootfs. A driver can be loaded and not
+# bound, because the device tree never described the part. Each of those
+# produces a different row here, and all of them look identical from a
+# program that just lists /sys/bus/iio/devices and finds nothing.
+#
+# The project specification asks for an honest inventory of which sensors
+# of the shield work with which driver. This is the program that produces
+# it, so that the table in the README is generated rather than remembered.
+#
+# BENCH_IIO_ROOT relocates /sys, /dev and the commands' view of the world
+# for tests/iio-probe-test.sh, which runs the whole thing against a fake
+# tree with no hardware anywhere.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+ROOT=${BENCH_IIO_ROOT:-}
+SYS=$ROOT/sys
+BUS=${BENCH_I2C_BUS:-1}
+
+machine_readable=no
+verbose=no
+
+while getopts "mvh" opt; do
+	case $opt in
+	m) machine_readable=yes ;;
+	v) verbose=yes ;;
+	h)
+		sed -n '3,7p' "$0" | sed 's/^# \{0,1\}//'
+		exit 0
+		;;
+	*)
+		echo "iio-probe: unknown option" >&2
+		exit 2
+		;;
+	esac
+done
+
+note() {
+	[ "$machine_readable" = yes ] || echo "--- $*"
+}
+
+# The parts the shield carries, their addresses, and the driver each one
+# needs. This list is the specification's, and it is here rather than
+# discovered because the interesting output is the DIFFERENCE between what
+# should be present and what is.
+#
+# Fields: address, part, expected driver, subsystem, note
+PARTS="
+0x6a|LSM6DSV16X|st_lsm6dsx|iio|IMU, two devices, one hardware FIFO
+0x1e|LIS2MDL|st_magn|iio|magnetometer, no FIFO
+0x5d|LPS22DF|st_pressure|iio|pressure, recent driver addition
+0x44|SHT40|sht4x|hwmon|humidity, NOT an IIO device
+0x3c|STTS22H|none|none|no mainline driver, expected unsupported
+0x19|LIS2DUXS12|none|none|driver may be absent from this kernel
+"
+
+# ------------------------------------------------------- what answers
+
+# i2cdetect prints a grid; a used address shows as its own two hex digits,
+# a free one as "--", and one held by a bound driver as "UU". That third
+# case is the one worth keeping: UU means a driver has claimed the address
+# and i2cdetect will not probe it, which is success rather than failure
+# and reads like an error to anybody who has not met it before.
+scan=$(i2cdetect -y "$BUS" 2>/dev/null || true)
+
+answers() {
+	_addr=$1
+	_short=$(printf '%s' "$_addr" | sed 's/^0x//')
+	case $scan in
+	*" $_short "*) echo present ;;
+	*"UU"*)
+		# UU appears without the address next to it, so a second pass
+		# is needed to tell which row and column it sat in.
+		if printf '%s' "$scan" | awk -v a="$_short" '
+			/^[0-9a-f]0:/ {
+				row = substr($1, 1, 1)
+				for (i = 2; i <= NF; i++) {
+					col = sprintf("%x", i - 2)
+					if (row col == a && $i == "UU") { found = 1 }
+				}
+			}
+			END { exit found ? 0 : 1 }'; then
+			echo claimed
+		else
+			echo absent
+		fi
+		;;
+	*) echo absent ;;
+	esac
+}
+
+# --------------------------------------------- what the kernel has bound
+
+# Everything below is keyed on the I2C address, through a path, and never
+# resolves a symlink.
+#
+# That is a deliberate choice and the first version did not make it. It
+# looked the driver up by walking from /sys/bus/iio/devices back through a
+# "driver" link, which does not exist there: in sysfs the driver link
+# belongs to the i2c client, not to the bus directory. The devices column
+# came back empty for a chip that was bound, and the row read not-bound,
+# which is the wrong answer pointing at the wrong layer.
+#
+# Addressing by path fixes it and buys something else. sysfs paths traverse
+# symlinks transparently, so /sys/bus/i2c/devices/1-006a/iio:device0/name
+# is readable on a real board where that middle component is a link, and is
+# an ordinary directory in a test fixture. The whole inventory is then
+# testable on a host whose shell turns symlinks into copies, which this one
+# does.
+#
+# It is also more honest about what is being asked. The question is not
+# "which devices did this module create" but "did anything bind to the part
+# at this address, and what did it produce", and the address is what the
+# table is organised around.
+i2c_dir() {
+	# 0x6a on bus 1 is the directory 1-006a: four lowercase hex digits,
+	# which is the kernel's format and not an arbitrary one.
+	_addr=$(printf '%s' "$1" | sed 's/^0x//' | tr 'A-Z' 'a-z')
+	printf '%s/bus/i2c/devices/%s-00%s' "$SYS" "$BUS" "$_addr"
+}
+
+bound_at() {
+	[ -e "$(i2c_dir "$1")/driver" ]
+}
+
+iio_devices_at() {
+	_dir=$(i2c_dir "$1")
+	_found=
+	for d in "$_dir"/iio:device*; do
+		[ -e "$d/name" ] || continue
+		_found="$_found $(cat "$d/name")"
+	done
+	printf '%s' "${_found# }"
+}
+
+# hwmon hangs off the same i2c client, one level down, which is why the
+# SHT40 can be found the same way as the others despite not being an IIO
+# device at all. Its absence from /sys/bus/iio/devices is a fact about the
+# subsystem, not about the part.
+hwmon_devices_at() {
+	_dir=$(i2c_dir "$1")
+	_found=
+	for h in "$_dir"/hwmon/hwmon*; do
+		[ -e "$h/name" ] || continue
+		_found="$_found $(cat "$h/name")"
+	done
+	printf '%s' "${_found# }"
+}
+
+# Always echoes, always returns 0.
+#
+# This was written as "[ "$_mod" = none ] && return 1" and it emptied the
+# table. Under set -e a false test at the end of an and-list ends the
+# script, and here the non-zero return travelled out through the command
+# substitution and killed the subshell running the loop. The rows that
+# disappeared were the last two: the STTS22H and the LIS2DUXS12, the only
+# parts with driver=none, which are exactly the rows this program exists
+# to print. A silent exit that deletes the unsupported parts leaves an
+# inventory that looks complete and says every sensor works.
+#
+# rt-run carries the same warning in a comment. Reading it is not the same
+# as having met it.
+module_present() {
+	_mod=$1
+	if [ "$_mod" = none ]; then
+		echo none
+		return 0
+	fi
+	# Loaded, or merely installed. Both are worth telling apart: an
+	# installed module that never loaded means nothing matched it, which
+	# points at the device tree rather than at the image.
+	if grep -q "^${_mod} " /proc/modules 2>/dev/null; then
+		echo loaded
+		return 0
+	fi
+	if modinfo -F filename "$_mod" >/dev/null 2>&1; then
+		echo installed
+		return 0
+	fi
+	# Built in rather than modular: no entry in /proc/modules and no
+	# file, but the driver directory exists.
+	if [ -d "$SYS/bus/i2c/drivers/$_mod" ]; then
+		echo builtin
+		return 0
+	fi
+	echo missing
+	return 0
+}
+
+# ------------------------------------------------------------- report
+
+if [ "$machine_readable" = yes ]; then
+	echo "address,part,driver,subsystem,bus,module,devices,status"
+else
+	note "i2c bus  $BUS"
+	note "sysfs    ${SYS:-/sys}"
+	echo
+	printf '%-7s %-12s %-12s %-8s %-9s %-10s %s\n' \
+		ADDRESS PART DRIVER SUBSYS BUS MODULE DEVICES
+fi
+
+printf '%s\n' "$PARTS" | while IFS='|' read -r addr part driver subsys why; do
+	[ -n "$addr" ] || continue
+
+	bus_state=$(answers "$addr")
+	mod_state=$(module_present "$driver")
+
+	case $subsys in
+	iio) devices=$(iio_devices_at "$addr") ;;
+	hwmon) devices=$(hwmon_devices_at "$addr") ;;
+	*) devices= ;;
+	esac
+
+	if bound_at "$addr"; then
+		bound=yes
+	else
+		bound=no
+	fi
+
+	# The status column is the judgement, and it is deliberately the only
+	# place a judgement is made. Everything left of it is observation.
+	if [ "$driver" = none ]; then
+		status=unsupported
+	elif [ -n "$devices" ]; then
+		status=working
+	elif [ "$bound" = yes ]; then
+		# Bound and producing nothing is its own fault and a rare one:
+		# the driver matched and then failed to register a device, which
+		# means a probe error and a line in dmesg.
+		status=bound-no-device
+	elif [ "$mod_state" = missing ]; then
+		status=no-driver-in-image
+	elif [ "$bus_state" = absent ]; then
+		status=not-on-bus
+	else
+		status=not-bound
+	fi
+
+	if [ "$machine_readable" = yes ]; then
+		printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
+			"$addr" "$part" "$driver" "$subsys" \
+			"$bus_state" "$mod_state" "${devices:-}" "$status"
+	else
+		printf '%-7s %-12s %-12s %-8s %-9s %-10s %s\n' \
+			"$addr" "$part" "$driver" "$subsys" \
+			"$bus_state" "$mod_state" "${devices:--}"
+		printf '        %s: %s\n' "$status" "$why"
+	fi
+done
+
+if [ "$verbose" = yes ]; then
+	echo
+	note "i2cdetect -y $BUS"
+	printf '%s\n' "$scan"
+	echo
+	note "iio devices"
+	for d in "$SYS"/bus/iio/devices/*; do
+		[ -e "$d" ] || continue
+		printf '  %s' "$(basename "$d")"
+		[ -r "$d/name" ] && printf '  %s' "$(cat "$d/name")"
+		echo
+	done
+fi
+
+if [ "$machine_readable" = no ]; then
+	echo
+	note "status meanings"
+	echo "    working             a driver is bound and created devices"
+	echo "    not-bound           driver present, nothing matched it:"
+	echo "                        look at the overlay, not the image"
+	echo "    no-driver-in-image  configured in the kernel is not the same"
+	echo "                        as packaged into the rootfs"
+	echo "    bound-no-device     the driver matched and registered"
+	echo "                        nothing: look in dmesg for its probe"
+	echo "    not-on-bus          nothing answered at that address"
+	echo "    unsupported         no mainline driver, recorded on purpose"
+fi

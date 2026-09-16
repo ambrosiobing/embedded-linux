@@ -1,0 +1,333 @@
+#!/bin/sh
+#
+# iio-rate - the three ways out of a sensor, measured the same way.
+#
+#   iio-rate poll     DEVICE [-d SEC]
+#   iio-rate trigger  DEVICE HZ [-d SEC]
+#   iio-rate fifo     DEVICE HZ WATERMARK [-d SEC]
+#
+# DEVICE is a name as it appears in /sys/bus/iio/devices/iio:deviceN/name,
+# for example lsm6dsv16x_accel or lis2mdl, not a path. Which iio:deviceN a
+# driver got is decided at probe time and changes between boots; the name
+# does not.
+#
+# WHAT IS COMPARABLE HERE AND WHAT IS NOT
+#
+# Three paths, and they do not all produce the same kind of number.
+#
+#   poll      user space reads a sysfs attribute in a loop. Every read is
+#             an I2C transaction started by a system call. There are no
+#             timestamps at all.
+#   trigger   the kernel fires a hrtimer, the IIO core captures one scan
+#             and timestamps it as it pushes it. The jitter of those
+#             timestamps is real kernel latency.
+#   fifo      the sensor fills its own FIFO and raises an interrupt at a
+#             watermark. The driver drains N samples in one burst and
+#             ASSIGNS timestamps by interpolating backwards from the
+#             interrupt time using the configured rate.
+#
+# So a FIFO timestamp is not a measurement. Its spread is the driver's
+# arithmetic and the sensor's oscillator, and it will look far better than
+# the hrtimer path for the same reason a clock that reports the time it was
+# set to always agrees with itself.
+#
+# This program therefore labels the ts_sd_us column with where the
+# timestamps came from, and refuses to print a comparison between the two.
+# docs/DESIGN.md has the argument. What IS comparable across all three:
+# interrupts per second, the reader's CPU time, and samples delivered
+# against samples asked for.
+#
+# BENCH_IIO_ROOT relocates /sys and /proc for tests/iio-rate-test.sh.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+ROOT=${BENCH_IIO_ROOT:-}
+SYS=$ROOT/sys
+PROC=$ROOT/proc
+RESULTS=${BENCH_IIO_RESULTS:-/var/lib/bench/iio}
+DURATION=${BENCH_IIO_DURATION:-10}
+
+die() {
+	echo "iio-rate: $*" >&2
+	exit 1
+}
+
+note() {
+	echo "--- $*"
+}
+
+usage() {
+	sed -n '3,8p' "$0" | sed 's/^# \{0,1\}//'
+	exit 2
+}
+
+# A device is found by name, never by index.
+#
+# Which iio:deviceN a driver gets depends on probe order, which depends on
+# the order the i2c bus enumerated, which is not a promise. A results table
+# whose rows say "iio:device0" is a table that means something different
+# after the next reboot.
+device_path() {
+	_want=$1
+	for d in "$SYS"/bus/iio/devices/iio:device*; do
+		[ -e "$d/name" ] || continue
+		[ "$(cat "$d/name")" = "$_want" ] || continue
+		printf '%s' "$d"
+		return 0
+	done
+	die "no IIO device named $_want.
+       iio-probe lists what is present, and says whether the driver is
+       missing from the image or merely unbound."
+}
+
+# ------------------------------------------------------------ accounting
+
+# The reader's own CPU time, not the system's.
+#
+# /proc/stat would give a system-wide idle delta, which on an otherwise
+# quiet board is close enough to be tempting and wrong: it counts the
+# shell, the stubs and anything else that woke up. The acceptance criterion
+# is about the reader, so the reader is what is measured, from its own
+# /proc/PID/stat before it is reaped.
+cpu_ticks_of() {
+	_pid=$1
+	_stat=$PROC/$_pid/stat
+	[ -r "$_stat" ] || { echo 0; return 0; }
+	# Fields 14 and 15 are utime and stime, counted from the end of the
+	# comm field, because a process name may contain spaces and
+	# parentheses and the naive cut on field 14 is wrong for exactly the
+	# processes whose names are interesting.
+	sed 's/.*) //' "$_stat" | awk '{print $12 + $13}'
+}
+
+clock_ticks() {
+	getconf CLK_TCK 2>/dev/null || echo 100
+}
+
+irq_count_of() {
+	# The IMU's interrupt is named after its driver in /proc/interrupts.
+	# Summing every CPU column matters on a four-core board where an
+	# interrupt may be steered elsewhere between two reads.
+	_match=$1
+	[ -r "$PROC/interrupts" ] || { echo 0; return 0; }
+	awk -v m="$_match" '
+		index($0, m) > 0 {
+			total = 0
+			for (i = 2; i <= NF; i++) {
+				if ($i ~ /^[0-9]+$/) { total += $i }
+			}
+			print total
+			found = 1
+			exit
+		}
+		END { if (!found) print 0 }
+	' "$PROC/interrupts"
+}
+
+# --------------------------------------------------------- buffer control
+
+scan_enable() {
+	_dev=$1
+	shift
+	for _c in "$@"; do
+		_f=$_dev/scan_elements/${_c}_en
+		[ -w "$_f" ] || die "no scan element $_c on $(basename "$_dev").
+       The channels a device offers are in its scan_elements directory;
+       asking for one it does not have is a typo, not a kernel problem."
+		echo 1 >"$_f"
+	done
+}
+
+buffer_off() {
+	_dev=$1
+	# Best effort and deliberately not fatal. This runs from a trap, and
+	# a failure to disable a buffer that is already disabled must not
+	# replace the real error with its own.
+	echo 0 >"$_dev/buffer/enable" 2>/dev/null || true
+}
+
+# ------------------------------------------------------------- the paths
+
+do_poll() {
+	dev=$(device_path "$1")
+	attr=${2:-in_accel_x_raw}
+	[ -r "$dev/$attr" ] || die "no $attr on $1"
+
+	note "path       poll"
+	note "device     $1 at $(basename "$dev")"
+	note "attribute  $attr"
+	note "duration   ${DURATION}s"
+
+	_start=$(date +%s)
+	_deadline=$((_start + DURATION))
+	_n=0
+	# Deliberately the naive loop, because the naive loop is the thing
+	# being measured. Every iteration is an open, a read, a close and an
+	# I2C transaction, and the number it produces is what a reader gets
+	# for doing the obvious thing.
+	while [ "$(date +%s)" -lt "$_deadline" ]; do
+		cat "$dev/$attr" >/dev/null
+		_n=$((_n + 1))
+	done
+	_elapsed=$(( $(date +%s) - _start ))
+	[ "$_elapsed" -gt 0 ] || _elapsed=1
+
+	emit poll "$1" "$((_n / _elapsed))" "$_n" "$_elapsed" 0 "" none
+}
+
+do_trigger() {
+	name=$1
+	hz=$2
+	dev=$(device_path "$name")
+	trig=${BENCH_IIO_TRIGGER:-iio-rate-t}
+
+	note "path       hrtimer trigger"
+	note "device     $name at $(basename "$dev")"
+	note "rate       ${hz} Hz"
+
+	iio-trigger add hrtimer "$trig" "$hz" >/dev/null
+	# shellcheck disable=SC2064
+	trap "buffer_off '$dev'; iio-trigger remove '$trig' >/dev/null 2>&1 || true" EXIT INT TERM
+
+	echo "$trig" >"$dev/trigger/current_trigger"
+	capture "$dev" "$name" trigger "$hz" iio-core
+}
+
+do_fifo() {
+	name=$1
+	hz=$2
+	watermark=$3
+	dev=$(device_path "$name")
+
+	[ -w "$dev/buffer/hwfifo_watermark" ] ||
+		die "$name has no hwfifo_watermark.
+       This device has no hardware FIFO, so there is no third path to
+       measure on it. The magnetometer is one such: that is why the
+       trigger path is demonstrated there and the FIFO path here."
+
+	note "path       hardware FIFO"
+	note "device     $name at $(basename "$dev")"
+	note "rate       ${hz} Hz"
+	note "watermark  $watermark"
+
+	echo "$hz" >"$dev/sampling_frequency"
+	echo "$watermark" >"$dev/buffer/hwfifo_watermark"
+	# shellcheck disable=SC2064
+	trap "buffer_off '$dev'" EXIT INT TERM
+
+	capture "$dev" "$name" fifo "$hz" driver-interpolated
+}
+
+# One capture, used by both buffered paths, so that the only difference
+# between the trigger row and the FIFO row is the thing under test.
+capture() {
+	dev=$1
+	name=$2
+	path=$3
+	hz=$4
+	ts_source=$5
+
+	scan_enable "$dev" in_timestamp
+	echo "${BENCH_IIO_BUFLEN:-256}" >"$dev/buffer/length"
+
+	irq_before=$(irq_count_of "${BENCH_IIO_IRQ:-lsm6}")
+	raw=$(mktemp)
+	# shellcheck disable=SC2064
+	trap "rm -f '$raw'; buffer_off '$dev'" EXIT INT TERM
+
+	# The character device, which is in /dev and not under sysfs. Its
+	# name is the sysfs directory's name, which is the one place the two
+	# namespaces agree: /sys/bus/iio/devices/iio:device0 is read through
+	# /dev/iio:device0.
+	chardev=$ROOT/dev/$(basename "$dev")
+	[ -e "$chardev" ] || die "no $chardev.
+       The device exists in sysfs and has no character device, which means
+       CONFIG_IIO_BUFFER is absent or the driver registered no buffer.
+       Without it there is nothing to read and only the poll path works."
+
+	echo 1 >"$dev/buffer/enable"
+	_start=$(date +%s)
+	# The reader runs in the background so that its own CPU time can be
+	# read out of /proc before it is reaped. Backgrounding and then
+	# waiting is not the same as running it in the foreground: the
+	# accounting needs a pid.
+	dd if="$chardev" of="$raw" bs=4096 2>/dev/null &
+	reader=$!
+	sleep "$DURATION"
+	ticks=$(cpu_ticks_of "$reader")
+	kill "$reader" 2>/dev/null || true
+	wait "$reader" 2>/dev/null || true
+	_elapsed=$(( $(date +%s) - _start ))
+	[ "$_elapsed" -gt 0 ] || _elapsed=1
+	echo 0 >"$dev/buffer/enable"
+
+	irq_after=$(irq_count_of "${BENCH_IIO_IRQ:-lsm6}")
+	irqs=$((irq_after - irq_before))
+
+	samples=$(iio-decode "$dev" --raw <"$raw" | tail -n +2 | wc -l)
+	cpu_pct=$(awk -v t="$ticks" -v hz="$(clock_ticks)" -v s="$_elapsed" \
+		'BEGIN { printf "%.2f", (hz > 0 && s > 0) ? 100 * t / hz / s : 0 }')
+
+	# The timestamp spread, and the column that says where it came from.
+	ts_sd=$(iio-decode "$dev" --raw <"$raw" | awk -F, '
+		NR == 1 { for (i = 1; i <= NF; i++) if ($i ~ /timestamp/) col = i; next }
+		col && NR > 2 { d = $col - prev; n++; s += d; q += d * d }
+		col { prev = $col }
+		END {
+			if (n < 2) { print ""; exit }
+			mean = s / n
+			printf "%.3f", sqrt((q / n) - (mean * mean)) / 1000
+		}')
+
+	emit "$path" "$name" "$((samples / _elapsed))" "$samples" "$_elapsed" \
+		"$irqs" "$ts_sd" "$ts_source"
+	note "expected   $((hz * _elapsed)) samples at ${hz} Hz"
+}
+
+# ------------------------------------------------------------- reporting
+
+emit() {
+	path=$1
+	device=$2
+	rate=$3
+	samples=$4
+	seconds=$5
+	irqs=$6
+	ts_sd=$7
+	ts_source=$8
+
+	mkdir -p "$RESULTS"
+	csv=$RESULTS/rates.csv
+	if [ ! -f "$csv" ]; then
+		echo "timestamp,path,device,samples_per_s,samples,seconds,irqs,irqs_per_s,cpu_pct,ts_sd_us,ts_source" >"$csv"
+	fi
+	irq_rate=$(awk -v i="$irqs" -v s="$seconds" \
+		'BEGIN { printf "%.2f", (s > 0) ? i / s : 0 }')
+	printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+		"$(date -Iseconds)" "$path" "$device" "$rate" "$samples" \
+		"$seconds" "$irqs" "$irq_rate" "${cpu_pct:-0}" "$ts_sd" \
+		"$ts_source" >>"$csv"
+
+	echo
+	note "samples/s  $rate  ($samples in ${seconds}s)"
+	note "interrupts $irqs  (${irq_rate}/s)"
+	note "reader cpu ${cpu_pct:-0}%"
+	if [ -n "$ts_sd" ]; then
+		note "ts sd      ${ts_sd} us, source: $ts_source"
+		if [ "$ts_source" = driver-interpolated ]; then
+			note "           NOT a latency measurement. The driver"
+			note "           assigns these from the interrupt time and"
+			note "           the configured rate. See docs/DESIGN.md."
+		fi
+	fi
+	note "row        $csv"
+}
+
+case ${1:-} in
+poll) shift; [ $# -ge 1 ] || usage; do_poll "$@" ;;
+trigger) shift; [ $# -ge 2 ] || usage; do_trigger "$@" ;;
+fifo) shift; [ $# -ge 3 ] || usage; do_fifo "$@" ;;
+*) usage ;;
+esac

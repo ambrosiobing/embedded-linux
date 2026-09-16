@@ -60,3 +60,18 @@ SRC_URI += '${@"file://netboot.cfg" if d.getVar("BENCH_NETBOOT_KERNEL") == "1" e
 # probe failure at every boot and buys nothing.
 BENCH_TEE_KERNEL ?= "0"
 SRC_URI += '${@"file://tee.cfg" if d.getVar("BENCH_TEE_KERNEL") == "1" else ""}'
+
+# And the IIO sensor fragment, same switch pattern. Project 10 binds four
+# sensors of an X-NUCLEO-IKS4A1 to in-tree drivers and measures three ways
+# of getting data out of them. The drivers are modules and cost nothing in
+# an image that does not install them, but the hrtimer trigger drags in
+# CONFIG_CONFIGFS_FS, and configfs in an image with no configfs consumer
+# is a mount point that exists for nobody.
+#
+# Note for whoever adds the next switch here: every one of these lines
+# changes the kernel recipe's basehash whether its condition is true or
+# not, because a basehash covers the expression rather than what it
+# evaluated to. Adding one while somebody else's build is running stops
+# that build. See ./go pull, which refuses exactly that.
+BENCH_IIO_KERNEL ?= "0"
+SRC_URI += '${@"file://iio.cfg" if d.getVar("BENCH_IIO_KERNEL") == "1" else ""}'

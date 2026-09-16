@@ -2123,3 +2123,160 @@ lists rather than one shared one.
 **Cost.** Nothing, and it must be recorded: a results table has to say what
 was attached, because "nothing else was running" is a claim about the
 hardware as much as about the software.
+
+## 77. A reconstructed number is labelled, or it is not published
+
+**Decision.** `iio-rate` carries a `ts_source` column beside every
+timestamp statistic, and prints a warning under the figure whenever the
+source is `driver-interpolated`. The FIFO and hrtimer timestamp spreads are
+never put in the same column of a results table.
+
+**Why.** The three paths this project compares do not all produce the same
+kind of timestamp. On the hrtimer path the IIO core stamps each scan as it
+pushes it, so the jitter is real kernel latency. On the hardware FIFO path
+the sensor stamps nothing: the driver takes one interrupt at the watermark,
+drains N samples in a burst, and **assigns** timestamps by interpolating
+backwards using the configured output data rate.
+
+So FIFO timestamp intervals are close to exactly `1 / ODR` by construction,
+and their standard deviation measures the driver's arithmetic and the
+stability of the sensor's oscillator. Printed beside the hrtimer figure it
+wins by a wide margin and means nothing, for the same reason a clock that
+reports the time it was set to always agrees with itself.
+
+**Rejected: print it and let the reader judge.** That is not neutrality. It
+would be the most quotable number in the project and the least meaningful,
+and an unlabelled figure in a portfolio is a claim whoever reads it will
+repeat.
+
+**Rejected: omit it.** The spread is worth knowing. A driver whose
+reconstruction wanders says something about the sensor's clock. It is
+evidence about a different question, and the column name is what keeps the
+two questions apart.
+
+**What is comparable**, and what the results table actually uses: interrupt
+rate and reader CPU across all three paths, timestamp regularity *within*
+the hrtimer path against the rate it was asked for, and samples delivered
+against samples configured, which catches drops and is comparable
+everywhere because a sample either arrived or did not.
+
+**Consequence.** One more column, and a warning printed every time rather
+than a note in a document that the person reading a CSV will not have open.
+This is Project 8's error caught before the measurement rather than after:
+that project asserted in five documents that the gap between its two
+instruments was the cost of a GPIO write, until the algebra showed a
+constant cost cancels.
+
+## 78. An inventory says how something failed, not that it did
+
+**Decision.** `iio-probe` reports five verdicts per sensor: `working`,
+`not-bound`, `no-driver-in-image`, `bound-no-device` and `not-on-bus`. A
+part with no mainline driver is `unsupported` and gets a row like any
+other.
+
+**Why.** From `ls /sys/bus/iio/devices` all five look identical, and they
+have entirely different fixes:
+
+| Verdict | Where the fix is |
+|---|---|
+| `not-bound` | the device tree overlay |
+| `no-driver-in-image` | the image's `kernel-module-*` lines |
+| `bound-no-device` | `dmesg`, a probe that failed |
+| `not-on-bus` | the wiring or the bus speed |
+
+A tool that answers "no sensor" sends the next hour to the wrong layer.
+Project 8 spent a bring-up session on exactly that, from a HAT that
+announced its own name out of its ID EEPROM and then could not be opened:
+the failure table in its bring-up notes named SPI rather than the HAT, and
+that one sentence was the difference between an hour and a morning.
+
+**Rejected: report only what works.** The specification asks for an honest
+inventory of which sensors work with which driver, and the interesting rows
+are the failures. An inventory listing four working parts out of six, with
+the other two absent, is not shorter: it is wrong by omission.
+
+**Consequence.** The parts list is in the program rather than discovered,
+because the useful output is the difference between what should be there
+and what is. That list has to be maintained when the shield changes, which
+is the cost, and it is what makes a missing part visible instead of simply
+absent.
+
+## 79. A scan layout is computed, never remembered
+
+**Decision.** `iio-decode` reads `scan_elements/*_type` and `*_index` and
+computes every offset. `iio-stream.c` uses `iio_buffer_first()` and
+`iio_buffer_step()`. Neither contains a byte offset.
+
+**Why.** The obvious IIO buffer loop indexes with literal offsets: 0, 2, 4
+for three 16-bit channels and 8 for the timestamp. Those are correct for
+exactly one configuration. Disable a channel and everything after it moves.
+Read the magnetometer instead and the channel names change. Meet a driver
+reporting 12 bits inside a 16-bit word and the values need a shift and sign
+extension from bit 11 rather than 15.
+
+None of that raises an error. The numbers stay plausible, which is the
+failure mode this whole project is about.
+
+**The rule the kernel uses**, and the reason it cannot be guessed: channels
+appear in index order, each is aligned to its own storage size, and the
+scan is padded to the largest alignment. A 64-bit timestamp after three
+16-bit channels sits at offset 8 and not 6, and the scan is 16 bytes and
+not 14. A reader that added sizes would be two bytes early on every
+timestamp and would produce a number nobody would question.
+
+**Rejected: hard-code and document.** The specification's own example does
+this and says a robust program would not. A comment does not survive being
+copied into the next program, and this layout is copied constantly.
+
+**Consequence.** Thirty lines instead of three, and a test suite that pins
+the alignment, the disabled-channel case, the shifted 12-bit case, big
+endian, unsigned, and the rule that a timestamp is never scaled however
+plausibly a `scale` attribute turns up beside it.
+
+## 80. A filter is named after what it is, or renamed
+
+**Decision.** `ahrs.py` implements Madgwick's gradient-descent update for
+the accelerometer and gyroscope, and takes yaw from a tilt-compensated
+magnetic heading rather than from his MARG variant. Its own header says so
+in the first paragraph.
+
+**Why not the filter the specification names.** The MARG variant folds the
+magnetometer into the same gradient through a six-row Jacobian, and that
+Jacobian is where published implementations disagree with one another: in
+signs, and in the handedness of the reference frame.
+
+A wrong sign there does not produce an obviously broken result. It produces
+an orientation that tracks movement smoothly, responds correctly to being
+turned, and is mirrored. Diffed against a recording from the same broken
+filter it agrees forever.
+
+The bench method already says not to copy a filter's helpers from a
+repository without checking them against the paper. The honest consequence
+of that rule, on a bench with no reference attitude source, is to implement
+the part that can be derived and checked and to be explicit about the part
+that was replaced.
+
+**Rejected: implement MARG anyway and validate on hardware.** The
+validation available here is "lay it flat and turn it ninety degrees",
+which a mirrored filter passes on two of three axes. The bench cannot tell
+the two apart, so building something the bench cannot check is building
+something nobody will ever know is wrong.
+
+**Rejected: call it Madgwick anyway.** Half of it is. A filter that
+silently differs from the one it is named after is worse than one that says
+so, because the name is what a reader uses to decide whether to trust it.
+
+**How the remaining half is checked.** Against physics, never against
+another program: gravity on an axis means ninety degrees about another, and
+a gyroscope turning at a known rate for a known time has turned by their
+product. Two independent paths to the same angle is what makes a sign
+convention visible. That is not theoretical: the first version of those
+checks had inverted expectations, and what exposed it was the gyroscope
+check passing while the accelerometer checks failed.
+
+**Consequence.** Yaw is noisier than a MARG filter would give, because it
+is measured rather than smoothed by the gyroscope. The acceptance criterion
+is pitch and roll within 2 degrees flat and 3 degrees after a 90 degree
+rotation, which this answers directly, and the yaw drift demonstration the
+specification asks for still works: turn the magnetometer off and yaw is
+the integrated gyroscope, drifting.

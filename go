@@ -14,6 +14,7 @@
 #   ./go rt-kernel    install that kernel beside the generic one on a card
 #   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
+#   ./go iio          build bench-iio-image, the IIO sensor lab of Project 10
 #   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
 #   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
 #   ./go armstub      put the secure world on a card the image is already on
@@ -52,6 +53,7 @@ rt-generic) exec sh ./scripts/build.sh bench-rt-generic ;;
 rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
 ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
+iio)        exec sh ./scripts/build.sh bench-iio ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
 tee)        exec sh ./scripts/build.sh bench-tee ;;
 armstub)    shift; exec sh ./scripts/optee-armstub.sh "$@" ;;

@@ -1,0 +1,107 @@
+/*
+ * bench-iks4a1: the four supported sensors of an X-NUCLEO-IKS4A1 on I2C1.
+ *
+ * Declarative binding only. Nothing here probes, configures or reads
+ * anything: it tells the kernel which driver owns which address, and the
+ * drivers do the rest. That is the whole argument for an overlay over a
+ * vendor library, and it is why this file is the entire hardware
+ * description for the project.
+ *
+ * Applied with "dtoverlay=bench-iks4a1" in config.txt, which
+ * kas/bench-iio.yml puts there through RPI_EXTRA_CONFIG.
+ *
+ * WHAT IS NOT HERE, AND WHY
+ *
+ * The STTS22H and the LIS2DUXS12 answer on the bus and have no node. A
+ * node naming a compatible string the kernel does not know is not an
+ * error: the node is created, nothing binds to it, and the part is
+ * invisible with no message anywhere. Leaving them out and listing them
+ * in the inventory table is the honest version of the same outcome.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/*
+	 * "brcm,bcm2835" is the compatible every Raspberry Pi overlay uses,
+	 * including on the BCM2837 of a 3B+ and the BCM2711 of a 4. It
+	 * matches the SoC family rather than the part, and the firmware
+	 * accepts it on all of them.
+	 */
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&i2c1>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			/*
+			 * Redundant with ENABLE_I2C, which puts
+			 * dtparam=i2c_arm=on in config.txt, and kept anyway:
+			 * this overlay should describe a working bus on its
+			 * own, so that moving it to another image does not
+			 * silently depend on a setting made somewhere else.
+			 */
+			status = "okay";
+
+			/*
+			 * The IMU. One chip, one hardware FIFO, one interrupt
+			 * line, and TWO IIO devices: st_lsm6dsx registers
+			 * lsm6dsv16x_accel and lsm6dsv16x_gyro separately.
+			 * They share the FIFO, so enabling both at different
+			 * output data rates changes the FIFO packet pattern
+			 * and with it the driver's timestamp reconstruction.
+			 *
+			 * st,drdy-int-pin selects which of the chip's two
+			 * interrupt pins the driver uses for data-ready and
+			 * FIFO watermark events. 1 means INT1, which is the
+			 * pin wired to GPIO24. Getting this wrong gives a
+			 * device that probes, reads fine through sysfs, and
+			 * never fills a buffer, because the interrupt the
+			 * driver waits on is on a pin nothing is connected
+			 * to.
+			 */
+			imu: lsm6dsv16x@6a {
+				compatible = "st,lsm6dsv16x";
+				reg = <0x6a>;
+				interrupt-parent = <&gpio>;
+				interrupts = <24 1>;	/* GPIO24, rising edge */
+				st,drdy-int-pin = <1>;
+			};
+
+			/*
+			 * The magnetometer. No FIFO of its own, which is
+			 * exactly why it is the device the hrtimer trigger is
+			 * demonstrated on: there is no hardware path to
+			 * confuse the comparison with.
+			 */
+			magn: lis2mdl@1e {
+				compatible = "st,lis2mdl";
+				reg = <0x1e>;
+			};
+
+			/* Pressure. Polled, or driven by the same trigger. */
+			press: lps22df@5d {
+				compatible = "st,lps22df";
+				reg = <0x5d>;
+			};
+
+			/*
+			 * Humidity and temperature, and NOT an IIO device.
+			 * sht4x is a hwmon driver, so this part appears under
+			 * /sys/class/hwmon and in sensors(1), and never under
+			 * /sys/bus/iio/devices. A program that enumerates IIO
+			 * devices looking for humidity finds nothing and
+			 * reports no error.
+			 */
+			hum: sht4x@44 {
+				compatible = "sensirion,sht4x";
+				reg = <0x44>;
+			};
+		};
+	};
+};
