@@ -47,8 +47,9 @@ note() {
 # is a directory tree and not a disk image. bench-netboot-image sets
 # IMAGE_FSTYPES accordingly; if this glob finds nothing, the image built was
 # the wrong one.
-tarball=$(ls -1t "$SRC"/bench-netboot-image-*.rootfs.tar.bz2 2>/dev/null |
-	head -1 || true)
+tarball=$(find "$SRC" -maxdepth 1 \
+	-name 'bench-netboot-image-*.rootfs.tar.bz2' \
+	-printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2- | head -1)
 [ -n "$tarball" ] || die "no rootfs tarball in $SRC.
        bench-netboot-image sets IMAGE_FSTYPES to include tar.bz2; a .wic
        there instead means ./go build ran rather than ./go netboot."
@@ -77,9 +78,8 @@ done
 
 # The kernel and the device tree for a 3B+.
 [ -f "$SRC/Image" ] && cp -f "$SRC/Image" "$target/kernel8.img"
-for dtb in "$SRC"/bcm2710-rpi-3-b-plus.dtb; do
-	[ -f "$dtb" ] && cp -f "$dtb" "$target/"
-done
+dtb=$SRC/bcm2710-rpi-3-b-plus.dtb
+[ -f "$dtb" ] && cp -f "$dtb" "$target/"
 [ -d "$SRC/bcm2710-rpi-3-b-plus" ] && true   # some layouts nest overlays
 [ -d "$SRC/overlays" ] && cp -rf "$SRC/overlays" "$target/"
 
@@ -107,7 +107,14 @@ tar -xf "$tarball" -C "$NFS_ROOT"
 # compare against. Without it that test can only check that uname works.
 
 mkdir -p "$HERE/build"
-release=$(ls -1 "$NFS_ROOT/lib/modules" 2>/dev/null | head -1 || true)
+# Newest, not lexically first. A rootfs that has carried two kernels has
+# two directories here, and text order is not version order: 6.12.93 sorts
+# before 6.6.63 because "1" is less than "6". The same sort bug has been
+# written five times in this repository, which is why common.sh has
+# newest_path; this script runs on the HIL server without that file, so the
+# ranking is spelled out rather than imported.
+release=$(find "$NFS_ROOT/lib/modules" -maxdepth 1 -mindepth 1 -type d \
+	-printf '%T@ %f\n' 2>/dev/null | sort -rn | cut -d' ' -f2- | head -1)
 if [ -n "$release" ]; then
 	printf '%s\n' "$release" >"$HERE/build/kernel-release"
 	note "deployed kernel release $release"

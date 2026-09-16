@@ -114,6 +114,12 @@ reject "the udev rule does not match on a device name" \
 # ------------------------------------------- the installer refuses to guess
 
 want "install.sh demands a topology" "install.sh" "isolated | proxy"
+# The single quotes and the escape are both deliberate: this is a grep
+# pattern that has to match install.sh's text literally, dollar sign and
+# all. Expanding it here would search for this test's own empty $other and
+# assert nothing. shellcheck cannot tell a pattern from an expression, so
+# the intent is stated rather than the warning left to be re-discovered.
+# shellcheck disable=SC2016
 want "install.sh removes the topology not chosen" \
 	"install.sh" 'rm -f "/etc/dnsmasq.d/bench-\$other.conf"'
 

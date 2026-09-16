@@ -224,3 +224,68 @@ advance so that the journal can say whether the guess was right:
    image has not been asked to.
 4. Whether `pytest`, `pyserial` and `python3-libgpiod` on Raspberry Pi OS
    are new enough for the libgpiod v2 API the loopback test uses.
+
+---
+
+## 9. CI went red on five shellcheck findings, and one of them was the old bug again
+
+**What happened.** The push of this project turned the `lint` job red at the
+"Shell scripts" step. Five findings, none of them in a program that had ever
+been run, because none of this has been run:
+
+```
+projects/04-netboot-hil/runner/deploy.sh:50   SC2012  ls instead of find
+projects/04-netboot-hil/runner/deploy.sh:80   SC2043  loop runs once
+projects/04-netboot-hil/runner/deploy.sh:110  SC2012  ls instead of find
+projects/04-netboot-hil/server/install.sh:82  SC2086  unquoted $TOPOLOGY
+tests/hil-server-config-test.sh:118           SC2016  $ in single quotes
+```
+
+**What was done.** Four fixes at the cause and one stated intent.
+
+`deploy.sh:110` was the interesting one. It read
+`ls -1 "$NFS_ROOT/lib/modules" | head -1` to learn which kernel release the
+DUT will report, and that is the lexical-order bug this repository has now
+written six times: a rootfs that has carried two kernels has two
+directories there, and `6.12.93` sorts before `6.6.63` because `1` is less
+than `6`. The consequence here is a `kernel-release` file naming the wrong
+kernel, which `test_kernel_is_the_one_we_deployed` would then compare
+against and pass on. Replaced with a `find -printf '%T@ %f'` ranked by time,
+with the reasoning in a comment next to it.
+
+`deploy.sh:50` was the same shape and not the same bug: `ls -1t` does sort
+by time, so it was correct and only awkward. Changed for consistency and to
+clear the finding.
+
+`deploy.sh:80` was a `for` loop over one literal path, written that way so a
+missing device tree would be skipped rather than fatal. A plain assignment
+and test does the same thing and says so. Checked that the change does not
+alter control flow under `set -e`: a failing `[ -f x ] && cp` is the left
+operand of an AND-OR list, which errexit ignores, so the script continues in
+both forms. Verified with a probe rather than assumed, because a script that
+exits early there would silently skip deploying the root filesystem.
+
+`install.sh:82` was an unquoted `$TOPOLOGY` in the destination path, four
+lines below the same variable quoted correctly in the source path. Quoted.
+
+`tests/hil-server-config-test.sh:118` was not a defect. The string is a grep
+pattern that must match install.sh's text including a literal dollar sign,
+so the single quotes and the escape are both deliberate; expanding it would
+search for this test's own empty `$other` and assert nothing. A
+`# shellcheck disable=SC2016` with five lines saying why, rather than a
+rewrite that would weaken the assertion.
+
+**Why that and not the alternative.** The alternative for all five is to add
+them to the `-e` exclusion list in CI, which is one line and turns the
+checker off for the whole repository. Four of the five were real, one of
+them was a wrong answer waiting for a board, and a checker you switch off
+when it disagrees with you is not a checker.
+
+**What this cost and what it says.** Nothing was caught locally, because
+this bench has no shellcheck: the authoring machine is Windows, and
+`scripts/host-check.sh` skips the step with a note when the tool is absent.
+That skip is honest and it means CI is the first place these appear, which
+is a twenty-minute round trip per finding. It is the same lesson as
+[Decision 59](../../walkthrough/DECISIONS.md): the sort bug had already been
+found, fixed, tested and written up, and it still arrived in a new file,
+because a fix applied where it was found does not reach where it lives next.

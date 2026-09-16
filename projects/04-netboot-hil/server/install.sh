@@ -79,7 +79,7 @@ mkdir -p /srv/tftp /srv/nfs/dut3
 
 note "installing the $TOPOLOGY dnsmasq configuration"
 install -Dm0644 "$HERE/dnsmasq.d/bench-$TOPOLOGY.conf" \
-	/etc/dnsmasq.d/bench-$TOPOLOGY.conf
+	"/etc/dnsmasq.d/bench-$TOPOLOGY.conf"
 
 other=proxy
 [ "$TOPOLOGY" = "proxy" ] && other=isolated
