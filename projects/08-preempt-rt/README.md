@@ -35,10 +35,18 @@ first to change the kernel itself.
 
 ## State
 
-**Everything is written and nothing has been run.** No image has been
-built, no kernel has been compiled, no board has been booted and the HAT
-has never been on the header. The results table below is empty on purpose;
-it has a schema and no rows.
+**The kernel configuration is proven; nothing has been built or run.** No
+image has been built, no kernel has been compiled, no board has been booted
+and the HAT has never been on the header. The results table below is empty
+on purpose; it has a schema and no rows.
+
+What changed on 16 September 2026 is the riskiest part of the project, and
+it was settled before the compile rather than after it: the 6.12 kernel is
+in place, every line of both fragments names a real symbol, and every one
+of them reached the `.config` that kconfig produced, `CONFIG_PREEMPT_RT=y`
+included. That is criterion 7, and it took minutes because
+`bitbake -c kernel_configme` merges the fragments without building
+anything.
 
 What is proven today, on a laptop and in CI:
 
@@ -52,7 +60,9 @@ What is proven today, on a laptop and in CI:
 | The relationship between the two instruments is the one the algebra predicts | `tests/rt-compare-test.sh`, 22 assertions against a simulation whose answer is known first |
 | `PREEMPT_RT` is selectable on this kernel at all | read out of `kernel/Kconfig.preempt` and `arch/arm64/Kconfig` in `rpi-6.12.y`, see below |
 | The fragment check catches a kernel built without it | `./go kconfig -f rt` against a deliberately broken config |
-| Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt` against the `rpi-6.12.y` Kconfig text |
+| Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt` against the unpacked 6.12.93 tree, 21484 declarations indexed |
+| The version pin took: the tree is 6.12.93, not the BSP default 6.6 | the kernel's own `Makefile`, read after `kernel_configme` |
+| **Every option of both fragments reached the `.config`, `CONFIG_PREEMPT_RT=y` included** | `./go kconfig -f rt`, [evidence](docs/evidence/kconfig-check.txt) |
 
 What that does not prove is any latency number whatsoever. See
 [Acceptance criteria](#acceptance-criteria) for which rows are evidence and
@@ -149,7 +159,7 @@ each, and where that stands today.
 | 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **not started** |
 | 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **not started**. The original wording, "agrees to within the system-call cost", was not measurable: that cost cancels in an interval measurement |
 | 6 | Every row names kernel, isolation, affinity, governor, load and the throttle status before and after | the CSV header has 27 columns and `rt-run` fills all of them | **met in the code**, proven by `tests/rt-run-test.sh`, unproven on a board |
-| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt` against `/proc/config.gz` from the running board | **tooling ready**, exercised against a synthetic config |
+| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host**, 16 Sep 2026: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them. [Evidence](docs/evidence/kconfig-check.txt). Not yet confirmed against a running kernel |
 | 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
 
 Criterion 4 is the one with a caveat attached, and it is in

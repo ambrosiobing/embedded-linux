@@ -1,0 +1,95 @@
+What:   The real-time kernel fragment against the .config kconfig produced
+On:     Ubuntu 26.04 build host, WSL2, kas 5.1, BitBake 2.8.1, poky
+        scarthgap, DISTRO_VERSION 5.0.20, MACHINE raspberrypi4-64
+When:   16 September 2026, 06:56
+Proves: Acceptance criterion 7, and it proves it before the kernel was
+        compiled rather than after.
+
+This is the check the whole kernel side of Project 8 exists to pass.
+CONFIG_PREEMPT_RT depends on EXPERT && ARCH_SUPPORTS_RT, and arch/arm64
+gained that select in 6.12 while meta-raspberrypi scarthgap still defaults
+to 6.6. On 6.6 the option is silently dropped and the board boots a kernel
+that is not preemptible while the results table claims otherwise.
+
+Three facts had to line up, and each was checked separately:
+
+  1. the version pin took            head -4 of the kernel's own Makefile
+  2. every fragment line is a symbol  ./go ksym -f rt
+  3. every line reached the .config   ./go kconfig -f rt, below
+
+Step 1, from the unpacked source at
+~/bench/build/tmp/work-shared/raspberrypi4-64/kernel-source/Makefile:
+
+    # SPDX-License-Identifier: GPL-2.0
+    VERSION = 6
+    PATCHLEVEL = 12
+    SUBLEVEL = 93
+
+Step 2 indexed 21484 declarations from that tree and found all 31 fragment
+symbols real, with two reported as consequences rather than requests:
+IRQ_FORCED_THREADING, promptless and selected by arch/arm64/Kconfig,
+arch/loongarch/Kconfig and arch/riscv/Kconfig; and LOCKUP_DETECTOR,
+promptless and selected by lib/Kconfig.debug.
+
+Step 3 is below. The .config was produced by
+
+    bitbake -c kernel_configme virtual/kernel
+
+which runs fetch, checkout and patch and then merges the fragments, so it
+costs minutes rather than the hour a full kernel compile takes. The path is
+given explicitly here because the automatic search was picking the wrong
+kernel at the time; see journal entry 25.
+
+----------------------------------------------------------------------
+
+$ ./go kconfig -f rt ~/bench/build/tmp/work/raspberrypi4_64-poky-linux/\
+linux-raspberrypi/6.12.93+git/linux-raspberrypi4_64-standard-build/.config
+
+--- config   /home/bing/bench/build/tmp/work/raspberrypi4_64-poky-linux/linux-raspberrypi/6.12.93+git/linux-raspberrypi4_64-standard-build/.config
+--- built    2026-09-16 06:56
+--- fragment meta-bench/recipes-kernel/linux/files/bench.cfg
+ok        CONFIG_GPIO_CDEV=y
+ok        CONFIG_GPIO_CDEV_V1 off
+ok        CONFIG_IIO=y
+ok        CONFIG_IIO_BUFFER=y
+ok        CONFIG_IIO_KFIFO_BUF=y
+ok        CONFIG_IIO_TRIGGER=y
+ok        CONFIG_IIO_SYSFS_TRIGGER=y
+ok        CONFIG_SPI_SPIDEV=m
+ok        CONFIG_I2C_CHARDEV=m
+ok        CONFIG_IKCONFIG=y
+ok        CONFIG_IKCONFIG_PROC=y
+ok        CONFIG_FTRACE=y
+ok        CONFIG_FUNCTION_TRACER=y
+ok        CONFIG_DYNAMIC_FTRACE=y
+ok        CONFIG_PREEMPT_TRACER=y
+--- fragment meta-bench/recipes-kernel/linux/files/rt.cfg
+ok        CONFIG_EXPERT=y
+ok        CONFIG_PREEMPT_NONE off
+ok        CONFIG_PREEMPT_VOLUNTARY off
+ok        CONFIG_PREEMPT off
+ok        CONFIG_PREEMPT_RT=y
+ok        CONFIG_IRQ_FORCED_THREADING=y
+ok        CONFIG_HIGH_RES_TIMERS=y
+ok        CONFIG_NO_HZ_IDLE off
+ok        CONFIG_NO_HZ_FULL=y
+ok        CONFIG_CPU_ISOLATION=y
+ok        CONFIG_RCU_NOCB_CPU=y
+ok        CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
+ok        CONFIG_DEBUG_PREEMPT off
+ok        CONFIG_SOFTLOCKUP_DETECTOR off
+ok        CONFIG_HARDLOCKUP_DETECTOR off
+ok        CONFIG_LOCKUP_DETECTOR off
+--- every option in every checked fragment is in the built .config
+
+----------------------------------------------------------------------
+
+What this does not prove:
+
+  - that the kernel compiles, boots, or schedules anything on time
+  - that /sys/kernel/realtime reads 1 on the board, which is criterion 1
+  - any latency number
+
+It proves that the configuration the board will be given is the
+configuration that was asked for. Everything after this is the build, the
+card and the wire.
