@@ -1,9 +1,10 @@
-What:   The real-time kernel fragment against the .config kconfig produced
+What:   Both kernel fragments against the kernel the board will run, on the
+        machine the board actually is
 On:     Ubuntu 26.04 build host, WSL2, kas 5.1, BitBake 2.8.1, poky
-        scarthgap, DISTRO_VERSION 5.0.20, MACHINE raspberrypi4-64
-When:   16 September 2026, 06:56
-Proves: Acceptance criterion 7, and it proves it before the kernel was
-        compiled rather than after.
+        scarthgap, DISTRO_VERSION 5.0.20, MACHINE raspberrypi3-64
+When:   16 September 2026, 09:20 to 09:22
+Proves: Acceptance criterion 7, before the kernel was compiled rather than
+        after.
 
 This is the check the whole kernel side of Project 8 exists to pass.
 CONFIG_PREEMPT_RT depends on EXPERT && ARCH_SUPPORTS_RT, and arch/arm64
@@ -11,42 +12,127 @@ gained that select in 6.12 while meta-raspberrypi scarthgap still defaults
 to 6.6. On 6.6 the option is silently dropped and the board boots a kernel
 that is not preemptible while the results table claims otherwise.
 
+It supersedes kconfig-check-raspberrypi4-64.txt, which is the same check
+against the machine this project was originally scoped for. That file is
+kept unedited. The board turned out to be a Raspberry Pi 3 Model B v1.2,
+the machine changed, and the prediction written into that file before this
+rerun was: the paths change, the kernel version does not, because it comes
+from PREFERRED_VERSION_linux-raspberrypi in kas/bench-rt.yml, and
+ARCH_SUPPORTS_RT does not, because arch/arm64/Kconfig selects it for the
+architecture rather than for the SoC. That is what happened.
+
 Three facts had to line up, and each was checked separately:
 
   1. the version pin took            head -4 of the kernel's own Makefile
   2. every fragment line is a symbol  ./go ksym -f rt
-  3. every line reached the .config   ./go kconfig -f rt, below
+  3. every line reached the .config   ./go kconfig -f rt
 
-Step 1, from the unpacked source at
-~/bench/build/tmp/work-shared/raspberrypi4-64/kernel-source/Makefile:
+READ THE FIRST LINE OF EACH CHECK BEFORE READING ITS RESULT
+
+Both checks below open by naming the tree they did NOT read. That line
+exists because of what happened on the first attempt at this rerun: the
+build host now holds one kernel tree and one .config per machine, both
+checks were choosing their input with a lexical sort, and
+"raspberrypi4-64" sorts after "raspberrypi3-64". So ./go ksym read the
+abandoned machine's tree and reported 31 symbols all real, which was the
+correct answer arrived at from the wrong file, because both trees were
+6.12.93 for arm64.
+
+A check that is right for the wrong reason is worse than one that fails.
+The selection is now newest_path in scripts/common.sh, shared by five call
+sites, and it names what it did not choose. See journal entry 35 and
+decision 59. The stale raspberrypi4-64 tree was deliberately left in place
+for this capture: the note firing is better evidence than a tidy directory.
+
+----------------------------------------------------------------------
+
+Step 1, the version pin, from the tree BitBake unpacked for this machine:
+
+$ head -4 ~/bench/build/tmp/work-shared/raspberrypi3-64/kernel-source/Makefile
 
     # SPDX-License-Identifier: GPL-2.0
     VERSION = 6
     PATCHLEVEL = 12
     SUBLEVEL = 93
 
-Step 2 indexed 21484 declarations from that tree and found all 31 fragment
-symbols real, with two reported as consequences rather than requests:
-IRQ_FORCED_THREADING, promptless and selected by arch/arm64/Kconfig,
-arch/loongarch/Kconfig and arch/riscv/Kconfig; and LOCKUP_DETECTOR,
-promptless and selected by lib/Kconfig.debug.
+PATCHLEVEL = 12 is the fact that matters. ./go ksym cannot establish it:
+CONFIG_PREEMPT_RT is declared with a prompt in 6.6 as well as in 6.12, and
+what 6.6 lacks on arm64 is ARCH_SUPPORTS_RT, which is a dependency rather
+than a declaration. On a 6.6 tree ksym prints "ok CONFIG_PREEMPT_RT" and
+tells you nothing, which is why this line is read separately.
 
-Step 3 is below. The .config was produced by
+The .config below was produced by
 
     bitbake -c kernel_configme virtual/kernel
 
 which runs fetch, checkout and patch and then merges the fragments, so it
-costs minutes rather than the hour a full kernel compile takes. The path is
-given explicitly here because the automatic search was picking the wrong
-kernel at the time; see journal entry 25.
+costs minutes rather than the hour a full kernel compile takes. Not
+do_unpack: that puts the tree in ${WORKDIR}/git and empties
+STAGING_KERNEL_DIR on the way past, leaving kernel-source empty.
 
 ----------------------------------------------------------------------
 
-$ ./go kconfig -f rt ~/bench/build/tmp/work/raspberrypi4_64-poky-linux/\
-linux-raspberrypi/6.12.93+git/linux-raspberrypi4_64-standard-build/.config
+Step 2, every fragment line names a real symbol:
 
---- config   /home/bing/bench/build/tmp/work/raspberrypi4_64-poky-linux/linux-raspberrypi/6.12.93+git/linux-raspberrypi4_64-standard-build/.config
---- built    2026-09-16 06:56
+$ ./go ksym -f rt
+
+--- also     1 older kernel tree(s) ignored, newest wins:
+---          /home/bing/bench/build/tmp/work-shared/raspberrypi4-64/kernel-source
+--- kernel   /home/bing/bench/build/tmp/work-shared/raspberrypi3-64/kernel-source
+--- symbols  21484 declarations indexed
+--- fragment meta-bench/recipes-kernel/linux/files/bench.cfg
+ok          CONFIG_GPIO_CDEV  drivers/gpio/Kconfig
+ok          CONFIG_GPIO_CDEV_V1  drivers/gpio/Kconfig
+ok          CONFIG_IIO  drivers/iio/Kconfig
+ok          CONFIG_IIO_BUFFER  drivers/iio/Kconfig
+ok          CONFIG_IIO_KFIFO_BUF  drivers/iio/buffer/Kconfig
+ok          CONFIG_IIO_TRIGGER  drivers/iio/Kconfig
+ok          CONFIG_IIO_SYSFS_TRIGGER  drivers/iio/trigger/Kconfig
+ok          CONFIG_SPI_SPIDEV  drivers/spi/Kconfig
+ok          CONFIG_I2C_CHARDEV  drivers/i2c/Kconfig
+ok          CONFIG_IKCONFIG  init/Kconfig
+ok          CONFIG_IKCONFIG_PROC  init/Kconfig
+ok          CONFIG_FTRACE  kernel/trace/Kconfig
+ok          CONFIG_FUNCTION_TRACER  kernel/trace/Kconfig
+ok          CONFIG_DYNAMIC_FTRACE  kernel/trace/Kconfig
+ok          CONFIG_PREEMPT_TRACER  kernel/trace/Kconfig
+--- fragment meta-bench/recipes-kernel/linux/files/rt.cfg
+ok          CONFIG_EXPERT  init/Kconfig
+ok          CONFIG_PREEMPT_NONE  kernel/Kconfig.preempt
+ok          CONFIG_PREEMPT_VOLUNTARY  kernel/Kconfig.preempt
+ok          CONFIG_PREEMPT  kernel/Kconfig.preempt
+ok          CONFIG_PREEMPT_RT  kernel/Kconfig.preempt
+consequence CONFIG_IRQ_FORCED_THREADING  promptless, selected by: arch/arm64/Kconfig arch/loongarch/Kconfig arch/riscv/Kconfig
+ok          CONFIG_HIGH_RES_TIMERS  kernel/time/Kconfig
+ok          CONFIG_NO_HZ_IDLE  kernel/time/Kconfig
+ok          CONFIG_NO_HZ_FULL  kernel/time/Kconfig
+ok          CONFIG_CPU_ISOLATION  init/Kconfig
+ok          CONFIG_RCU_NOCB_CPU  kernel/rcu/Kconfig
+ok          CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE  drivers/cpufreq/Kconfig
+ok          CONFIG_DEBUG_PREEMPT  lib/Kconfig.debug
+ok          CONFIG_SOFTLOCKUP_DETECTOR  lib/Kconfig.debug
+ok          CONFIG_HARDLOCKUP_DETECTOR  lib/Kconfig.debug
+consequence CONFIG_LOCKUP_DETECTOR  promptless, selected by: lib/Kconfig.debug
+
+--- 31 symbols, all real, 2 recorded as consequences
+--- Next: build, then ./go kconfig to check the values reached it
+
+The two consequences are reported rather than requested and are marked as
+such in rt.cfg. IRQ_FORCED_THREADING is promptless and selected by arm64
+unconditionally; LOCKUP_DETECTOR is promptless and selected by the two
+detectors above it. Asking for either is a prediction, not a request, and
+this is the only check that can tell the difference.
+
+----------------------------------------------------------------------
+
+Step 3, every line reached the .config that kconfig actually produced:
+
+$ ./go kconfig -f rt
+
+--- also     1 older .config(s) ignored, newest wins:
+---          /home/bing/bench/build/tmp/work/raspberrypi4_64-poky-linux/linux-raspberrypi/6.12.93+git/linux-raspberrypi4_64-standard-build/.config
+--- config   /home/bing/bench/build/tmp/work/raspberrypi3_64-poky-linux/linux-raspberrypi/6.12.93+git/linux-raspberrypi3_64-standard-build/.config
+--- built    2026-09-16 09:22
 --- fragment meta-bench/recipes-kernel/linux/files/bench.cfg
 ok        CONFIG_GPIO_CDEV=y
 ok        CONFIG_GPIO_CDEV_V1 off
@@ -84,36 +170,36 @@ ok        CONFIG_LOCKUP_DETECTOR off
 
 ----------------------------------------------------------------------
 
-What this does not prove:
+The four lines this file exists for:
 
-  - that the kernel compiles, boots, or schedules anything on time
+    CONFIG_PREEMPT_RT=y
+    CONFIG_PREEMPT_NONE off
+    CONFIG_PREEMPT_VOLUNTARY off
+    CONFIG_PREEMPT off
+
+kernel/Kconfig.preempt declares those four inside a choice block, so
+exactly one can be set and the other three are not merely absent, they are
+excluded. Reading PREEMPT_RT=y alone would not establish that; reading all
+four does. This is also why rt.cfg carries the three "is not set" lines
+rather than only the one that is wanted: a fragment that asks for a member
+of a choice without saying what it displaces is a fragment whose result
+depends on the defconfig it lands on.
+
+WHAT THIS DOES NOT PROVE
+
+  - that the board booted this kernel
   - that /sys/kernel/realtime reads 1 on the board, which is criterion 1
   - any latency number
 
 It proves that the configuration the board will be given is the
-configuration that was asked for. Everything after this is the build, the
-card and the wire.
+configuration that was asked for, on the machine the board actually is.
+Everything after this is the build, the card and the wire.
 
+To confirm it against the running kernel, once the board is up:
 
-NOTE ADDED 16 September 2026, after the board was confirmed
------------------------------------------------------------
+    scp root@BOARD:/proc/config.gz /tmp/ && zcat /tmp/config.gz > /tmp/config
+    ./go kconfig -f rt /tmp/config
 
-Everything above was captured for MACHINE raspberrypi4-64 and is left
-exactly as captured, because evidence that is edited afterwards is not
-evidence. The board the MCC 118 is actually stacked on turned out to be a
-Raspberry Pi 3 Model B v1.2, so the machine is now raspberrypi3-64 and
-this check has to be run again against that tree.
-
-What the rerun is expected to change and what it is not:
-
-  changes    the paths, which carry the machine name, and the defconfig
-             the fragments are merged on top of
-  unchanged  the kernel version, because PREFERRED_VERSION_linux-
-             raspberrypi is set in kas/bench-rt.yml and is not a machine
-             property
-  unchanged  ARCH_SUPPORTS_RT, which arch/arm64/Kconfig selects for the
-             architecture and not for the SoC
-
-So the expected outcome is the same 31 lines, from a different directory.
-If it is not, that is the finding, and it goes in the journal before
-anything else is built.
+That is better evidence than this file, because a .config in a work
+directory is what kconfig produced and /proc/config.gz is what the board
+is running.

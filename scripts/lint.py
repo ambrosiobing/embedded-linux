@@ -364,6 +364,56 @@ def check_exec_bits() -> None:
         if not shebang and mode == "100755":
             fail(path, "is committed executable but has no shebang")
 
+    check_untracked_scripts()
+
+
+def check_untracked_scripts() -> None:
+    """A new script has no index entry, so the check above cannot see it.
+
+    This is how tests/common-test.sh reached CI as 644. It was written,
+    chmod +x'd on Windows where that changes nothing git records, linted
+    while still untracked, and only then added and committed. Every step
+    reported success and the mode check simply had nothing to look at.
+
+    The check above reads "git ls-files --stage". An untracked file is not
+    in that listing at all, so a brand new script is exactly the case it
+    cannot cover, which is also the only case where the mode is likely to
+    be wrong.
+
+    So: name untracked shebang files, and say the command. This is a note
+    rather than a failure, because an untracked file is not yet a claim
+    about anything and a working tree may hold scratch scripts on purpose.
+    """
+    try:
+        listing = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return
+
+    pending = []
+    for name in listing.splitlines():
+        path = ROOT / name.strip()
+        if not path.is_file():
+            continue
+        try:
+            with open(path, "rb") as handle:
+                if handle.read(2) != b"#!":
+                    continue
+        except OSError:
+            continue
+        pending.append(name.strip())
+
+    if not pending:
+        return
+
+    print("note: untracked scripts, whose mode is not checked until staged:")
+    for name in pending:
+        print(f"      {name}")
+    print("      git add them, then:  git update-index --chmod=+x <file>")
+    print("      and run this again. On Windows chmod alone does not do it.")
+
 
 def markdown_link_targets(text: str) -> list[str]:
     """Link targets, found without a regex so the pattern stays readable."""

@@ -1581,3 +1581,75 @@ in the same directory, and the one with teeth was in the script that
 erases a card. The question that was never asked in entry 25 was the cheap
 one: *where else did I write this?* Nine entries and one nearly dark board
 later, it is a step rather than an afterthought.
+
+## 36. Criterion 7, on the right machine, and a red CI in between
+
+**What happened.** Both checks reran against `raspberrypi3-64` and both
+opened by naming the tree they did not read:
+
+```
+--- also     1 older kernel tree(s) ignored, newest wins:
+---          .../work-shared/raspberrypi4-64/kernel-source
+--- kernel   .../work-shared/raspberrypi3-64/kernel-source
+```
+
+and the same for the `.config`. The fix from entry 35 is doing exactly what
+it was written for, in both the script where the bug was found and the one
+it was propagated to. 31 symbols real, 31 options present,
+`CONFIG_PREEMPT_RT=y`.
+
+**Criterion 7 is met on the build host for the machine the board actually
+is.** The new capture is `docs/evidence/kconfig-check.txt`. The Pi 4 one
+was renamed to `kconfig-check-raspberrypi4-64.txt`, unedited, with a note
+recording that its prediction held: same 31 lines, same kernel version,
+different directory.
+
+That prediction was worth writing down. It is the difference between a
+rerun that confirms something and a rerun that merely happens.
+
+**Then CI went red on the commit before this one.**
+
+```
+tests/common-test.sh: has a shebang but is committed as 100644, not 100755
+```
+
+`scripts/lint.py` has checked exactly this for months. It reads
+`git ls-files --stage`, because Git on Windows defaults to
+`core.filemode=false` and a `chmod` on that side never reaches the commit.
+I ran `chmod +x`, ran the linter, saw `lint: clean`, staged, committed.
+
+**The linter was clean because the file was untracked.** An untracked file
+has no index entry, so it does not appear in `git ls-files --stage` at all.
+The one case the mode check cannot see is a brand new script, which is the
+only case where the mode is ever wrong. Every existing test file in the
+repository is already 755; the check had been passing for months by having
+nothing to do.
+
+**This is the third time this session that a check was clean about a file
+it had not looked at.** `ksym` read the wrong kernel tree and reported the
+right answer. `kconfig` read the wrong `.config` back in entry 25. Now the
+linter passed a file it had never been given. The shape is identical: the
+output says "clean" and the honest statement is "clean, of what I looked
+at".
+
+**What was done.**
+
+1. `git update-index --chmod=+x tests/common-test.sh`, which is the only
+   way to set the bit from this side.
+2. `check_untracked_scripts()` in `lint.py`: untracked files with a
+   shebang are now listed, with the command, as a **note** rather than a
+   failure. An untracked file is not yet a claim about anything, and a
+   working tree may hold scratch scripts on purpose. Verified by dropping
+   a probe script in `tests/` and watching it appear, then removing it.
+
+**What changes as a result.** Lint runs **after** `git add`, not before.
+Every index-based check has the same blind spot and the ordering is the
+whole fix. It also means the pre-commit sequence is now: `git add -A`, then
+`python scripts/lint.py`, then commit, rather than the other way round.
+
+**The aha.** A green check answers a narrower question than it appears to.
+`lint: clean` means "the files I was given are clean", and what it was
+given is a decision made somewhere else, by `git ls-files`, by a `find`, by
+a glob. Three times in one session that decision was the actual bug, and in
+none of them did the tool say what it had looked at. So both pickers now
+name their inputs, and the linter names what it could not see.

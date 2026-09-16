@@ -1586,3 +1586,44 @@ between them is wrong in both.
 
 **Cost.** One shared function, eleven assertions, and five call sites that
 now read as what they mean rather than as how they do it.
+
+## 60. Lint runs after `git add`, and says what it could not see
+
+**Decision.** The pre-commit sequence is `git add -A`, then
+`python scripts/lint.py`, then commit. Not the other way round. And
+`lint.py` now lists untracked files that carry a shebang, as a note.
+
+**Why.** `check_exec_bits` reads `git ls-files --stage`, because Git on
+Windows defaults to `core.filemode=false` and a `chmod` there never reaches
+the commit. An untracked file has no entry in that listing, so the check
+cannot see it. A brand new script is therefore the one case it misses, and
+it is the only case where the mode is ever wrong: every file already in the
+repository was fixed long ago.
+
+`tests/common-test.sh` was written, `chmod +x`ed on Windows where that
+records nothing, linted while untracked, reported clean, staged, committed,
+and failed CI on the mode. Four steps, each reporting success, and the one
+that should have caught it had been handed nothing to check.
+
+**The general form, and it came up three times in one session.** A check
+that selects its own inputs reports on what it selected, and says "clean"
+either way:
+
+| Check | Said | Had actually looked at |
+|---|---|---|
+| `./go kconfig` | fragment missing | a `.config` from another kernel version |
+| `./go ksym` | 31 symbols, all real | the abandoned machine's tree |
+| `lint.py` | clean | every file except the new one |
+
+None of the three said what it had looked at. So both pickers now name the
+inputs they rejected, and the linter names the files it could not check.
+The rule is: **a tool that chooses its own inputs must report the choice**,
+because the alternative is a green result that answers a narrower question
+than the reader thinks it does.
+
+**A note, not a failure.** An untracked file is not yet a claim about
+anything, and a working tree legitimately holds scratch scripts. Making it
+an error would turn ordinary work into a lint failure and teach people to
+skip the linter, which costs more than the bug.
+
+**Cost.** One function, and an ordering that has to be remembered once.
