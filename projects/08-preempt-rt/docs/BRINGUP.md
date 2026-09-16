@@ -155,16 +155,45 @@ Hence two `gpioset` runs rather than one release. Drive high, read, drive
 low, read. That tests the thing the measurement actually depends on, which
 is that the pin follows what the software asks of it.
 
-## 4. Optional, and only for the rows that need it: slow the edge
+## 4. Slow the edge: DEFERRED, for want of two components
 
 Series 1 kohm from pin 38, 10 nF from CH0 to GND. See
 [METHOD.md](METHOD.md) for why. With it, `rt-analyze` reports
 `subsample_fraction` near 1; without it, near 0 and a warning on stderr.
 
-It is worth doing this once with a 60 s capture in each configuration and
-putting both numbers in the table, because that comparison is itself a
-result: it shows how much of a published jitter figure can be an artefact
-of the instrument.
+**Deferred on 16 September 2026: neither part is on this bench.** The
+matrix therefore runs in the coarse regime, and every row it produces
+carries a quantisation that has to be stated rather than discovered later.
+
+What that costs, measured rather than estimated. The first run on hardware
+reported:
+
+```
+subsample_fraction=0.150   sample_us=10.000
+p999_us=23.754             max_abs_us=30.217
+```
+
+So 85% of edges landed inside a single sample, **the per-edge resolution is
+one sample period, 10 us**, and the two tail figures are suspiciously close
+to multiples of it. The mean and the clock offset are unaffected, because
+averaging over 5000 edges recovers far more than one sample of precision;
+`sd`, `p99.9` and `max` carry the quantisation and are the numbers a reader
+of a latency table cares about most.
+
+The comparison this project is making survives it. The real-time and
+generic rows are quantised identically, so a ratio between them is honest
+even when neither absolute number is finer than 10 us. What does not
+survive is an absolute claim: a maximum of 30.2 us on this instrument is
+"between 30 and 40 us", and the acceptance thresholds of 50 us and 150 us
+are comfortably clear of the quantisation, which is why the matrix can
+proceed.
+
+**When the parts arrive**, do this before anything else and it is one
+evening's work: a 60 s capture in each configuration, both numbers in the
+table. That comparison is itself a result, and a more interesting one than
+most rows in the matrix, because it measures how much of a published jitter
+figure is an artefact of the instrument rather than a property of the
+kernel. Almost nobody publishes that number.
 
 ## 5. A first run, no isolation, no load
 

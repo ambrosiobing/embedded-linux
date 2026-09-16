@@ -2524,3 +2524,47 @@ not the output.**
 None of those numbers mean anything yet: this is one unisolated, unloaded
 row on the real-time kernel, with no control to compare against. It is the
 instrument proving it works, not a result.
+
+## 51. Step 4 deferred, and the quantisation stated rather than discovered
+
+**What happened.** The optional RC filter needs a 1 kohm resistor and a
+10 nF capacitor. Neither is on this bench. So the matrix will run in the
+coarse regime.
+
+**Why that is a decision rather than a shortfall.** The first hardware run
+measured what it costs, so this is not an estimate:
+
+```
+subsample_fraction=0.150   sample_us=10.000
+p999_us=23.754             max_abs_us=30.217
+```
+
+85% of edges landed inside one sample, so the per-edge resolution is one
+sample period, 10 us, and the two tail figures sit suspiciously close to
+multiples of it. `rt-analyze` said so on stderr during the run rather than
+leaving it to be noticed.
+
+**What survives and what does not.** The mean and the clock offset are
+unaffected: averaging 5000 edges recovers far more precision than one
+sample. `sd`, `p99.9` and `max` carry the quantisation, and those are the
+numbers a reader of a latency table looks at first.
+
+The comparison this project exists to make survives it, because the
+real-time and generic rows are quantised identically and a ratio between
+them is honest even when neither absolute number is finer than 10 us. What
+does not survive is an absolute claim: a maximum of 30.2 us on this
+instrument means "between 30 and 40". The acceptance thresholds, 50 us and
+150 us, are comfortably clear of the quantisation, which is why the matrix
+can proceed rather than waiting for parts.
+
+**Why write it down now rather than when the numbers are in.** Because a
+limit stated in advance is a method and a limit stated afterwards is an
+excuse. It is in BRINGUP step 4, in the departures table in the README with
+the measured figures, and here. When somebody reads a maximum of 30.2 us in
+the results table, the reason it is not 30.217 is already on the page.
+
+**What it is worth when the parts arrive.** One evening: a 60 s capture in
+each configuration, both numbers in the table. That comparison is a more
+interesting result than most rows of the matrix, because it measures how
+much of a published jitter figure is an artefact of the instrument rather
+than a property of the kernel, and almost nobody publishes that number.

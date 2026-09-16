@@ -140,7 +140,17 @@ else
 	no "no symlinks in the store"
 fi
 if [ "$symlinks" = real ]; then
-	check "the content came with it" "$(cat "$dir/$stem.wic.bz2")" \
+	# Found rather than named. The store keeps everything under the
+	# resolved basename now, so on a host with real symlinks this file is
+	# $stem.rootfs-<timestamp>.wic.bz2 and not $stem.wic.bz2.
+	#
+	# This assertion hardcoded the short name and passed on Windows, where
+	# ln -s makes copies and the two names are the same, then failed on CI
+	# where they are not. Which is the arrangement working: the naming
+	# change is only observable where symlinks are real, and that is the
+	# half of the world CI covers.
+	real_stored=$(find "$dir" -name '*.wic.bz2' -type f | head -n 1)
+	check "the content came with it" "$(cat "$real_stored")" \
 		"image bytes"
 fi
 
