@@ -24,3 +24,16 @@ sdk/hello-gpiod/hello-gpiod
 # Byte code from running the Python programs out of the tree during tests.
 __pycache__/
 *.pyc
+
+# Credentials the boards read from their boot partition. The design keeps
+# these off the card image and out of the repository on purpose: the image
+# carries the capability, the card carries the identity. See
+# meta-bench/recipes-bench/bench-router/files/bench-router-setup.
+#
+# Named here anyway, because the failure is silent and permanent. A boot
+# partition copied off a card for safekeeping is a directory of ordinary
+# files, and one of them holds an access point passphrase, a WAN passphrase
+# and a SIM PIN. If that directory is ever moved into this tree, git would
+# take it without comment and the history would be public.
+router.conf
+wifi.conf
