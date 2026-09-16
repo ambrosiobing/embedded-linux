@@ -2568,3 +2568,149 @@ each configuration, both numbers in the table. That comparison is a more
 interesting result than most rows of the matrix, because it measures how
 much of a published jitter figure is an artefact of the instrument rather
 than a property of the kernel, and almost nobody publishes that number.
+
+## 52. The control booted, and the boot log is the proof
+
+**What happened.** The control image, `bench-rt-generic` at `5ec99fd`,
+flashed and booted on the same Pi 4, with the same HAT, the same wiring and
+the same card.
+
+```
+#1 SMP PREEMPT Fri Jun 12 11:45:31 UTC 2026
+```
+
+`PREEMPT`, not `PREEMPT_RT`. And three lines present in every real-time
+boot today are **absent**:
+
+```
+rcu: RCU priority boosting: priority 1 delay 500 ms
+rcu: RCU_SOFTIRQ processing moved to rcuc kthreads
+ No expedited grace period (rcu_normal_after_boot)
+```
+
+Same kernel version, same userspace, one symbol different, and the
+difference is legible in the first twenty lines of a boot log. That is what
+the two-configuration arrangement was for, and it is the first time both
+halves have existed on the same hardware.
+
+**The build that made it cost two minutes.** `./go rt` after the control:
+
+```
+Sstate summary: Wanted 540 Local 536 Missed 4 Current 2323 (99% match)
+Attempted 6258 tasks of which 6244 didn't need to be rerun
+--- build took 2 min 4 s
+```
+
+I had predicted 46 minutes, on the reasoning that switching
+`BENCH_RT_KERNEL` changes the fragment set and rebuilds the kernel. That is
+true the first time. The real-time kernel at this commit had already been
+built this morning, and only `rt-run` had changed since, which lives in
+`bench-rt` rather than in the kernel recipe. So it came from sstate.
+
+**Both kernels are now cached at one commit, and that is the state the
+matrix needs.** Switching between the two costs minutes rather than an
+hour, and both images are archived as a matched pair:
+
+```
+proj08-bench-rt-generic/2026-09-16_5ec99fd
+proj08-bench-rt/2026-09-16_5ec99fd
+```
+
+Same commit, therefore the same rootfs, therefore "everything else was
+identical" is a statement about the build rather than a hope.
+
+**One thing deliberately not done.** The `image_build` column landed in
+`ababbf6`, after these images were built, so neither carries it and the
+rows from this matrix will have 27 columns. Rebuilding for it would have
+meant pulling, which would also have pulled Project 10's kernel switch and
+cost the kernel rebuild that had just been avoided.
+
+The column matters when images change during a campaign. This campaign is
+one matched pair, so its provenance belongs in `results/README.md` once
+rather than repeated in sixteen rows. The column earns its keep from the
+next campaign onwards.
+
+## 53. Two more extractors that never agreed with their own tools
+
+**The first row that was complete.** `rt-run -d 10 smoke-generic`, and the
+BusyBox fix from entry 50 held:
+
+```
+...,4999,1999.938,3.335,28.288,30.180,-30.859,0.147,6.363,12.306,44.678,39,,,,0x0,0x0
+```
+
+Every external column populated, no `head: invalid option` anywhere. The
+first genuinely complete row this project has produced.
+
+**And three columns still empty.** `cyc_min_us`, `cyc_avg_us`,
+`cyc_max_us`, while the console two lines below printed:
+
+```
+internal (cyclictest)  n=10000 mean=13.57 us sd=3.32 us max=100.5 us
+```
+
+**Why.** `rt-run` invokes `cyclictest -t 1 -h 400 -q`. In histogram mode
+cyclictest prints a histogram and then:
+
+```
+# Min Latencies: 00004
+# Avg Latencies: 00013
+# Max Latencies: 00100
+```
+
+The parser looked for `^T: 0` and walked its fields for `Min:`, `Avg:` and
+`Max:`. **That line is what cyclictest prints without `-h`.** It has never
+existed in this script's output. awk matched nothing, returned the empty
+string three times, and no part of the script noticed.
+
+`rt-compare` reads the same file and reads it correctly, which is exactly
+why the summary showed numbers the CSV did not. **Console right, file
+wrong, for the second time in one day.**
+
+**The test agreed with the bug, for the third time today.** The cyclictest
+stub in `tests/rt-run-test.sh` emitted the `T:` line. So the fixture
+described an invocation `rt-run` does not make, the parser was written to
+match the fixture rather than the tool, and the assertions passed against a
+format that never occurs on any board.
+
+Three components, two of which agreed with each other and neither of which
+agreed with cyclictest.
+
+**The aha, and it is the sharpest statement of the pattern so far.** When a
+parser, a fixture and a tool disagree, the two that agree are not
+necessarily the two that are right. A test written from the same
+misunderstanding as the code it tests produces a green suite and a blank
+column, and nothing distinguishes that from a green suite and a correct
+one except reading the artefact on real hardware.
+
+Which is what happened: `cat /var/lib/bench/rt/smoke-generic-cyclictest.txt`
+answered in one screen what an afternoon of reasoning about cyclictest's
+output format would not have.
+
+**What was done.** The parser reads the summary lines, with `+ 0` to unpad
+`00004` into `4`. The invocation and the parser are coupled, and the
+comment above them says so, because the next person to add or drop `-h`
+breaks this again otherwise. The stub emits real `-h` output and the
+assertions check 4, 13 and 100.
+
+**What the numbers say so far, with every caveat attached.** One unisolated
+unloaded row on each kernel, ten seconds each, from different images, so
+this is not a result:
+
+| | generic | real-time |
+|---|---|---|
+| rt-toggle mean | 12.34 us | 7.49 us |
+| rt-toggle sd | 3.14 us | 2.78 us |
+| rt-toggle max | 44.5 us | 41.5 us |
+| cyclictest max | **100.5 us** | **47.5 us** |
+| external sd | 3.33 us | 2.33 us |
+| external max | 31.0 us | 31.0 us |
+
+The cyclictest maximum is the one to look at: 100.5 against 47.5 on an idle
+board with no isolation and no load. That is the shape the project predicts
+and it is visible in a ten second smoke run, before any of the tuning the
+matrix exists to measure.
+
+It is also exactly the number most likely to be wrong for an uninteresting
+reason, which is why it is recorded here as an observation on two
+unmatched images rather than in the results table.

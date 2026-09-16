@@ -386,3 +386,47 @@ so.
 None reported an error. All reported success. So: **name the inputs you
 rejected, say when you could not look at all, and prove a new check by
 breaking the thing it checks.**
+
+## When a parser, a fixture and a tool disagree
+
+Project 8 found three of these in one day, and the third is the clearest.
+
+`rt-run` invokes `cyclictest -t 1 -h 400 -q` and parsed its output by
+looking for a line starting `T: 0`. In histogram mode cyclictest prints no
+such line: it prints a histogram and then `# Min Latencies: 00004`. The
+`T:` line is what it prints *without* `-h`.
+
+So awk matched nothing, returned three empty strings, and `results.csv` had
+three blank columns in every row ever written, while the summary printed
+two lines below showed the numbers correctly, because a different tool read
+the same file the right way.
+
+**The test agreed with the bug.** Its cyclictest stub emitted the `T:`
+line, so the fixture described an invocation the script does not make. The
+parser was written to match the fixture rather than the tool. Green suite,
+blank column.
+
+That is the general shape:
+
+> When a parser, a fixture and a tool disagree, the two that agree are not
+> necessarily the two that are right.
+
+A test written from the same misunderstanding as the code it tests will
+pass, and nothing distinguishes that from a correct one by reading either.
+What distinguishes them is the artefact on real hardware.
+
+### Three practical consequences
+
+**Write fixtures from captured output, not from memory.** The stub now
+contains real `-h` output, copied off a board. Where a stub is invented, it
+records an assumption about a tool, and the assumption is exactly the thing
+most likely to be wrong.
+
+**Couple a parser to its invocation, out loud.** The comment above the
+parser names the flags that produce the format it reads. Adding or dropping
+`-h` breaks it, and there is nothing in the code that would say so.
+
+**Check the artefact, not the output.** The console was right in both of
+today's cases. The file was wrong in both. A results file is the only part
+that outlives the session, and it is the half nobody looks at while a run
+is succeeding in front of them.
