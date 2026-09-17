@@ -159,13 +159,30 @@ believing a failure.
 |---|---|
 | `rt-plot-test.sh` | MSYS converts a plain path argument to a Windows path before a native executable sees it, but leaves `FILE:LABEL` alone, because the colon makes it look like a path list. `rt-plot.py` takes its inputs in exactly that form, so a native Python receives `/tmp/...` and cannot open it. Verified directly: passing `/tmp/x/a.txt:generic` and `/tmp/x/b.txt` to Python in one command converts the second and not the first. The suite exits 1 with no output at all, which is the confusing part |
 | `sensorhub-cabi-test.sh` | needs `gcc`. It says so and points at `scripts/host-setup.sh` |
-| `lte-watchdog-test.sh` | 7 passed, 18 failed on this host. The watchdog never writes `metrics.prom`, so most assertions compare against an empty string. **Not diagnosed** |
-| `lte-exporter-test.sh` | several parse assertions fail and the suite ends without printing a summary. **Not diagnosed** |
+| `lte-watchdog-test.sh` | its stubs are invoked by Python, and native Windows Python cannot exec an extensionless shell script. The stub never runs, `metrics.prom` is never written, and most assertions compare against an empty string |
+| `lte-exporter-test.sh` | the same cause. The parse assertions fail because the stub that would have produced the input never ran |
 
-The two `lte-*` entries are honest ignorance rather than a known
-limitation. They are listed so that a sweep of every suite on this host
-has an expected result to compare against, which is what makes a NEW
-failure visible.
+The two `lte-*` suites fail for one reason, and it is worth being able to
+demonstrate it in ten seconds rather than re-deriving it from a wall of
+failures:
+
+```
+mkdir -p /tmp/pt/bin
+printf '#!/bin/sh\necho stub ran\n' >/tmp/pt/bin/mystub
+chmod +x /tmp/pt/bin/mystub
+PATH=/tmp/pt/bin:$PATH sh -c mystub
+PATH=/tmp/pt/bin:$PATH python -c "import subprocess; subprocess.run(['mystub'])"
+```
+
+The first prints `stub ran`. The second raises `FileNotFoundError:
+[WinError 2]`, because Windows resolves an executable by extension and
+the stub has none. Git Bash resolves it by the shebang, which is why
+every suite whose stubs are driven by `sh` passes here and every suite
+whose stubs are driven by Python does not.
+
+This table exists so that a sweep of every suite on this host has an
+expected result to compare against, which is what makes a NEW failure
+visible.
 
 Everything else passes here: 32 suites clean as of 17 September 2026,
 including all of the Project 8 tooling except the plotter.
