@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""explorer-beep - sound the Explorer 700's buzzer through evdev.
+
+The buzzer is on line P7 of an I2C expander and this program does not know
+that. It writes an EV_SND / SND_BELL event to an input device, which is
+the same thing a kernel console bell does, and gpio-beeper turns that into
+a level on a pin. Nothing here is board specific, which is the point.
+
+    explorer-beep              one beep, 200 ms
+    explorer-beep 3            three beeps
+    explorer-beep 3 500        three beeps of 500 ms
+
+Needs write access to the event node. The udev rule shipped beside this
+file puts the beeper in the "input" group and gives it a stable symlink,
+so this does not have to run as root once that rule is in place.
+
+WHY NOT python3-evdev. The specification suggests it. It is 200 kB of
+package plus a compiled extension to pack a 24 byte structure that the
+standard library packs in one line, and the structure is stable kernel
+ABI. Adding a dependency to avoid struct.pack would be the same trade the
+whole project argues against, one level up.
+
+SPDX-License-Identifier: MIT
+"""
+
+import os
+import struct
+import sys
+import time
+
+SYS = os.environ.get("EXPLORER_ROOT", "") + "/sys/class/input"
+DEV = os.environ.get("EXPLORER_DEV", "/dev/input")
+
+EV_SYN = 0x00
+EV_SND = 0x12
+SYN_REPORT = 0x00
+SND_BELL = 0x01
+
+# struct input_event: two longs of timeval, then type, code, value.
+#
+# Native sizes and native alignment on purpose. The structure is 24 bytes
+# where a long is 8, which is the arm64 target this runs on, and 16 where
+# a long is 4, which is both a 32 bit kernel and, incidentally, CPython on
+# Windows. "@" follows whichever it is, so the same line is right
+# everywhere and there is no constant to keep in step with the platform.
+# Measured rather than assumed: a two beep run writes ten events, and the
+# byte count on the authoring laptop was 160. Ten and not eight because
+# the finally below sends one more release than the loop needs, which is
+# two events of insurance against a buzzer left sounding.
+EVENT = "@llHHi"
+
+
+def find_beeper():
+    """The event node of the input device named "beeper".
+
+    By name and not by index: this board brings up five joystick keys, a
+    buzzer and an IR receiver as input devices, four of the keys arrive
+    over I2C, and the resulting order is whatever the expander's probe
+    felt like that boot.
+    """
+    if not os.path.isdir(SYS):
+        raise SystemExit(f"explorer-beep: no {SYS}; is this the right board?")
+
+    seen = []
+    for entry in sorted(os.listdir(SYS)):
+        if not entry.startswith("input"):
+            continue
+        base = os.path.join(SYS, entry)
+        try:
+            with open(os.path.join(base, "name")) as handle:
+                name = handle.read().strip()
+        except OSError:
+            continue
+        seen.append(f"{entry}={name}")
+        if name != "beeper":
+            continue
+        for leaf in sorted(os.listdir(base)):
+            if leaf.startswith("event"):
+                return os.path.join(DEV, leaf)
+        raise SystemExit(
+            f"explorer-beep: {entry} is the beeper and has no event node"
+        )
+
+    raise SystemExit(
+        "explorer-beep: no input device named 'beeper'. Saw: "
+        + (", ".join(seen) if seen else "no input devices at all")
+        + ".\n  gpio-beeper did not probe: check INPUT_GPIO_BEEPER and "
+        "that the\n  expander bound, since the buzzer hangs off its line 7."
+    )
+
+
+def send(handle, code, value):
+    handle.write(struct.pack(EVENT, 0, 0, EV_SND, code, value))
+    handle.write(struct.pack(EVENT, 0, 0, EV_SYN, SYN_REPORT, 0))
+    handle.flush()
+
+
+def main(argv):
+    count = int(argv[0]) if len(argv) > 0 else 1
+    millis = int(argv[1]) if len(argv) > 1 else 200
+
+    path = find_beeper()
+    try:
+        handle = open(path, "wb", buffering=0)
+    except PermissionError:
+        raise SystemExit(
+            f"explorer-beep: cannot write {path}.\n"
+            "  Either run as root, or install "
+            "99-explorer700.rules, which puts this\n"
+            "  node in the input group."
+        )
+
+    # try / finally and not just an ordinary sequence. A buzzer left
+    # asserted is not a subtle bug but it is a loud one, and the line
+    # stays driven until something else drives it: nothing releases a
+    # gpio-beeper on process exit, because the kernel owns the pin and
+    # the process was only sending events. Ctrl-C between the on and the
+    # off is the ordinary way to meet this.
+    with handle:
+        try:
+            for index in range(count):
+                if index:
+                    time.sleep(millis / 1000.0)
+                send(handle, SND_BELL, 1)
+                time.sleep(millis / 1000.0)
+                send(handle, SND_BELL, 0)
+        finally:
+            send(handle, SND_BELL, 0)
+
+    print(f"explorer-beep: {count} beep of {millis} ms on {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except KeyboardInterrupt:
+        sys.exit(130)

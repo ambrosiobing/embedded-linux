@@ -75,3 +75,19 @@ SRC_URI += '${@"file://tee.cfg" if d.getVar("BENCH_TEE_KERNEL") == "1" else ""}'
 # that build. See ./go pull, which refuses exactly that.
 BENCH_IIO_KERNEL ?= "0"
 SRC_URI += '${@"file://iio.cfg" if d.getVar("BENCH_IIO_KERNEL") == "1" else ""}'
+
+# And the Explorer 700 fragment, same switch pattern. Project 6 binds
+# eleven peripherals of one HAT to in-tree drivers, and the expensive part
+# of that list is the display: it is an SPI SSD1306, the only in-tree
+# driver for one is the DRM ssd130x, and DRM is a module in the Pi 3
+# defconfig. Built in it drags the KMS helpers, the GEM SHMEM helper and
+# the backlight class in with it, none of which any other image in this
+# repository has a use for, because none of them has a display that is not
+# already handled by the BSP.
+#
+# The fragment is also the only one here that is entirely =y. The reason is
+# in its own header and it is worth the summary: the two bus controllers
+# are modules in the defconfig, so a missing kernel-module package does not
+# cost one driver, it costs the whole I2C bus and four parts at once.
+BENCH_EXPLORER_KERNEL ?= "0"
+SRC_URI += '${@"file://explorer.cfg" if d.getVar("BENCH_EXPLORER_KERNEL") == "1" else ""}'

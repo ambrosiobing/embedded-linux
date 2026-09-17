@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""explorer-oled - put text on the Explorer 700's OLED, through the
+framebuffer and nothing else.
+
+No vendor library, no smbus, no SPI writes. The panel is a device the
+kernel drives; this program opens a framebuffer and writes pixels, exactly
+as it would to any other display. That is the whole argument of Project 6
+seen from user space.
+
+    explorer-oled                     the default three lines
+    explorer-oled "line one" "two"    up to four short lines
+    explorer-oled --clear             blank the panel
+
+TWO THINGS THE PROJECT SPECIFICATION GETS WRONG HERE, BOTH BECAUSE IT
+EXPECTS THE ssd1307fb DRIVER.
+
+It says the framebuffer is 1 bit per pixel with 16 bytes per line, and it
+says the device is /dev/fb1. Neither holds on this board.
+
+The panel is on SPI, so the only in-tree driver is the DRM ssd130x, and
+its fbdev shim is set up with drm_fbdev_generic_setup(drm, 32): the
+framebuffer is 32 bits per pixel XRGB8888, and the kernel converts to the
+panel's 1 bit per pixel itself. 128 x 64 x 4 is 32768 bytes, not 1024.
+
+And the index is not fixed. With vc4 absent from this image there may be
+no HDMI framebuffer at all, which makes the OLED fb0. So the device is
+found by name and its geometry is read from sysfs rather than assumed. If
+a future kernel changes the shim's depth, this program follows it instead
+of writing a screen of noise.
+
+SPDX-License-Identifier: MIT
+"""
+
+import os
+import sys
+
+SYS = os.environ.get("EXPLORER_ROOT", "") + "/sys/class/graphics"
+DEV = os.environ.get("EXPLORER_DEV", "/dev")
+
+
+def find_framebuffer():
+    """The fb whose driver is ssd130x, with its geometry.
+
+    Returns (path, width, height, bpp, stride). Raises with a message
+    that says what it looked at, because "no framebuffer" is otherwise
+    indistinguishable from "looked in the wrong place".
+    """
+    if not os.path.isdir(SYS):
+        raise SystemExit(f"explorer-oled: no {SYS}; is this the right board?")
+
+    seen = []
+    for name in sorted(os.listdir(SYS)):
+        if not name.startswith("fb"):
+            continue
+        base = os.path.join(SYS, name)
+        driver = read(base, "name")
+        seen.append(f"{name}={driver or '?'}")
+        if not driver or "ssd130x" not in driver:
+            continue
+
+        size = read(base, "virtual_size") or ""
+        try:
+            width, height = (int(v) for v in size.split(","))
+        except ValueError:
+            raise SystemExit(
+                f"explorer-oled: {name} has virtual_size {size!r}, "
+                "which is not 'width,height'"
+            )
+        bpp = int(read(base, "bits_per_pixel") or "32")
+        stride = int(read(base, "stride") or (width * bpp // 8))
+        return os.path.join(DEV, name), width, height, bpp, stride
+
+    raise SystemExit(
+        "explorer-oled: no framebuffer named ssd130x. Looked at: "
+        + (", ".join(seen) if seen else "nothing")
+        + ".\n  The panel is bound but has no fb node when "
+        "DRM_FBDEV_EMULATION is off,\n  and has no node at all when "
+        "ssd130x-spi did not probe. explorer-verify says which."
+    )
+
+
+def read(base, leaf):
+    try:
+        with open(os.path.join(base, leaf)) as handle:
+            return handle.read().strip()
+    except OSError:
+        return None
+
+
+# A 5 by 7 font, digits and upper case and a few marks, one byte per
+# column with the low bit at the top. Written out rather than pulled from
+# Pillow because a 30 MB imaging library to draw sixteen characters on a
+# 128 pixel panel is not a dependency this image should carry, and because
+# ImageFont.load_default() needs a font file that Yocto does not
+# necessarily install with it.
+FONT = {
+    " ": (0x00, 0x00, 0x00, 0x00, 0x00),
+    "-": (0x08, 0x08, 0x08, 0x08, 0x08),
+    ".": (0x00, 0x00, 0x40, 0x00, 0x00),
+    ":": (0x00, 0x36, 0x36, 0x00, 0x00),
+    "/": (0x20, 0x10, 0x08, 0x04, 0x02),
+    "0": (0x3E, 0x51, 0x49, 0x45, 0x3E),
+    "1": (0x00, 0x42, 0x7F, 0x40, 0x00),
+    "2": (0x42, 0x61, 0x51, 0x49, 0x46),
+    "3": (0x21, 0x41, 0x45, 0x4B, 0x31),
+    "4": (0x18, 0x14, 0x12, 0x7F, 0x10),
+    "5": (0x27, 0x45, 0x45, 0x45, 0x39),
+    "6": (0x3C, 0x4A, 0x49, 0x49, 0x30),
+    "7": (0x01, 0x71, 0x09, 0x05, 0x03),
+    "8": (0x36, 0x49, 0x49, 0x49, 0x36),
+    "9": (0x06, 0x49, 0x49, 0x29, 0x1E),
+    "A": (0x7E, 0x11, 0x11, 0x11, 0x7E),
+    "B": (0x7F, 0x49, 0x49, 0x49, 0x36),
+    "C": (0x3E, 0x41, 0x41, 0x41, 0x22),
+    "D": (0x7F, 0x41, 0x41, 0x22, 0x1C),
+    "E": (0x7F, 0x49, 0x49, 0x49, 0x41),
+    "F": (0x7F, 0x09, 0x09, 0x09, 0x01),
+    "G": (0x3E, 0x41, 0x49, 0x49, 0x7A),
+    "H": (0x7F, 0x08, 0x08, 0x08, 0x7F),
+    "I": (0x00, 0x41, 0x7F, 0x41, 0x00),
+    "J": (0x20, 0x40, 0x41, 0x3F, 0x01),
+    "K": (0x7F, 0x08, 0x14, 0x22, 0x41),
+    "L": (0x7F, 0x40, 0x40, 0x40, 0x40),
+    "M": (0x7F, 0x02, 0x0C, 0x02, 0x7F),
+    "N": (0x7F, 0x04, 0x08, 0x10, 0x7F),
+    "O": (0x3E, 0x41, 0x41, 0x41, 0x3E),
+    "P": (0x7F, 0x09, 0x09, 0x09, 0x06),
+    "Q": (0x3E, 0x41, 0x51, 0x21, 0x5E),
+    "R": (0x7F, 0x09, 0x19, 0x29, 0x46),
+    "S": (0x46, 0x49, 0x49, 0x49, 0x31),
+    "T": (0x01, 0x01, 0x7F, 0x01, 0x01),
+    "U": (0x3F, 0x40, 0x40, 0x40, 0x3F),
+    "V": (0x1F, 0x20, 0x40, 0x20, 0x1F),
+    "W": (0x3F, 0x40, 0x38, 0x40, 0x3F),
+    "X": (0x63, 0x14, 0x08, 0x14, 0x63),
+    "Y": (0x07, 0x08, 0x70, 0x08, 0x07),
+    "Z": (0x61, 0x51, 0x49, 0x45, 0x43),
+}
+
+CELL_W = 6
+CELL_H = 8
+
+
+def render(lines, width, height):
+    """A set of lit (x, y) pixels for up to height // CELL_H lines."""
+    lit = set()
+    for row, text in enumerate(lines[: height // CELL_H]):
+        y0 = row * CELL_H
+        for col, character in enumerate(text.upper()[: width // CELL_W]):
+            glyph = FONT.get(character, FONT["-"])
+            x0 = col * CELL_W
+            for dx, column in enumerate(glyph):
+                for dy in range(7):
+                    if column & (1 << dy):
+                        lit.add((x0 + dx, y0 + dy))
+    return lit
+
+
+def write(path, width, height, bpp, stride, lit):
+    """Paint the whole framebuffer, because a partial write leaves
+    whatever the previous program put there and the result reads as a
+    corrupt panel rather than as two programs disagreeing."""
+    if bpp == 32:
+        on, off, size = b"\xff\xff\xff\x00", b"\x00\x00\x00\x00", 4
+    elif bpp == 1:
+        on = off = None
+        size = 0
+    else:
+        raise SystemExit(
+            f"explorer-oled: {path} is {bpp} bits per pixel, and this "
+            "program knows 32 (the DRM shim) and 1 (the old fbdev "
+            "driver). Neither guess is safe, so nothing was written."
+        )
+
+    frame = bytearray()
+    for y in range(height):
+        if size:
+            row = bytearray()
+            for x in range(width):
+                row += on if (x, y) in lit else off
+        else:
+            row = bytearray((width + 7) // 8)
+            for x in range(width):
+                if (x, y) in lit:
+                    row[x // 8] |= 0x80 >> (x % 8)
+        row += bytes(stride - len(row)) if stride > len(row) else b""
+        frame += row
+
+    with open(path, "wb") as handle:
+        handle.write(frame)
+
+
+def main(argv):
+    path, width, height, bpp, stride = find_framebuffer()
+
+    if argv and argv[0] == "--clear":
+        lines = []
+    elif argv:
+        lines = argv
+    else:
+        lines = ["EXPLORER 700", "ONE OVERLAY", "ELEVEN PARTS", "PROJECT 06"]
+
+    write(path, width, height, bpp, stride, render(lines, width, height))
+    print(f"explorer-oled: wrote {width}x{height} at {bpp} bpp to {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

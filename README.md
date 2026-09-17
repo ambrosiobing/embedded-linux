@@ -141,6 +141,7 @@ rather than about effort:
 | State | What it means |
 |---|---|
 | **Planned** | Not started. The row names the board and the theme, nothing more |
+| **Written, not yet built** | The recipes, programs and documents exist and the suites pass, and no build has been run, so nothing has checked that BitBake can parse them. A rung that exists because the one below it claims more than it should |
 | **Software complete** | It builds and its tests pass on a machine with no board attached. Nothing has been powered on. A project whose work is split across two processors says which half is done, so Project 12 reads "Linux side complete" |
 | **Built and running on the board** | The image was flashed, the hardware works and the thing does its job. Named measurements are still outstanding, and the row says which |
 | **Complete** | Every acceptance criterion in that project's README is met, each with evidence in its `docs/evidence/`, or deferred with a written reason |
@@ -158,7 +159,7 @@ the claim can be checked rather than taken.
 | 03 | Boot time and energy per boot, measured | NanoPi NEO Air + PPK2 | Boot-time optimisation, systemd-analyze, power | Planned |
 | 04 | [A network-boot hardware-in-the-loop lab](projects/04-netboot-hil) | Pi 4 server + Pi 3B+ DUT | TFTP/NFS root, udev, serial consoles, automated tests | **Software complete**: server configuration, console framing, fixtures and the DUT image, with 47 assertions that need no boards. Nothing has netbooted yet |
 | 05 | An IIO driver for the ADXL345 written from scratch | Raspberry Pi 3 | Kernel driver model, regmap, threaded IRQ, IIO events | Planned |
-| 06 | Explorer 700: every peripheral in one device-tree overlay | Raspberry Pi 3 | Device tree composition, sysfs, hwmon, rtc, w1, input | Planned |
+| 06 | [Explorer 700: every peripheral in one device-tree overlay](projects/06-explorer700) | Raspberry Pi 3 | Device tree composition, sysfs, hwmon, rtc, w1, drm, input | **Written, not yet built**: one overlay binding eleven peripherals, a 26 symbol kernel fragment, the verifier and two demonstration tools, with 96 assertions that need no hardware. The vendor manual overturned five rows of the specification, one of them a driver that cannot bind this board's display at all. **BitBake has never parsed these recipes and dtc has never compiled the overlay**, so this is a rung below Software complete on purpose |
 | 07 | A 3.5 inch SPI display as a DRM panel with touch | Raspberry Pi 3B+ | DRM/KMS tiny drivers, input subsystem, fbcon | Planned |
 | 08 | [PREEMPT_RT latency lab with the MCC 118 as instrument](projects/08-preempt-rt) | Raspberry Pi 4, and a 3B v1.2 as second board | Real-time kernel, cyclictest, IRQ affinity, jitter | **Software complete**: RT kernel fragment, both instruments, the run protocol and three test suites; no board work yet |
 | 09 | Kernel debugging lab: kgdb, ftrace, perf, pstore | Raspberry Pi 3B+ | Debugging and tracing over the serial console | Planned |

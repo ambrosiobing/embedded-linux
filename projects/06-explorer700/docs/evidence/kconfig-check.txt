@@ -1,0 +1,115 @@
+Kernel symbol check for explorer.cfg, before any build
+======================================================
+
+What            every CONFIG_ symbol in
+                meta-bench/recipes-kernel/linux/files/explorer.cfg
+On              the Windows authoring laptop, against the Linux 6.6
+                source on raw.githubusercontent.com, not against a
+                checked out tree
+When            16 September 2026
+Why             a fragment line naming a symbol nobody declares is
+                silently ignored. The build succeeds, the option is
+                absent, and the board disagrees a week later. This
+                repository has paid for that once with three invented
+                netfilter symbols that survived review, CI and a 178
+                minute build.
+
+WHAT THIS DOES NOT PROVE. It proves the symbols are DECLARED in mainline
+6.6. It does not prove they reach the .config of the kernel that gets
+built, which is a different question with a different tool:
+
+    ./go bitbake bench-explorer -c kernel_configme virtual/kernel
+    ./go ksym -f explorer          against the tree that will be built
+    ./go kconfig -f explorer       against the .config it produced
+
+Nor does it prove anything about the Raspberry Pi tree's own additions.
+Both of those are bring-up steps and both are still to be run.
+
+The command
+-----------
+
+    for spec in "<Kconfig path>:<SYMBOL>" ... ; do
+        f=${spec%%:*}; s=${spec##*:}
+        curl -s "$B/$f" | grep -n "^config $s$\|^menuconfig $s$"
+    done
+
+Result
+------
+
+I2C_BCM2835                declared   drivers/i2c/busses/Kconfig:455
+SPI_BCM2835                declared   drivers/spi/Kconfig:163
+RTC_DRV_DS1307             declared   drivers/rtc/Kconfig:247
+GPIO_PCF857X               declared   drivers/gpio/Kconfig:1124
+SENSORS_PCF8591            declared   drivers/hwmon/Kconfig:1668
+BMP280                     declared   drivers/iio/pressure/Kconfig:19
+BMP280_I2C                 declared   drivers/iio/pressure/Kconfig:34
+DRM                        declared   drivers/gpu/drm/Kconfig:8
+DRM_SSD130X                declared   drivers/gpu/drm/solomon/Kconfig:1
+DRM_SSD130X_SPI            declared   drivers/gpu/drm/solomon/Kconfig:24
+DRM_FBDEV_EMULATION        declared   drivers/gpu/drm/Kconfig:135
+W1                         declared   drivers/w1/Kconfig:2
+W1_MASTER_GPIO             declared   drivers/w1/masters/Kconfig:44
+W1_SLAVE_THERM             declared   drivers/w1/slaves/Kconfig:8
+RC_CORE                    declared   drivers/media/rc/Kconfig:3
+RC_DECODERS                declared   drivers/media/rc/Kconfig:42
+IR_GPIO_CIR                declared   drivers/media/rc/Kconfig:174
+IR_NEC_DECODER             declared   drivers/media/rc/Kconfig:71
+IR_RC5_DECODER             declared   drivers/media/rc/Kconfig:79
+IR_RC6_DECODER             declared   drivers/media/rc/Kconfig:87
+LIRC                       declared   drivers/media/rc/Kconfig:32
+LEDS_GPIO                  declared   drivers/leds/Kconfig:344
+LEDS_TRIGGER_HEARTBEAT     declared   drivers/leds/trigger/Kconfig:49
+KEYBOARD_GPIO_POLLED       declared   drivers/input/keyboard/Kconfig:249
+INPUT_GPIO_BEEPER          declared   drivers/input/misc/Kconfig:291
+INPUT_EVDEV                declared   drivers/input/Kconfig:146
+
+26 of 26 declared. No line in explorer.cfg names a symbol that does not
+exist.
+
+The negative result, which is the one that changed the design
+-------------------------------------------------------------
+
+FB_SSD1307, the driver the project specification names for the OLED:
+
+    drivers/video/fbdev/Kconfig:1928
+    config FB_SSD1307
+            tristate "Solomon SSD1307 framebuffer support"
+            depends on FB && I2C
+            depends on GPIOLIB || COMPILE_TEST
+
+"depends on FB && I2C", and the driver is registered with
+module_i2c_driver. The Explorer 700's panel is on SPI, so this driver
+cannot bind it at any address with any property set. It is deliberately
+absent from explorer.cfg and tests/explorer-overlay-test.sh asserts that
+it stays absent.
+
+What the Raspberry Pi 3 defconfig already sets
+-----------------------------------------------
+
+Read from arch/arm64/configs/bcmrpi3_defconfig in raspberrypi/linux
+rpi-6.6.y, because it decides which lines in the fragment are load
+bearing and which are belt and braces:
+
+    CONFIG_BMP280=m           BMP280_I2C absent entirely
+    CONFIG_DRM=m              forced to y so ssd130x can be built in
+    CONFIG_GPIO_PCF857X=m
+    CONFIG_I2C_BCM2835=m      the controller, as a module
+    CONFIG_INPUT_EVDEV=y
+    CONFIG_IR_GPIO_CIR=m
+    CONFIG_LEDS_GPIO=y
+    CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+    CONFIG_RC_CORE=y
+    CONFIG_RTC_DRV_DS1307=m
+    CONFIG_SPI_BCM2835=m      the other controller, as a module
+    CONFIG_W1=m
+    CONFIG_W1_MASTER_GPIO=m
+    CONFIG_W1_SLAVE_THERM=m
+
+Absent from it entirely, and therefore the lines that would be silently
+missing if the fragment were dropped: SENSORS_PCF8591, BMP280_I2C,
+DRM_SSD130X, DRM_SSD130X_SPI, KEYBOARD_GPIO_POLLED, INPUT_GPIO_BEEPER,
+RC_DECODERS and the three protocol decoders.
+
+The two controller lines are why this fragment is entirely =y. A
+forgotten kernel-module package for a driver costs one device; a
+forgotten one for I2C_BCM2835 costs the bus and four devices at once.

@@ -1,0 +1,39 @@
+# Keymap for the IR remote, in ir-keytable's TOML format.
+#
+# THE SCANCODES BELOW ARE NOT FROM A REMOTE ON THIS BENCH. They are the
+# three the vendor manual's own example prints in chapter 14, which is
+# enough to show the file's shape and is not a keymap for anything. A
+# scancode is a property of a remote, not of a protocol, so this file
+# cannot be written correctly in advance by anyone.
+#
+# Replace them. The receiver is protocol agnostic until a keymap is
+# loaded, so the codes come off the board in under a minute:
+#
+#     ir-keytable -p nec,rc-5,rc-6 -t
+#     # press each key, note "scancode = 0x..." and which key it was
+#
+# Then load this file and check that evtest reports named keys:
+#
+#     ir-keytable -c -w /etc/rc_keymap.toml
+#     evtest /dev/input/explorer-ir
+#
+# -c clears the existing map first. Without it the new entries are added
+# to the old ones and a key that used to be mapped stays mapped, which is
+# the version of this that looks like it worked.
+#
+# To have it loaded at every boot, name it in /etc/rc_maps.cfg against the
+# receiver's driver and table name. That file ships with v4l-utils and
+# this image does not edit it, because a line there is a claim about which
+# remote is in the drawer and the image carries capability rather than
+# identity.
+#
+# SPDX-License-Identifier: MIT
+
+[[protocols]]
+name = "explorer700-remote"
+protocol = "nec"
+
+[protocols.scancodes]
+0x0c = "KEY_POWER"
+0x18 = "KEY_UP"
+0x5e = "KEY_ENTER"

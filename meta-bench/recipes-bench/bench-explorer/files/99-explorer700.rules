@@ -1,0 +1,42 @@
+# Stable names for the Explorer 700's input devices.
+#
+# Three drivers on this board create /dev/input/eventN nodes: the polled
+# joystick, the buzzer and the IR receiver. The number each one gets is
+# decided by probe order, and four of the five joystick lines arrive over
+# I2C behind an expander that probes whenever it probes. So the numbers
+# move between boots, and anything that hardcodes one is a program that
+# works until it beeps at the joystick.
+#
+# This is the same argument as the wan0 rule in Project 15, one bus down:
+# a name the kernel assigns by enumeration order is not an identifier.
+# There the discriminator was a USB id; here it is the device name, which
+# comes from the overlay for the keys and from the driver for the other
+# two.
+#
+# The group is what lets explorer-beep run without root. Writing an
+# EV_SND event needs write access to the node, and the alternative to a
+# group is a program that documents "run this with sudo", which is how a
+# bench ends up with everything running as root.
+#
+# SPDX-License-Identifier: MIT
+
+# The five way joystick. "explorer700-keys" is the label property of the
+# keys node in bench-explorer700-overlay.dts, which gpio_keys_polled uses
+# as the input device name.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="explorer700-keys", \
+  SYMLINK+="input/explorer-joystick", GROUP="input", MODE="0660"
+
+# The buzzer. gpio-beeper names its input device after the platform
+# device, which for a device tree node called "beeper" is "beeper".
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="beeper", \
+  SYMLINK+="input/explorer-beeper", GROUP="input", MODE="0660"
+
+# The IR receiver. The name is a literal in the driver, GPIO_IR_DEVICE_NAME
+# in drivers/media/rc/gpio-ir-recv.c, and not something the overlay sets.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="gpio_ir_recv", \
+  SYMLINK+="input/explorer-ir", GROUP="input", MODE="0660"
+
+# And the lirc node beside it, for capturing a protocol no decoder knows.
+# Separate rule because a lirc device is not an input device and the match
+# above will never see it.
+SUBSYSTEM=="lirc", GROUP="input", MODE="0660"

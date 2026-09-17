@@ -1,0 +1,341 @@
+#!/bin/sh
+#
+# explorer-verify - one line per peripheral of the Explorer 700.
+#
+# This is the acceptance test for Project 6 and the thing the README's
+# status table is made from. It answers three questions per peripheral, in
+# this order, because they fail in this order:
+#
+#   1. is the device there at all (a node, an address that answers)
+#   2. did a driver bind to it
+#   3. does it produce a value
+#
+# A peripheral that passes 1 and fails 2 is a kernel configuration problem.
+# One that passes 2 and fails 3 is wiring, or a part that is not fitted.
+# Collapsing those into "broken" is what makes this kind of board take a
+# week, so the status vocabulary keeps them apart:
+#
+#   ok            bound, and it produced something
+#   absent        nothing at that address or path. The overlay, or the bus
+#   no-driver     the device exists and nothing claimed it. The kernel config
+#   not-fitted    bound and working, and the part it talks to is not present
+#   unterminated  bound and working, and its inputs go nowhere on this board
+#   unchecked     this bench cannot answer the question, and says so
+#
+# THE ADC IS THE REASON "unterminated" EXISTS. All four PCF8591 inputs
+# leave this board through a screw terminal, so they float, and four
+# floating CMOS inputs produce four plausible drifting numbers. Printing
+# them as measurements would be manufacturing evidence. See
+# projects/06-explorer700/docs/pin-map.md.
+#
+#   explorer-verify            human readable, aligned
+#   explorer-verify -m         machine readable, one "name status detail"
+#   EXPLORER_ROOT=/tmp/fake    read sysfs from somewhere else, for tests
+#
+# Exit status is 0 when every required peripheral is ok or not-fitted, and
+# 1 otherwise. not-fitted is not a failure: the DS18B20 ships loose.
+#
+# SPDX-License-Identifier: MIT
+
+set -u
+
+ROOT=${EXPLORER_ROOT:-}
+SYS=$ROOT/sys
+DT=$ROOT/proc/device-tree
+
+MACHINE=0
+[ "${1:-}" = "-m" ] && MACHINE=1
+
+failed=0
+
+# chk NAME STATUS DETAIL
+chk() {
+	case $2 in
+	ok | not-fitted | unterminated | unchecked) ;;
+	*) failed=1 ;;
+	esac
+	if [ "$MACHINE" = "1" ]; then
+		printf '%s %s %s\n' "$1" "$2" "$3"
+	else
+		printf '%-10s %-13s %s\n' "$1" "$2" "$3"
+	fi
+}
+
+# first_line FILE... prints the first line of the first file that exists.
+# Globs are expanded by the caller, so a pattern that matched nothing
+# arrives here as a path that does not exist and produces nothing.
+first_line() {
+	for f in "$@"; do
+		if [ -r "$f" ]; then
+			head -n 1 "$f"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# bound_by BUS DEVICE prints the driver that claimed DEVICE, or fails.
+#
+# Found by looking for the device under each driver's own directory,
+# /sys/bus/<bus>/drivers/<driver>/<device>, rather than by reading the
+# device's "driver" symlink back. The two are the same fact: the kernel
+# creates both ends when a driver binds.
+#
+# Doing it this way is a test decision as much as a style one. Reading the
+# symlink needs readlink, so the fake sysfs a test builds needs real
+# symlinks, and the Windows authoring laptop does not reliably make them.
+# This version needs nothing but directories, so the whole suite runs on
+# both machines rather than being skipped on one of them with a note
+# nobody reads.
+bound_by() {
+	for d in "$SYS"/bus/"$1"/drivers/*/; do
+		[ -e "$d$2" ] || continue
+		basename "$d"
+		return 0
+	done
+	return 1
+}
+
+# exists PATH... is true when at least one argument exists. Callers pass a
+# glob and the SHELL expands it before the call.
+#
+# That split matters and it is not only style. Taking the pattern as one
+# string and expanding it inside with "for f in $1" needs an unquoted
+# expansion, which is SC2086, and the authoring laptop has no shellcheck
+# to say so: the runner is the linter and the finding arrives as a red
+# build. Expanding at the call site is the same behaviour with nothing to
+# silence, including the case where the glob matches nothing and the shell
+# passes the pattern through literally, which [ -e ] then answers no to.
+exists() {
+	for f in "$@"; do
+		[ -e "$f" ] && return 0
+	done
+	return 1
+}
+
+# --- I2C1 -------------------------------------------------------------
+
+# i2c_bound ADDRESS EXPECTED_DRIVER returns 0 when that driver has that
+# device, and otherwise returns 1 having set i2c_why to "status|detail".
+#
+# It reports through a variable rather than through stdout, and the first
+# version of this file did the opposite: it printed the driver name for
+# the caller to capture and called chk itself for the failures. Every
+# caller then wrote "if i2c_check ... >/dev/null", and that redirect
+# swallowed the failure rows along with the name. The result was a checker
+# that printed nothing at all for a part with no driver, which is the
+# worst possible output: the reader sees ten rows instead of eleven and
+# has no reason to count them.
+#
+# tests/explorer-verify-test.sh found it on its first run, by asserting
+# the status of a row rather than the exit code of the program.
+i2c_why=
+
+i2c_bound() {
+	if [ ! -d "$SYS/bus/i2c/devices/1-$1" ]; then
+		i2c_why="absent|no 1-$1 on i2c1: overlay not loaded, or wrong address"
+		return 1
+	fi
+	if ! drv=$(bound_by i2c "1-$1"); then
+		i2c_why="no-driver|device present, nothing bound: check explorer.cfg"
+		return 1
+	fi
+	if [ "$drv" != "$2" ]; then
+		i2c_why="no-driver|bound to $drv, expected $2"
+		return 1
+	fi
+	return 0
+}
+
+# why NAME emits the row i2c_bound refused with.
+why() {
+	chk "$1" "${i2c_why%%|*}" "${i2c_why#*|}"
+}
+
+# DS3231. The functional read is the RTC class device rather than
+# hwclock(8), because hwclock needs root and this script should be
+# runnable by anyone. Whether the time is CORRECT is a different question
+# and needs a battery in the holder; see docs/BRINGUP.md.
+if ! i2c_bound 0068 rtc-ds1307; then
+	why DS3231
+else
+	rtc=$(first_line "$SYS"/bus/i2c/devices/1-0068/rtc/rtc*/name) || rtc=
+	if [ -n "$rtc" ]; then
+		chk DS3231 ok "$rtc, /dev/rtc0"
+	else
+		chk DS3231 no-driver "bound, but no rtc class device appeared"
+	fi
+fi
+
+# PCF8574. The functional check is the line names, because they come from
+# the overlay and prove that THIS overlay is the one loaded rather than
+# some other pcf8574 node.
+if ! i2c_bound 0020 pcf857x; then
+	why PCF8574
+else
+	names=$SYS/bus/i2c/devices/1-0020/gpio
+	if exists "$names"/gpiochip*; then
+		n=0
+		for g in "$names"/gpiochip*; do
+			[ -e "$g" ] && n=$((n + 1))
+		done
+		chk PCF8574 ok "$n gpiochip, 8 lines, names from the overlay"
+	else
+		chk PCF8574 no-driver "bound, but no gpiochip appeared"
+	fi
+fi
+
+# PCF8591. Bound and working means a hwmon directory. What it is measuring
+# is nothing, and that is the honest answer on this board.
+if ! i2c_bound 0048 pcf8591; then
+	why PCF8591
+else
+	if exists "$SYS"/bus/i2c/devices/1-0048/hwmon/hwmon*; then
+		chk PCF8591 unterminated "hwmon present; AIN0..3 go to the screw terminal"
+	else
+		chk PCF8591 no-driver "bound, but no hwmon directory appeared"
+	fi
+fi
+
+# The pressure sensor. This is the one part whose identity the vendor
+# manual contradicts itself about, so the failure message says so: a chip
+# id mismatch is a probe failure, not a silence, and the kernel log names
+# the id it read.
+if ! i2c_bound 0076 bmp280; then
+	why BMP280
+else
+	p=$(first_line "$SYS"/bus/i2c/devices/1-0076/iio:device*/in_pressure_input) || p=
+	if [ -n "$p" ]; then
+		chk BMP280 ok "$p kPa"
+	else
+		chk BMP280 no-driver "bound, no in_pressure_input: BMP180 rather than BMP280?"
+	fi
+fi
+
+# --- SPI0: the OLED ---------------------------------------------------
+#
+# The framebuffer index is NOT assumed. With vc4 absent from this image
+# there may be no HDMI framebuffer at all, which makes the OLED fb0 rather
+# than the fb1 the project specification expects. Searching by name costs
+# nothing and removes a whole class of confused bring-up.
+
+oled=$SYS/bus/spi/devices/spi0.0
+if [ ! -d "$oled" ]; then
+	chk SSD1306 absent "no spi0.0: SPI off, or spidev0 still holds chip select 0"
+else
+	drv=$(bound_by spi spi0.0) || drv=
+	if [ -z "$drv" ]; then
+		chk SSD1306 no-driver "device present, nothing bound: check DRM_SSD130X_SPI"
+	elif [ "$drv" != "ssd130x-spi" ]; then
+		chk SSD1306 no-driver "bound to $drv, expected ssd130x-spi"
+	else
+		fb=
+		for f in "$SYS"/class/graphics/fb*; do
+			[ -r "$f/name" ] || continue
+			case $(head -n 1 "$f/name") in
+			*ssd130x*) fb=$(basename "$f") ;;
+			esac
+		done
+		if [ -n "$fb" ]; then
+			chk SSD1306 ok "ssd130x-spi, /dev/$fb"
+		else
+			chk SSD1306 unchecked "bound; no fb node, so DRM_FBDEV_EMULATION is off"
+		fi
+	fi
+fi
+
+# --- 1-Wire -----------------------------------------------------------
+#
+# THE TWO EMPTY CASES ARE DIFFERENT AND THIS IS WHERE THEY ARE SEPARATED.
+# No master at all is the overlay or the kernel. A master reporting zero
+# slaves is a probe that is not plugged into the three-pin header, or a
+# missing pull-up on the data line. The manual ships the DS18B20 loose.
+
+master=$SYS/bus/w1/devices/w1_bus_master1
+if [ ! -d "$master" ]; then
+	chk DS18B20 absent "no w1_bus_master1: overlay or W1_MASTER_GPIO"
+else
+	count=$(first_line "$master/w1_master_slave_count") || count=0
+	if [ "${count:-0}" = "0" ]; then
+		chk DS18B20 not-fitted "bus up, 0 slaves: probe unplugged, or no pull-up"
+	else
+		t=$(first_line "$SYS"/bus/w1/devices/28-*/temperature) || t=
+		if [ -n "$t" ]; then
+			chk DS18B20 ok "$t milli C, $count slave"
+		else
+			chk DS18B20 no-driver "$count slave, no temperature: W1_SLAVE_THERM"
+		fi
+	fi
+fi
+
+# --- the IR receiver --------------------------------------------------
+#
+# Whether a REMOTE works cannot be answered without a remote and a thumb,
+# so this reports the receiver only and says which half it checked.
+
+if exists "$SYS"/class/rc/rc*; then
+	rcname=$(first_line "$SYS"/class/rc/rc*/device_name "$SYS"/class/rc/rc*/name) || rcname=rc0
+	chk IR ok "$rcname; decoding needs ir-keytable -t and a remote"
+else
+	chk IR absent "no /sys/class/rc: IR_GPIO_CIR, or the wrong pin"
+fi
+
+# --- LEDs -------------------------------------------------------------
+
+for led in led1 led2; do
+	d=$SYS/class/leds/explorer:$led
+	if [ -d "$d" ]; then
+		trg=$(first_line "$d/trigger") || trg=
+		# The trigger file lists every trigger with the active one in
+		# brackets. Take the bracketed one and nothing else.
+		active=$(printf '%s\n' "$trg" | tr ' ' '\n' | grep '^\[' | tr -d '[]')
+		chk "LED ${led#led}" ok "trigger ${active:-none}"
+	else
+		chk "LED ${led#led}" absent "no explorer:$led: LEDS_GPIO, or the wrong line"
+	fi
+done
+
+# --- input devices ----------------------------------------------------
+#
+# Matched by the name the overlay gives them rather than by event index,
+# because the index depends on probe order and the expander probes over
+# I2C, which is to say whenever it feels like it.
+
+input_named() {
+	for d in "$SYS"/class/input/input*; do
+		[ -r "$d/name" ] || continue
+		if [ "$(head -n 1 "$d/name")" = "$1" ]; then
+			basename "$d"
+			return 0
+		fi
+	done
+	return 1
+}
+
+if dev=$(input_named "explorer700-keys"); then
+	chk Joystick ok "$dev, five keys; directions need evtest and a thumb"
+else
+	chk Joystick absent "no explorer700-keys input: KEYBOARD_GPIO_POLLED"
+fi
+
+if dev=$(input_named "beeper"); then
+	chk Buzzer ok "$dev, EV_SND"
+else
+	chk Buzzer absent "no beeper input: INPUT_GPIO_BEEPER, or expander line 7"
+fi
+
+# --- the console ------------------------------------------------------
+#
+# The CP2102 is on the far side of the UART and this script is on the near
+# side, so it can report that the port is enabled and cannot report that
+# anything is listening to it. Saying which of those it checked is the
+# point; the real test is a login prompt on the PC.
+
+st=$(first_line "$DT"/soc/serial@*/status) || st=
+case $st in
+okay*) chk Console unchecked "uart0 okay; a login prompt on the PC is the test" ;;
+"") chk Console unchecked "no serial node read; is this a Raspberry Pi device tree?" ;;
+*) chk Console absent "uart0 status is $st: disable-bt missing from config.txt" ;;
+esac
+
+exit "$failed"

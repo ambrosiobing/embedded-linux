@@ -2360,3 +2360,103 @@ the problem was a check that selected its own input and reported on what it
 selected. Here it is a check that rejects and does not report at all. Both
 are the same omission: the check knows something the reader needs and keeps
 it.
+
+## 83. A binding is cited to a driver line, not recalled
+
+**Context.** The Project 6 specification describes two kernel mechanisms in
+one paragraph, in the same confident voice. One is exactly right: the I2C
+core derives a client name from a compatible string by taking what follows
+the comma, which is how `nxp,pcf8591` binds a driver that has no of_match
+table at all. The other is impossible: it names `ssd1307fb` for an SPI
+panel, and that driver's Kconfig entry is `depends on FB && I2C` and it is
+registered with `module_i2c_driver`.
+
+Nothing about the prose separates them. Both read as settled fact.
+
+**Decision.** Every binding this repository uses is recorded in the
+project's `docs/bindings.md` with the source file and line that settled it,
+and the negative results are recorded the same way.
+
+**Rejected.** Citing the binding documents under
+`Documentation/devicetree/bindings/`, which is what the specification does.
+They are a description of intent and they are not what decides whether a
+probe happens. A file name there also changes between kernel versions,
+which turns a citation into a dead reference.
+
+**Why.** The failure this prevents is not a wrong property. It is a whole
+design built on a driver that cannot bind, where the first three things
+anybody debugs are the address, the bus speed and the overlay syntax, and
+the bus is the fourth at best. The Kconfig line that settles it takes
+thirty seconds to read and appears on nobody's list.
+
+**Consequence.** Writing an overlay now includes reading the drivers it
+names. That is perhaps an hour per project, and it is the hour that would
+otherwise be spent on a board with a dead device and no message anywhere.
+
+---
+
+## 84. A parameter covers what the board varies, a source edit covers what the design chooses
+
+**Context.** Project 6's pin numbers all come from a vendor manual's block
+diagram rather than from a net list, so a wrong one is likely and should be
+cheap. Device tree overlays have `__overrides__` for exactly that, and the
+first draft of the design document also promised a parameter for choosing
+between polled and interrupt-driven keys, on the strength of a Raspberry Pi
+firmware feature that enables and disables whole fragments.
+
+That feature is not documented in the kernel tree. `arch/arm/boot/dts/
+overlays/README` in `rpi-6.6.y` is 258 KB of parameter lists and does not
+mention `__overrides__` anywhere; the authoring syntax lives only on a
+documentation website. Writing it from memory would have produced a
+parameter that silently does nothing.
+
+**Decision.** Parameters expose what a board revision changes: pin numbers,
+an I2C address, a pull setting, a polarity, a poll interval. Anything that
+changes which driver binds or how it is driven is a source edit, printed as
+a diff in the bring-up document with the test to run before making it.
+
+**Rejected.** Using the fragment enable syntax anyway. It is probably
+correct and it is used by official overlays, and "probably" is the whole
+problem: an overlay parameter that does nothing fails exactly like a
+correct one on a board where the thing was going to work regardless.
+
+**Why.** This is the Kconfig rule from chapter 2 applied one layer up. A
+fragment line naming a symbol nobody declares is silently ignored; so is a
+parameter naming a mechanism the firmware does not implement. Both produce
+a build that succeeds and a board that disagrees.
+
+**Consequence.** The interrupt-driven variant costs a rebuild rather than a
+reboot. Given that it also costs an evening of `gpiomon` before it should
+be trusted at all, the rebuild is not the expensive part.
+
+---
+
+## 85. A checker reports through a variable, never through the stream it shares with its output
+
+**Context.** `explorer-verify` prints one line per peripheral and is the
+acceptance test for Project 6. Its first version had a helper that printed
+a driver name on stdout for the caller to capture, and called the row
+printer itself when a device failed. Every call site therefore looked like
+
+    if i2c_check DS3231 0068 rtc-ds1307 >/dev/null; then
+
+and that redirect discarded the failure rows along with the name. A part
+with no driver produced no line at all: ten rows where eleven were
+expected, and nothing saying which one was missing.
+
+**Decision.** A function that both reports and returns a value returns the
+value through a variable. Output streams belong to output.
+
+**Rejected.** Sending the diagnostic rows to stderr instead. It works, and
+it splits one table across two streams so that `explorer-verify > log`
+keeps the passes and loses every failure, which is worse than the bug.
+
+**Why.** The exit status was still correct, so a test asserting only on
+exit codes would have called this program right. What found it was a test
+asserting the **status word of a named row**, which is a different and
+better question: it checks what the reader will see rather than what the
+shell will see.
+
+**Consequence.** A small amount of awkwardness in POSIX shell, which has no
+return values. The alternative is a checker whose worst output is a silent
+omission, and an omission is the one error a reader cannot notice.

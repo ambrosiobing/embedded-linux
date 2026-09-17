@@ -1,0 +1,76 @@
+# Project 6: the Explorer 700, bound by one device tree overlay.
+#
+#   kas build kas/bench-explorer.yml    or  ./go explorer
+#
+# Its own configuration because the kernel needs eleven drivers built in
+# and a DRM core that no other image here wants, and because config.txt
+# has to say three things this bench has never needed together: enable
+# SPI, free the PL011 from the Bluetooth radio, and load the overlay.
+#
+# It includes bench-rpi3.yml because the specification puts this project
+# on a Raspberry Pi 3 and that file already exists to say so.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-explorer-image
+
+repos:
+  # evtest comes from meta-oe (recipes-test), ir-keytable from the
+  # v4l-utils recipe in meta-oe (recipes-multimedia/v4l2apps), and
+  # lmsensors-sensors from meta-oe as well. One repository, one pin.
+  meta-openembedded:
+    layers:
+      meta-oe:
+
+local_conf_header:
+  explorer: |
+    # The switch that adds recipes-kernel/linux/files/explorer.cfg. Opt in
+    # for the reason in the bbappend: it is the only fragment here that
+    # builds a DRM core into the kernel.
+    BENCH_EXPLORER_KERNEL = "1"
+
+    # Both buses the HAT uses. ENABLE_I2C writes "dtparam=i2c1=on" and
+    # "dtparam=i2c_arm=on"; ENABLE_SPI_BUS writes "dtparam=spi=on".
+    # Without the second one there is no spi0 node for the display
+    # fragment to attach to, and the overlay loads with the OLED silently
+    # missing while everything else works. That is the failure this line
+    # exists to prevent and it is the least obvious one in the file.
+    ENABLE_I2C = "1"
+    ENABLE_SPI_BUS = "1"
+
+    # And the rest of config.txt, a deliberate REPLACEMENT of the line in
+    # bench-rpi4.yml rather than an addition to it.
+    #
+    # The DSI panel overlay is gone, as it is for Project 10: this board
+    # has a HAT covering the header and no DSI display, and Project 8
+    # measured what an overlay for absent hardware costs, which is a
+    # deferred probe retrying for ever.
+    #
+    # disable-bt comes FIRST and the order matters. It moves the PL011
+    # from the Bluetooth radio to GPIO14 and GPIO15, which is where the
+    # HAT's CP2102 bridge is wired, and it owns the pin multiplexing
+    # while doing it. The vendor manual warns about this from the other
+    # side: "The serial port of the Raspberry Pi 3B is not available
+    # because pin14 and 15 are connected with its own Bluetooth."
+    #
+    # The cost is the radio. This board has no Bluetooth after this line,
+    # which is the opposite trade from Project 17 and the reason the two
+    # are not the same image.
+    RPI_EXTRA_CONFIG = "dtoverlay=disable-bt\ndtoverlay=bench-explorer700"
+
+    # GPIO_IR is deliberately NOT set. meta-raspberrypi turns it into
+    # "dtoverlay=gpio-ir,gpio_pin=N", which binds a second gpio-ir-recv.
+    # This project's own overlay already describes the receiver on
+    # GPIO18, and two overlays claiming one pin is the failure the
+    # specification warns produces "a confusing failure in the firmware
+    # log" rather than an error anyone would recognise.
+
+    # The kernel's work directory has to survive, because ./go kconfig
+    # reads the .config it produced and that is the only evidence that
+    # the eleven driver symbols in explorer.cfg actually arrived.
+    # bench-explorer700 is kept for the same reason one step down: when a
+    # node does not probe, the first useful thing to do is read the
+    # compiled overlay back with dtc -I dtb.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-explorer700 bench-explorer"

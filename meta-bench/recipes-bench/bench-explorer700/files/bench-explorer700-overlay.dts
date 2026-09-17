@@ -1,0 +1,557 @@
+/*
+ * bench-explorer700: eleven peripherals of a JOY-iT RB-Explorer700, bound
+ * to in-tree drivers, on a Raspberry Pi 3.
+ *
+ * Declarative only. Nothing here reads, writes or configures a device: it
+ * says which driver owns which address or line, and the drivers do the
+ * rest. The vendor's own software for this board is Python talking to
+ * smbus and RPi.GPIO, and replacing that with a hardware description is
+ * the entire point of Project 6.
+ *
+ * Applied with "dtoverlay=bench-explorer700" in config.txt, which
+ * kas/bench-explorer.yml puts there through RPI_EXTRA_CONFIG.
+ *
+ * EVERY PIN NUMBER BELOW CAME FROM THE VENDOR MANUAL, NOT FROM A SCHEMATIC
+ *
+ * Joy-it RB-Explorer700 manual, 16 November 2020, page 3: a block diagram
+ * per peripheral, each signal labelled with a Raspberry Pi BCM number.
+ * Page 2 fixes the convention: "All pins listed here refer to the
+ * GPIO/BCM pins of the Raspberry Pi."
+ *
+ * That is the best source available short of a net list, and it is not a
+ * net list. projects/06-explorer700/docs/pin-map.md carries every line
+ * here with its evidence and a "confirmed" column, and at the time this
+ * file was written NOTHING in that column said yes.
+ *
+ * It also disagrees with the project specification in five places, three
+ * of which are in this file: the OLED is SPI and not I2C, the joystick
+ * directions are permuted, and the joystick's push contact is on a SoC
+ * pin rather than on the expander.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/*
+	 * The SoC family string every Raspberry Pi overlay uses, including
+	 * on the BCM2837 of a Pi 3. It matches the family rather than the
+	 * part and the firmware accepts it across the range.
+	 */
+	compatible = "brcm,bcm2835";
+
+	/* ------------------------------------------------------------ *
+	 * fragment@0: the four I2C devices
+	 * ------------------------------------------------------------ */
+	fragment@0 {
+		target = <&i2c1>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			/*
+			 * Redundant with ENABLE_I2C in the kas file, and
+			 * kept so that this overlay describes a working bus
+			 * on its own rather than depending on a setting made
+			 * somewhere a reader of this file cannot see.
+			 */
+			status = "okay";
+
+			/*
+			 * The clock. rtc-ds1307 covers the DS3231 as well as
+			 * the DS1307 the driver is named after, which is why
+			 * the vendor manual tells you to "modprobe
+			 * rtc-ds1307" for a chip called DS3231.
+			 *
+			 * It keeps time only with a CR1220 in the holder
+			 * (manual chapter 12). Without one it probes, reads
+			 * and reports a time that is wrong, which is the
+			 * failure that looks like a working clock.
+			 */
+			ds3231: rtc@68 {
+				compatible = "maxim,ds3231";
+				reg = <0x68>;
+			};
+
+			/*
+			 * The I/O expander, and the node three other
+			 * fragments reference by label. Eight quasi
+			 * bidirectional lines: reading requires the line to
+			 * have been left high, which is what makes the
+			 * joystick contacts work as inputs with no external
+			 * pull-up.
+			 *
+			 * gpio-line-names is not decoration. It is what
+			 * makes "gpioinfo" readable to somebody who has
+			 * neither this file nor the manual, and the names
+			 * come from the manual's own net labels.
+			 *
+			 * NO INTERRUPT HERE, ON PURPOSE. The manual puts the
+			 * expander's INT output on GPIO21, so the wire
+			 * exists and gpio-pcf857x installs an interrupt chip
+			 * whenever an irq is given. It is left out because
+			 * an open-drain output with no confirmed pull-up,
+			 * under an edge-triggered handler, is an interrupt
+			 * storm rather than a silent failure. See
+			 * docs/BRINGUP.md for the test that has to pass
+			 * before this changes, and the diff that changes it.
+			 */
+			pcf8574: gpio@20 {
+				compatible = "nxp,pcf8574";
+				reg = <0x20>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				gpio-line-names =
+					"joy-left", "joy-up", "joy-down",
+					"joy-right", "led2", "button-l3",
+					"button-l4", "buzzer";
+			};
+
+			/*
+			 * The 8-bit ADC and DAC.
+			 *
+			 * pcf8591 is a hwmon driver with NO of_device_id
+			 * table at all, only an i2c_device_id named
+			 * "pcf8591". It binds anyway, and the mechanism is
+			 * worth naming because the next person to read the
+			 * driver will have the same doubt: the I2C core
+			 * derives the client name from the compatible
+			 * string by taking what follows the comma
+			 * (of_alias_from_compatible, drivers/of/base.c), so
+			 * "nxp,pcf8591" becomes "pcf8591" and matches.
+			 *
+			 * All four inputs leave this board through a screw
+			 * terminal and a header and nothing is connected to
+			 * them here, so the four values in sysfs are
+			 * floating inputs until somebody wires one. That is
+			 * a property of the board, not of this node, and
+			 * explorer-verify reports it rather than printing
+			 * four numbers that look like measurements.
+			 */
+			pcf8591: adc@48 {
+				compatible = "nxp,pcf8591";
+				reg = <0x48>;
+			};
+
+			/*
+			 * Pressure and temperature.
+			 *
+			 * THE ONE PART WHOSE IDENTITY IS UNRESOLVED. The
+			 * manual calls it a BMP280 twice, including in the
+			 * chapter that talks to it, and a BMP180 once, in
+			 * the block diagram that gives the address. Both are
+			 * handled by the bmp280 driver and differ by chip
+			 * id, so a wrong guess here is a probe failure
+			 * naming the id it read, not a silence.
+			 *
+			 * If it turns out to be a BMP180, the fix is this
+			 * compatible string and nothing else; the address is
+			 * a parameter below. Both spellings are in the
+			 * driver's of_match_table in 6.6.
+			 *
+			 * 0x76 from the manual. The specification said 0x77,
+			 * which is the same part with its address pin
+			 * strapped the other way, so i2cdetect settles it.
+			 */
+			bmp: pressure@76 {
+				compatible = "bosch,bmp280";
+				reg = <0x76>;
+			};
+		};
+	};
+
+	/* ------------------------------------------------------------ *
+	 * fragment@1: the OLED, which is on SPI and not on I2C
+	 * ------------------------------------------------------------ */
+	fragment@1 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			/*
+			 * A 128x64 SSD1306 on a 4-wire SPI interface.
+			 *
+			 * The specification describes this panel as I2C at
+			 * 0x3c driven by ssd1307fb. That cannot work on this
+			 * board and not for a reason any property would fix:
+			 * FB_SSD1307 is "depends on FB && I2C" in the 6.6
+			 * Kconfig and the driver is registered with
+			 * module_i2c_driver, so it has no SPI probe path at
+			 * all. The manual's chapter 16 confirms the bus from
+			 * the other side by telling you to enable SPI before
+			 * running the display examples.
+			 *
+			 * So the binding is the DRM driver, ssd130x, whose
+			 * SPI transport takes the plain "solomon,ssd1306"
+			 * compatible. User space sees /dev/dri/card0, and
+			 * /dev/fbN only through DRM_FBDEV_EMULATION, which
+			 * explorer.cfg names for exactly that reason.
+			 *
+			 * dc-gpios is NOT optional: ssd130x-spi does
+			 * devm_gpiod_get(dev, "dc", ...) and fails probe
+			 * without it, because 4-wire SPI has no room for the
+			 * control byte that carries data-versus-command on
+			 * I2C. reset-gpios is devm_gpiod_get_optional and is
+			 * wired on this board, so it is declared.
+			 *
+			 * There is deliberately no cs-gpios here. GPIO8 is
+			 * chip select because the SPI controller drives it
+			 * as CE0; claiming it again in this node would be
+			 * two owners on one line.
+			 */
+			oled: oled@0 {
+				compatible = "solomon,ssd1306";
+				reg = <0>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&oled_pins>;
+
+				spi-max-frequency = <10000000>;
+
+				dc-gpios = <&gpio 16 0>;	/* active high */
+				reset-gpios = <&gpio 19 1>;	/* active low */
+
+				solomon,width = <128>;
+				solomon,height = <64>;
+				solomon,page-offset = <0>;
+			};
+		};
+	};
+
+	/*
+	 * fragment@2: and the spidev that was already at chip select 0.
+	 *
+	 * The Raspberry Pi base device tree puts spidev@0 and spidev@1
+	 * under spi0. Leaving spidev0 enabled while adding a display at the
+	 * same chip select gives two drivers sharing one select line, and
+	 * the symptom is a display that works until something opens
+	 * /dev/spidev0.0.
+	 *
+	 * This file is checked against the reference implementation:
+	 * arch/arm/boot/dts/overlays/ssd1306-spi-overlay.dts in rpi-6.6.y
+	 * binds the same panel on the same bus, and disables spidev0 the
+	 * same way. Two deliberate differences from it:
+	 *
+	 * spidev1 is left ENABLED. The official overlay disables it too,
+	 * which is defensible for a general purpose overlay that does not
+	 * know what else is on the bus. Here the board is known: chip
+	 * select 1 on GPIO7 has nothing on it, so /dev/spidev0.1 stays
+	 * available and costs nothing.
+	 *
+	 * Its fbtft leftovers are not copied. That overlay still carries
+	 * bgr, bpp, rotate, fps, buswidth and debug, which were properties
+	 * of the fbtft driver it used to bind and are read by nothing in
+	 * ssd130x. They are harmless and they are also four parameters in
+	 * its __overrides__ that silently do nothing, which is the failure
+	 * this repository refuses to ship on purpose.
+	 */
+	fragment@2 {
+		target = <&spidev0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	/* ------------------------------------------------------------ *
+	 * fragment@3: the things that hang off the root
+	 * ------------------------------------------------------------ */
+	fragment@3 {
+		target-path = "/";
+		__overlay__ {
+
+			/*
+			 * FIVE KEYS, TWO GPIO CONTROLLERS, ONE INPUT DEVICE.
+			 *
+			 * Four directions are on the I2C expander and the
+			 * push contact is on a SoC pin (manual p3; the
+			 * specification put all five on the expander). They
+			 * are in one node anyway, because gpio-keys-polled
+			 * polls descriptors and does not care which chip
+			 * they came from, and because splitting them would
+			 * give one physical joystick two event devices that
+			 * every consumer would then have to know about.
+			 *
+			 * Polled rather than interrupt driven: expander
+			 * lines are sleeping lines, so a driver using the
+			 * atomic GPIO accessors refuses them at probe.
+			 * gpio-keys-polled and gpio-beeper both use the
+			 * sleeping accessors and are safe.
+			 *
+			 * THE DIRECTION MAPPING IS THE LEAST CERTAIN THING
+			 * IN THIS FILE. It is read off a rendered page of a
+			 * PDF, the manual's net labels are single letters,
+			 * and a permuted joystick works perfectly and is
+			 * wrong. evtest and a thumb settle it in a minute,
+			 * and that is acceptance criterion 3.
+			 *
+			 * All contacts are active low: they close to ground,
+			 * and the expander's quasi-bidirectional lines idle
+			 * high with no external pull-up needed. The SoC pin
+			 * has no such property, so push_pins gives GPIO20 an
+			 * internal pull-up.
+			 */
+			explorer_keys: keys {
+				compatible = "gpio-keys-polled";
+				poll-interval = <20>;
+				autorepeat;
+
+				/*
+				 * gpio_keys_polled reads "label" and uses it
+				 * as the input device name, falling back to
+				 * the platform device name. Set explicitly
+				 * because explorer-verify finds this device
+				 * by name: matching on the event index
+				 * instead would depend on probe order, and
+				 * four of these five lines come up over I2C
+				 * whenever the expander gets round to it.
+				 */
+				label = "explorer700-keys";
+
+				key-left {
+					label = "Left";
+					gpios = <&pcf8574 0 1>;
+					linux,code = <105>;	/* KEY_LEFT */
+				};
+				key-up {
+					label = "Up";
+					gpios = <&pcf8574 1 1>;
+					linux,code = <103>;	/* KEY_UP */
+				};
+				key-down {
+					label = "Down";
+					gpios = <&pcf8574 2 1>;
+					linux,code = <108>;	/* KEY_DOWN */
+				};
+				key-right {
+					label = "Right";
+					gpios = <&pcf8574 3 1>;
+					linux,code = <106>;	/* KEY_RIGHT */
+				};
+				key_push: key-push {
+					label = "Press";
+					gpios = <&gpio 20 1>;
+					linux,code = <28>;	/* KEY_ENTER */
+				};
+			};
+
+			/*
+			 * Both LEDs, on two different controllers again.
+			 *
+			 * Named for the silkscreen rather than for the
+			 * specification, which expected one LED and called
+			 * it "explorer:user". There are two on this board
+			 * and "user" does not say which, so the acceptance
+			 * table carries the changed path with this reason.
+			 *
+			 * The heartbeat trigger on LED1 is the cheapest
+			 * proof of life a headless board has: it needs no
+			 * console, no network and nobody watching at the
+			 * right moment.
+			 */
+			leds {
+				compatible = "gpio-leds";
+
+				led1: led-1 {
+					label = "explorer:led1";
+					gpios = <&gpio 26 0>;
+					linux,default-trigger = "heartbeat";
+				};
+				led2: led-2 {
+					label = "explorer:led2";
+					gpios = <&pcf8574 4 0>;
+					default-state = "off";
+				};
+			};
+
+			/*
+			 * The buzzer, on expander line P7.
+			 *
+			 * gpio-beeper is an input device that accepts
+			 * EV_SND/SND_BELL and drives one line, which is a
+			 * strange shape until you remember that the console
+			 * bell is where kernel beeping comes from. Nothing
+			 * in user space needs to know it is a GPIO.
+			 *
+			 * Active high is an assumption: a buzzer behind a
+			 * transistor usually sounds when the base is driven,
+			 * and the manual draws the net without a polarity.
+			 * beeper_active below flips it without a recompile,
+			 * and the failure is a buzzer that sounds constantly
+			 * except when asked, which is at least loud.
+			 */
+			beeper: beeper {
+				compatible = "gpio-beeper";
+				gpios = <&pcf8574 7 0>;
+			};
+
+			/*
+			 * The 1-Wire bus for the DS18B20.
+			 *
+			 * THE PROBE IS NOT ON THE BOARD. Manual chapter 13:
+			 * it ships loose and plugs into the three-pin header
+			 * by the display, flat side towards the display. So
+			 * an empty /sys/bus/w1/devices has two causes that
+			 * look identical and are not: no w1_bus_master1 at
+			 * all is this overlay or the kernel; a master with
+			 * w1_master_slave_count of 0 is a missing probe or a
+			 * missing pull-up. explorer-verify separates them.
+			 *
+			 * The pull is set to up here although the vendor
+			 * board is expected to carry 4.7 kOhm on the data
+			 * line, because the SoC's internal pull-up is around
+			 * 50 kOhm: in parallel with a fitted resistor it
+			 * moves the value by about eight percent, and
+			 * without one it is the difference between a bus and
+			 * nothing. w1_pullup makes it a parameter.
+			 */
+			onewire: onewire {
+				compatible = "w1-gpio";
+				pinctrl-names = "default";
+				pinctrl-0 = <&w1_pins>;
+				gpios = <&gpio 4 0>;
+				status = "okay";
+			};
+
+			/*
+			 * The IR receiver, an LFN0038K demodulating 38 kHz.
+			 *
+			 * Its output is open collector and idles high, so
+			 * the line is active low and takes an internal
+			 * pull-up. rc-empty keeps the receiver
+			 * protocol-agnostic: scancodes appear through
+			 * "ir-keytable -t" with no keymap loaded, which is
+			 * what you need before you know what the remote in
+			 * the drawer speaks.
+			 *
+			 * GPIO18 is also a hardware PWM pin, which is why
+			 * the specification's fallback of driving the buzzer
+			 * with pwm-beeper on GPIO12, 13, 18 or 19 is not
+			 * available here: two of those four are taken by
+			 * this receiver and by the display's reset.
+			 */
+			ir: ir-receiver {
+				compatible = "gpio-ir-receiver";
+				pinctrl-names = "default";
+				pinctrl-0 = <&ir_pins>;
+				gpios = <&gpio 18 1>;
+				linux,rc-map-name = "rc-empty";
+			};
+		};
+	};
+
+	/* ------------------------------------------------------------ *
+	 * fragment@4: pin configuration for the three SoC inputs
+	 * ------------------------------------------------------------ */
+	fragment@4 {
+		target = <&gpio>;
+		__overlay__ {
+			/* brcm,function: 0 input. brcm,pull: 0 none, 1 down, 2 up. */
+			w1_pins: w1_pins {
+				brcm,pins = <4>;
+				brcm,function = <0>;
+				brcm,pull = <2>;
+			};
+			ir_pins: ir_pins {
+				brcm,pins = <18>;
+				brcm,function = <0>;
+				brcm,pull = <2>;
+			};
+			push_pins: push_pins {
+				brcm,pins = <20>;
+				brcm,function = <0>;
+				brcm,pull = <2>;
+			};
+
+			/*
+			 * The display's two control lines, as outputs.
+			 * gpiolib would set the direction anyway when
+			 * ssd130x-spi takes the descriptors, so this is
+			 * belt and braces; it is here because the reference
+			 * overlay does it, and because it gives the two
+			 * pins a place for the parameters below to move.
+			 *
+			 * Order matters for those parameters: reset is at
+			 * byte offset 0 of brcm,pins and dc is at offset 4.
+			 */
+			oled_pins: oled_pins {
+				brcm,pins = <19 16>;	/* reset, dc */
+				brcm,function = <1 1>;	/* out, out */
+			};
+		};
+	};
+
+	/*
+	 * WHAT IS NOT HERE, AND WHY
+	 *
+	 * No uart0 fragment. The CP2102 bridge needs the PL011 on GPIO14
+	 * and GPIO15, and on a Pi 3 those belong to the Bluetooth radio
+	 * until "dtoverlay=disable-bt" moves it. That overlay both frees
+	 * the pins and enables the port, and it owns the pin multiplexing
+	 * while doing it. A status = "okay" here would be a second owner
+	 * for a node whose pinmux this file does not control, which is the
+	 * failure the design document's ownership table exists to prevent.
+	 * config.txt carries disable-bt, ahead of this overlay.
+	 *
+	 * No nodes for the L3 and L4 buttons on expander lines P5 and P6.
+	 * They are silkscreened on the back of the board, they are not
+	 * among the specification's eleven peripherals, they have no
+	 * documented function, and the manual's diagram draws its arrows
+	 * out of the expander rather than into it, which would make them
+	 * outputs. The part is quasi-bidirectional so the drawing cannot
+	 * settle it. Binding them as keys on a guess would put two keys
+	 * into the input device that might be driving something instead.
+	 * They keep their names in gpio-line-names so that gpioinfo says
+	 * what they are, and docs/BRINGUP.md has the gpioget that answers
+	 * the question.
+	 *
+	 * No nodes for the sensor header D0 to D3 on GPIO5, 6, 13 and 12,
+	 * or for the screw terminal. They are general purpose pins with
+	 * nothing attached; they belong to whatever gets plugged in.
+	 */
+
+	/*
+	 * Parameters.
+	 *
+	 * These cover what a board revision changes, and nothing else. A
+	 * wrong pin number is then a config.txt edit rather than a
+	 * recompile, which matters because every pin in this file is
+	 * evidence from a manual rather than from a net list.
+	 *
+	 * Offsets into a GPIO property: bytes 0 to 3 are the phandle, 4 to
+	 * 7 the line number, 8 to 11 the flags. So "gpios:4" is the pin
+	 * and "gpios:8" is the polarity.
+	 *
+	 * Choosing between polled and interrupt driven keys is NOT here.
+	 * That is a decision about the driver rather than about the board,
+	 * the firmware feature that would express it is not documented in
+	 * the kernel tree, and a parameter written from memory that
+	 * silently does nothing is worse than no parameter. docs/BRINGUP.md
+	 * has the source change and the test to run before making it.
+	 */
+	__overrides__ {
+		w1_pin = <&onewire>,"gpios:4",
+			 <&w1_pins>,"brcm,pins:0";
+		w1_pullup = <&w1_pins>,"brcm,pull:0";
+
+		ir_pin = <&ir>,"gpios:4",
+			 <&ir_pins>,"brcm,pins:0";
+
+		led1_pin = <&led1>,"gpios:4";
+
+		push_pin = <&key_push>,"gpios:4",
+			   <&push_pins>,"brcm,pins:0";
+
+		dc_pin = <&oled>,"dc-gpios:4",
+			 <&oled_pins>,"brcm,pins:4";
+		reset_pin = <&oled>,"reset-gpios:4",
+			    <&oled_pins>,"brcm,pins:0";
+		speed = <&oled>,"spi-max-frequency:0";
+
+		bmp_addr = <&bmp>,"reg:0";
+		poll_ms = <&explorer_keys>,"poll-interval:0";
+		beeper_active = <&beeper>,"gpios:8";
+	};
+};
