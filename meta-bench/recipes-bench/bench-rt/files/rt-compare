@@ -245,6 +245,29 @@ def main(argv):
     excess_var = (external["sd_us"] ** 2 - 2.0 * internal["sd_us"] ** 2) / 2.0
     report["write_path_sd_us"] = math.sqrt(excess_var) if excess_var > 0 else 0.0
 
+    # A STANDARD DEVIATION IS NOT ALWAYS A SUMMARY OF ITS DISTRIBUTION.
+    #
+    # The ratio test above asks whether the external spread exceeds the
+    # internal one by enough. It never asks whether that external spread
+    # describes anything. For a distribution without extreme outliers the
+    # 99.9th percentile sits at roughly three times the standard deviation.
+    # When it sits BELOW, the standard deviation is being carried by a
+    # handful of excursions rather than by the bulk, and the sqrt(2)
+    # derivation does not apply to it: that derivation assumes a write cost
+    # which varies in a stationary way, not one which is flat with a single
+    # millisecond spike in it.
+    #
+    # This is not hypothetical. rt-iso-aff-performance, 17 September, gave
+    # ext p99.9 = 10.163 us against ext sd = 10.906 us with a maximum of
+    # 920.745 us, and this program duly reported a ratio of 12.430 and
+    # 7.653 us of write-path variation. Both figures were arithmetically
+    # correct and neither meant anything, and they were printed in exactly
+    # the format used for a figure that does.
+    report["ext_p999_us"] = external["p999_us"]
+    report["sd_is_outlier_carried"] = external["p999_us"] < external["sd_us"]
+    report["write_path_usable"] = (report["sd_ratio"] >= SQRT2 and
+                                   not report["sd_is_outlier_carried"])
+
     # An isolated late wake-up shows up in the period as itself, measured
     # from the typical latency rather than from zero.
     report["int_max_above_mean_us"] = internal["max_us"] - internal["mean_us"]
@@ -273,12 +296,26 @@ def main(argv):
           "is constant" % (report["sd_ratio"], SQRT2))
     print("                              and consecutive latencies are "
           "independent)")
-    print("write-path variation   %.3f us" % report["write_path_sd_us"])
+    if report["write_path_usable"]:
+        print("write-path variation   %.3f us" % report["write_path_sd_us"])
+    else:
+        print("write-path variation   not computed, see below")
     print("max agreement          %.1f us  (external max minus internal max "
           "above its mean)" % report["max_agreement_us"])
     print()
 
-    if report["sd_ratio"] < SQRT2:
+    if report["sd_is_outlier_carried"]:
+        print("The external p99.9 (%.3f us) is below the external standard"
+              % report["ext_p999_us"])
+        print("deviation (%.3f us), so fewer samples lie outside p99.9 than"
+              % report["ext_sd_us"])
+        print("the spread implies: the standard deviation is carried by a few")
+        print("excursions and is not a summary of this distribution. The")
+        print("sqrt(2) derivation assumes a write cost that varies in a")
+        print("stationary way, so no claim about the write cost can be made")
+        print("from this row either. Read p99.9 instead, and the maximum")
+        print("separately.")
+    elif report["sd_ratio"] < SQRT2:
         print("The external spread is below sqrt(2) times the internal one.")
         print("That is a statement about correlation, not about the GPIO")
         print("path: under load, late wake-ups arrive in bursts, consecutive")

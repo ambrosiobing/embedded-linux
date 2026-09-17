@@ -112,6 +112,12 @@ spike = float(sys.argv[4]) if len(sys.argv) > 4 else 0.0
 # arrive in bursts rather than independently, and for an AR(1) series the
 # ratio the program reports falls to sqrt(2 (1 - rho)), exactly.
 rho = float(sys.argv[5]) if len(sys.argv) > 5 else 0.0
+# An excursion on the WRITE path alone, which the internal instrument
+# cannot see by construction. It has to be large because this fixture has
+# 120000 samples: one excursion carries the standard deviation in
+# proportion to 1/sqrt(N), so reproducing the shape of a 30000 sample row
+# takes a proportionally bigger one.
+write_spike = float(sys.argv[6]) if len(sys.argv) > 6 else 0.0
 
 N = 120000
 PERIOD_US = 2000.0
@@ -130,6 +136,8 @@ if spike > 0:
     latency[N // 3] += spike
 
 write = [WRITE_CONST_US + random.gauss(0.0, write_jitter) for _ in range(N)]
+if write_spike > 0:
+    write[N // 2] += write_spike
 edge = [i * PERIOD_US + latency[i] + write[i] for i in range(N)]
 period = [edge[i + 1] - edge[i] for i in range(N - 1)]
 
@@ -274,6 +282,48 @@ between "and no write-path variation is claimed from them" \
 text=$("$PYTHON" "$SUT" --results "$WORK" bursty)
 contains "and the program says why rather than asserting a cost" "$text" \
 	"statement about correlation"
+
+# --------------------------- a spread carried by one excursion, not a cost
+
+# rt-iso-aff-performance, 17 September, reported ext p99.9 = 10.163 us
+# against ext sd = 10.906 us with a maximum of 920.745 us, and this program
+# turned that into a ratio of 12.430 and 7.653 us of write-path variation.
+# Both were arithmetically correct and neither was a measurement: p99.9
+# below sd means the standard deviation is carried by a few excursions
+# rather than by the bulk, and the sqrt(2) derivation assumes a write cost
+# that varies in a stationary way.
+#
+# The spike goes on the write path, so the internal histogram cannot see it
+# at all, which is the same asymmetry the real row had: int_max was 26.078
+# us in the minute the pin showed 920.745.
+"$PYTHON" "$WORK/make_run.py" "$WORK" outlier 0.0 0 0 6000
+out=$("$PYTHON" "$SUT" --results "$WORK" --json outlier)
+
+p999=$(printf '%s' "$out" | field ext_p999_us)
+extsd=$(printf '%s' "$out" | field ext_sd_us)
+verdict=$(awk -v a="$p999" -v b="$extsd" 'BEGIN { print (a < b) ? "yes" : "no" }')
+check "one write-path excursion puts ext p99.9 below ext sd" "$verdict" "yes"
+check "and the figure is refused rather than reported" \
+	"$(printf '%s' "$out" | field write_path_usable)" "False"
+check "while the ratio alone would have accepted it" \
+	"$(awk -v r="$(printf '%s' "$out" | field sd_ratio)" \
+		'BEGIN { print (r >= 1.414) ? "yes" : "no" }')" "yes"
+
+text=$("$PYTHON" "$SUT" --results "$WORK" outlier)
+contains "the prose says the spread is carried by excursions" "$text" \
+	"not a summary of this distribution"
+contains "and no number is printed in the usable format" "$text" \
+	"write-path variation   not computed"
+
+# The two earlier cases must still report normally, or the guard has
+# replaced one defect with another.
+"$PYTHON" "$WORK/make_run.py" "$WORK" jittery2 2.0
+text=$("$PYTHON" "$SUT" --results "$WORK" jittery2)
+contains "a genuine write-path figure is still printed" "$text" \
+	"write-path variation   "
+out=$("$PYTHON" "$SUT" --results "$WORK" --json jittery2)
+check "and is still marked usable" \
+	"$(printf '%s' "$out" | field write_path_usable)" "True"
 
 # ------------------------------------------------------------- errors
 
