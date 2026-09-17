@@ -65,9 +65,21 @@ repos:
 
 local_conf_header:
   rt: |
-    # The switch that adds recipes-kernel/linux/files/rt.cfg. See the
-    # bbappend for why it is opt in.
+    # The switch that adds recipes-kernel/linux/files/rt.cfg, which now
+    # holds one symbol: CONFIG_PREEMPT_RT. See the bbappend for why it is
+    # opt in.
     BENCH_RT_KERNEL = "1"
+
+    # And the switch that adds rt-common.cfg, everything the lab needs
+    # that is not the variable. This one is NOT overridden by
+    # kas/bench-rt-generic.yml, which is the whole point: both arms carry
+    # it, so the two configurations differ by the line above and nothing
+    # else.
+    #
+    # Before 17 September 2026 there was one fragment and one switch, and
+    # the control therefore received none of the isolation configuration
+    # it was being compared under. Journal 57, decision 88.
+    BENCH_RT_LAB = "1"
 
     # And the kernel that can honour it. PREEMPT_RT depends on
     # EXPERT && ARCH_SUPPORTS_RT, and arch/arm64/Kconfig gained the

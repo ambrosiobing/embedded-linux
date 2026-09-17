@@ -2,8 +2,9 @@
 #
 # check-kernel-symbols.sh - is every line of a fragment a real request?
 #
-#   ./go ksym                      bench.cfg against the unpacked kernel
-#   ./go ksym -f rt                bench.cfg and rt.cfg
+#   ./go ksym                          bench.cfg against the unpacked kernel
+#   ./go ksym -f rt-common -f rt       the real-time arm of Project 8
+#   ./go ksym -f rt-common             its control
 #   ./go ksym -f router /path/to/linux
 #
 # This is the check that runs BEFORE a kernel is compiled, and it exists

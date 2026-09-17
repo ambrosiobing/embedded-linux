@@ -81,10 +81,10 @@ What is proven today, on a laptop and in CI:
 | Movable and kernel-owned interrupts are distinguished correctly | `tests/rt-irq-affinity-test.sh`, 14 assertions |
 | The relationship between the two instruments is the one the algebra predicts | `tests/rt-compare-test.sh`, 22 assertions against a simulation whose answer is known first |
 | `PREEMPT_RT` is selectable on this kernel at all | read out of `kernel/Kconfig.preempt` and `arch/arm64/Kconfig` in `rpi-6.12.y`, see below |
-| The fragment check catches a kernel built without it | `./go kconfig -f rt` against a deliberately broken config |
-| Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt` against the unpacked 6.12.93 tree, 21484 declarations indexed |
+| The fragment check catches a kernel built without it | `./go kconfig -f rt-common -f rt` against a deliberately broken config |
+| Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt-common -f rt` against the unpacked 6.12.93 tree, 21484 declarations indexed. **Run before the 17 Sep fragment split; the symbols are the same and the grouping is not, so it needs repeating** |
 | The version pin took: the tree is 6.12.93, not the BSP default 6.6 | the kernel's own `Makefile`, read after `kernel_configme` |
-| **Every option of both fragments reached the `.config`, `CONFIG_PREEMPT_RT=y` included** | `./go kconfig -f rt`, evidence for [the Pi 4](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [the Pi 3B](docs/evidence/kconfig-check-raspberrypi3-64.txt) |
+| **Every option of both fragments reached the `.config`, `CONFIG_PREEMPT_RT=y` included** | `./go kconfig -f rt-common -f rt`, evidence for [the Pi 4](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [the Pi 3B](docs/evidence/kconfig-check-raspberrypi3-64.txt). **Both captures are of the real-time arm only, and predate the split; the control was never checked, which is how it came to have no fragment at all** |
 | The image builds: 6258 tasks, all succeeded, 78 MB | `./go rt`, 16 Sep 2026 |
 | The vendor library cross-compiles, packages and installs | the same build, after three defects only building could find |
 
@@ -97,13 +97,14 @@ the places where this departs from the original scope on purpose.
 
 | Path | What |
 |---|---|
-| `meta-bench/recipes-kernel/linux/files/rt.cfg` | The opt-in kernel fragment: `PREEMPT_RT`, `NO_HZ_FULL`, `RCU_NOCB_CPU`, and the debug options that have to be off |
-| `kas/bench-rt.yml` | The fragment switch, the kernel version that can honour it, SPI, `meta-python` |
+| `meta-bench/recipes-kernel/linux/files/rt.cfg` | The variable, and nothing else: `CONFIG_PREEMPT_RT` plus the three other members of its choice named off |
+| `meta-bench/recipes-kernel/linux/files/rt-common.cfg` | Everything the lab needs that is not the variable, applied to **both** arms: `NO_HZ_FULL`, `RCU_NOCB_CPU`, `CPU_ISOLATION`, `HIGH_RES_TIMERS`, the default governor and the debug options that have to be off |
+| `kas/bench-rt.yml` | Both fragment switches, the kernel version that can honour them, SPI, `meta-python` |
 | `meta-bench/recipes-core/images/bench-rt-image.bb` | `bench-image` plus both instruments and the load generator |
 | `meta-bench/recipes-bench/bench-rt/` | `rt-toggle`, `rt-capture`, `rt-analyze`, `rt-compare`, `rt-run`, `rt-irq-affinity` and their configuration |
 | `meta-bench/recipes-bench/daqhats/` | The vendor library and its Python bindings, pinned to a commit, cross-compiled |
 | `scripts/rt-kernel-install.sh` | Puts the RT kernel on a card beside the generic one, with a one-line way back |
-| `scripts/check-kernel-config.sh` | Extended: `-f rt` checks the real-time fragment too |
+| `scripts/check-kernel-config.sh` | Extended: `-f rt-common -f rt` checks the real-time fragments too |
 | `scripts/check-kernel-symbols.sh` | The check that runs before a build: is each fragment line a symbol the kernel can receive |
 | `tests/rt-analyze-test.sh` and two more | What can be proven without the instrument |
 
@@ -147,7 +148,7 @@ committing a board to it.
 v1.2 as a second board, and an adapter so the MCC 118 stacks on either.
 The comparison this project makes needs the DAQ HAT: without it
 the internal instrument still runs and the external one has nothing to
-measure, which is half the point missing. `./go ksym -f rt` before the
+measure, which is half the point missing. `./go ksym -f rt-common -f rt` before the
 kernel compiles is the check that catches a fragment line the kernel cannot
 receive, and it is worth running even if you never flash anything.
 
@@ -155,7 +156,7 @@ receive, and it is worth running even if you never flash anything.
 
 ```sh
 ./go check                   # about 2 minutes, no board and no HAT
-./go ksym -f rt              # after the kernel unpacks, before it compiles
+./go ksym -f rt-common -f rt # after the kernel unpacks, before it compiles
 ./go rt                      # bench-rt-image, with the PREEMPT_RT kernel
 ./go flash /dev/sdX          # or install beside the generic kernel:
 ./go rt-kernel install /mnt/boot /mnt/root
@@ -244,7 +245,7 @@ So a fragment containing `CONFIG_PREEMPT_RT=y` on the default BSP kernel
 asks for a symbol that has no prompt. kconfig drops it without a word, the
 build succeeds, and the board boots a kernel that is not preemptible. That
 is why `kas/bench-rt.yml` sets the kernel version as well as the switch,
-and why `uname -v` and `./go kconfig -f rt` are both in the acceptance
+and why `uname -v` and `./go kconfig -f rt-common -f rt` are both in the acceptance
 list rather than one of them.
 
 ## What is in the image beyond Project 1, and why
@@ -277,8 +278,8 @@ each, and where that stands today.
 | 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **not started** |
 | 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **not started**. The original wording, "agrees to within the system-call cost", was not measurable: that cost cancels in an interval measurement |
 | 6 | Every row names kernel, isolation, affinity, governor, load and the throttle status before and after | the CSV header has 27 columns and `rt-run` fills all of them | **met in the code**, proven by `tests/rt-run-test.sh`, unproven on a board |
-| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host for both machines**, 16 Sep 2026: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them and the other three members of its choice block excluded. Evidence for [`raspberrypi4-64`](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [`raspberrypi3-64`](docs/evidence/kconfig-check-raspberrypi3-64.txt), each named for the machine it was captured on. Not yet confirmed against a running kernel |
-| 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
+| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt-common -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host for both machines**, 16 Sep 2026: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them and the other three members of its choice block excluded. Evidence for [`raspberrypi4-64`](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [`raspberrypi3-64`](docs/evidence/kconfig-check-raspberrypi3-64.txt), each named for the machine it was captured on. Not yet confirmed against a running kernel. **Both captures are of the real-time arm and predate the 17 Sep fragment split. The control was never checked at all, which is how it came to receive no fragment, and re-running this criterion against both arms is part of the next cycle** |
+| 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt-common -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
 
 Criterion 4 is the one with a caveat attached, and it is in
 [METHOD.md](docs/METHOD.md): a 150 us threshold measured through an
@@ -388,8 +389,8 @@ the one grouped by kernel and then by isolation, which is the order above.
 | The run protocol | `sh tests/rt-run-test.sh` | Ordering, core confinement, both directions of the isolation claim, the throttle gate, an overrun voiding the run, and every column of the row |
 | Interrupt affinity | `sh tests/rt-irq-affinity-test.sh` | Movable against kernel-owned interrupts, ranges in a CPU list, the failure that matters |
 | Host compile | `./go check` | `rt-toggle` with `-Werror` against host libgpiod v2 |
-| Fragment symbols | `./go ksym -f rt` | That every line names a real Kconfig symbol, and that a promptless one is declared as a consequence rather than presented as a request |
-| The fragment | `./go kconfig -f rt CONFIG` | Every line of `rt.cfg`, including the ones that ask for an option to stay off |
+| Fragment symbols | `./go ksym -f rt-common -f rt` | That every line names a real Kconfig symbol, and that a promptless one is declared as a consequence rather than presented as a request |
+| The fragments | `./go kconfig -f rt-common -f rt CONFIG` | Every line of both, including the ones that ask for an option to stay off |
 | Instrument comparison | `sh tests/rt-compare-test.sh` | That a constant write cost is invisible, that 2 us of write jitter is recovered as 2 us, that correlated latencies are refused rather than interpreted, and that all three file formats parse |
 | The symbol checker itself | `sh tests/kernel-symbols-test.sh` | All five Kconfig declaration shapes against a six-file kernel, including the two that the checker got wrong first |
 
@@ -420,7 +421,8 @@ every number in the results table.
 | `isolcpus` without `nohz_full` and `rcu_nocbs` | the refusal message names all three, and `rt.cfg` carries the reason |
 | Interrupts that cannot be moved are reported as failures | `rt-irq-affinity check` writes an interrupt's own affinity back to it: succeeding means it was movable and is a real finding, failing means the kernel owns it |
 | The SD card is written by the stressor and the capture at once | the capture goes to `/dev/shm`, and only the histogram is kept |
-| `CONFIG_PREEMPT_RT` is silently dropped | the kernel version is pinned in the kas file, and `./go kconfig -f rt` checks the built config |
+| `CONFIG_PREEMPT_RT` is silently dropped | the kernel version is pinned in the kas file, and `./go kconfig -f rt-common -f rt` checks the built config |
+| A switch meant to gate one symbol gates a whole fragment | the variable is alone in `rt.cfg`; everything else is in `rt-common.cfg` behind `BENCH_RT_LAB`, which both arms set. Eight rows were measured before this was found, and only the serial console found it |
 | The 10 us sample period is mistaken for the resolution | `subsample_fraction` is measured, warned about and recorded in every row |
 
 ---

@@ -244,8 +244,31 @@ build_sys() {
 		echo "${1:-1}" >"$WORK/sys/kernel/realtime"
 	fi
 	echo "${2:-}" >"$WORK/sys/devices/system/cpu/isolated"
+
+	# nohz_full defaults to the same set as isolcpus, because that is what
+	# a correctly configured board looks like and because every existing
+	# case in this file was written before rt-run checked it.
+	#
+	# Pass a third argument to diverge, or "absent" to omit the file, which
+	# is what a kernel built without CONFIG_NO_HZ_FULL looks like. That was
+	# the real board on 17 September: isolcpus took, the other two
+	# parameters were rejected, and this suite would have passed anyway
+	# because the only file it wrote was "isolated".
+	_nohz=${3:-${2:-}}
+	if [ "$_nohz" != absent ]; then
+		echo "$_nohz" >"$WORK/sys/devices/system/cpu/nohz_full"
+	fi
+
 	echo ondemand \
 		>"$WORK/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+
+	# min and max differ unless a case says otherwise, so the governor is
+	# reported by name. Equal values are what force_turbo=1 produces, and
+	# rt-run reports that as "fixed" however the policy names itself.
+	echo "${4:-600000}" \
+		>"$WORK/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
+	echo "${5:-1500000}" \
+		>"$WORK/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
 }
 
 reset() {
@@ -477,6 +500,65 @@ reset
 build_sys 1
 out=$(sh "$SUT" -n 2>&1)
 contains "agreeing sources still work" "$out" "realtime=yes"
+
+# ------------------------------- isolation is three parameters, not one
+#
+# /sys/devices/system/cpu/isolated is populated by isolcpus alone, so every
+# check that reads only that file passes on a kernel built without
+# CONFIG_NO_HZ_FULL or CONFIG_RCU_NOCB_CPU. That is what happened: four rows
+# were written isolated=yes for a core still taking its timer tick.
+
+reset
+build_sys 1 "3" absent
+rc=0
+out=$(sh "$SUT" -i -n 2>&1) || rc=$?
+check "-i refuses when the kernel has no nohz_full file at all" "$rc" "1"
+contains "and names the config symbol that creates it" "$out" "CONFIG_NO_HZ_FULL"
+contains "and says where to turn it on" "$out" "rt-common.cfg"
+
+reset
+build_sys 1 "3" ""
+rc=0
+out=$(sh "$SUT" -i -n 2>&1) || rc=$?
+check "-i refuses when nohz_full is present but empty" "$rc" "1"
+contains "and says the tick is still arriving" "$out" "still arriving on CPU"
+
+reset
+build_sys 1 "3" "0-2"
+rc=0
+out=$(sh "$SUT" -i -n 2>&1) || rc=$?
+check "-i refuses when nohz_full covers the wrong cores" "$rc" "1"
+
+reset
+build_sys 1 "3" "3"
+out=$(sh "$SUT" -i -n 2>&1)
+contains "all three agreeing is accepted" "$out" "isolated   yes"
+
+# ------------------------------------- the governor column and force_turbo
+#
+# With force_turbo=1 the firmware pins the clock underneath cpufreq. The
+# sysfs interface remains and the policy still calls itself ondemand while
+# having one frequency to choose from, so reading scaling_governor reports
+# a policy that cannot act. Row 8 of the generic half recorded exactly that.
+#
+# These run the full path rather than -n, because governor_now is called
+# after the dry-run exit and a dry run therefore never reaches it. The note
+# printed by -n shows what was ASKED for; the column shows what was found.
+
+reset
+build_sys 1 "" "" 1500000 1500000
+sh "$SUT" -d 1 >/dev/null 2>&1
+row=$(tail -1 "$WORK/results/results.csv")
+header=$(head -1 "$WORK/results/results.csv")
+check "min equal to max is recorded as fixed" "$(field governor)" "fixed"
+
+reset
+build_sys 1 "" "" 600000 1500000
+sh "$SUT" -d 1 >/dev/null 2>&1
+row=$(tail -1 "$WORK/results/results.csv")
+header=$(head -1 "$WORK/results/results.csv")
+check "and a governor with room to move is recorded by name" \
+	"$(field governor)" "ondemand"
 
 # ------------------------------------------ the shipped header and this one
 #

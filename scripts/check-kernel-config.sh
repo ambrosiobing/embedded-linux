@@ -15,16 +15,24 @@
 # and the build tree at a few hundred bytes of fake instead of a kernel.
 FRAGMENT_DIR=${BENCH_FRAGMENT_DIR:-$REPO_DIR/meta-bench/recipes-kernel/linux/files}
 
-# Which fragments to check. bench.cfg goes into every image; router.cfg and
-# rt.cfg are opt in, so asking for them is opt in too:
+# Which fragments to check. bench.cfg goes into every image; router.cfg,
+# rt-common.cfg and rt.cfg are opt in, so asking for them is opt in too:
 #
 #   ./go kconfig                     bench.cfg against the last build
-#   ./go kconfig -f rt /tmp/config   bench.cfg and rt.cfg against a config
-#                                    taken off the board
+#   ./go kconfig -f rt-common -f rt  the real-time arm of Project 8
+#   ./go kconfig -f rt-common        its control, which carries everything
+#                                    except CONFIG_PREEMPT_RT
 #
-# Repeatable, because the real-time image gets both fragments and a check
-# that only looked at one of them would pass on a kernel missing half of
+# Repeatable, because the real-time image gets three fragments and a check
+# that only looked at one of them would pass on a kernel missing most of
 # what was asked for.
+#
+# ASK FOR BOTH ARMS. Project 8 measured eight rows against a control that
+# had received no fragment at all, and this check never said so, because a
+# build with no fragment gives it nothing to verify and it passes by having
+# nothing to say. Its evidence file described the other kernel. The control
+# now has rt-common.cfg precisely so that there is something to check, and
+# checking it is a separate invocation that has to be made. Decision 89.
 fragments=
 while [ $# -gt 0 ]; do
 	case ${1:-} in

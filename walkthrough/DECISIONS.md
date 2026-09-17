@@ -2572,3 +2572,58 @@ This is the same rule as chapter 7's arrived at from a third direction. A
 check that selects its own input must say what it selected. A guard that
 refuses must say what it matched. And a check with nothing to examine must
 say that it examined nothing, rather than passing in silence.
+
+## 90. An instrument sits outside the load it measures under
+
+**Context.** `rt-capture` streams an MCC 118 over SPI while `stress-ng`
+runs on the housekeeping cores. It ran at ordinary priority, on the
+argument that a capture process competing with the task it measures would
+be measuring itself.
+
+**Decision.** The instrument runs at SCHED_FIFO 60: above the load, below
+the measured task's 80. It sets that itself rather than relying on its
+caller.
+
+**Rejected.** Deepening the ring buffer from one second to five. It works,
+and it converts a loud failure into a quiet one: the reader is still
+starved, the overrun just arrives later or not at all, and a run that
+happened not to overrun is a row taken under conditions no column records.
+
+**Why.** The original argument is about the measured core and was applied
+to the wrong one. The load exists to perturb CPU 3. On the housekeeping
+cores the instrument is not part of the experiment, it is the apparatus,
+and apparatus that competes with the stimulus is not measuring the subject.
+Two runs died at 1480000 and 120000 samples before this was obvious.
+
+**Consequence.** A real-time process on the housekeeping cores, which is a
+cost. It is bounded: the reader blocks in the library for nearly all of its
+life, and 60 leaves the measured task ahead of it. And it sets the priority
+itself because the board has neither `chrt` nor `nice`, not even as BusyBox
+applets, so the caller could not have done it.
+
+## 91. A column reports what can still change, not what the thing is called
+
+**Context.** The results table has a `governor` column, read back after the
+run rather than taken from the flag. With `force_turbo=1` the Raspberry Pi
+firmware pins the clock underneath cpufreq: the sysfs interface remains,
+`scaling_governor` still says `ondemand`, and `scaling_min_freq` equals
+`scaling_max_freq`.
+
+**Decision.** The column is derived from whether min equals max, not from
+the policy's name. Equal means `fixed`, whatever the policy calls itself.
+
+**Rejected.** Recording the name and explaining the exception in the
+schema. A table whose reader has to remember which rows to discount is a
+table with a footnote where a value should be.
+
+**Why.** Reading back rather than trusting the flag was already the right
+instinct, and it was applied to the wrong quantity. A governor name is a
+policy; what a row needs to know is whether the clock could move. The
+project's own schema had even predicted the outcome, "fixed means cpufreq
+had nothing to offer, which is what force_turbo=1 looks like", and was
+wrong about the mechanism, so the prediction and the code failed together
+and neither corrected the other.
+
+**Consequence.** Generalises past this column. Wherever a check reads a
+name to infer a capability, the name can survive the capability. Read the
+constraint.

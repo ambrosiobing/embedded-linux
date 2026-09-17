@@ -221,6 +221,66 @@ if [ "$isolated" = yes ]; then
        and the RCU callbacks on the core, and the tail of the histogram
        is exactly where they show up."
 	fi
+
+	# And the other two, which this check used to skip.
+	#
+	# /sys/devices/system/cpu/isolated is populated by isolcpus alone, so
+	# the test above passes on a kernel built without CONFIG_NO_HZ_FULL or
+	# CONFIG_RCU_NOCB_CPU. On 17 September 2026 it did: cmdline.txt carried
+	# all three parameters, the kernel accepted one and rejected two with
+	#
+	#     Housekeeping: nohz unsupported. Build with CONFIG_NO_HZ_FULL
+	#     Unknown kernel command line parameters "nohz_full=3 rcu_nocbs=3"
+	#
+	# on the serial console and nowhere else, and four rows were written
+	# isolated=yes for a core still taking its timer tick and running its
+	# own RCU callbacks. The column was true in the sense the check could
+	# express and misleading in the sense a reader would take.
+	#
+	# nohz_full has its own sysfs file. rcu_nocbs does not, so the kernel's
+	# acceptance is read from its own boot log instead, which is the only
+	# place it is stated. A kernel too old for either file is not silently
+	# excused: the run refuses, because a row that cannot be verified is
+	# worth less than no row.
+	if [ -r "$SYS/devices/system/cpu/nohz_full" ]; then
+		nohz=$(cat "$SYS/devices/system/cpu/nohz_full")
+		case $nohz in
+		"" | "(null)") nohz= ;;
+		esac
+		if ! in_list "$RT_CPU" "$nohz"; then
+			die "-i given and isolcpus took, but nohz_full did not:
+       $SYS/devices/system/cpu/nohz_full says '${nohz:-nothing}'.
+       The scheduler tick is still arriving on CPU $RT_CPU, which is a
+       periodic interruption of exactly the task being measured.
+       This kernel is probably built without CONFIG_NO_HZ_FULL; the boot
+       log says so, on the console only:
+           Housekeeping: nohz unsupported. Build with CONFIG_NO_HZ_FULL
+       meta-bench/recipes-kernel/linux/files/rt-common.cfg asks for it.
+       Set BENCH_RT_LAB = \"1\" and rebuild, or drop -i for this row."
+		fi
+	else
+		die "-i given, but this kernel has no
+       $SYS/devices/system/cpu/nohz_full, so whether the tick was stopped
+       on CPU $RT_CPU cannot be read. CONFIG_NO_HZ_FULL creates that file.
+       Refusing rather than writing isolated=yes on a core that may still
+       be taking the tick."
+	fi
+
+	if [ -r "$SYS/kernel/debug/rcu_nocbs" ]; then
+		nocbs=$(cat "$SYS/kernel/debug/rcu_nocbs" 2>/dev/null || true)
+		if ! in_list "$RT_CPU" "$nocbs"; then
+			die "-i given, but rcu_nocbs does not cover CPU $RT_CPU:
+       '${nocbs:-nothing}'. Grace-period work still runs there in softirq
+       context and it arrives in bursts, which lands in the tail rather
+       than in the mean."
+		fi
+	elif command -v dmesg >/dev/null 2>&1 &&
+		dmesg 2>/dev/null | grep -q 'Unknown kernel command line parameters.*rcu_nocbs'; then
+		die "-i given, and the kernel rejected rcu_nocbs at boot:
+       dmesg carries 'Unknown kernel command line parameters' naming it.
+       That means CONFIG_RCU_NOCB_CPU is absent, and this core is running
+       its own RCU callbacks. rt-common.cfg asks for it."
+	fi
 elif [ -n "$kernel_isolated" ]; then
 	die "CPU isolation is active ($kernel_isolated) but -i was not given.
        Reboot without isolcpus to measure the unisolated case. A row
@@ -290,12 +350,43 @@ set_governor() {
 	fi
 }
 
+# What the governor column reports, which is not the same as what the
+# governor calls itself.
+#
+# The first version returned the contents of scaling_governor, and printed
+# "fixed" only when no such file existed. The Pi 4 does not work that way.
+# With force_turbo=1 the firmware pins the clock underneath cpufreq, the
+# sysfs interface is still there, and the governor still calls itself
+# ondemand while having exactly one frequency to choose from:
+#
+#     scaling_cur_freq  1500000
+#     scaling_min_freq  1500000
+#     scaling_max_freq  1500000
+#     scaling_governor  ondemand
+#
+# Row 8 of the generic half recorded governor=ondemand for a board whose
+# clock could not move. results/README.md had predicted "fixed means
+# cpufreq had nothing to offer, which is what force_turbo=1 looks like",
+# which is the right idea and the wrong mechanism.
+#
+# So the question is not what the policy is named but whether there is
+# anything left for it to decide. min == max means there is not.
 governor_now() {
 	for f in "$SYS"/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
 		[ -r "$f" ] || continue
+		dir=${f%/scaling_governor}
+		if [ -r "$dir/scaling_min_freq" ] && [ -r "$dir/scaling_max_freq" ]; then
+			_min=$(cat "$dir/scaling_min_freq")
+			_max=$(cat "$dir/scaling_max_freq")
+			if [ "$_min" = "$_max" ]; then
+				echo fixed
+				return
+			fi
+		fi
 		cat "$f"
 		return
 	done
+	# No cpufreq at all, which is the other way a clock ends up fixed.
 	echo fixed
 }
 

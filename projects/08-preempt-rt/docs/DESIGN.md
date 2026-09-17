@@ -283,7 +283,7 @@ flowchart LR
     subgraph host["on the host"]
         kas["kas/bench-rt.yml"]
         install["rt-kernel-install.sh"]
-        kconf["go kconfig -f rt"]
+        kconf["go kconfig -f rt-common -f rt"]
     end
 
     kas --> rtcfg

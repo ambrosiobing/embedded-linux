@@ -3262,3 +3262,92 @@ Three shapes of the same thing in one afternoon, all in tooling meant to
 prevent mistakes. The legend test asserted presence where position was
 wrong. The `while read` remedy would have silenced a counter. And a comment
 became a directive. Every one of them looked correct while reading it.
+
+## 60. The four fixes the board asked for, none of which needed the board
+
+Everything the generic half exposed, turned into code. No hardware was
+involved in any of it, which is the point: the board said what was wrong
+and a laptop can say what to do about it.
+
+**The fragment is split.** `rt.cfg` now holds `CONFIG_PREEMPT_RT` and the
+three other members of its choice named off, and nothing else.
+`rt-common.cfg` holds the rest and is applied to both arms behind a second
+switch, `BENCH_RT_LAB`, which `kas/bench-rt.yml` sets and
+`kas/bench-rt-generic.yml` does not override. So the two configurations now
+differ in the one line the control's own header always claimed they did.
+
+`EXPERT` moved to the common half, which was not obvious. `PREEMPT_RT`
+depends on it, so the instinct is to keep them together. But `EXPERT`
+changes what kconfig may ask about, and an arm that can see options the
+other cannot is a second variable hiding inside the first.
+
+Reading the old kas file properly turned up something worth recording: it
+said both things. Its header claimed the configurations "differ in one
+symbol, CONFIG_PREEMPT_RT", and forty lines below, its body argued that the
+isolation symbols "are part of the configuration under test rather than
+incidental, which is why they travel together in one fragment and not as
+separate switches". The second is a coherent experiment, stock against an
+adopted real-time configuration. It is not the one the header described,
+and the header is the sentence the README and the journal repeated.
+
+So this is a reversal of a documented decision rather than a correction of
+an oversight, and the new files say so. Both experiments are now available
+and the second costs no extra build, because the eight stock rows already
+exist: stock to tuned control is what the isolation buys, tuned control to
+real-time is what PREEMPT_RT alone buys, stock to real-time is the package.
+
+**The instrument moved out of the load.** `rt-capture` sets SCHED_FIFO 60
+on itself, replacing the hand patch that lived only on that card. 60 is
+below `rt-toggle`'s 80, so the measured task still preempts the recorder.
+
+The placement is the whole fix and it is invisible: the daqhats library
+spawns its reader thread inside `a_in_scan_start`, a thread inherits its
+creator's policy, so setting the priority afterwards raises this program's
+Python loop and leaves the thread that actually drains SPI where it was.
+The correct and the incorrect version differ only in which line comes
+first.
+
+`rt-capture` had no test at all, so it has one now, and the assertion that
+matters is an ordering: a stub daqhats records the calls it receives, and
+`os.sched_setscheduler` is replaced with one that records rather than
+performs, so the order is observable without the HAT and without root.
+Proved by moving the call after the scan in a copy, where exactly one
+assertion fails and the other nine still pass.
+
+Two host details cost time and are worth keeping. `spec_from_file_location`
+returns `None` for a file with no extension, and every program in
+`meta-bench/` is extensionless, so the loader has to be named explicitly;
+the failure arrives later as "NoneType has no attribute loader". And
+Windows `os` has neither `SCHED_FIFO` nor `sched_param`, so without
+supplying them the test would take the refusal branch and assert nothing on
+the machine it is usually run from.
+
+**The governor column reports capability, not a name.** `governor_now`
+returned the contents of `scaling_governor` and said "fixed" only when
+there was no such file. With `force_turbo=1` the firmware pins the clock
+underneath cpufreq: the interface remains, the policy still calls itself
+ondemand, and `scaling_min_freq` equals `scaling_max_freq`. Row 8 recorded
+`ondemand` for a board whose clock could not move.
+
+It now compares min against max, and exercising the function directly
+against a fake sysfs gives `ondemand` when they differ, `fixed` when they
+match, `fixed` when there is no cpufreq at all, and the name when the two
+files are missing.
+
+**`rt-run -i` verifies all three parameters.**
+`/sys/devices/system/cpu/isolated` is populated by `isolcpus` alone, which
+is why four rows were written `isolated=yes` for a core still taking its
+tick. It now also requires `nohz_full` to cover the measured CPU, refuses
+when that file is absent rather than excusing the kernel, and checks the
+boot log for a rejected `rcu_nocbs` since that one has no sysfs file of its
+own. The refusal names the config symbol and the fragment that supplies it.
+
+**What is not verified here.** `tests/rt-run-test.sh` does not run on the
+authoring laptop: its stub `uname` is not exec'd, so the real one answers
+and the suite aborts at its first assertion. Confirmed pre-existing by
+running it at HEAD, where it fails identically, 28 passed 9 failed. The new
+assertions were written against the fixture's own shape and go to CI
+unexercised by me, which is stated here rather than discovered later. The
+fixture builder gained `nohz_full` and the two frequency files, defaulting
+so that every case written before today still describes a correctly
+configured board.

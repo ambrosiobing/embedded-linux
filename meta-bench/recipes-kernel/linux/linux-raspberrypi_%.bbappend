@@ -35,6 +35,30 @@ SRC_URI += '${@"file://router.cfg" if d.getVar("BENCH_ROUTER_KERNEL") == "1" els
 BENCH_RT_KERNEL ?= "0"
 SRC_URI += '${@"file://rt.cfg" if d.getVar("BENCH_RT_KERNEL") == "1" else ""}'
 
+# The second switch, and the reason there are two.
+#
+# Until 17 September 2026 there was one fragment behind one switch, and
+# kas/bench-rt-generic.yml turning that switch off gave the control none of
+# it: no NO_HZ_FULL, no RCU_NOCB_CPU, no CPU_ISOLATION, no debug options
+# held off, and a different default cpufreq governor. Eight rows were
+# measured against it before the board said so on its serial console.
+#
+# A switch that gates a file gates everything in the file. That is obvious
+# written down and invisible in a kas file that says BENCH_RT_KERNEL = "0",
+# because the name says kernel and the reader supplies the word
+# "preemption" from context.
+#
+# So the lab's background configuration is its own fragment and its own
+# switch. BENCH_RT_LAB is set by kas/bench-rt.yml, which
+# kas/bench-rt-generic.yml includes, so both arms carry rt-common.cfg and
+# only BENCH_RT_KERNEL differs between them. Every other image in this
+# repository leaves both at 0 and stays comparable to stock.
+#
+# To rebuild the stock arm that the 17 September rows were taken on, set
+# BENCH_RT_LAB = "0". Decision 88, journal 57.
+BENCH_RT_LAB ?= "0"
+SRC_URI += '${@"file://rt-common.cfg" if d.getVar("BENCH_RT_LAB") == "1" else ""}'
+
 # And the Bluetooth fragment, on the same switch pattern. Project 17 runs a
 # BLE gateway on a Raspberry Pi 3B+, where the radio is on a UART rather
 # than on USB, so the transport has to be built into the kernel. The cost

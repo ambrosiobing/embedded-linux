@@ -3,18 +3,53 @@
 
     rt-capture --seconds 60 --out /dev/shm/run.npy
 
-This is the external instrument. It runs at ordinary priority on the
-housekeeping cores, because a capture process competing with the task it is
-measuring would be measuring itself; rt-run starts it under taskset and
-this program does not try to enforce that itself.
+This is the external instrument. rt-run pins it to the housekeeping cores
+with taskset, and it raises its own priority there, for the reason below.
 
-Three properties of the scan matter enough to be spelled out:
+Four properties of the scan matter enough to be spelled out:
+
+SCHED_FIFO 60, set by this program rather than by its caller.
+
+    The first version ran at ordinary priority, on the argument that a
+    capture process competing with the task it measures would be measuring
+    itself. That argument is about the measured core. It does not apply to
+    the housekeeping cores, where the instrument competes with the load
+    instead, and on 17 September 2026 it lost: two runs of rt-run -L died
+    with
+
+        rt-capture: overrun after 1480000 samples, discarding the run
+        rt-capture: overrun after 120000 samples, discarding the run
+
+    stress-ng runs --cpu 3 --vm 2 --vm-bytes 128M --hdd 1 on the same three
+    cores, so six workers were scheduled against one Python reader and a
+    one second ring buffer lost a second inside 1.2 s of reading.
+
+    The load exists to perturb the measured core, not the recorder. 60 sits
+    below rt-toggle's 80, so the thing being measured still wins, and this
+    process spends nearly all its life blocked in the library waiting for
+    data, so it does not starve the housekeeping cores in practice.
+
+    WHERE IT IS SET MATTERS AS MUCH AS THAT IT IS SET. The library spawns
+    its own reader thread inside a_in_scan_start, and on Linux a thread
+    inherits its creator's scheduling policy. Setting the priority after
+    that call would raise this Python loop and leave the thread that
+    actually drains SPI at ordinary priority, which is the half that was
+    starving. It is set before, and the test asserts the ordering.
+
+    The board has neither chrt nor nice, and BusyBox carries neither as an
+    applet, so doing it in the caller was not available even if it were the
+    better place.
 
 Continuous mode with chunked reads. The library keeps a ring buffer and
 fills it from an interrupt; the reader has to drain it faster than the
 converter fills it. Reading in 10000-sample chunks means about ten reads a
-second at 100 kS/s, which is slack enough that an ordinary scheduling delay
-on a loaded housekeeping core cannot overrun the buffer.
+second at 100 kS/s.
+
+    The original text here said that was "slack enough that an ordinary
+    scheduling delay on a loaded housekeeping core cannot overrun the
+    buffer". It was written from arithmetic, never tested under load, and
+    the board disproved it twice in three minutes. The slack is real; the
+    scheduling delay was not ordinary.
 
 Overruns discard the run, not the chunk. The library reports
 hardware_overrun and buffer_overrun per read. A run with a gap in it still
@@ -32,10 +67,36 @@ SPDX-License-Identifier: MIT
 """
 
 import argparse
+import os
 import sys
 import time
 
 import numpy as np
+
+# SCHED_FIFO 60. Below rt-toggle's 80 so the measured task still wins, and
+# above the load so the instrument is not part of what is being measured.
+CAPTURE_PRIORITY = 60
+
+
+def raise_priority():
+    """Ask for SCHED_FIFO, and say so if refused rather than proceeding quietly.
+
+    Refusal is survivable: the scan still runs, and an overrun is reported
+    rather than hidden, so a starved run is thrown away instead of
+    published. But a run that quietly took the slow path and happened not
+    to overrun would be a row taken under conditions no column records,
+    which is worse than a missing row.
+    """
+    try:
+        os.sched_setscheduler(0, os.SCHED_FIFO,
+                              os.sched_param(CAPTURE_PRIORITY))
+        return True
+    except (AttributeError, OSError) as error:
+        print("rt-capture: could not set SCHED_FIFO %d: %s"
+              % (CAPTURE_PRIORITY, error), file=sys.stderr)
+        print("rt-capture: continuing at ordinary priority; under load this "
+              "is where overruns come from", file=sys.stderr)
+        return False
 
 
 def parse_args(argv):
@@ -67,6 +128,12 @@ def main(argv):
         return 1
 
     board = mcc118(args.address)
+
+    # BEFORE a_in_scan_start, not after. The library's reader thread is
+    # created in that call and inherits this policy; raising the priority
+    # afterwards would leave that thread, which is the one that drains SPI,
+    # at ordinary priority. See the module docstring.
+    raise_priority()
 
     # samples_per_channel sizes the ring buffer, not the run. One second of
     # data is a compromise: large enough that a stalled reader has a second

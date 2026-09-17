@@ -222,8 +222,8 @@ First build it, and check the fragment before paying for the compile:
 ```sh
 ./go bitbake bench-rt -c kernel_configme virtual/kernel
 head -4 $BENCH_WORK/build/tmp/work-shared/raspberrypi4-64/kernel-source/Makefile
-./go ksym -f rt
-./go kconfig -f rt
+./go ksym -f rt-common -f rt
+./go kconfig -f rt-common -f rt
 ./go rt
 ```
 
@@ -233,8 +233,8 @@ of them together take minutes; `do_compile` is most of an hour.
 | Step | Question | What a wrong answer looks like |
 |---|---|---|
 | `head -4 Makefile` | did the version pin take | `PATCHLEVEL = 6`, so `ARCH_SUPPORTS_RT` is absent and `PREEMPT_RT` can never be set |
-| `./go ksym -f rt` | does every fragment line name a real symbol | a line that is a typo or a module object rather than an option |
-| `./go kconfig -f rt` | did the fragment reach the `.config` | `PREEMPT_RT` requested and missing, which is the whole risk of this project |
+| `./go ksym -f rt-common -f rt` | does every fragment line name a real symbol | a line that is a typo or a module object rather than an option |
+| `./go kconfig -f rt-common -f rt` | did both fragments reach the `.config` | `PREEMPT_RT` requested and missing, which is the whole risk of this project |
 | `./go rt` | does it build | |
 
 Two things about that list are worth stating rather than assuming.
@@ -296,7 +296,7 @@ Copy that config back to the build host and check it against both
 fragments:
 
 ```sh
-./go kconfig -f rt /tmp/config
+./go kconfig -f rt-common -f rt /tmp/config
 ```
 
 This is the step that catches a fragment which was silently dropped. It
