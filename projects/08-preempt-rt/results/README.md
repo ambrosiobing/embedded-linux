@@ -1,14 +1,17 @@
 # Results
 
-`results.csv` has a header and no rows, which is still the honest state of
-this file but no longer the honest state of the project. Both kernels have
-booted and both have been measured. What has not happened is a measurement
-worth keeping: the first row written was removed because a BusyBox
-incompatibility left every external column empty, so it recorded nothing
-(journal 50), and the smoke runs after it were taken on two images built at
-different times, which makes them an observation about a board rather than
-a comparison between kernels (journal 53). Those numbers live in the
-journal, where their conditions are stated beside them, and not here.
+`results.csv` holds 18 rows: the completed matrix, taken on 17 September
+between 12:49 and 15:23, eight on the generic kernel and ten on
+PREEMPT_RT. Same image, same board, same session, matched configuration by
+configuration, with repeats on four of them.
+
+It was empty for a long time and the reason is worth keeping. The first row
+ever written was removed because a BusyBox incompatibility left every
+external column empty, so it recorded nothing (journal 50), and the smoke
+runs after it were taken on two images built at different times, which
+makes them an observation about a board rather than a comparison between
+kernels (journal 53). Those numbers live in the journal, where their
+conditions are stated beside them, and not here.
 
 The distinction is the point. A row in this file is a measurement of a
 named system. A number that cannot say which system produced it belongs in
@@ -86,6 +89,135 @@ late wake-ups arrive in bursts, consecutive latencies correlate, and the
 factor falls. That is a statement about correlation and supports no claim
 about the write path at all. `rt-compare` says so rather than computing a
 number from it.
+
+## What the matrix says
+
+`ext_p999_us` is the column to read. It is the tail the whole argument is
+about, and unlike `ext_max_us` it reproduces: where a repeat exists the two
+values agree to within a few percent, while the maxima do not agree at all.
+
+| isolated / affinity / governor / load | generic | PREEMPT_RT | change |
+|---|---|---|---|
+| no / no / schedutil / no | 29.64 | 29.19 | -2% |
+| no / no / schedutil / yes | 93.95 | 98.11, 94.28 | +2% |
+| no / no / performance / yes | 100.42 | 100.42 | 0% |
+| no / yes / performance / yes | 226.75 | 110.43 | -51%, see below |
+| **yes** / no / performance / yes | 119.16, 149.44 | 68.05, 70.49 | **-48%** |
+| **yes** / yes / performance / no | 16.81 | 10.16 | **-40%** |
+| **yes** / yes / performance / yes | 99.32 | 71.08, 63.92 | **-32%** |
+
+**PREEMPT_RT bought nothing measurable at the pin until the core was
+isolated.** The three pairs with the measured core still in the scheduler's
+general pool differ by 2 percent or less, which is well inside the spread
+between repeats of one configuration. Every pair with `isolcpus` and
+`nohz_full` covering CPU 3 improved by between a third and a half.
+
+This is worth stating in the order the measurements put it, because it is
+not the order the two are usually presented in. Isolation is normally
+described as tuning applied on top of a real-time kernel. Here isolation is
+the precondition and the real-time kernel is the increment, and a reader
+who applied PREEMPT_RT to this workload without `isolcpus` would have
+measured nothing and concluded, correctly for what they did, that it made
+no difference.
+
+**The fourth row is not evidence and is not counted.** Affinity without
+isolation shows the largest apparent gain in the table, and it rests on a
+single generic row whose `ext_p999_us` of 226.75 is more than double both
+of its neighbours: 100.42 with nothing applied and 119.16 with isolation
+instead. No repeat was taken on that arm. It reads as a bad generic row
+rather than as an effect of the kernel, and the 51 percent is left in the
+table with this note beside it rather than removed, for the reason the
+last section of this file gives.
+
+**The strongest pair is the one with repeats on both arms.** Isolated
+without affinity was run twice on each kernel: 119.16 and 149.44 against
+68.05 and 70.49. The arms do not overlap at all, and the RT pair reproduces
+to 3.5 percent while the generic pair spreads 22 percent, which is itself
+part of the result. A kernel that gives a more repeatable tail is making a
+different claim from one that gives a lower tail, and here it does both.
+
+## What the external instrument saw and the internal ones did not
+
+`ext_max_us` runs from 649.8 to 1229.7 across all 18 rows. `int_max_us`
+never exceeds 462.7. **In every row an excursion of several hundred
+microseconds to over a millisecond appears at the pin and appears in
+neither internal instrument.**
+
+It is insensitive to everything the matrix varies. It is present on both
+kernels, at both governors, loaded and quiet, isolated and not. It is
+present in the quietest row in the file, `generic-iso-aff-performance`,
+where the pin shows 649.8 us and the toggler's own worst wake-up in that
+same minute was 43.6 us.
+
+**It is not attributed here.** The candidates are the SPI path to the HAT,
+the recorder, and firmware activity underneath the kernel, and separating
+them needs an experiment this matrix does not contain. Naming it as
+unattributed is the finding rather than a gap in it: this is the one
+quantity no amount of cyclictest would have revealed, and it is the reason
+the project has an external instrument at all.
+
+## One row where the standard deviation is not a summary
+
+`rt-iso-aff-performance` is the only row in the file where `ext_p999_us`
+(10.163) is **below** `ext_sd_us` (10.906). For any distribution without
+extreme outliers, p99.9 sits at roughly three times the standard deviation.
+Below it means fewer than 30 samples in 30000 exceed 10 us while at least
+one reaches 920, so the standard deviation is carried almost entirely by a
+handful of excursions and is not a summary of the distribution it came
+from.
+
+`rt-compare` reported `sd ratio 12.430` and `write-path variation 7.653 us`
+for that row. Both are arithmetically correct and neither is usable. The
+sqrt(2) derivation assumes a write cost that varies in a stationary way,
+not one that is flat with a single millisecond spike in it, and the ratio
+test guards the ratio without ever asking whether the standard deviation it
+divides into is meaningful. That is a gap in `rt-compare` rather than in
+the row, and it is the same class of defect as the one `rt-compare` was
+written to fix.
+
+## Two rows to read with their repeats
+
+- **13:15:10, `generic-iso-performance-load`.** `ext_ppm` is -509.333
+  against -53 to -233 in every other row, `ext_mean_us` is 1998.981, the
+  only mean below 1999.5 in the file, and it found 28941 edges. By the rule
+  in the schema above, a row whose ppm moved is a row where the board's
+  clock changed during the run. Its repeat at 13:20:32 is the one to read.
+- **14:52:48, `rt-iso-performance-load`.** 29124 edges, roughly 900 short.
+  It also has a repeat, at 14:58:24, and the two agree to 3.5 percent.
+
+Both short rows are the same configuration on opposite arms, isolated
+without affinity. That is worth noticing and is not explained.
+
+## What was not taken, and why
+
+Two rows of the planned matrix, generic and PREEMPT_RT with
+`force_turbo=1`, **were not taken.** `force_turbo=1` permanently sets the
+warranty bit in the SoC and does not clear when the line is removed from
+`config.txt`.
+
+The question it would have answered is whether the residual tail has a
+component the `performance` governor does not remove, since `performance`
+pins the cpufreq policy while the firmware can still move the clock
+underneath it. That is a secondary question, the matrix answers its primary
+one without it, and this board is the bench for the rest of the portfolio.
+Recorded here as a decision with its reason rather than left as a silent
+hole in the table.
+
+## The earlier matrix
+
+An earlier eight row matrix taken the same day between 03:55 and 05:09 is
+preserved at `2026-09-17_5ec99fd-dirty/results.csv`. It is superseded but
+it is not wrong: it is the generic arm only, taken before the card was
+reflashed, and it was never paired.
+
+Three of its rows ran at `ondemand`, and **the RT kernel has no `ondemand`
+governor, so those three have no counterpart that can be taken at all.**
+`rt-common.cfg` sets `CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE`, which
+chooses the default and compiles none of the others in; this kernel offers
+conservative, userspace, powersave, performance and schedutil. That is why
+the current matrix uses `schedutil` where the earlier one used `ondemand`,
+and why `rt-run` now reads `scaling_available_governors` and refuses by
+name instead of failing inside an `echo`.
 
 ## Histograms
 
