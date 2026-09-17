@@ -515,6 +515,38 @@ contains "agreeing sources still work" "$out" "realtime=yes"
 # CONFIG_NO_HZ_FULL or CONFIG_RCU_NOCB_CPU. That is what happened: four rows
 # were written isolated=yes for a core still taking its timer tick.
 
+# ------------------------------- a governor the kernel does not have
+#
+# scaling_governor takes any string and the kernel rejects an unknown one
+# with EINVAL, which a shell reports as "echo: write error: Invalid
+# argument" naming the line number of an echo. That is what ended row 1 of
+# the matrix on 17 September: the message named neither the governor, nor
+# the file, nor the list of what was on offer.
+#
+# The cause is worth keeping in the test. rt-common.cfg sets
+# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE, which picks the DEFAULT and
+# compiles nothing else in; the board turned out to offer conservative,
+# userspace, powersave, performance and schedutil, with no ondemand, so
+# four rows of the published matrix asked for something absent.
+
+reset
+build_sys 1
+echo "conservative userspace powersave performance schedutil" 	>"$WORK/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+rc=0
+out=$(sh "$SUT" -g ondemand 2>&1) || rc=$?
+check "a governor the kernel lacks is refused" "$rc" "1"
+contains "and the refusal names the one asked for" "$out" "no 'ondemand' governor"
+contains "and lists what the kernel does offer" "$out" "schedutil"
+contains "and says the default symbol is not the same question" "$out" 	"CONFIG_CPU_FREQ_DEFAULT_GOV"
+contains "and warns that a rebuild must cover both arms" "$out" "BOTH arms"
+
+reset
+build_sys 1
+echo "performance schedutil" 	>"$WORK/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+rc=0
+out=$(sh "$SUT" -n -g schedutil 2>&1) || rc=$?
+check "a governor the kernel has is accepted" "$rc" "0"
+
 reset
 build_sys 1 "3" absent
 rc=0

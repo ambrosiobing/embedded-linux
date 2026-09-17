@@ -339,6 +339,43 @@ mkdir -p "$RT_RESULTS"
 set_governor() {
 	want=$1
 	found=no
+
+	# ASK WHETHER THE KERNEL HAS IT BEFORE WRITING IT.
+	#
+	# Writing an unavailable governor to scaling_governor fails with
+	# EINVAL, and in a shell that surfaces as
+	#
+	#     rt-run: line NNN: echo: write error: Invalid argument
+	#
+	# which names the line number of an echo rather than the governor, the
+	# file, or the list of what was on offer. On 17 September that ended
+	# row 1 of the matrix with nothing to act on: the operator has to go
+	# and read the source to find out which of the four things on that
+	# line went wrong.
+	#
+	# The cause was worth knowing and invisible from the message.
+	# rt-common.cfg sets CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE, which
+	# chooses the DEFAULT governor and says nothing about which ones are
+	# compiled in. This kernel offers conservative, userspace, powersave,
+	# performance and schedutil, and no ondemand, so four rows of the
+	# published matrix asked for something that does not exist here.
+	avail=$(cat "$SYS"/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null || true)
+	if [ -n "$avail" ]; then
+		case " $avail " in
+		*" $want "*) ;;
+		*)
+			die "this kernel has no '$want' governor.
+       available: $avail
+       CONFIG_CPU_FREQ_DEFAULT_GOV_* chooses the default and does not
+       compile the others in; the governor has to be enabled in its own
+       right. Pick one from the list above, or add the symbol to
+       meta-bench/recipes-kernel/linux/files/rt-common.cfg and rebuild
+       BOTH arms, because a governor present on one kernel and absent on
+       the other is not a matched pair."
+			;;
+		esac
+	fi
+
 	for f in "$SYS"/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
 		[ -w "$f" ] || continue
 		echo "$want" >"$f"
