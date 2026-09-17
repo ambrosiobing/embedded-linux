@@ -23,6 +23,23 @@ A row appears here by being measured on the board, written to
 typed into this file by hand, which is the point of having `rt-run` build
 the row rather than a person.
 
+**This copy was transcribed over the serial console, not `scp`'d**, which
+is the one exception and is recorded rather than glossed. The card was
+flashed without a `/boot/wifi.conf`, so the board had no route at any
+point during the matrix. It was verified afterwards by checksum from the
+console:
+
+```
+md5sum /var/lib/bench/rt/results.csv; wc -lc /var/lib/bench/rt/results.csv
+9a6a04dd2fc8d71c4affa296fcb86869  /var/lib/bench/rt/results.csv
+      19      4678
+```
+
+which is what this file gives. Identical, byte for byte. The rule above
+is about a person composing a row rather than about the transport, and a
+checksum is how the distinction is kept honest when the transport has to
+change.
+
 ## The schema
 
 28 columns, in this order.
