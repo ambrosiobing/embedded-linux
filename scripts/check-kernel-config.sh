@@ -85,7 +85,7 @@ if [ -n "${1:-}" ]; then
 	config=$1
 else
 	config=$(find "$KAS_BUILD_DIR/tmp/work" -path "*linux-raspberrypi*" \
-		-name ".config" -printf '%T@ %p\n' 2>/dev/null |
+		-name ".config" -type f -printf '%T@ %p\n' 2>/dev/null |
 		newest_path ".config")
 fi
 

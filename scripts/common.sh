@@ -199,6 +199,28 @@ warn_stray_build_tree() {
 # rather than everywhere it lived. flash.sh had it too, where the
 # consequence is a card written with an image for the wrong board.
 #
+# THE CALLER MUST PASS -type f, AND THAT IS NOT THIS FUNCTION'S JOB.
+#
+# Yocto's deploy directory holds bench-rt-image-....rootfs-20260917064750
+# .wic.bz2 and a bench-rt-image-....rootfs.wic.bz2 symlink pointing at it.
+# A find that matches both hands two candidates to this function, which
+# duly ranks them and reports one as an older candidate ignored. There is
+# one image. The pick is right and the warning is an invention.
+#
+# That matters more than it sounds. A warning that fires when there is no
+# ambiguity teaches its reader to skip warnings, which is the same failure
+# as a guard that refuses without evidence: the check survives and its
+# audience stops reading it. On 17 September ./go archive printed it on a
+# clean single-image build and the line had to be chased before the
+# archive could be trusted.
+#
+# Resolving symlinks here instead was considered and rejected: this
+# function is fed directories by check-kernel-symbols.sh, which ranks
+# kernel source trees, so it cannot assume its candidates are files. The
+# filter belongs where the caller already says what it is looking for.
+# tests/common-test.sh asserts that every mtime-ranking find in scripts/
+# carries a -type filter.
+#
 # Ranking by time cannot get this wrong, and unlike a filter it never
 # excludes everything: there is always a newest.
 #

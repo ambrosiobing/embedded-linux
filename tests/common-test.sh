@@ -160,5 +160,42 @@ contains "and lists what does exist" "$out" "bench-router"
 contains "and says either spelling works" "$out" "Either spelling works"
 
 echo
+echo "--- every mtime-ranking find says what kind of thing it wants"
+
+# newest_path ranks whatever it is handed. Yocto's deploy directory holds
+# each image twice, once under its build timestamp and once as a stable
+# symlink, so a find matching both feeds two candidates for one file and
+# newest_path dutifully reports the loser as "1 older image ignored". The
+# pick is correct and the warning is invented, which is worse than it
+# sounds: a warning that fires with no ambiguity present trains its reader
+# to skip warnings.
+#
+# Checked as a static property rather than with a fixture, because the
+# authoring laptop cannot make a symlink: Git Bash silently copies
+# instead, so both candidates are real files there and the behavioural
+# test would pass while proving nothing. This shape is what the bug looks
+# like in source, and it catches the next call site as well as these.
+#
+# check-kernel-symbols.sh ranks DIRECTORIES, which is why the assertion is
+# "carries a -type filter" rather than "carries -type f".
+missing=
+for f in "$ROOT"/scripts/*.sh; do
+	# One find may span two lines, so join continuations before matching.
+	# Comments stripped first. common.sh documents this very pattern in
+	# newest_path's header, so a rule that reads whole lines flags the
+	# explanation of the rule. That is the seventh time in this repository
+	# that a check could not tell use from mention, and the fix is the
+	# same as the other six: name the legitimate context rather than widen
+	# the pattern.
+	bad=$(sed -e ':a' -e '/\\$/{N;s/\\\n//;ta' -e '}' -e 's/#.*//' "$f" |
+		grep -- "-printf '%T@" | grep -v -- "-type " || true)
+	if [ -n "$bad" ]; then
+		missing="$missing $(basename "$f")"
+	fi
+done
+
+check "every find feeding newest_path names a -type" "${missing:-none}" "none"
+
+echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

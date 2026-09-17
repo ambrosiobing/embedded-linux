@@ -36,7 +36,7 @@ DEPLOY=$KAS_BUILD_DIR/tmp/deploy/images
 # deploy directory holds more than the one image the last build produced.
 available() {
 	[ -d "$DEPLOY" ] || die "no build tree at $DEPLOY. Nothing to archive."
-	found=$(find "$DEPLOY" -name '*.wic.bz2' -printf '%T@ %p\n' 2>/dev/null |
+	found=$(find "$DEPLOY" -name '*.wic.bz2' -type f -printf '%T@ %p\n' 2>/dev/null |
 		sort -rn | cut -d' ' -f2-)
 	[ -n "$found" ] || die "no .wic.bz2 under $DEPLOY."
 	printf '%s\n' "$found" | while read -r path; do
@@ -169,7 +169,7 @@ save() {
 		image=$BENCH_IMAGE
 		[ -f "$image" ] || die "BENCH_IMAGE is not a file: $image"
 	else
-		image=$(find "$DEPLOY" -name '*.wic.bz2' -printf '%T@ %p\n' \
+		image=$(find "$DEPLOY" -name '*.wic.bz2' -type f -printf '%T@ %p\n' \
 			2>/dev/null | newest_path image)
 		[ -n "$image" ] || die "no .wic.bz2 under $DEPLOY. Build first."
 	fi
@@ -306,6 +306,39 @@ save() {
 	bmap=$(sibling "$image" "$real" .wic.bmap)
 	manifest=$(sibling "$image" "$real" .manifest)
 
+	# A SECOND IMAGE IN THE SAME DIRECTORY IS REFUSED, NAMING BOTH.
+	#
+	# The store path is <project>-<config>/<date>_<commit>[-dirty], and
+	# that is not unique: two builds of the same configuration from the
+	# same commit on the same day land here together. They differ only by
+	# a build timestamp in the middle of the filename, and the second
+	# archive REWRITES PROVENANCE.txt, so the first image is left present,
+	# undescribed, and with no recorded sha256. Flashing the wrong one is
+	# then a coin toss that nothing downstream can catch.
+	#
+	# It happened on 17 September: proj08-bench-rt/2026-09-17_63b179f
+	# ended up holding both ...rootfs-20260917080243.wic.bz2 and
+	# ...rootfs-20260917104455.wic.bz2 with one record between them.
+	# The gap was written up in the skill before it bit; this is the guard
+	# that was missing.
+	#
+	# Re-archiving the SAME image is allowed, because that is idempotent
+	# and is what a repeated command should do.
+	if [ -d "$dest" ]; then
+		existing=$(find "$dest" -maxdepth 1 -name '*.wic.bz2' -type f \
+			! -name "$(basename "$real")" -print 2>/dev/null | head -1)
+		if [ -n "$existing" ]; then
+			die "$dest already holds a different image:
+       have  $(basename "$existing")
+       new   $(basename "$real")
+       Both are $config at $commit on the same day, so they share a
+       store path and the second would overwrite PROVENANCE.txt and
+       leave the first undescribed.
+       Move the old one aside and archive again:
+           mv $dest ${dest}-$(date '+%H%M')"
+		fi
+	fi
+
 	mkdir -p "$dest"
 	note "image   $image"
 	note "store   $dest"
@@ -362,7 +395,14 @@ save() {
 		note "kas absent, layer revisions not recorded"
 	fi
 
-	write_provenance "$dest" "$config" "$machine" "$image" "$commit" "$dirty"
+	# "$real" and not "$image". The copy above stores the file under
+	# basename "$real", the timestamped name, because cp -L follows the
+	# symlink that deploy/images uses as its stable name. Passing "$image"
+	# here made the "To flash" line in PROVENANCE.txt name the SYMLINK,
+	# which is not what was archived and does not exist in the store: every
+	# archive taken before 17 September prints a copy-and-paste flash
+	# command for a file that is not there.
+	write_provenance "$dest" "$config" "$machine" "$real" "$commit" "$dirty"
 
 	note "archived $(du -sh "$dest" | cut -f1)"
 	note "flash it with: ./go flash /dev/sdX $dest/$(basename "$image")"

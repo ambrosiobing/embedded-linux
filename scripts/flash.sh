@@ -41,7 +41,7 @@ if [ -n "$named" ]; then
 	[ -f "$named" ] || die "no such image: $named"
 	image=$named
 else
-	image=$(find "$KAS_BUILD_DIR/tmp/deploy/images" -name '*.wic.bz2' \
+	image=$(find "$KAS_BUILD_DIR/tmp/deploy/images" -name '*.wic.bz2' -type f \
 		-printf '%T@ %p\n' 2>/dev/null | newest_path image)
 	[ -n "$image" ] || die "no image found. Run scripts/build.sh first,
        or name an archived image: scripts/flash.sh $dev IMAGE.wic.bz2

@@ -163,6 +163,72 @@ contains "a sha256 is recorded" "$prov" "[0-9a-f][0-9a-f][0-9a-f][0-9a-f]"
 contains "it says how to flash it" "$prov" "go flash"
 contains "it says how to rebuild it" "$prov" "git checkout"
 
+# AND THE PATH IT NAMES HAS TO EXIST. Saying "go flash" is not the same
+# as saying it usefully. write_provenance was handed the symlink rather
+# than its target, so it printed a copy-and-paste command for
+# $stem.wic.bz2 while the store held $stem.rootfs-<timestamp>.wic.bz2.
+# Every archive taken before 17 September carries that line, and the only
+# way to find out was to paste it and get "no such file".
+#
+# Only observable where symlinks are real: on Windows the two names are
+# identical, so this passes there whether the bug is present or not. Said
+# out loud rather than left as a silent pass, because a green result that
+# could not have been red is worth knowing about.
+flashpath=$(sed -n 's|^  ./go flash /dev/sdX ||p' "$prov" | head -1)
+if [ -z "$flashpath" ]; then
+	no "the flash line names a path"
+elif [ -e "$flashpath" ]; then
+	ok "the flash command names a file that exists ($symlinks symlinks)"
+else
+	no "the flash command names a file that exists: it names $(basename "$flashpath"), which is not in the store"
+fi
+
+echo "== a second image in the same store directory is refused"
+# The store path is <project>-<config>/<date>_<commit>, which is NOT
+# unique: two builds of one configuration from one commit on one day land
+# together, differing only by a build timestamp mid-filename. The second
+# archive rewrites PROVENANCE.txt, leaving the first image present,
+# undescribed and with no recorded sha256.
+#
+# That happened on 17 September to proj08-bench-rt/2026-09-17_63b179f.
+# Re-archiving the SAME image must still work, because a repeated command
+# should be idempotent, so both directions are asserted.
+out=$(run bench-rpi4 2>&1 || true)
+case $out in
+*"already holds a different image"*)
+	no "re-archiving the same image is still allowed"
+	;;
+*)
+	ok "re-archiving the same image is still allowed"
+	;;
+esac
+
+# Now a genuinely different image, same day, same commit.
+#
+# Named explicitly with BENCH_IMAGE rather than dropped into deploy/ and
+# found. On a host where ln -s makes copies the stable short name IS the
+# file, so both images would arrive under one basename and the guard would
+# correctly see no difference: the fixture, not the guard, would be the
+# thing failing. Naming the timestamped file sidesteps symlinks entirely
+# and exercises the same code path on both hosts.
+echo "other image bytes" >"$deploy/$stem.rootfs-20260916999999.wic.bz2"
+touch -d '2026-09-16 23:00:00' "$deploy/$stem.rootfs-20260916999999.wic.bz2"
+out=$(run_named "$deploy/$stem.rootfs-20260916999999.wic.bz2" bench-rpi4 2>&1 || true)
+case $out in
+*"already holds a different image"*)
+	ok "a second, different image is refused rather than filed beside it"
+	;;
+*)
+	no "a second, different image is refused rather than filed beside it"
+	echo "$out" | sed 's/^/       /'
+	;;
+esac
+case $out in
+*20260916999999*) ok "and the refusal names the incoming image" ;;
+*) no "and the refusal names the incoming image" ;;
+esac
+rm -f "$deploy/$stem.rootfs-20260916999999.wic.bz2"
+
 echo "== the wrong board is refused, not filed"
 # A Pi 4 image filed under bench-rpi3 is a card that does not boot and
 # reads as dead hardware. Newest-wins is right after a build and wrong

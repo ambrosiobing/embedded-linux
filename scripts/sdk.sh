@@ -38,7 +38,7 @@ install)
 	sh "$inst"
 	;;
 check)
-	env_script=$(find /opt/poky -maxdepth 2 -name 'environment-setup-*' \
+	env_script=$(find /opt/poky -maxdepth 2 -name 'environment-setup-*' -type f \
 		-printf '%T@ %p\n' 2>/dev/null | newest_path "SDK environment")
 	[ -n "$env_script" ] || die "no SDK environment found under /opt/poky."
 	note "using $env_script"
