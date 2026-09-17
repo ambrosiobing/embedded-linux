@@ -15,6 +15,7 @@
 #   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
 #   ./go iio          build bench-iio-image, the IIO sensor lab of Project 10
+#   ./go explorer     build bench-explorer-image, the Explorer 700 of Project 6
 #   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
 #   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
 #   ./go armstub      put the secure world on a card the image is already on
@@ -29,6 +30,7 @@
 #   ./go kconfig      check that the kernel fragment reached the .config
 #   ./go reproduce    build the same commit again and diff the package lists
 #   ./go packages     the image package list, for the README table
+#   ./go plot -o FIG.svg FILE[:LABEL]...   a histogram figure from a run
 #   ./go lint         static checks that need no Yocto host
 #   ./go projects     list the projects and where each one lives
 #   ./go shell [CFG]  a BitBake shell inside the kas environment
@@ -54,6 +56,7 @@ rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
 ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
 iio)        exec sh ./scripts/build.sh bench-iio ;;
+explorer)   exec sh ./scripts/build.sh bench-explorer ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
 tee)        exec sh ./scripts/build.sh bench-tee ;;
 armstub)    shift; exec sh ./scripts/optee-armstub.sh "$@" ;;
@@ -65,6 +68,7 @@ ksym)       shift; exec sh ./scripts/check-kernel-symbols.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
 reproduce)  shift; exec sh ./scripts/reproduce.sh "$@" ;;
 packages)   exec sh ./scripts/packages.sh ;;
+plot)       shift; exec python3 ./scripts/rt-plot.py "$@" ;;
 lint)       exec python3 ./scripts/lint.py ;;
 projects)
 	for d in projects/*/; do

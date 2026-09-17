@@ -2823,3 +2823,133 @@ Three in one evening, all of them guards, all of them refusing on evidence
 they did not print. Chapter 7 was written about checks that select their
 own input. This is the same omission on the other side of the branch, and
 decision 82 now carries it.
+
+## 55. The figure generator, and four defects in one afternoon
+
+All entries from here are 17 September 2026.
+
+Asked for plots, and the honest answer was that this repository could not
+produce one. The three instruments each leave a histogram file per run and
+nothing read them. So `scripts/rt-plot.py`, behind `./go plot`.
+
+Reading the three writers before writing anything paid for itself
+immediately. `rt-toggle` prints comment lines then `bin count` integers,
+`rt-analyze --hist` prints comment lines then `deviation count` with one
+decimal, and `cyclictest -h` prints comment lines then six-digit zero
+padded pairs. Three instruments, one shape. One parser reads all three, and
+that is the only reason the script is short. The rule that follows is
+written into its docstring: a fourth instrument writes that shape too,
+rather than teaching this file a second format.
+
+The count axis is logarithmic and there is no flag to make it linear. That
+is not a preference. 4413 of 10000 samples in one bin and 99.6 percent
+under 30 microseconds means a linear axis draws one spike and a flat line,
+and the flat line is the finding.
+
+Then four defects, in the order they were found.
+
+**The first render lost the tail.** log10(1) is 0, so a one-sample bin drew
+at exactly the same height as an empty one, and the four bins at 44, 69, 76
+and 100 microseconds, which are the entire argument for a real-time kernel
+on this board, were invisible. Worse: the code carried a comment asserting
+that this was correct, that "one sample is the smallest thing that
+happened, not the smallest thing that could". Confident, well written, and
+wrong. The axis now spans decades plus one, so a count of one sits a full
+band above the baseline.
+
+Nothing would have caught this except looking at the picture. There was no
+test to write, because the misunderstanding was in what the figure was for.
+The test exists now and asserts a coordinate rather than a sentiment: a
+single sample must be drawn above y=308, which is the baseline.
+
+**A single series' label was parsed and then drawn nowhere.** The legend
+only appears for two or more series, on the correct principle that a legend
+of one is a label with extra steps, so with one input the label was
+computed, carried through, and discarded. Caught by a test that looked in
+the figure for the label rather than at the exit status. The fix is the
+rule the principle implies and the code had not: with one series the title
+carries the identity, so the title defaults to the label.
+
+**A missing input file raised a traceback.** Every other refusal in the
+script is a one-line message; `open` was the one path that escaped as a
+`FileNotFoundError`. That was found by running the tests on the authoring
+laptop, where a Git Bash `/tmp` path is invisible to native Windows Python,
+so the wrong-path case ran by accident before anyone wrote it.
+
+**The shipped results.csv was a column behind the board.** This one has
+been true for a while and nothing noticed. `rt-run` writes 28 columns.
+`projects/08-preempt-rt/results/results.csv` shipped 27: `image_build` was
+documented in the schema table beside it and written by the board and
+missing from the header this repository hands out. Harmless until somebody
+appends a real row to the shipped file or reads a column by position, and
+then it is a silent off-by-one across every column after the second.
+
+The test for it was wrong three times before it was right. Counting rows in
+the schema table does not count columns, because the table groups several
+columns onto one row, because the comparison table below it has the same
+shape and gets counted too, and because a character class of `[a-z_]`
+silently drops `ext_p999_us` for containing digits. The assertion that
+works asks the question directly: is every column the board writes
+described somewhere, and does the prose count match. Proved in both
+directions against mutated copies in a scratch directory, where the
+`ext_p999_us` case is precisely the one the naive pattern had dropped.
+
+While there, `results/README.md` still opened with "the code is written and
+no board has run it". Both kernels have booted and both have been measured.
+What has not happened is a measurement worth keeping, which is a different
+statement, and the file now makes it.
+
+**No figure is committed.** The histogram numbers available today were
+transcribed out of a terminal, not copied off the board as a file. A figure
+generated from retyped numbers would look exactly like a figure generated
+from an instrument, and this project is arranged against precisely that.
+The script ships; the figure gets generated next session from the real
+`LABEL-cyclictest.txt`.
+
+One note for the bench: `rt-run-test.sh` does not run on the authoring
+laptop at all. Its stub `uname` is never exec'd, so the real one answers,
+the script correctly refuses a kernel that disagrees with itself, and the
+suite aborts at its first assertion. That is `core.filemode=false` and it
+is why the new assertions were verified standalone and by negative test
+rather than by running the suite they live in.
+
+Added while committing, because the commit itself was wrong twice.
+
+Project 6 and Project 8 were written in the same checkout on the same day,
+so both had entries in `walkthrough/DECISIONS.md` and neither could be
+staged by path, one file being one file. Project 6's were 83 to 85, mine
+collided at 83 and 84 and were renumbered to 86 and 87. To give each commit
+only its own entries, mine were cut to a scratch file, Project 6 was
+committed, and mine were appended back afterwards.
+
+Committing Project 6 used the pathspec form, `git commit -- <paths>`, so
+that the Project 8 files already in the index would stay there. It worked
+and it shipped three programs and two test suites without their executable
+bit. On a clone that is `Permission denied`, which is the exact symptom
+`scripts/lint.py` grew a rule to prevent.
+
+The cause is that **`git commit -- <pathspec>` commits the working tree's
+file mode and ignores the index**, and on this laptop `core.filemode=false`
+means the working tree mode is always 100644. So a staged
+`git update-index --chmod=+x` is silently discarded by that form of commit.
+It cannot ever ship an executable bit from here.
+
+The obvious repair made it worse in the same way: `git commit --amend
+--no-edit --only <paths>` is also a pathspec form, so it re-read the
+working tree, and the modes went straight back to 100644. Two attempts, the
+same mechanism, and the second one looked like a different command.
+
+What works is an index-based amend. Unstage everything that is not being
+amended, so the index holds only the mode changes, then
+
+    git update-index --chmod=+x <files>
+    git commit --amend --no-edit
+
+with no pathspec at all. `git ls-tree HEAD -r` is the check, and it is the
+only one that reads what was actually committed rather than what was asked
+for. The commit went from 100644 to 100755 on all five files.
+
+Both mistakes are the same family as the rest of this project: a command
+that reports success while acting on a source the caller did not intend.
+Neither `git commit` nor `git commit --amend` said anything about a mode,
+and the staged change simply was not there any more.

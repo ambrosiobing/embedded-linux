@@ -1,7 +1,19 @@
 # Results
 
-`results.csv` has a header and no rows. That is the honest state of this
-project: the code is written and no board has run it.
+`results.csv` has a header and no rows, which is still the honest state of
+this file but no longer the honest state of the project. Both kernels have
+booted and both have been measured. What has not happened is a measurement
+worth keeping: the first row written was removed because a BusyBox
+incompatibility left every external column empty, so it recorded nothing
+(journal 50), and the smoke runs after it were taken on two images built at
+different times, which makes them an observation about a board rather than
+a comparison between kernels (journal 53). Those numbers live in the
+journal, where their conditions are stated beside them, and not here.
+
+The distinction is the point. A row in this file is a measurement of a
+named system. A number that cannot say which system produced it belongs in
+the narrative, where it can be qualified, rather than in a table, where it
+cannot.
 
 A row appears here by being measured on the board, written to
 `/var/lib/bench/rt/results.csv` by `rt-run`, and copied back. Nothing is
@@ -10,7 +22,7 @@ the row rather than a person.
 
 ## The schema
 
-27 columns, in this order.
+28 columns, in this order.
 
 | Column | From | Meaning |
 |---|---|---|

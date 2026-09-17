@@ -478,6 +478,38 @@ build_sys 1
 out=$(sh "$SUT" -n 2>&1)
 contains "agreeing sources still work" "$out" "realtime=yes"
 
+# ------------------------------------------ the shipped header and this one
+#
+# projects/08-preempt-rt/results/results.csv is committed with a header and
+# no rows, so that the schema is readable before any board has run. Nothing
+# kept it in step with the header this script writes, and it drifted: when
+# image_build was added here, the committed file stayed at 27 columns while
+# the schema table beside it documented 28.
+#
+# That is harmless right up until somebody appends a board's row to the
+# shipped file, or reads a column by position, and then it is a silent
+# off-by-one across every column after the second.
+
+shipped=$ROOT/projects/08-preempt-rt/results/results.csv
+written=$(grep -o 'timestamp,label,[a-z_,0-9]*throttled_after' "$SUT" |
+	head -n 1)
+check "the committed results.csv header is the one rt-run writes" \
+	"$(head -n 1 "$shipped")" "$written"
+
+# Not by counting table rows. The schema table groups columns onto shared
+# rows, the comparison table below it has the same shape, and a column name
+# containing digits escapes the obvious pattern. Ask the question directly
+# instead: is every column the board writes described somewhere.
+schema=$ROOT/projects/08-preempt-rt/results/README.md
+undocumented=
+for column in $(printf '%s\n' "$written" | tr ',' ' '); do
+	grep -q -- "\`$column\`" "$schema" || undocumented="$undocumented $column"
+done
+check "every column rt-run writes is documented" "$undocumented" ""
+check "and the schema says how many there are" \
+	"$(sed -n 's/^\([0-9]*\) columns, in this order.*/\1/p' "$schema")" \
+	"$(printf '%s\n' "$written" | tr ',' '\n' | grep -c .)"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
