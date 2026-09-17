@@ -5,7 +5,7 @@ as org.bench.SensorHub1 on the system bus, with the bus policy that says \
 who may talk to it, the polkit action that says who may calibrate it, the \
 two activation paths that start it, and a client that knows none of the \
 wire format."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

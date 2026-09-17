@@ -5,7 +5,7 @@ the MCC 118 that watches the same line from outside the system, an analysis \
 that recovers edge times below the sample period by interpolation, and the \
 orchestration that applies one configuration at a time and refuses to \
 label a run with a claim the kernel does not support."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

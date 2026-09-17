@@ -2,7 +2,7 @@ SUMMARY = "Device tree overlay for the X-NUCLEO-IKS4A1 sensor shield"
 DESCRIPTION = "Binds the LSM6DSV16X, LIS2MDL, LPS22DF and SHT40 of an \
 X-NUCLEO-IKS4A1 to their in-tree drivers on I2C1, with INT1 of the IMU on \
 GPIO24 for FIFO watermark and data-ready events. Project 10."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

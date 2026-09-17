@@ -4,7 +4,7 @@ rather than code: two NetworkManager uplink profiles with different route \
 metrics, an access-point profile, the connectivity check, one nftables file \
 holding the whole packet path, DHCP for the bench LAN, the ModemManager \
 port filter and stable names for the modem's serial ports."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

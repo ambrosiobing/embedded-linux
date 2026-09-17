@@ -5,7 +5,7 @@ what the normal world hands it; a client library over the TEE Client API, \
 a CLI, a Python binding whose canonical serialisation is shared with the \
 verifier, a link-state LED daemon and a conformance check that runs once \
 per boot."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

@@ -1,6 +1,6 @@
 [Unit]
 Description=Hold the modem FLIGHT line out of flight mode
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 # Before ModemManager, so that the radio is already out of flight mode the
 # first time the modem is probed. A modem found in flight mode registers
 # with no operator and looks exactly like an antenna fault.

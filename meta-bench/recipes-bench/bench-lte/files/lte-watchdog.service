@@ -1,6 +1,6 @@
 [Unit]
 Description=Cellular bearer watchdog with escalating recovery
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 After=NetworkManager.service ModemManager.service
 Wants=NetworkManager.service ModemManager.service
 

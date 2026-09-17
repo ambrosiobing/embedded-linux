@@ -3,7 +3,7 @@ DESCRIPTION = "Binds eleven peripherals of an RB-Explorer700 to in-tree \
 drivers on a Raspberry Pi 3: a DS3231, a PCF8574, a PCF8591 and a BMP280 on \
 I2C1, an SSD1306 on SPI0, a DS18B20 on 1-Wire, an IR receiver, two LEDs, a \
 buzzer and a five-way joystick. Project 6."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

@@ -4,7 +4,7 @@ project or any one network: at present the console keymap. Kept separate \
 from bench-net-wifi so that an image which manages its own networking, such \
 as the router image of Project 15, can take the keyboard without also \
 taking a wpa_supplicant client profile for wlan0."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

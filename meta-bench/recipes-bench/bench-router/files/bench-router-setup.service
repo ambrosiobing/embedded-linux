@@ -1,6 +1,6 @@
 [Unit]
 Description=Fill in the router profiles from the boot partition
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 ConditionPathExists=/boot/router.conf
 Before=NetworkManager.service
 Wants=NetworkManager.service

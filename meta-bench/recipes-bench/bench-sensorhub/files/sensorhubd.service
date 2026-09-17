@@ -1,6 +1,6 @@
 [Unit]
 Description=Sensor hub D-Bus service
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 
 # BindsTo rather than Requires: the unit stops when the device goes away,
 # which is what unplugging the Nucleo should do. Requires would leave the

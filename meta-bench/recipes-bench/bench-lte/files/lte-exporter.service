@@ -1,6 +1,6 @@
 [Unit]
 Description=Collect modem metrics into the textfile directory
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 After=ModemManager.service
 
 [Service]

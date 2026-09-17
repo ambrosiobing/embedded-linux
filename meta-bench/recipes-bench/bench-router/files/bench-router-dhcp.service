@@ -1,6 +1,6 @@
 [Unit]
 Description=Bench router DHCP and DNS for the access point
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 After=NetworkManager.service
 Wants=NetworkManager.service
 ConditionPathExists=/etc/bench/dnsmasq.conf

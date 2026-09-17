@@ -18,7 +18,7 @@
 <policyconfig>
 
   <vendor>embedded-linux-bench</vendor>
-  <vendor_url>https://github.com/ambrosiobing/embedded-linux-bench</vendor_url>
+  <vendor_url>https://github.com/ambrosiobing/embedded-linux</vendor_url>
 
   <action id="org.bench.sensorhub.calibrate">
     <description>Calibrate the sensor hub</description>

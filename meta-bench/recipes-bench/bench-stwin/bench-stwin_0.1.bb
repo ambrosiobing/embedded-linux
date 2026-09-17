@@ -5,7 +5,7 @@ the frames against a feature-mask table, and forwards them to a daily CSV \
 file, an MQTT topic and three link-state LEDs. It reconnects on its own \
 with bounded back-off, and it notices a link that is still up and has \
 stopped delivering, which a supervision timeout cannot."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

@@ -1,6 +1,6 @@
 [Unit]
 Description=Bench router packet filter and NAT
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 Before=network-pre.target
 Wants=network-pre.target
 ConditionPathExists=/etc/bench/nftables.conf

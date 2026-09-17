@@ -4,7 +4,7 @@ card-booted one does not: a network configuration that does not take the \
 root filesystem's own interface away from the kernel, and an fstab with no \
 entry for a card that is not there. Project 4's DUT runs with no microSD \
 card at all."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

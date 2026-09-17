@@ -4,7 +4,7 @@ inventory, software trigger management through configfs, the three-path \
 rate comparison, a scan decoder that reads the layout the kernel declares, \
 and a libiio client whose only difference between local and remote is the \
 context URI."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

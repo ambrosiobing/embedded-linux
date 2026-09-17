@@ -4,7 +4,7 @@ joins somebody else's wireless network: a systemd-networkd profile for \
 wlan0 and the first-boot step that reads SSID and PSK from the boot \
 partition into a wpa_supplicant configuration. Images that run their own \
 access point, or that are gateways rather than clients, leave this out."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

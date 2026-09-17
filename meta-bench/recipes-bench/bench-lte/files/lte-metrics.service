@@ -1,6 +1,6 @@
 [Unit]
 Description=Serve the modem metrics directory over HTTP
-Documentation=https://github.com/ambrosiobing/embedded-linux-bench
+Documentation=https://github.com/ambrosiobing/embedded-linux
 After=NetworkManager.service
 
 [Service]

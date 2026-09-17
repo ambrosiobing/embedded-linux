@@ -4,7 +4,7 @@ modem's PWRKEY and FLIGHT lines, a watchdog that probes the bearer and \
 escalates from a bearer restart through a modem reset to a power cycle, \
 and a collector that writes the modem's state, signal and position as \
 Prometheus text for a timer to refresh and a small server to hand out."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\

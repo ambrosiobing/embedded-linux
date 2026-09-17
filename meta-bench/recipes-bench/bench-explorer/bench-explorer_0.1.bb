@@ -3,7 +3,7 @@ DESCRIPTION = "explorer-verify checks all eleven peripherals through their \
 kernel subsystems and is the acceptance test for Project 6. explorer-oled \
 writes text to the panel through the framebuffer, and explorer-beep sounds \
 the buzzer through evdev. Neither touches an I2C or SPI register."
-HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux-bench"
+HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
