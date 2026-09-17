@@ -2511,3 +2511,64 @@ would have found it, because the misunderstanding was about what the figure
 was for rather than about what the code did. It was found by rendering the
 file and looking at it, which is the step that gets skipped because the
 program exited zero.
+
+## 88. A control is built by subtracting one symbol, never by omitting the fragment
+
+**Context.** Project 8 compares a PREEMPT_RT kernel against a generic one.
+The two builds are one kas file apart, and the control's file sets
+`BENCH_RT_KERNEL = "0"`, which in the bbappend means the kernel fragment is
+not added to `SRC_URI` at all.
+
+**Decision.** The tuning symbols live in `rt-common.cfg`, applied to both
+configurations. The variable under study, `CONFIG_PREEMPT_RT`, lives alone
+in `rt.cfg`, applied to one.
+
+**Rejected.** One fragment behind one switch, which is what shipped. It
+reads as a single variable and is eight. The control booted without
+`NO_HZ_FULL`, without `RCU_NOCB_CPU`, and with a different default cpufreq
+governor, and the file's own header asserted that the two differed in one
+symbol.
+
+**Why.** A switch that gates a file gates everything in the file. That is
+obvious written down and invisible in a kas file that says
+`BENCH_RT_KERNEL = "0"`, because the name says kernel and the reader
+supplies the word "preemption" from context. The grouping in the fragment
+was done for authoring convenience; the experiment needs it grouped by
+whether a symbol is the variable or the background.
+
+**Consequence.** A kernel rebuild on both sides whenever the background
+changes, rather than on one. That is the correct cost: if a symbol belongs
+to the background, both arms must carry it, and if only one arm rebuilds,
+it was not the background.
+
+## 89. A check that verifies a fragment cannot speak for a build that has none
+
+**Context.** `./go kconfig` proves every symbol in a kernel fragment
+reached the produced `.config`. It is one of this repository's better
+checks and it found three real defects the first time it could run.
+
+**Decision.** Where a comparison has two arms, the check runs against both,
+and an arm with no fragment to check is reported as unchecked rather than
+as passing.
+
+**Rejected.** Leaving it as is, on the grounds that a build with no
+fragment has nothing that could have gone wrong. What went wrong was the
+absence itself, and the check was the only thing positioned to notice.
+
+**Why.** The check asks "did what I asked for arrive". When nothing was
+asked for, the answer is yes, trivially and forever. The evidence file it
+produced is real, correct, and describes the other kernel; nothing in it
+says the control was never examined, because from the check's point of view
+the control was never a subject. A vacuous pass is indistinguishable from a
+real one in every artefact the check leaves behind.
+
+**Consequence.** Checks need to report their scope, not only their verdict.
+"7 symbols verified against raspberrypi4-64" and "no fragment configured
+for this build, nothing verified" are different sentences, and only the
+second one would have prevented four rows being measured against a control
+that was not one.
+
+This is the same rule as chapter 7's arrived at from a third direction. A
+check that selects its own input must say what it selected. A guard that
+refuses must say what it matched. And a check with nothing to examine must
+say that it examined nothing, rather than passing in silence.

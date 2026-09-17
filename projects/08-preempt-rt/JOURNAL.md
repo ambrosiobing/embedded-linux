@@ -2953,3 +2953,197 @@ Both mistakes are the same family as the rest of this project: a command
 that reports success while acting on a source the caller did not intend.
 Neither `git commit` nor `git commit --amend` said anything about a mode,
 and the staged change simply was not there any more.
+
+## 56. Four rows on the board, and the instrument was competing with the load
+
+The generic image went onto a card, the board came up on a phone hotspot,
+and the first four rows of the matrix exist. What follows is what the board
+said that no amount of reading the code had.
+
+**The cyclictest columns are populated.** `cyc_min_us=4 cyc_avg_us=13
+cyc_max_us=77` on the first row. Those three had been blank in every row
+this project ever wrote, and yesterday's whole rebuild existed to fix them.
+Proven on hardware rather than in a test.
+
+**`/etc/timestamp` is a constant, so the `image_build` column is useless.**
+It reads `20180309123456` on this image and will read it on every image
+this repository ever builds: epoch 1520598896 is poky's default
+`REPRODUCIBLE_TIMESTAMP_ROOTFS`, and `ls -l` confirms it, every file in the
+rootfs is dated 9 March 2018. That is what reproducible builds are for.
+
+The column's own comment in `rt-run` says
+
+    /etc/timestamp is written by poky during rootfs assembly and is unique
+    per build
+
+which is false, and was written by me, in the most convincing possible
+place. `/etc/os-release` carries no `BUILD_ID` either, checked rather than
+assumed, so the image genuinely holds no per-build identifier. The fix is
+to inject one from the recipe rather than to read one that cannot vary.
+
+**The external instrument was competing with the load it measures under.**
+The first `rt-run -L` died with
+
+    rt-capture: overrun after 1480000 samples, discarding the run
+
+and the second with `after 120000 samples`. Both void. Two failures an
+order of magnitude apart is not a scheduling tail, it is starvation.
+
+`rt-run` pins `stress-ng --cpu 3 --vm 2 --vm-bytes 128M --hdd 1` to the
+housekeeping cores, and pins `rt-capture` to the same three cores at
+ordinary priority, while `rt-toggle` runs at SCHED_FIFO 80 on the measured
+core. So a Python process draining SPI was scheduled against six stress
+workers on three cores, and the one second ring buffer lost a second inside
+1.2 s of reading. `rt-capture`'s own header had predicted otherwise:
+
+    Reading in 10000-sample chunks means about ten reads a second at
+    100 kS/s, which is slack enough that an ordinary scheduling delay on a
+    loaded housekeeping core cannot overrun the buffer
+
+Confident, plausible, never tested under load, wrong.
+
+The board has no `chrt` and no `nice`, and BusyBox carries neither as an
+applet, so the external-tool route was closed. Python can do it itself:
+`os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(60))`. Placement
+mattered more than the call. The daqhats library spawns its reader thread
+inside `a_in_scan_start`, and on Linux a thread inherits its creator's
+policy, so setting the priority after that call would have raised the
+Python reader and left the thread that actually drains SPI at ordinary
+priority. Set before, it works: 6300000 samples, no overrun.
+
+The instrument should never have been inside the contended set. The load
+exists to perturb the measured core, not the recorder.
+
+**Every loaded row loses edges, and that is where `ext_max_us` goes wrong.**
+
+| Row | edges | missing | ext_max | int_max |
+|---|---|---|---|---|
+| no load | 30000 | 0 | 189.8 | 194.7 |
+| load | 29994 | 6 | 1100.0 | 323.7 |
+| performance, load | 29990 | 10 | 1196.4 | 277.2 |
+| affinity, performance, load | 29991 | 9 | 948.8 | 513.9 |
+
+The unloaded row loses nothing and its two maxima agree to 5 us. Every row
+that loses edges reports an external maximum three to four times its
+internal one. A dropped edge merges two periods and manufactures a
+deviation that nothing experienced. So `ext_max_us` is not measuring
+latency in the loaded rows, while `ext_sd_us` still looks sound. Why edges
+go missing when the capture itself reports no overrun is open.
+
+**cyclictest's histogram clips at 400 and the CSV does not.** Row 3:
+
+    CSV:      cyc_min_us=3  cyc_avg_us=8  cyc_max_us=488
+    summary:  cyclictest mean=9.30 us  max=392.5 us
+
+`-h 400` has 400 bins, so anything past 400 us lands in the overflow and
+never reaches the histogram. `rt-compare` derives from the histogram and
+saturates near 392.5; the CSV column reads cyclictest's own
+`# Max Latencies:` line and counts everything. The column that was blank
+until yesterday is the only one telling the truth about that row. Row 2
+agreed at 277 and 277.5 only because it stayed under the clip.
+
+**A hypothesis tested and dropped.** `clock_offset_ppm` moved +39.4,
+-106.5, -202.1, -146.5 across the four rows, and the schema says that
+figure should be constant per board. Thermal drift of the crystals was the
+obvious candidate, so the next run was bracketed with `vcgencmd
+measure_temp`: 51.6 to 55.5 C, under four degrees, and the sequence is not
+monotonic anyway. Not temperature. Timesync disciplining the Pi's clock
+during a run is the remaining suspect, and the answer is probably to stop
+it for the duration of a measurement.
+
+**A methodological problem visible at row 4 rather than row 16.** `int_max`
+reads 324, 277, 514 across rows 2, 3 and 4. Row 4 applies IRQ affinity,
+which should help, and has the worst maximum of the three. These are single
+observations of rare events and the run-to-run spread exceeds the effect
+being measured. One run per cell cannot separate them. The rows that matter
+need repeats, and knowing that at row 4 is worth more than discovering it
+at row 16.
+
+Two smaller things. The affinity step reports what it did rather than
+claiming success: 12 interrupts moved, 18 refused as per-CPU or IPI, then
+`no movable interrupt can reach CPU 3`. And `rt-compare` refuses to compute
+a write-path figure on every loaded row, because the sd ratio falls below
+sqrt(2) when late wake-ups arrive in bursts, which is the check behaving
+exactly as designed.
+
+The board is running a hand-patched `rt-capture` that no longer matches the
+flashed image, and `image_build` is a constant, so nothing in the CSV can
+record that. It is recorded here instead.
+
+## 57. The control is not one symbol away, it is the whole fragment away
+
+Adding isolation to the running board produced two lines that only the
+serial console could have shown:
+
+    Housekeeping: nohz unsupported. Build with CONFIG_NO_HZ_FULL
+    Unknown kernel command line parameters "nohz_full=3 rcu_nocbs=3",
+    will be passed to user space.
+
+`isolcpus=3` was accepted. The other two were rejected by name and handed
+to userspace as if they were environment variables.
+
+`rt.cfg` asks for both, so the question was why they were absent, and the
+answer is one line in the bbappend and one in the control's kas file:
+
+    SRC_URI += '${@"file://rt.cfg" if d.getVar("BENCH_RT_KERNEL") == "1" else ""}'
+    BENCH_RT_KERNEL = "0"
+
+The control does not get one fewer symbol than the experiment. **It gets
+none of the fragment.** All eight lines are absent from the generic build:
+`EXPERT`, `PREEMPT_RT`, `IRQ_FORCED_THREADING`, `HIGH_RES_TIMERS`,
+`NO_HZ_FULL`, `CPU_ISOLATION`, `RCU_NOCB_CPU` and
+`CPU_FREQ_DEFAULT_GOV_PERFORMANCE`.
+
+`kas/bench-rt-generic.yml` says, in its own header, that the two
+configurations "differ in one symbol, CONFIG_PREEMPT_RT, and that is the
+entire point of this file". The boot log falsified that sentence.
+
+Three of the differences are proven rather than inferred. Two by the boot
+log above. The third is already sitting in row 1 of the results: it
+recorded `governor=ondemand` under "unchanged", and the RT kernel carries
+`CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y`, so the two "unchanged governor" rows
+at the top of each half would have compared different governors with
+nothing in the table saying so.
+
+This is the project's own first rule, broken by the project:
+
+> A comparison differs in one variable, or it is not a comparison.
+
+**Why no check caught it, which is the part that generalises.** `./go
+kconfig` verifies that the symbols in a fragment reached the `.config`.
+The generic build has no fragment, so there is nothing to verify and the
+check passes by having nothing to say. The evidence file on disk,
+`kconfig-check-raspberrypi4-64.txt`, reads `CONFIG_PREEMPT_RT=y`: it
+describes the real-time kernel. The control's configuration was never
+checked at all, and could not have been, because the check can only ask
+about a file that is absent.
+
+A check that verifies a fragment is structurally incapable of speaking for
+a build that has none. That is not a bug in the check; it is the check
+being asked the wrong question, and the wrong question is invisible because
+the answer is always "ok".
+
+**And the run would have been certified.** `rt-run -i` verifies
+`/sys/devices/system/cpu/isolated`, which `isolcpus` alone populates. It
+never checks that `nohz_full` or `rcu_nocbs` took effect. Rows 5 to 7 would
+have been written `isolated=yes` for a core still taking its timer tick and
+its own RCU callbacks, and the column would have been technically true and
+practically misleading. The verification that this project is proudest of,
+the one that refuses to trust a flag, verifies one third of what the flag
+means.
+
+The fix has three parts and none of them are subtle. Split the fragment:
+`rt-common.cfg` carrying the seven tuning symbols, applied to both
+configurations, and `rt.cfg` reduced to `PREEMPT_RT` and `EXPERT`. Extend
+`rt-run -i` to verify all three parameters rather than the one that
+happens to be visible in sysfs. Run `./go kconfig` against the control as
+well, which requires it to have a fragment to check, which the split gives
+it.
+
+It costs a kernel rebuild on both sides and a reflash. That is what this
+kind of finding is for.
+
+The four generic rows already taken are not discarded. They are valid
+measurements of a named system, the stock Raspberry Pi kernel, and they
+are the evidence for why the split was needed. Decision 81 says every
+attempt is recorded and stays recorded until it is superseded.

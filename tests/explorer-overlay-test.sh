@@ -230,18 +230,26 @@ echo "--- cross-file: every BCM pin in the overlay is in the pin map"
 # and the column saying whether anything has confirmed it. A pin that
 # reached the overlay without reaching that document is a number with no
 # provenance, which on this project is the whole risk.
-for pin in $(grep -o "<&gpio [0-9]* " "$DTS" | grep -o "[0-9]*" | sort -un); do
+# Into a file and then redirected in, rather than piped into the loop.
+# A "while read" at the end of a pipeline runs in a subshell, so every
+# pass and fail this loop counts would be discarded when that subshell
+# exits, and the suite would report a total that silently omits these.
+grep -o "<&gpio [0-9]* " "$DTS" | grep -o "[0-9]*" | sort -un >"$WORK/pins"
+while read -r pin; do
 	# The document bolds the pins that differ from the project
 	# specification, and that emphasis is carrying meaning. So the
 	# pattern tolerates the markers rather than the document dropping
 	# them to suit a test.
-	if grep -qE "[|] [*]{0,2}$pin[*]{0,2} [|]" "$PINMAP"; then
+	#
+	# ${pin} rather than $pin: the next character is a bracket, and
+	# shellcheck reads "$pin[" as an array subscript (SC1087).
+	if grep -qE "[|] [*]{0,2}${pin}[*]{0,2} [|]" "$PINMAP"; then
 		ok "GPIO$pin appears in pin-map.md"
 	else
 		no "GPIO$pin appears in pin-map.md" \
 			"the overlay uses it and the document does not list it"
 	fi
-done
+done <"$WORK/pins"
 
 echo
 echo "--- cross-file: the fragment is entirely built in, as the image claims"
