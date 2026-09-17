@@ -242,7 +242,12 @@ while read -r pin; do
 	# them to suit a test.
 	#
 	# ${pin} rather than $pin: the next character is a bracket, and
-	# shellcheck reads "$pin[" as an array subscript (SC1087).
+	# the linter reads "$pin[" as an array subscript (SC1087).
+	#
+	# "the linter", not its name: a comment whose first word after the
+	# hash is that name is parsed as a directive, so writing it here
+	# raised SC1073 and SC1072 and turned the build red. A comment
+	# explaining a fix broke the tool the fix was for.
 	if grep -qE "[|] [*]{0,2}${pin}[*]{0,2} [|]" "$PINMAP"; then
 		ok "GPIO$pin appears in pin-map.md"
 	else

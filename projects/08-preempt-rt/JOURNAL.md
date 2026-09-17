@@ -3215,3 +3215,50 @@ what is actually the case: half the matrix is measured and the control it
 was measured against is wrong. Same failure as the `rt-capture` comment
 and the `image_build` comment, and the same cure, which is to re-read a
 claim against the thing rather than to trust that it aged well.
+
+## 59. A comment explaining a shellcheck fix broke shellcheck
+
+Three red CI runs, and the third was caused by the fix for the first two.
+
+`cb28e2c` and `f857a46` failed on the same two findings in
+`tests/explorer-overlay-test.sh`, both Project 6's: SC1087, where `$pin`
+followed by a bracket reads as an array subscript, and SC2013 on a
+`for x in $(grep ...)`.
+
+The SC2013 remedy is worth recording on its own, because the tool's own
+suggestion is a trap here. Shellcheck says to pipe into a `while read`
+loop. A `while read` at the end of a pipeline runs in a subshell, and this
+suite's `ok` and `no` increment shell variables, so every pass and fail
+that loop counted would have been discarded when the subshell exited. The
+suite would have reported a smaller total and no error. The loop reads
+from a file instead.
+
+Then `87b5241` failed on the comment written to explain the SC1087 fix:
+
+    # ${pin} rather than $pin: the next character is a bracket, and
+    # shellcheck reads "$pin[" as an array subscript (SC1087).
+
+**A comment whose first word after the hash is the tool's own name is a
+directive, not prose.** So it tried to parse `reads` as a directive key,
+raised SC1073 and SC1072, and failed the build. The explanation of the fix
+broke the tool the fix was for.
+
+Nothing local could say so. This host has no shellcheck, which has now cost
+four red runs, and the existing guards in `scripts/lint.py` cover SC2086
+and SC2120 because those were the previous two.
+
+So a third narrow rule, and this one is cheap to get right because a real
+directive has a closed set of keys, each followed by `=`. Any other first
+word on a `# shellcheck` line is prose that needs rewording. Proved in both
+directions by putting the exact defect back and watching it name the file,
+the line and the offending word.
+
+The footer that prints when shellcheck is absent said "only SC2086 and
+SC2120 are checked here", which stopped being true the moment the rule was
+added. Updated in the same commit, because a note about coverage that
+undercounts its own coverage is the same fault as the rest of this entry.
+
+Three shapes of the same thing in one afternoon, all in tooling meant to
+prevent mistakes. The legend test asserted presence where position was
+wrong. The `while read` remedy would have silenced a counter. And a comment
+became a directive. Every one of them looked correct while reading it.

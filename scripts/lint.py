@@ -498,6 +498,40 @@ def check_exec_bits() -> None:
     check_untracked_scripts()
 
 
+def check_shellcheck_directives() -> None:
+    """The third shellcheck finding this machine keeps shipping to CI.
+
+    A comment whose first word after the hash is the linter's own name is a
+    directive, not prose. So this, written to explain an SC1087 fix:
+
+        # shellcheck reads "$pin[" as an array subscript (SC1087).
+
+    is parsed as a directive with the key "reads", raises SC1073 and SC1072,
+    and fails the build. A comment explaining a fix broke the tool the fix
+    was for, and there is no shellcheck on the authoring host to say so.
+
+    A real directive is one of a closed set of keys followed by "=". Anything
+    else on that first word is prose that has to be reworded, and the fix is
+    always the same: name the tool anywhere except immediately after the
+    hash.
+    """
+    keys = ("disable", "enable", "source", "source-path", "shell",
+            "external-sources")
+    directive = re.compile(r"^\s*#\s*shellcheck\s+(\S+)")
+    for path in shell_files():
+        for number, line in enumerate(text(path).splitlines(), start=1):
+            match = directive.match(line)
+            if not match:
+                continue
+            word = match.group(1)
+            if any(word.startswith(key + "=") for key in keys):
+                continue
+            fail(path, f"line {number}: a comment starting '# shellcheck' is "
+                       f"parsed as a directive, and '{word}' is not one of "
+                       f"{', '.join(keys)}. Reword so the tool's name is not "
+                       f"the first word after the hash.")
+
+
 def check_untracked_scripts() -> None:
     """A new script has no index entry, so the check above cannot see it.
 
@@ -595,6 +629,7 @@ def main() -> int:
         check_src_uri,
         check_shell_exports,
         check_shell_unused_params,
+        check_shellcheck_directives,
         check_busybox_compat,
         check_src_uri_installed,
         check_image_packages,
@@ -627,8 +662,9 @@ def main() -> int:
     # the failure this repository keeps finding in its own tools. So it
     # says. One line, and it costs nothing on a host that has the tool.
     if not shutil.which("shellcheck"):
-        print("note: no shellcheck on this host, so only SC2086 and SC2120")
-        print("      are checked here. CI runs the real thing.")
+        print("note: no shellcheck on this host, so of its findings only")
+        print("      SC2086, SC2120 and SC1072/SC1073 are checked here.")
+        print("      CI runs the real thing.")
 
     print("lint: clean")
     return 0
