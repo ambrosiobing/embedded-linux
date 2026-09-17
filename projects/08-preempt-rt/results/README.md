@@ -136,6 +136,19 @@ to 3.5 percent while the generic pair spreads 22 percent, which is itself
 part of the result. A kernel that gives a more repeatable tail is making a
 different claim from one that gives a lower tail, and here it does both.
 
+**Neither arm had wireless.** The card was flashed without a
+`/boot/wifi.conf` and WiFi was never configured afterwards, so `wlan0`
+was down for all 18 rows on both kernels. That matters more than it
+sounds: an associated interface generates interrupts and softirqs on a
+schedule nobody in this experiment controls, and an arm that had it while
+the other did not would make every pair in the table unreadable. The
+earlier matrix did have that difference across its rows. This one does
+not have it at all.
+
+It is not the same as saying the radio is absent. The driver is in the
+image and its interrupt exists; what is missing is association and
+traffic.
+
 ## What the external instrument saw and the internal ones did not
 
 `ext_max_us` runs from 649.8 to 1229.7 across all 18 rows. `int_max_us`
