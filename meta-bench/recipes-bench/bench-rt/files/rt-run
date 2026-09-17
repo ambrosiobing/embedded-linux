@@ -262,6 +262,8 @@ if [ "$isolated" = yes ]; then
 		die "-i given, but this kernel has no
        $SYS/devices/system/cpu/nohz_full, so whether the tick was stopped
        on CPU $RT_CPU cannot be read. CONFIG_NO_HZ_FULL creates that file.
+       meta-bench/recipes-kernel/linux/files/rt-common.cfg asks for it.
+       Set BENCH_RT_LAB = \"1\" and rebuild, or drop -i for this row.
        Refusing rather than writing isolated=yes on a core that may still
        be taking the tick."
 	fi

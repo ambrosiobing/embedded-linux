@@ -254,7 +254,14 @@ build_sys() {
 	# the real board on 17 September: isolcpus took, the other two
 	# parameters were rejected, and this suite would have passed anyway
 	# because the only file it wrote was "isolated".
-	_nohz=${3:-${2:-}}
+	# ${3-...} and NOT ${3:-...}. The colon form substitutes the default
+	# when the argument is unset OR EMPTY, and "empty" is precisely the
+	# case this fixture has to be able to express: a kernel that has the
+	# nohz_full file and lists nothing in it, which is what isolcpus alone
+	# produces. With the colon, build_sys 1 "3" "" wrote "3" into the file,
+	# the guard in rt-run correctly declined to refuse a properly isolated
+	# core, and the test called that a bug in rt-run. It was a bug here.
+	_nohz=${3-${2:-}}
 	if [ "$_nohz" != absent ]; then
 		echo "$_nohz" >"$WORK/sys/devices/system/cpu/nohz_full"
 	fi
