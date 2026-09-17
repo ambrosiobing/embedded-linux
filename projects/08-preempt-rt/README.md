@@ -35,9 +35,25 @@ first to change the kernel itself.
 
 ## State
 
-**The image builds. No board has run it.** The Raspberry Pi has not been
-booted with this image, the HAT has never been on the header, and the
-results table below is empty on purpose: it has a schema and no rows.
+**Half the matrix is measured, and the control it was measured against is
+wrong.** On 17 September 2026 the Pi 4 ran the generic image with the
+MCC 118 on the header and produced the eight rows in
+[results/results.csv](results/results.csv). They are sound measurements of
+the stock Raspberry Pi kernel and they are not yet the comparison this
+project exists to make, because `kas/bench-rt-generic.yml` omits the whole
+kernel fragment rather than one symbol of it. The board said so on its
+serial console and nothing else could have: journal 57, decision 88.
+
+So the next cycle rebuilds both kernels with the fragment split, and the
+sixteen row matrix restarts. The eight rows stay, because a superseded
+measurement is still a measurement and deleting it is how a table comes to
+agree with its conclusion.
+
+The headline that survives either way: **under load, isolating the
+measured core takes worst-case wake-up from 277 to 488 us down to 99 to
+125 us**, and that is with `isolcpus` alone, because the kernel rejected
+`nohz_full` and `rcu_nocbs` for want of the config symbols that the
+omitted fragment would have supplied.
 
 `bench-rt-image` was built on 16 September 2026, 78 MB compressed, with
 `CONFIG_PREEMPT_RT=y` verified in the `.config` before the compile began.
@@ -95,9 +111,14 @@ the places where this departs from the original scope on purpose.
 
 **No image is published.** `bench-rt-image` was built here on 16 September
 2026, 78 MB compressed, and it is not downloadable from this repository:
-`.gitignore` excludes `*.wic*` on purpose. Nor would having it help much
-yet, because no board has run it, so nothing downstream of the boot has
-been observed.
+`.gitignore` excludes `*.wic*` on purpose.
+
+**What the board produced is published.** The generic half of the matrix
+ran on 17 September 2026 and its eight rows, twenty-four histograms,
+figures and provenance are in
+[results/2026-09-17_5ec99fd-dirty/](results/2026-09-17_5ec99fd-dirty).
+The figures regenerate from those histograms with `./go plot`, so nothing
+in them has to be taken on trust.
 
 **If the software and the method are what interest you, no HAT is
 required.** Three test suites and two static checks run on any machine, and
@@ -267,14 +288,73 @@ cost, which is criterion 5. Criterion 5 needs the series RC.
 
 ## Results
 
+Eight of the sixteen rows are measured. The generic half was taken on
+17 September 2026 and lives in
+[results/results.csv](results/results.csv), with its histograms, figures
+and a full provenance note in
+[results/2026-09-17_5ec99fd-dirty/](results/2026-09-17_5ec99fd-dirty).
+
+**Read that provenance file before quoting any number from this half.** It
+records three things that qualify every row: the board ran a hand-patched
+`rt-capture`, the control kernel is not one symbol away from the real-time
+one, and the isolated rows carry `isolcpus` only because the kernel
+rejected `nohz_full` and `rcu_nocbs`. These are measurements of the stock
+Raspberry Pi kernel, which is a real baseline, and not yet the controlled
+comparison the matrix is for.
+
+### Isolation is the whole story on this board
+
+![cyclictest wake-up latency under load](results/2026-09-17_5ec99fd-dirty/cyclictest-loaded.svg)
+
+Two 60 second runs at 1 kHz, `stress-ng --cpu 3 --vm 2 --vm-bytes 128M
+--hdd 1` on the housekeeping cores in both. The count axis is logarithmic
+because 99 percent of the samples sit in the first few bins and the
+argument is entirely in the tail.
+
+| | `cyc_avg_us` | `cyc_max_us` | `int_max_us` |
+|---|---|---|---|
+| stock, loaded | 14 | 277 | 324 |
+| `isolcpus` + IRQ affinity, loaded | 6 | **116** | 151 |
+
+The four configurations together, idle and loaded:
+
+![cyclictest wake-up latency, four configurations](results/2026-09-17_5ec99fd-dirty/cyclictest-isolation.svg)
+
+The worst case across the eight rows, in order taken:
+
+| Row | Isolation | Affinity | Governor | Load | `cyc_max_us` |
+|---|---|---|---|---|---|
+| 1 | no | no | ondemand | no | 77 |
+| 2 | no | no | ondemand | yes | 277 |
+| 3 | no | no | performance | yes | 488 |
+| 4 | no | yes | performance | yes | 483 |
+| 5 | **yes** | no | performance | yes | 99 |
+| 6 | **yes** | yes | performance | no | **42** |
+| 7 | **yes** | yes | performance | yes | 116 |
+| 8 | **yes** | yes | force_turbo | yes | 125 |
+
+Under load, 277 to 488 us without isolation and 99 to 125 us with it.
+Governor and IRQ affinity move nothing outside the run-to-run spread, and
+that spread is itself larger than the effect: rows 2, 3 and 4 differ only
+in settings that should not matter and their `int_max_us` reads 324, 277
+and 514. A maximum is a single observation of a rare event, so the rows
+that matter need repeats before any of them is quoted as a figure.
+
+### Regenerating the figures
+
 ```
-projects/08-preempt-rt/results/results.csv
+./go plot -o FIG.svg -t TITLE FILE[:LABEL] ...
 ```
 
-Empty, with a header. The schema is documented in
-[results/README.md](results/README.md), and the file on the board lives at
-`/var/lib/bench/rt/results.csv`; copying it here is the last step of the
-matrix.
+They are generated from the instrument's own histogram files and never
+drawn by hand, so a figure can always be traced back to the capture that
+produced it. See decision 86.
+
+### The schema
+
+The schema is documented in [results/README.md](results/README.md), and
+the file on the board lives at `/var/lib/bench/rt/results.csv`; copying it
+here is the last step of a campaign.
 
 The sixteen rows the matrix is made of:
 

@@ -1,0 +1,112 @@
+What:   The generic half of the Project 8 matrix. Eight rows and their
+        three histograms each, taken on 17 September 2026 between 04:23
+        and 05:09 UTC.
+
+Board:  Raspberry Pi 4 Model B Rev 1.4, MCC 118 stacked on the 40 pin
+        header, toggle line on header pin 38 to the DAQ input. Powered
+        from its own supply. Serial console on ttyS0 at 115200 8N1
+        throughout, which is how three of the findings below were seen.
+
+Image:  bench-rt-image, kas/bench-rt-generic.yml, MACHINE raspberrypi4-64,
+        commit 5ec99fd with a dirty tree, archived as
+        proj08-bench-rt-generic/2026-09-16_5ec99fd-dirty, built stamp
+        20260916175406.
+
+        The dirty tree is one file: meta-bench/recipes-bench/bench-rt/
+        files/rt-run taken from origin/main rather than by pulling, to
+        avoid an unrelated kernel rebuild. See journal 54.
+
+Why this directory is named after the image rather than the date alone:
+        the results.csv image_build column cannot identify the image.
+        It reads /etc/timestamp, which reproducible builds pin to
+        20180309123456 on every image this repository produces. The
+        column is a constant. Provenance therefore lives here.
+
+THREE THINGS THAT QUALIFY THESE ROWS
+====================================
+
+1.  The board ran a hand-patched rt-capture that does not match the
+    flashed image.
+
+    The shipped rt-capture ran at ordinary priority against stress-ng on
+    the same three cores, and its ring buffer overran twice, at 1480000
+    and at 120000 samples. Rows 2 onward were taken after adding
+
+        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(60))
+
+    before a_in_scan_start, applied on the board with the original kept
+    at /usr/bin/rt-capture.orig. Row 1 predates the patch and did not
+    need it, having no load.
+
+2.  The control kernel is not one symbol away from the real-time one.
+    It is the whole fragment away.
+
+    kas/bench-rt-generic.yml sets BENCH_RT_KERNEL = "0", and the bbappend
+    adds rt.cfg only when that is "1", so the generic build carries none
+    of EXPERT, PREEMPT_RT, IRQ_FORCED_THREADING, HIGH_RES_TIMERS,
+    NO_HZ_FULL, CPU_ISOLATION, RCU_NOCB_CPU or
+    CPU_FREQ_DEFAULT_GOV_PERFORMANCE.
+
+    These rows are therefore measurements of the stock Raspberry Pi
+    kernel, which is a real and useful baseline, and not of a control
+    that differs from the experiment in one variable. Journal 57.
+
+3.  The isolated rows carry isolcpus only.
+
+    nohz_full=3 and rcu_nocbs=3 were placed in cmdline.txt and rejected
+    by the kernel, which said so on the console and nowhere else:
+
+        Housekeeping: nohz unsupported. Build with CONFIG_NO_HZ_FULL
+        Unknown kernel command line parameters "nohz_full=3 rcu_nocbs=3"
+
+    So isolated=yes in these rows means the scheduler was kept off CPU 3.
+    The timer tick and that core's own RCU callbacks remained.
+
+COLUMNS TO READ WITH CARE
+=========================
+
+ext_max_us      Untrustworthy in any row that lost edges. A dropped edge
+                merges two periods and manufactures a deviation nothing
+                experienced. Compare ext_edges against 30000 first: the
+                idle rows lose 0 and 1, the loaded rows lose 6 to 1034,
+                and the disagreement with int_max_us tracks that exactly.
+
+ext_sd_us       Sound, but floored by quantisation. subsample_fraction is
+                about 0.15, so the per-edge resolution is one sample
+                period, 10 us, contributing roughly 2.9 us on its own.
+                The write-path figure of 2.212 us in the idle tuned row
+                sits at or below that floor and is not a measurement.
+
+ext_ppm         Not a clock measurement. It is derived from the mean
+                period, and a run that loses a contiguous block of edges
+                reports a mean over a shortened span. It flipped sign
+                between two comparable rows three minutes apart.
+
+cyc_max_us      Trustworthy. Read from cyclictest's own
+                "# Max Latencies:" line, which counts every sample. Note
+                that the console summary printed beside it derives from
+                the -h 400 histogram and saturates near 392.5, so the two
+                disagree above 400 us and the column is the honest half.
+
+governor        Says ondemand in the force_turbo row. That is the
+                column's fault, not the board's: force_turbo pinned
+                scaling_min_freq and scaling_max_freq both to 1500000, so
+                cpufreq had one frequency to choose from while still
+                calling itself ondemand.
+
+CONDITIONS
+==========
+
+Network:   wlan0 on a phone hotspot, 192.168.92.85. Time sync active, so
+           the Pi's clock was being disciplined during runs.
+Thermal:   no throttling in any row, throttled_before and throttled_after
+           both 0x0 throughout. Idle around 52 C, peaking at 65.7 C
+           during the loaded rows.
+Monitor:   rows 5 to 8 were taken with a two second temperature, throttle
+           and clock monitor running on the serial console. Rows 1 to 4
+           were not. Small, but it is a difference.
+Reboots:   rows 1 to 4 on one boot, rows 5 to 7 on a second after adding
+           isolcpus, row 8 on a third after adding force_turbo. KASLR is
+           enabled, so kernel layout differs per boot and that variation
+           is inseparable from isolation in this design. The fix is to
+           reboot before every row, and it is on the list.

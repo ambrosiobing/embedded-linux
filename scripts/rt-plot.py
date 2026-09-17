@@ -154,7 +154,13 @@ def escape(text):
 def build_svg(series, title, xlabel):
     """series is a list of (label, {bin: count}) in draw order."""
     plot_width = WIDTH - MARGIN_LEFT - MARGIN_RIGHT
-    plot_height = HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
+
+    # A legend needs a band of its own. Without this the legend swatches
+    # are drawn 4 px below the x axis label and overlap it, which the
+    # first real figure showed and no test would have: every assertion
+    # about the legend asks whether it is present, and it was.
+    margin_bottom = MARGIN_BOTTOM + (20 if len(series) > 1 else 0)
+    plot_height = HEIGHT - MARGIN_TOP - margin_bottom
 
     lows = [min(bins) for _, bins in series]
     highs = [max(bins) for _, bins in series]

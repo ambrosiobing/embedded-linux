@@ -130,6 +130,22 @@ contains "two series name the first" "$svg" ">generic<"
 contains "two series name the second" "$svg" ">real-time<"
 contains "two series use the second hue" "$svg" "#eb6834"
 
+# The legend was drawn 4 px below the x axis label and overlapped it on
+# the first real figure. Every assertion above passes on that layout,
+# because each asks whether the legend is present and it was. Geometry
+# needs a geometric assertion: the swatch must sit clear of the label.
+#
+# Before the fix: label y=344, swatch y=339, so the swatch was above the
+# label. After: label y=324, swatch y=339.
+"$PYTHON" "$SUT" -o "$WORK/lay.svg" -x "XAXISLABEL" \
+	"$WORK/toggle.txt:a" "$WORK/cyclictest.txt:b" 2>/dev/null
+label_y=$(sed -n 's/.*y="\([0-9.]*\)"[^>]*>XAXISLABEL<.*/\1/p' "$WORK/lay.svg")
+swatch_y=$(sed -n 's/.*<rect x="[0-9.]*" y="\([0-9.]*\)" width="10" height="10".*/\1/p' \
+	"$WORK/lay.svg" | head -n 1)
+verdict=$(awk -v a="$label_y" -v b="$swatch_y" \
+	'BEGIN { print (a != "" && b != "" && b > a + 4) ? "clear" : "overlapping" }')
+check "the legend sits clear of the x axis label" "$verdict" "clear"
+
 # ------------------------------------------- the defect the first render had
 #
 # log10(1) is 0, so the obvious mapping puts a one-sample bin at the same

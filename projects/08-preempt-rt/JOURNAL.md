@@ -3147,3 +3147,71 @@ The four generic rows already taken are not discarded. They are valid
 measurements of a named system, the stock Raspberry Pi kernel, and they
 are the evidence for why the split was needed. Decision 81 says every
 attempt is recorded and stays recorded until it is superseded.
+
+## 58. The results came back over a zip, and the first real figure had a bug the tests could not see
+
+The two laptops share no filesystem and GitHub is the only bridge, which
+is fine for text and useless for 348 MB. So the generic half travelled as
+a zip: the four archived images, the Project 15 card copy, and both
+results sets. Unpacked here, the images went to the Desktop beside
+Project 15's, and the results into the repository.
+
+**Where the results live, and why the directory is named after the image.**
+
+    projects/08-preempt-rt/results/2026-09-17_5ec99fd-dirty/
+
+One directory per campaign, named the way `./go archive` names a stored
+image, because the column that was supposed to carry that information
+cannot. `image_build` reads `/etc/timestamp`, which reproducible builds
+pin to a constant. So provenance lives in the path and in a
+`PROVENANCE.txt` beside the data, which states the three things that
+qualify every row in it: the hand-patched `rt-capture`, the control that
+is a whole fragment rather than one symbol away, and the isolated rows
+carrying `isolcpus` only. It also lists which columns to distrust and why,
+because a reader six months from now will have the numbers and none of
+this conversation.
+
+`results/results.csv` carries the eight rows as the running log, and the
+campaign directory holds a snapshot of the same rows beside their
+twenty-four histograms.
+
+**The first figure generated from real instrument files had a layout bug,
+and 23 passing assertions said nothing about it.** The legend was drawn
+four pixels below the x axis label and overlapped it. Every legend
+assertion in the suite asks whether the legend is *present*, and it was:
+the swatch was there, both labels were there, the second hue was there.
+Nothing asked where.
+
+The fix is a band of its own, twenty pixels of extra bottom margin when
+there is more than one series. The test that now guards it is geometric
+rather than lexical: extract the y of the axis label and the y of the
+first legend swatch and assert the swatch sits below it. Proved in both
+directions by reverting the fix in a copy, which reports label y=344 and
+swatch y=339, overlapping.
+
+That is the third distinct shape of this repository's recurring fault.
+A check that selects its own input and does not say so. A guard that
+refuses without naming its evidence. And now a check that asks the
+question it can express rather than the question that matters: presence is
+easy to assert and position is what was wrong.
+
+**What the figures show.** Two were generated, both from the cyclictest
+histogram files the board wrote, neither drawn by hand. The two-series one
+is the headline: stock kernel against `isolcpus` plus IRQ affinity, both
+under `stress-ng`, on a logarithmic count axis. The stock tail runs from
+about 120 us out past 230 while the isolated one stops at 116. The
+four-series one adds the idle rows and shows the same thing in a 2 by 2.
+
+A detail worth recording about the figures: the histogram files clip at
+400 us, so the drawn tail of row 2 ends short of the 277 in its own CSV
+column, and the drawn tail of row 3 ends far short of its 488. The figures
+understate the stock kernel's worst case. The table beside them does not,
+and the README says which to trust.
+
+**The README's own State section had gone false.** It opened with "The
+image builds. No board has run it", which was true when written on
+16 September and stopped being true at 03:55 on the 17th. Rewritten to say
+what is actually the case: half the matrix is measured and the control it
+was measured against is wrong. Same failure as the `rt-capture` comment
+and the `image_build` comment, and the same cure, which is to re-read a
+claim against the thing rather than to trust that it aged well.
