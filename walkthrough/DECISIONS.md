@@ -2627,3 +2627,67 @@ and neither corrected the other.
 **Consequence.** Generalises past this column. Wherever a check reads a
 name to infer a capability, the name can survive the capability. Read the
 constraint.
+
+## 92. A package in the manifest is not a file on a path
+
+`linux-firmware-rpidistro-bcm43455` was named in the image recipe, its
+licence flag was accepted in the kas file, and it appears in the manifest
+of all three archived images. The radio still did not work, because the
+package installs under `/usr/lib/firmware` and the kernel's firmware
+loader searches `/lib/firmware`, and on this image `/lib` is a real
+directory rather than a symlink.
+
+Every artefact the build produces answers "was this installed". None of
+them answers "can the thing that needs it find it". Those are different
+questions and the second one is the one that matters on the board.
+
+The general form: a check that reads the build's own records can only
+confirm the build's own intentions. `./go ksym` and `./go kconfig` already
+carry this lesson for kernel symbols, where the journal puts it as "did
+what I asked for arrive" against "did I ask for what I needed". This is
+the same gap one layer out, and it is worse here, because a missing symbol
+eventually produces a message and a misplaced file produces ENOENT
+attributed to the file rather than to the path.
+
+Verify on the target, by the path the consumer uses.
+
+## 93. A setter that cannot validate its value reports success for a file nothing can read
+
+`bench-wifi-setup` reads `PSK=` from the boot partition and writes
+`psk=%s` into a wpa_supplicant configuration. Unquoted, `psk=` means a 64
+character hex key, so a bare passphrase is rejected and the whole network
+block fails to parse. The script's own header documents the requirement.
+The script does not enforce it, prints `configured wlan0 for ...`, and
+exits 0.
+
+The card then holds a credential file that looks right, a setup service
+that reports success at every boot, and a supplicant that dies on startup
+with the real message buried in a unit nobody reads.
+
+A program that transforms a value into a format with rules should either
+validate against those rules or normalise into them. Accepting anything
+and passing it through is the option that produces a confident wrong
+answer, and a confident wrong answer costs more than a refusal.
+
+## 94. When the fix needs a rebuild, stop diagnosing on the board
+
+The radio firmware was on the wrong path. That is fixed in an image
+recipe. It cannot be fixed from a serial console, and once the cause was
+known every further command on the board was diagnosis for its own sake.
+
+It ran anyway, through four wrong hypotheses, a BusyBox option that does
+not exist, three log excerpts pasted into the shell because they were in
+fenced blocks, and finally a repair that destroyed the credential it was
+meant to quote. It stopped when Joseph said it was not converging, which
+it was not.
+
+The rule is about the moment the class of fix becomes clear rather than
+about patience. Once a defect is known to live in a build, the console has
+nothing left to contribute, and the next step is to write it down and
+rebuild. Carrying on costs the thing that was still working.
+
+The corollary, learned the hard way on the same evening: **a repair to a
+file holding a credential is not a diagnostic step.** It cannot be undone
+from anything in the repository, by design, because the image carries
+capability and the card carries identity. Read it, record what it should
+say, and let the person who owns the credential write it.

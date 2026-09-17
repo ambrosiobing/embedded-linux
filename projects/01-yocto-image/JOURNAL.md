@@ -836,10 +836,111 @@ lives only in a diff is a convention that lasts one project.
 
 ---
 
+## 25. The radio was in the image, in the manifest, and on a path the kernel never searches
+
+Found on 17 September 2026 while trying to get the board back on the
+network after Project 8's matrix. It took about an hour, it did not
+converge, and most of what is worth keeping is about how it was chased
+rather than about the defect.
+
+**The symptom.** `ip addr show wlan0` answered `can't find device`. Not a
+down interface: no interface at all.
+
+**Four wrong hypotheses, in order, each one disproved by the next
+command.** That the card had been flashed without a `/boot/wifi.conf`.
+That `bench-wifi-setup` had failed. That the licence flag for the
+proprietary firmware had not been accepted, so the package never built.
+That the two kernels sharing `/lib/modules/6.12.93-v8` had overwritten
+each other's modules. Every one of them was plausible, every one was
+wrong, and the fourth was wrong even though the collision it describes is
+real and still open.
+
+**What it actually was.** `brcmfmac` loaded, found the chip, asked for
+`brcm/brcmfmac43455-sdio.bin` and got ENOENT. The firmware is in
+`/usr/lib/firmware/brcm/`. The kernel's firmware loader searches
+`/lib/firmware`. On this image `/lib` is a **real directory**, not a
+symlink to `/usr/lib`, so the two never meet.
+
+Proved at runtime without a rebuild, which is the part worth keeping:
+
+    echo -n /usr/lib/firmware > /sys/module/firmware_class/parameters/path
+    modprobe -r brcmfmac; modprobe brcmfmac
+
+and `wlan0` appeared, with the firmware announcing itself as
+`BCM4345/6 wl0 version 7.45.265`.
+
+**The recipe was right the whole time.** `bench-image.bb` names
+`linux-firmware-rpidistro-bcm43455` and both driver modules.
+`bench-rpi4.yml` accepts `synaptics-killswitch`. All three archived images
+list the package in their manifests. Every artefact said the radio was
+installed and the radio was installed. A manifest records what was put
+into an image and says nothing about whether anything can find it.
+
+**A second defect in the same output.** `regulatory.db` also fails with
+ENOENT and does not come back when the path is changed, so it is not in
+the image at all. `cfg80211` falls back to the built-in world domain,
+which is why the `country=` string in the supplicant config is currently
+moot. `wireless-regdb` is missing.
+
+**A third, in `bench-wifi-setup`.** It writes `psk=%s` verbatim. An
+unquoted value means a 64 character hex key to wpa_supplicant, so a bare
+passphrase is rejected and the network block fails to parse. The script's
+own header documents that a passphrase must be wrapped in double quotes
+and the script does not check, then prints `configured wlan0 for ...` and
+exits 0. The card on this bench had a bare 12 character passphrase, so
+this image could not have associated even with the firmware present.
+
+**And a fourth, which was mine.** `sed -i 's/^PSK=\(.*\)$/PSK="\1"/'`
+on the FAT partition was supposed to add those quotes. Afterwards
+wpa_supplicant reported `psk '""'`, an empty quoted string: the value was
+gone. A repair turned into damage on a file holding a credential that is
+not recoverable from anywhere in this repository, by design. The measured
+length was 16 characters before and the quotes were empty after, and the
+step in between is not explained.
+
+### What this cost, and the rule that comes out of it
+
+The honest move an hour earlier was to say **this needs a rebuild, so
+stop**. The firmware path cannot be fixed from a console. Once that was
+clear, every further command on the board was diagnosis for its own sake,
+and it ran until Joseph said it was not converging, which it was not.
+
+Two smaller things that cost real round trips:
+
+- **The board is BusyBox.** `head -20` fails and needs `head -n 20`.
+  `cat -A` does not exist. `sed -n l` prints nothing. Three exchanges went
+  on GNU habits rather than on the board.
+- **Log output in a fenced block gets pasted into the shell.** It happened
+  three times, because a fence reads as "run this". Quote log lines
+  inline, and reserve fences for commands.
+
+### What has to change in the image
+
+Both need a build and neither is done:
+
+- A `/lib/firmware` symlink to `${libdir}/firmware` in `bench-image.bb`,
+  next to the comment that already explains why the driver and the
+  firmware are both named there. That comment records half of this
+  lesson. This is the better half, because "firmware present, driver
+  present, and still no radio" is the failure that looks like nothing is
+  wrong.
+- `wireless-regdb`, so `cfg80211` has a database to read.
+
+And `bench-wifi-setup` should accept 64 hex characters bare, accept an
+already quoted value, quote a bare passphrase of 8 to 63 characters
+itself, and refuse anything else by name.
+
 ## Still open
 
 **Project 01 is complete.** Eleven of eleven criteria met, four evidence
 artefacts captured in `docs/evidence/`.
+
+**Three image defects found on 17 September 2026 and not yet fixed**, all
+of them needing a rebuild. Entry 25 has the detail. `/lib/firmware` is not
+a symlink to `${libdir}/firmware`, so the radio firmware is installed and
+unreachable. `wireless-regdb` is absent. And `bench-wifi-setup` writes a
+passphrase through unvalidated, so an unquoted one is rejected by
+wpa_supplicant while the setup script reports success.
 
 Two optional transcripts remain, and neither changes a result:
 
