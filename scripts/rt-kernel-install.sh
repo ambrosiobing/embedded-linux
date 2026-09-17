@@ -86,6 +86,22 @@ write_block() {
 		echo "# The device tree below is this board's, recorded by"
 		echo "# install in rt/DTB. A Pi 4 name on a Pi 3 card is a"
 		echo "# board that does not boot and does not say why."
+		echo "#"
+		echo "# arm_64bit=1 is here because kernel= is here. The"
+		echo "# firmware infers the architecture from the DEFAULT"
+		echo "# kernel name, and kernel8.img is one of the names it"
+		echo "# knows; kernel8-rt.img is not, so it is loaded as"
+		echo "# 32-bit, the arm64 image is not a valid 32-bit one,"
+		echo "# and the board produces no console output at all."
+		echo "# That cost an evening on 17 September, bisected to"
+		echo "# kernel alone with no dtb and no overlays, which"
+		echo "# booted only once this line was present."
+		echo "#"
+		echo "# It is written in BOTH branches on purpose. Selecting"
+		echo "# generic must not remove a line the next select rt"
+		echo "# depends on, and on a 64-bit image it is correct for"
+		echo "# the stock kernel too."
+		echo "arm_64bit=1"
 		if [ "$want" = rt ]; then
 			echo "kernel=kernel8-rt.img"
 			echo "device_tree=rt/$dtb"
@@ -102,6 +118,10 @@ write_block() {
 
 	mv "$tmp" "$config"
 }
+
+# The host's depmod unless told otherwise. A cross build has its own, and
+# what it writes is an index for a kernel this host is not running.
+DEPMOD=${BENCH_DEPMOD:-depmod}
 
 do_install() {
 	boot=$1
@@ -264,6 +284,44 @@ $(find "$deploy" -maxdepth 1 -name 'bcm*.dtb' ! -name '*+git0*' \
 	if [ -n "$modules" ]; then
 		note "modules  $modules"
 		tar -xzf "$modules" -C "$root"
+
+		# A TARBALL IS NOT AN INSTALL. modules.dep is generated, not
+		# shipped, so a freshly extracted /lib/modules has the .ko
+		# files and no index. modprobe then reports that the module
+		# does not exist, for every module, while every module is
+		# sitting on the card: 1887 files present and none loadable,
+		# which is what this looked like on 17 September and which
+		# reads as a broken image rather than a missing step.
+		#
+		# The version comes out of the tarball rather than off the
+		# running kernel. The host is not the target, and on this
+		# project the two have deliberately different kernels.
+		kver=$(tar -tzf "$modules" |
+			# The leading ./ is optional: tar writes it when told to pack
+			# '.' and omits it when told to pack 'lib', and both
+			# spellings reach this from a real deploy directory. It is
+			# stripped first rather than matched optionally, because
+			# an interval needs braces and a comma and this expression
+			# would then need a delimiter that is neither.
+			sed -n -e 's,^\./,,' -e 's,^lib/modules/\([^/]*\)/.*,\1,p' |
+			head -n 1)
+		if [ -z "$kver" ]; then
+			note "warning: no lib/modules/VERSION/ inside $modules"
+			note "so depmod cannot be run and modprobe will report"
+			note "every module as not found. Run depmod on the board."
+		elif command -v "$DEPMOD" >/dev/null 2>&1; then
+			# BENCH_DEPMOD because the host's depmod is not always
+			# the right one: a cross build has its own, and this
+			# writes an index a different kernel will read.
+			"$DEPMOD" -b "$root" "$kver"
+			note "depmod   $kver"
+		else
+			note "warning: no depmod on this host, so modules.dep was"
+			note "not generated for $kver. Every modprobe on the board"
+			note "will report the module as not found even though the"
+			note "files are there. Run 'depmod -a' on the board once,"
+			note "then reboot."
+		fi
 	else
 		note "warning: no modules-*.tgz in $deploy"
 		note "The RT kernel will boot with no modules at all, which on"

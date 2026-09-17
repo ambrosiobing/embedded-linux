@@ -121,8 +121,34 @@ EOF
 		>"$_boot/cmdline.txt"
 }
 
+# A recording depmod, because this host has none and the CI host has a
+# real one. Stubbing it is the only way the assertion means the same
+# thing in both places, and it also makes the invocation itself
+# observable: -b ROOT and the version out of the tarball, not the
+# version this laptop happens to be running.
+mkdir -p "$WORK/bin"
+cat >"$WORK/bin/depmod" <<'EOF'
+#!/bin/sh
+echo "depmod $*" >>"$DEPMOD_LOG"
+# depmod -b ROOT VERSION, so $2 is the root and $3 the version.
+mkdir -p "$2/lib/modules/$3"
+echo "# written by the stub" >"$2/lib/modules/$3/modules.dep"
+EOF
+chmod +x "$WORK/bin/depmod"
+DEPMOD_LOG=$WORK/depmod.log
+: >"$DEPMOD_LOG"
+export DEPMOD_LOG
+
 run() {
-	BENCH_WORK=$WORK/bench sh "$SUT" "$@" 2>&1
+	PATH="$WORK/bin:$PATH" BENCH_WORK=$WORK/bench sh "$SUT" "$@" 2>&1
+}
+
+# The same, with no depmod anywhere. BENCH_DEPMOD names the binary, so a
+# name that does not exist reaches the same branch a host without depmod
+# does, without having to strip PATH down to nothing.
+run_without_depmod() {
+	PATH="$WORK/bin:$PATH" BENCH_DEPMOD=bench-no-such-depmod \
+		BENCH_WORK=$WORK/bench sh "$SUT" "$@" 2>&1
 }
 
 # ------------------------------------------------- a Pi 4 card, flat dtbo
@@ -167,6 +193,49 @@ contains "and the Pi 4 device tree" \
 check "the choice is recorded on the card" \
 	"$(cat "$boot/rt/DTB")" "bcm2711-rpi-4-b.dtb"
 
+# The firmware infers the architecture from the DEFAULT kernel name.
+# kernel8.img is a name it knows and kernel8-rt.img is not, so without
+# this line the RT image is loaded as 32-bit and the board produces no
+# console output whatsoever. Bisected on 17 September to kernel alone,
+# no dtb and no overlays, which booted only once the line was there.
+# ANCHORED, and counted rather than matched. The block writes a
+# comment explaining arm_64bit=1 immediately above the setting, so
+# an unanchored search of config.txt finds the word whether or not
+# the line is there. Proved by deleting the echo: the substring
+# form still passed.
+#
+# "|| true" because grep -c exits 1 when the count is zero, and
+# under set -e that ends the suite instead of failing one case.
+check "the block declares 64-bit explicitly, once" \
+	"$(grep -c '^arm_64bit=1$' "$boot/config.txt" || true)" "1"
+
+# modules.dep is generated, not shipped. Without depmod every modprobe
+# reports the module as not found while every .ko sits on the card.
+contains "depmod ran for the version inside the tarball" "$out" \
+	"depmod   6.12.93-rt"
+
+if [ -f "$root/lib/modules/6.12.93-rt/modules.dep" ]; then
+	ok "and modules.dep exists where modprobe looks for it"
+else
+	no "and modules.dep exists where modprobe looks for it"
+fi
+
+# The version is read from the tarball and not from the host, because on
+# this project the host deliberately runs a different kernel, and -b
+# points it at the card rather than at this laptop's own /lib/modules.
+contains "depmod was pointed at the card, not at the host" \
+	"$(cat "$DEPMOD_LOG")" "depmod -b $root 6.12.93-rt"
+
+# A host with no depmod must say what will happen on the board rather
+# than install a module tree nothing can load and report success.
+out=$(run_without_depmod install "$boot" "$root" "$deploy" || echo EXIT-FAILED)
+absent "a host without depmod still completes the install" "$out" "EXIT-FAILED"
+contains "and says modules.dep was not generated" "$out" \
+	"modules.dep was"
+contains "and says what modprobe will do on the board" "$out" \
+	"not found"
+contains "and says how to repair it there" "$out" "depmod -a"
+
 # ------------------------------------------------- a Pi 3 card
 #
 # The defect this pins: device_tree= was the literal Pi 4 name whatever the
@@ -199,6 +268,22 @@ out=$(BENCH_RT_DTB=bcm2710-rpi-3-b-plus.dtb \
 absent "BENCH_RT_DTB is accepted" "$out" "EXIT-FAILED"
 contains "and overrides the default" \
 	"$(cat "$boot3/config.txt")" "device_tree=rt/bcm2710-rpi-3-b-plus.dtb"
+
+# ------------------------------- selecting generic keeps arm_64bit
+
+# A select that removed this line would leave the NEXT select rt with a
+# config.txt that names a kernel the firmware then loads as 32-bit, and
+# the failure would appear one boot after the change that caused it.
+boot64=$WORK/boot64
+mkdir -p "$WORK/root64"
+make_card "$boot64"
+out=$(run install "$boot64" "$WORK/root64" "$deploy" || echo EXIT-FAILED)
+absent "install for the select test succeeds" "$out" "EXIT-FAILED"
+out=$(run select "$boot64" generic || echo EXIT-FAILED)
+check "selecting generic keeps the 64-bit declaration, once" \
+	"$(grep -c '^arm_64bit=1$' "$boot64/config.txt" || true)" "1"
+contains "and it still selects the stock kernel" \
+	"$(cat "$boot64/config.txt")" "kernel=kernel8.img"
 
 # ------------------------------------------------- select reads the card
 #
