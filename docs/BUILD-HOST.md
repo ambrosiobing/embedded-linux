@@ -146,3 +146,26 @@ A shell script that arrives with CRLF endings fails with a confusing
 ```sh
 tar czf embedded-linux-bench.tar.gz embedded-linux-bench
 ```
+
+## Test suites that cannot pass on the Windows authoring host
+
+`tests/` is run in CI on Linux, where all of it passes. Four suites
+cannot pass on the Windows laptop the repository is authored from, and
+the reasons are recorded here so that a failure is read as a host
+limitation and not as a defect. Run them in CI, or in WSL, before
+believing a failure.
+
+| Suite | Why |
+|---|---|
+| `rt-plot-test.sh` | MSYS converts a plain path argument to a Windows path before a native executable sees it, but leaves `FILE:LABEL` alone, because the colon makes it look like a path list. `rt-plot.py` takes its inputs in exactly that form, so a native Python receives `/tmp/...` and cannot open it. Verified directly: passing `/tmp/x/a.txt:generic` and `/tmp/x/b.txt` to Python in one command converts the second and not the first. The suite exits 1 with no output at all, which is the confusing part |
+| `sensorhub-cabi-test.sh` | needs `gcc`. It says so and points at `scripts/host-setup.sh` |
+| `lte-watchdog-test.sh` | 7 passed, 18 failed on this host. The watchdog never writes `metrics.prom`, so most assertions compare against an empty string. **Not diagnosed** |
+| `lte-exporter-test.sh` | several parse assertions fail and the suite ends without printing a summary. **Not diagnosed** |
+
+The two `lte-*` entries are honest ignorance rather than a known
+limitation. They are listed so that a sweep of every suite on this host
+has an expected result to compare against, which is what makes a NEW
+failure visible.
+
+Everything else passes here: 32 suites clean as of 17 September 2026,
+including all of the Project 8 tooling except the plotter.
