@@ -218,3 +218,154 @@ number rather than at this file.
 The expected SPL banner in `docs/BRINGUP.md` moved with it. A milestone
 that names a version is a claim, and it was one line away from being a
 stale one.
+
+## 8. The session itself: forks, dead ends, and what transfers
+
+Entry 7 records what was wrong with the code. This one records how the day
+went, because the reusable part of a bring-up is rarely the bring-up.
+
+Project 2 went from nothing to a pushed, tested, half-built project in one
+sitting. The order below is the order it happened in.
+
+### Timeline
+
+| Step | What |
+|---|---|
+| 1 | specification read in full, 351 lines of it, before a file existed |
+| 2 | two scoping questions asked: is the hardware here, and where does a project with no Yocto live |
+| 3 | DESIGN.md, four figures redrawn as text, ownership table |
+| 4 | toolchain.env, both build scripts, both fragments |
+| 5 | guard ordering fixed after it proved unreachable on this laptop |
+| 6 | flash-emmc.sh, then its test, then two changes to the code the test forced |
+| 7 | sdcard.sh, its test, and four failed attempts at one negative test |
+| 8 | mkrootfs.sh, fel-boot.sh, overlay, README, JOURNAL, BRINGUP |
+| 9 | committed and pushed, 18 files, CI green after one SC2154 fix |
+| 10 | ./go neo-air added, because the repository claims one entry point |
+| 11 | disk and archive inventory, on request rather than on habit |
+| 12 | toolchain installed, three failures before one object compiled |
+| 13 | UBOOT_TAG moved, reason recorded beside the number |
+
+### The forks, and what was not chosen
+
+**Where does a project with no Yocto live?** Options were a separate
+neo-air-mainline repository, which is what the specification literally
+names, or `projects/02-neo-air-mainline/` inside the bench. Chose inside,
+because Project 4 already keeps scripts under `projects/` so there was
+precedent, and because a second repository means a second CI, a second
+journal and a second place to forget. The cost showed up hours later:
+`./go` had nothing to dispatch to, which is what produced the
+`./go neo-air` target.
+
+**Where do sources and artefacts go?** The specification puts an `out/`
+directory in the project. Chose `$NEO_WORK` outside the checkout instead,
+which is a direct departure from the text. The reason is in `.gitignore` at
+length: a build tree inside the checkout once made every archived image in
+this repository claim a dirty tree, so the provenance was wrong about the
+one thing it exists to get right. A specification is a starting point, and
+this repository has already paid for the other answer.
+
+**How is the PARTUUID placeholder written?** Three candidates. Leave the
+field absent. Ship a plausible value copied from a previous card. Ship
+something that cannot possibly work. Chose the third,
+`root=PARTUUID=FILLED-BY-FLASH-EMMC`. Absent and plausible both fail late
+and quietly; a value that cannot parse fails at the first boot with the
+reason on the console, and the console is the only way into this board.
+
+**Should `./go neo-air` be a case block in `go` or its own dispatcher?**
+`go` is deliberately thin, one line per target, and a six-way case block
+would have been its first exception. Chose a dispatcher in the project
+directory plus one line in `go`. That also gave somewhere to put the disk
+guard and the `toolchain.env` sourcing, which removed the two things a
+caller previously had to remember and get right.
+
+**Patch, pin the host, or move the tag?** When SWIG 4.4 refused to build
+v2024.10's vendored dtc, all three were available. Patching a vendored tree
+inside a pinned tag makes the pin a lie. Holding the host's SWIG back makes
+the build depend on an apt pin nothing in this repository can state. Moving
+the tag leaves one honest number in one file, so that is what happened, and
+the reason lives next to the number rather than only in this journal.
+
+### Dead ends, all of them environmental
+
+Four attempts went into proving one assertion in `neo-air-sdcard-test.sh`,
+and not one of them failed for a reason about the code:
+
+1. `/tmp` in Git Bash is a Windows path that native Python cannot open.
+2. A Windows-style `TMPDIR` makes `mktemp -d` return `C:/Users/...`, and a
+   Windows path in `PATH` is never searched. The stubs were therefore
+   ignored and the real `dd` ran against `/dev/mmcblk1`. It was noticed
+   only because that device does not exist on aquamarine and the kernel
+   answered `Permission denied`.
+3. Matching exact blocks of text across a heredoc was fragile. Line numbers
+   were not.
+4. `sdcard.sh` locates the overlay relative to its own directory, so
+   copying the script alone into a scratch folder broke it. The whole
+   project tree has to be mirrored.
+
+The second is the one to keep. **A test harness whose stubs are silently
+absent from PATH does not fail. It runs the real tools.** That is worse
+than a broken test, because a broken test is loud.
+
+A fifth dead end happened while writing this very entry: a shell heredoc
+carrying the text failed to parse and wrote nothing. The skill already says
+to use a file rather than a heredoc for anything long, and the second
+attempt did that.
+
+### The tally nobody wants
+
+Four guards have now refused on evidence they should not have, and the
+fourth was written the day after the decision naming the pattern:
+
+| Guard | Refused because | Should have |
+|---|---|---|
+| require_no_running_build | a pgrep matched an idle BitBake server | matched the client invocation, and printed the pid |
+| newest_path | it ranked a symlink against its own target | resolved with readlink -f first |
+| kas.sh | a configuration name lacked a bench- prefix | accepted both spellings, as its own helper promises |
+| uboot/build.sh | merge_config.sh said "redefined" | not parsed that output at all |
+
+The fourth is the instructive one. The word "redefined" appeared on the
+single most important line in the fragment, the one that makes U-Boot see
+the eMMC, and the guard treated the fragment doing its job as failure.
+Writing a decision about a pattern is not the same as not repeating it.
+
+### Two habits that had to be asked for
+
+**Check the disk before proposing a build.** Not after it fails. The number
+that matters under WSL is the Windows one, and today it read 24.75 GB free
+while the guest claimed 917. Project 2 costs about 10 GB, so the right
+answer was to build and delete nothing, which is only knowable by asking
+first. Project 2's build entry point had no disk guard at all while the
+Yocto side has had one since a build filled a 254 GB drive and took the
+filesystem read-only.
+
+**Check what is archived before proposing a deletion.** Three read-only
+commands found that the pair of images the entire Project 8 matrix was
+measured on existed only inside the VHDX. Safe from `./go clean`, not safe
+from the virtual disk this bench has already compacted, filled to
+read-only and rebuilt. The distinction had never been written down: an
+image in `~/bench/images` reads as archived and is one tier short of it.
+976 MB of rsync closed the gap.
+
+**And name the machine in every command.** Two laptops, one repository
+name, one directory name, similar prompts. Saying "that laptop" makes the
+reader decode before they can act. Both identifiers are now a table in the
+skill: aquamarine authors, JPTOUPM678 builds.
+
+### What transfers, and where it went
+
+The bring-up specifics stay with the NEO Air. These do not:
+
+| Learning | Recorded as |
+|---|---|
+| A test stub captures everything the program consumes, not only argv. sfdisk is configured on stdin, and the most important number in this project was invisible to a stub that recorded arguments | decision 98 |
+| A placeholder that cannot work beats a value that might. Impossible fails once and loudly; plausible-but-stale fails later, quietly, somewhere else | decision 99 |
+| A pinned input against a moving host: move the number and record why, beside the number. Never patch inside the pin, never depend on a host pin the repository cannot state | decision 100 |
+| Configuration errors are refused before the environment is probed, so guards stay reachable on machines that cannot run the build | both build scripts, and entry 3 |
+| Check the disk, and the archive, before proposing a build or a deletion | the skill, with the cost table and the two tiers of safe |
+| Name the machine in every command, by identifier | the skill, as a table |
+
+The first is the one worth the most. Every test in this repository that
+uses recording stubs has the same exposure, and the failure mode is not a
+false pass. It is a **false accusation**: a correct program reported as
+broken, whose natural fix on the next reading is to weaken the assertion
+rather than to widen the stub.

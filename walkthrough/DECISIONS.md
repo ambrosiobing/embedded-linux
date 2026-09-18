@@ -2841,3 +2841,117 @@ So: **when a document names an artefact, go and look for it.** Not as a
 lint rule, because a lint rule would only find paths, and the claims worth
 checking are behavioural. As a step, at the point where the work is called
 finished, and before it is called finished to anyone else.
+
+## 98. A stub captures everything the program consumes, not only its arguments
+
+**Context.** The destructive scripts of Project 2 are tested with recording
+stubs: `dd`, `sfdisk`, `mkfs.ext4` and the rest are replaced by shell
+scripts that append their argument list to a file and exit 0, so the tests
+run with no board, no root and no loop devices.
+
+The most important number in that project is the sector the first partition
+starts at. Below 2048 it overwrites the bootloader, and the symptom is not
+an error: the board stops after the SPL banner, or a filesystem will not
+mount and `fsck` cannot say why.
+
+`sfdisk` is configured on **stdin**. The partition table is piped to it.
+
+**Decision.** A stub records every channel the real program reads. Where a
+tool takes configuration on stdin, the stub captures stdin too, prefixed so
+that assertions can tell the two apart.
+
+**Rejected.** Asserting on the pipeline that feeds the stub instead, by
+checking the script's source for the `printf`. That tests that the text
+exists, not that it reaches the tool, which is a different and weaker
+claim, and it passes on a script that builds the table and never sends it.
+
+**Why.** A stub that captures less than the program consumes does not
+produce a false pass. It produces a **false accusation**: a correct program
+reported as broken. That is worse than it sounds, because the natural
+response on the next reading is to weaken the assertion rather than widen
+the stub, and the assertion is the thing worth keeping.
+
+It happened twice in one file. The sector-2048 assertion failed against a
+script doing exactly the right thing, and then the write-order assertion
+failed because it matched `sfdisk /dev/sdz` while the stub records
+`sfdisk -q /dev/sdz`. Same shape: the test could not see what it was
+asserting about.
+
+**Consequence.** Every recording stub in this repository has the same
+exposure. Any tool configured through stdin, a file descriptor, an
+environment variable or a configuration file needs a stub that records that
+channel, and an assertion that reads it.
+
+## 99. A placeholder that cannot work beats a value that might
+
+**Context.** `extlinux.conf` and `/etc/fstab` name the root filesystem by
+`PARTUUID`. Both are written twice on purpose: once by the rootfs build,
+which cannot know the identity of a partition that does not exist yet, and
+once by the provisioning script that creates it.
+
+So the overlay has to ship something in that field.
+
+**Decision.** It ships `root=PARTUUID=FILLED-BY-FLASH-EMMC`, which cannot
+parse and cannot boot.
+
+**Rejected.** Leaving the field absent, and shipping a plausible value
+copied from a previous card. The first gives a kernel with no root and an
+error a long way from its cause. The second is worse: it boots the wrong
+filesystem, or drops to a prompt naming a device that really does exist
+somewhere else, and the operator then debugs the wrong machine.
+
+**Why.** The question is not whether the placeholder is wrong. It is
+whether being wrong is **visible at the first attempt**. An impossible
+value fails once, immediately, with the reason on the console. A plausible
+one fails later, quietly, in a way that looks like hardware.
+
+This is the same rule as the results table's blanks, arrived at from the
+other side. There the point was that a number nobody measured is worse than
+a blank, because the blank is honest. Here the point is that a blank is not
+enough when something has to occupy the field, and then the occupant should
+be self-evidently a placeholder.
+
+**Consequence.** Anything written twice, once before a value is knowable
+and once after, gets a first value that cannot be mistaken for the second.
+The script that fills it in matches both the placeholder and any previous
+real value, so running it twice is not a special case.
+
+## 100. A pinned input against a moving host: move the number, never patch inside the pin
+
+**Context.** Project 2 pins U-Boot, the kernel and the Debian suite in
+`toolchain.env`, because an unpinned build of a bootloader cannot support
+the project's claim that the boot chain is known from the SoC ROM upwards.
+
+On 18 September 2026 the pinned U-Boot, `v2024.10`, would not build. It
+carries a copy of dtc whose pylibfdt typemaps call
+`SWIG_Python_AppendOutput` with two arguments; SWIG 4.3 added a third, and
+the host ships SWIG 4.4. `pylibfdt` is not skippable, because
+`u-boot-sunxi-with-spl.bin` is a binman image and binman needs it.
+
+**Decision.** Move the tag, and record the reason beside the number rather
+than only in the journal.
+
+**Rejected, and why each is worse.**
+
+Patching the vendored dtc inside the pinned tree. The tag then names a tree
+that is not what is built, which is precisely the property the pin exists
+to provide. A pin that requires a patch is a pin that lies.
+
+Holding the host's SWIG back. This moves the dependency from a file in the
+repository to an apt pin on one machine, where nothing in the repository
+can state it, nothing checks it, and a fresh clone on a fresh host fails
+with no clue why.
+
+**Why.** A pin is a claim about what was built. When the host moves under
+it, the honest options are to move the pin or to state the host constraint
+where the build can enforce it. Patching inside the pin does neither: it
+keeps the number and changes the thing the number refers to.
+
+**Consequence.** The reason lives in `toolchain.env`, next to
+`UBOOT_TAG`, because the next reader is looking at the number rather than
+at a journal. `docs/BRINGUP.md`'s expected SPL banner moved with it, since
+a milestone that names a version is a claim and was one line from being
+stale.
+
+This will happen again. Every pinned input in this repository is a bet that
+the host stays still, and hosts do not.
