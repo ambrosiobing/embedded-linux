@@ -484,3 +484,110 @@ Nothing has touched hardware yet. The next artefact is the kernel, then the
 root filesystem, and the root filesystem cannot be built before the kernel
 because `brcmfmac` is a module and a filesystem built first is a board with
 no Wi-Fi and nothing in `dmesg` to say why.
+
+## 10. The fragment check earned its keep, and one of the two defects had no symptom
+
+The kernel builds: `6.12.0`, `zImage`, the device tree from
+`arch/arm/boot/dts/allwinner/`, and `brcmfmac.ko` where `mkrootfs.sh` will
+look for it. Getting there took one refusal and two unrelated defects in a
+file that had been read several times and looked right.
+
+### What the guard said
+
+    kernel/build.sh: these fragment options are not in the built .config:
+    CONFIG_MMC_PWRSEQ_SIMPLE CONFIG_CFG80211 CONFIG_MAC80211
+    CONFIG_BRCMFMAC CONFIG_BRCMFMAC_SDIO
+           Requested and absent. Do not build on top of this.
+
+Five of the fragment's sixteen options. This is the failure the check was
+written for, and it is the first time in this repository that the check
+fired on its first real run rather than after a board had already been
+flashed.
+
+### The wrong hypothesis, and why it was wrong
+
+Three of the four wireless options share `=m`, so the reading that arrived
+first was that `sunxi_defconfig` has no `CONFIG_MODULES`, which would make
+every module request unsatisfiable and take `BRCMFMAC_SDIO` down with
+`BRCMFMAC`. One cause, four symptoms, and it fit.
+
+It was wrong. The `.config` has `CONFIG_MODULES=y` at line 654. The `=m`
+pattern was a coincidence, and the shared cause was one line further down:
+
+    895: # CONFIG_WIRELESS is not set
+
+`sunxi_defconfig` closes the entire wireless menu, and cfg80211, mac80211
+and everything under `drivers/net/wireless` lives inside it. Still one
+cause and four symptoms, but not the one the pattern suggested.
+
+Worth recording because the reasoning was sound and the conclusion was
+false. Two commands settled it and neither cost anything. The habit that
+matters is not guessing better, it is reaching for the cheap read before
+committing to the shape that fits.
+
+### The defect that would never have shown a symptom
+
+`CONFIG_MMC_PWRSEQ_SIMPLE` is not a Kconfig symbol. The symbol is
+`PWRSEQ_SIMPLE`, in `drivers/mmc/core/Kconfig:26`. The name that looks
+right is `mmc-pwrseq-simple`, which is the **device-tree compatible
+string** in `sun8i-h3-nanopi-neo-air.dts`, and the fragment's own comment
+names it two lines above the wrong request. Two namespaces that read alike,
+one of them borrowed for the other.
+
+kconfig does not object to a symbol it has never heard of. There is no
+warning and no line in `.config`. The request simply evaporates.
+
+And here is the part worth keeping. `PWRSEQ_SIMPLE` is `default y`, so
+`.config` already had `CONFIG_PWRSEQ_SIMPLE=y` at line 3586. The driver was
+present. The board would have worked. The fragment would have carried a
+line that did nothing, for the entire life of the project, and no test, no
+boot and no measurement would ever have disagreed with it.
+
+That is a defect with no symptom, found by a check that compares requests
+against results rather than watching for failures. Nothing else in this
+repository would have caught it, because there was nothing to catch.
+
+### One cosmetic oddity, noted so the next reader does not chase it
+
+`merge_config.sh` printed this:
+
+    Value of CONFIG_WIRELESS is redefined by fragment ...
+    Previous value: # CONFIG_WIRELESS is not set
+    New value: # # CONFIG_WIRELESS is not set CONFIG_WIRELESS=y
+
+The "New value" line is mangled. It is a display artefact of how that
+script builds the message when the previous value is a `# ... is not set`
+comment rather than an assignment. The merge itself is correct:
+`CONFIG_WIRELESS=y` is in `.config` as an exact line, which is what the
+check asserts and what it confirmed.
+
+Two days ago this repository refused a correct build because a guard read
+`merge_config.sh`'s prose. The prose is now printed and not parsed, which
+is the only reason this line was an oddity to note rather than a second
+false refusal.
+
+### What the build produced
+
+| Artefact | Where |
+|---|---|
+| `zImage` | `$NEO_OUT` |
+| `sun8i-h3-nanopi-neo-air.dtb` | `arch/arm/boot/dts/allwinner/`, the post-6.5 path |
+| `modules/lib/modules/6.12.0` | with `brcmfmac.ko`, `cfg80211.ko`, `mac80211.ko` |
+| `kernel-version` | `6.12.0`, which is what unlocks `mkrootfs.sh` |
+
+The dtb fallback in `build.sh` chose the `allwinner/` path, so the case it
+was written for is the case that occurred. Three
+`-Wunterminated-string-initialization` warnings appeared from
+`drm_dp_dual_mode_helper.c`, `stmmac_ethtool.c` and
+`power_supply_sysfs.c`. They are upstream, they are a warning class newer
+than the tag, and they are not this project's to fix.
+
+### The exposure this leaves open
+
+Every kernel fragment in this repository asks for leaves and trusts the
+defconfig for the branches. This one asked for four options inside a menu
+its defconfig had closed. The Yocto projects' fragments have the same
+shape and have never been checked for it, and their symptom would be the
+same: a feature absent from a board that boots perfectly.
+
+Recorded as decision 102.

@@ -3007,3 +3007,62 @@ the comment were wrong, and check whether the guard would catch it.
 The corollary is the reason the skip message exists. An unavailable check
 must never be indistinguishable from a satisfied one, which is exactly what
 Project 8's control arm cost, twice.
+
+## 102. A fragment states the gates it depends on, not only the options it wants
+
+**Context.** Project 2's kernel fragment asked for `CONFIG_CFG80211`,
+`CONFIG_MAC80211`, `CONFIG_BRCMFMAC` and `CONFIG_BRCMFMAC_SDIO`.
+`sunxi_defconfig` carries `# CONFIG_WIRELESS is not set`, and all four live
+inside that menu. All four were dropped, with no error from kconfig, and
+the only reason anyone knew is that `kernel/build.sh` compares every line
+of the fragment against the produced `.config`.
+
+The fragment's own header says a fragment should not restate its defconfig,
+because a fragment that repeats what it is layered on cannot be read for
+its intent. That rule is right and it is what produced the omission.
+
+**Decision.** The rule applies to options the defconfig already provides.
+It does not apply to a gate the defconfig has **closed**. A fragment states
+every menu gate, dependency and vendor switch that its options sit behind,
+because those are overrides rather than restatements. Here that is
+`CONFIG_WIRELESS`, `CONFIG_WLAN` and `CONFIG_WLAN_VENDOR_BROADCOM`.
+
+Stating a gate that is already open costs one line and nothing else: the
+option is `y` either way, so the check still passes and the file still
+reads as intent.
+
+**Rejected.** Relying on kconfig's `select` and `default y` to open the
+gates. They do open them in many cases, which is exactly the problem: the
+fragment then works on one defconfig and silently produces less on another,
+and the difference is invisible until a feature is missing from a board
+that boots perfectly.
+
+Also rejected: turning the wireless options on by editing `.config`
+directly, which is how this class of problem is usually "fixed" and which
+leaves no record of what was asked for.
+
+**Why.** A dropped option in a menu is not a build failure. It is a kernel
+that boots, runs, and lacks something. Project 2's version of that is a
+board with no wireless interface and nothing in `dmesg` naming a cause,
+which is the same failure the modules-before-rootfs ordering exists to
+prevent, arriving by a different route.
+
+The general shape: **a request is only meaningful if the thing it depends
+on is also requested.** A leaf without its branch is a wish.
+
+**Consequence, and it is not confined to Project 2.** Every kernel fragment
+in this repository asks for leaves and trusts the defconfig for the
+branches. The Yocto projects' fragments have never been checked for a
+closed gate, and `./go kconfig` compares requests against results the same
+way this script does, so the check exists there and has simply never
+refused. That is not evidence of absence. It is worth one pass over each
+fragment, asking of every option which menu it sits in and whether that
+menu is open in the defconfig underneath.
+
+A second consequence, from the other defect found in the same run:
+`CONFIG_MMC_PWRSEQ_SIMPLE` is not a symbol at all, and the driver it meant,
+`PWRSEQ_SIMPLE`, was already enabled by `default y`. A request for a
+nonexistent symbol leaves no trace, and when the thing it was reaching for
+happens to be on anyway, the line is inert for the life of the project with
+nothing ever disagreeing. Only a check that compares requests against
+results can see that, because there is no failure to observe.
