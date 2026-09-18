@@ -522,3 +522,25 @@ So the compile step is still worth having, and it is not the guard for
 this class. The guard is refusing to write a literal where a symbol
 exists, which converts a value error into a name error, and a name error
 is one the compiler does see.
+
+## 16. Three acceptance rows cited a folder that was never created
+
+**What happened.** A review across the repository found criteria 1, 2 and 6
+citing `docs/evidence/xtest-report.txt` and "a timing table in
+`docs/evidence/`", with no such directory in the project. The rows are all
+marked "not started", so nothing was overclaimed, and a reader following
+the citation still arrived nowhere.
+
+**What was done.** `docs/evidence/README.md` added, one row per criterion
+with its command, including the two that carry caveats rather than numbers:
+`leds.jpg` is deferred on the same terms as Project 1, needing three bare
+LEDs or an LK-Cable, and the whole folder carries a pointer to
+`THREAT-MODEL.md` because the Pi 3 has no secure boot and no hardware
+unique key.
+
+**Why that and not the alternative.** The alternative was to reword the
+three rows so they stopped naming a path. That would have removed the
+dangling reference and also the information: the point of naming
+`xtest-report.txt` is that criterion 2 is settled by one whole command
+output and not by a summary of it. Keeping the path and creating the index
+keeps that, and turns the citation into a plan a reader can act on.

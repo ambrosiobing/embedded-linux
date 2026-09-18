@@ -138,7 +138,7 @@ decision.
 
 | # | Criterion | Evidence | State |
 |---|---|---|---|
-| 1 | `btmon` shows LE Create Connection, the CCCD write of `0x0001` and Handle Value Notifications; the annotated trace is kept | `docs/first-connect.btsnoop` and a walk-through | **not started**, needs a board |
+| 1 | `btmon` shows LE Create Connection, the CCCD write of `0x0001` and Handle Value Notifications; the annotated trace is kept | `docs/evidence/first-connect.btsnoop` and its walk-through, both listed in [docs/evidence/README.md](docs/evidence/README.md) | **not started**, needs a board |
 | 2 | The decoder passes against at least three frames taken from a real trace, one per characteristic | `tests/stwin-bluest-test.sh` with captured bytes | **partly met**: the suite exists and its frames are synthetic |
 | 3 | The CSV grows at the rate the connection interval implies, and `mosquitto_sub` shows the same records | the rate calculation in BRINGUP.md, and both outputs side by side | **not started** |
 | 4 | Removing the battery lights red within the supervision timeout plus 1 s; replacing it reaches green within 30 s with no service restart | the journal, and `NRestarts` still 0 | **logic proven against a fake link**, unproven on a radio |

@@ -349,3 +349,25 @@ and take the arctangent. Four lines, derivable on paper, and every step
 checkable against a known rotation. The header says this is a substitution
 and why, because a filter that silently differs from the one it is named
 after is worse than one that says so.
+
+## 9. The acceptance table pointed at a folder that did not exist
+
+**What happened.** A review across the repository found this project citing
+evidence by path without the path existing. There was no `docs/evidence/`
+here at all, and the sensor inventory and the three-paths table are both
+committed with empty measurement columns, which is correct and which left
+a reader nowhere to look for what would fill them.
+
+**What was done.** `docs/evidence/README.md` added, in the shape Project 1
+uses: one row per criterion, the command that produces it, and the header
+that says the folder is empty until the board has run. It also records the
+one thing no criterion asks for, which Arduino pin carries INT1, because
+`DESIGN.md` states plainly that it is not known from the drawing and the
+first session with the shield is when that gets settled.
+
+**Why that and not the alternative.** The alternative was to leave the
+folder absent until there was something to put in it. An absent folder and
+an empty one say different things: absent reads as not thought about, empty
+with an index reads as a plan with its captures named. The rows in the
+acceptance table stay at "not started", because creating the index proves
+nothing about the shield.

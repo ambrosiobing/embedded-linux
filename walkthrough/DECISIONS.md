@@ -2691,3 +2691,58 @@ file holding a credential is not a diagnostic step.** It cannot be undone
 from anything in the repository, by design, because the image carries
 capability and the card carries identity. Read it, record what it should
 say, and let the person who owns the credential write it.
+
+---
+
+## 95. Measured and met are different rungs, and a criterion can be measured and missed
+
+**Context.** The status ladder in the top README had five rungs, from
+Planned to Complete, and the table underneath it had already outgrown them:
+Project 8 read **Measured** and Project 10 read **In progress**, neither of
+which the legend defined. That is the shape of drift the repository already
+knows, a claim written when it was true and left standing after the thing
+it described changed, and it had reached the one table a reader consults
+first.
+
+Bringing Project 8 forward showed why the missing rung mattered. Its matrix
+is taken, on the board, with provenance: 18 rows, both kernels, one
+session. Under the old ladder its only honest labels were "Built and
+running on the board", which undersells a completed measurement, or
+"Complete", which is false, because two of its acceptance criteria were
+measured and **not met**. Criterion 4 asked for `ext_p999_us` below 50 us
+and got 63.9, and asked for the generic kernel to be five times worse and
+got 1.4. Criterion 2 asked for 30000 +/- 1 edges, which no row in the file
+reaches.
+
+**Decision.** Two rungs added to the legend. **In progress** is for a
+project between rungs that names both rather than rounding down.
+**Measured** sits above "Built and running on the board" and below
+"Complete", and its definition says the thing the ladder previously had no
+way to say: a criterion can be measured and not met, and that is a result
+rather than a gap.
+
+**Rejected.** Relabelling the two rows to fit the existing five rungs. It
+would have made the legend true again in one edit and lost the distinction
+that the edit was for. Project 8 would have gone back to reading as
+unfinished work when what it has is a finished measurement with two
+negative findings in it, one of them the most interesting thing the project
+has produced.
+
+**Why.** A ladder whose rungs are claims about evidence has to be able to
+express a claim that the evidence refutes. Without a Measured rung, the
+only way to record criterion 4 is to leave it at "not started", which is
+what it said while the data to answer it sat two directories away, and
+which invites a reader to assume it would pass if anyone got round to it.
+The bar this project set is one this bench does not reach, and the reason
+is visible in every row: an unattributed excursion of several hundred
+microseconds at the pin that appears in neither internal instrument.
+Naming that is the output.
+
+**Consequence.** Every project now has to distinguish three states that
+used to collapse into "not done": not measured, measured and met, measured
+and missed. The acceptance tables carry the burden, which is where it
+belongs, and the cost is that a row saying "measured, and not met" will
+look like a failure to a reader skimming for green ticks. That is the
+correct impression of the criterion and the wrong impression of the work,
+and the row has to carry enough numbers to make the difference obvious
+without being read twice.

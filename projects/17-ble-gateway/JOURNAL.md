@@ -352,3 +352,30 @@ both in its first section rather than at the bottom.
 - **No plot.** The CSV has a real header with units in the column names,
   which is what makes it plottable by anything. What plots it belongs on
   the host.
+
+## 13. A dangling capture path, and the distinction it was hiding
+
+**What happened.** A review across the repository found acceptance
+criterion 1 citing `docs/first-connect.btsnoop`, a file that does not
+exist, in a project with no `docs/evidence/` folder either. The linter did
+not object, correctly: the citation is a code span in a table cell, not a
+markdown link, so there was nothing for a link checker to resolve.
+
+**What was done.** The citation repointed at `docs/evidence/`, and that
+folder created with an index naming all seven captures and the command for
+each.
+
+The index states the thing this project most needs a reader to understand,
+which the acceptance table currently spreads across two rows: the decoder
+suite passes 29 assertions against frames this repository invented, and
+that is not evidence about the peripheral. `frames.txt` in the index is the
+file that changes it, and it comes out of the same capture as criterion 1
+rather than a separate session.
+
+**Why that and not the alternative.** The alternative was to move the
+capture path under `docs/` as originally written and leave it at that. Two
+reasons not to. The repository keeps verbatim command output under
+`docs/evidence/` everywhere else, and a project whose evidence sits one
+directory higher than every sibling is a small thing a reader has to learn.
+And a bare path with no index says what file to expect but not what makes
+it sufficient, which for a radio trace is most of the question.

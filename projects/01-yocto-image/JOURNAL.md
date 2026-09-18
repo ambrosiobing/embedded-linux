@@ -1012,3 +1012,34 @@ Three habits earned their place here and are worth repeating:
 3. **When something fails late and unrecognisably, add a check where the
    cause is.** The executable bit, the case-sensitive filesystem, the kernel
    fragment and the skipped compile are all the same pattern.
+
+## 26. A false alarm about the evidence index, and why it read as one
+
+**What happened.** A review across the repository flagged this project's
+`docs/evidence/README.md` as listing three files that do not exist,
+`kconfig-check.txt`, `state-transition.txt` and `leds.mp4`, while the
+verification table marks the kconfig and state-transition criteria met.
+That looked like a claim without its evidence.
+
+It is not. The file's own heading is "What goes here, and how each item is
+produced", its second sentence is "Empty until the board has actually run;
+nothing in this folder should be written from expectation", and the
+`leds.mp4` row reads "Deferred". It is a table of recipes for evidence,
+not a manifest of evidence, and three of its seven rows being unfilled is
+the state it was written to express.
+
+**What was done.** Nothing to the file. The alarm is recorded here instead,
+because the next reader will make the same inference from the same two
+facts, and a journal entry is cheaper than rediscovering it.
+
+What the review did leave standing is a smaller and real gap, stated here
+rather than fixed: criteria for kconfig and state-transition are marked met
+in the project README on the strength of runs whose output was never filed
+in this folder. The claim is true and the artefact is missing, which is a
+weaker fault than a false claim and is still worth closing next time the
+board is up. Both commands are one line each and are in the table already.
+
+**Why that and not the alternative.** The alternative was to "fix" the
+index by deleting the three unfilled rows, which would have destroyed the
+thing that makes the file useful: it tells the next session what to capture
+and how. An index that lists only what already exists cannot do that.

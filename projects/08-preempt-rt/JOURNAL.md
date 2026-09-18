@@ -3451,3 +3451,67 @@ warranty bit in the SoC permanently, the question it answers is secondary
 to the one the matrix was built for, and this board is the bench for the
 rest of the portfolio. Recorded in `results/README.md` as a decision with
 its reason rather than left as a hole in the table.
+
+## 62. The README described the world before the matrix, and two criteria turn out to be measured and not met
+
+**What happened.** A review of the acceptance tables across the repository
+started from a simple question, which projects have software and wiring
+both done, and found this project's own README two days behind its own
+results. The State section opened "Half the matrix is measured, and the
+control it was measured against is wrong" and the Results section said
+"Eight of the sixteen rows are measured". Both were true when written.
+`results/results.csv` holds 18 rows, 10 of them `realtime=yes`, and
+`results/README.md` had already been written to describe the completed
+paired matrix. The project README was never brought forward with it.
+
+`docs/BRINGUP.md` was worse in a quieter way. Line 7 still read "Nothing
+below has been performed" while the same file, further down, records
+3.2977 V high and 0.00113 V low measured on the board and two things that
+were wrong until hardware said so. A document that denies on one page what
+it reports on the next is not a stale claim, it is two claims.
+
+Bringing the acceptance table forward was where it stopped being
+bookkeeping. Rows 1 to 5 all read "not started", and the matrix has since
+answered four of them:
+
+- **Criterion 4 is measured and not met on all three clauses.** RT
+  isolated with affinity under load gives `ext_p999_us` of 71.084 and
+  63.916 against a target below 50, `ext_max_us` of 1054.020 and 989.682
+  against a target below 150, and a generic counterpart of 99.316, which
+  is 1.4 times worse rather than the five the criterion asked for.
+- **Criterion 2's tolerance was never achievable.** It asks for 30000 +/-
+  1 rising edges. No row in the file reaches 30000. The 16 sound rows run
+  29984 to 29997 and two are genuinely short at 28941 and 29124.
+- **Criterion 1 cannot be met as worded**, because `/sys/kernel/realtime`
+  did not survive the merge into mainline for 6.12 and is absent on both
+  kernels. Decision 74 already made `uname -v` the authority; the
+  criterion was not updated to match.
+
+**What was done.** The State and Results sections rewritten against
+`results/README.md` and pointing at it rather than restating it. The
+BRINGUP header replaced with what actually ran, on which dates, and what
+did not: the series RC, which is not on this bench, and the two
+`force_turbo` rows. Rows 1 to 5 of the acceptance table rewritten to say
+what was measured and what it came to, including the two that failed.
+
+**Why that and not the alternative.** The alternative was to leave rows 1
+to 5 at "not started", which is what they said while the data to answer
+them sat two directories away. That reads as modesty and is the opposite:
+"not started" invites a reader to assume the criterion would pass if
+anyone got round to it, and two of these do not pass. A criterion that was
+measured and missed is a result about this bench, and the unattributed
+excursion of several hundred microseconds at the pin, present in all 18
+rows and in neither internal instrument, is the most interesting thing the
+project has produced. Recording criterion 4 as failed is what makes that
+excursion visible in the table rather than only in the discussion.
+
+The shortfall of 3 to 16 edges in criterion 2 is left unexplained on
+purpose. It was observed, not investigated, and writing a mechanism for it
+here is exactly the fault decision 55 forbids.
+
+**A correction inside this entry.** The sentence above first cited "entry
+55 of this journal", which is about a figure generator. The rule lives in
+`walkthrough/DECISIONS.md` as decision 55, and the two numbering schemes,
+one per project and one global, both happen to have reached 55. Fixed
+before the commit and recorded because the next cross-reference between
+the two will be just as easy to get wrong.

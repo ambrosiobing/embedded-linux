@@ -4,9 +4,20 @@ In order. Each step ends with something that either works or says why not,
 because the alternative is arriving at step 9 with a fault introduced at
 step 2.
 
-Nothing below has been performed. It is the plan, written while the code
-was written, and it will be corrected in the [journal](../JOURNAL.md) as
-soon as it meets hardware.
+This was written as a plan, before the hardware, and it has since met the
+hardware twice: the first bring-up on 16 September 2026 and the paired
+matrix on 17 September between 12:49 and 15:23. The steps below have been
+run, and the places where the board contradicted the plan are corrected in
+place rather than silently, so a sentence reading like an instruction may
+be followed by what actually happened. Two of them are worth finding
+before you need them: `timeout` is not in this image, and the first run
+reported `subsample_fraction=0.150` with `sample_us=10.000`, which is the
+quantisation every `sd`, `p99.9` and `max` in the results carries.
+
+What has **not** been run is the series RC of step 4, which is not on this
+bench, and the two `force_turbo` rows, which are declined for the reason
+given in [results/README.md](../results/README.md). The
+[journal](../JOURNAL.md) is the running account of both days.
 
 ## 0. Before the power goes on
 

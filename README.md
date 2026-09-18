@@ -142,8 +142,10 @@ rather than about effort:
 |---|---|
 | **Planned** | Not started. The row names the board and the theme, nothing more |
 | **Written, not yet built** | The recipes, programs and documents exist and the suites pass, and no build has been run, so nothing has checked that BitBake can parse them. A rung that exists because the one below it claims more than it should |
+| **In progress** | Between two rungs and saying which. Used where part of the work is at one rung and part at another, so the row names both rather than rounding to the lower one |
 | **Software complete** | It builds and its tests pass on a machine with no board attached. Nothing has been powered on. A project whose work is split across two processors says which half is done, so Project 12 reads "Linux side complete" |
 | **Built and running on the board** | The image was flashed, the hardware works and the thing does its job. Named measurements are still outstanding, and the row says which |
+| **Measured** | The measurement the project exists to make has been taken, on the board, with its provenance recorded. Not the same as Complete: a criterion can be measured and **not met**, which is a result rather than a gap, and Project 8 has two of those |
 | **Complete** | Every acceptance criterion in that project's README is met, each with evidence in its `docs/evidence/`, or deferred with a written reason |
 
 The gap between the last two rungs is deliberate. A router that routes

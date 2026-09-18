@@ -35,25 +35,34 @@ first to change the kernel itself.
 
 ## State
 
-**Half the matrix is measured, and the control it was measured against is
-wrong.** On 17 September 2026 the Pi 4 ran the generic image with the
-MCC 118 on the header and produced the eight rows in
-[results/results.csv](results/results.csv). They are sound measurements of
-the stock Raspberry Pi kernel and they are not yet the comparison this
-project exists to make, because `kas/bench-rt-generic.yml` omits the whole
-kernel fragment rather than one symbol of it. The board said so on its
-serial console and nothing else could have: journal 57, decision 88.
+**The matrix is measured on both arms.** On 17 September 2026 between
+12:49 and 15:23 the Pi 4 ran one image with the MCC 118 on the header and
+produced the 18 rows in [results/results.csv](results/results.csv): eight
+on the generic kernel and ten on PREEMPT_RT, matched configuration by
+configuration, with repeats on four of them. The reading of those rows,
+with every caveat that qualifies them, is in
+[results/README.md](results/README.md).
 
-So the next cycle rebuilds both kernels with the fragment split, and the
-sixteen row matrix restarts. The eight rows stay, because a superseded
-measurement is still a measurement and deleting it is how a table comes to
-agree with its conclusion.
+This section previously said half the matrix was measured against a wrong
+control, and that was true when it was written. The control was wrong
+because `kas/bench-rt-generic.yml` omitted the whole kernel fragment rather
+than one symbol of it, which the board said on its serial console and
+nothing else could have: journal 57, decision 88. The fragment was split,
+both kernels were rebuilt, and the paired matrix was taken.
 
-The headline that survives either way: **under load, isolating the
-measured core takes worst-case wake-up from 277 to 488 us down to 99 to
-125 us**, and that is with `isolcpus` alone, because the kernel rejected
-`nohz_full` and `rcu_nocbs` for want of the config symbols that the
-omitted fragment would have supplied.
+The headline: **PREEMPT_RT bought nothing measurable at the pin until the
+measured core was isolated.** The three pairs with CPU 3 still in the
+scheduler's general pool differ by 2 percent or less, inside the spread
+between repeats of one configuration. Every pair with `isolcpus` and
+`nohz_full` covering that core improved `ext_p999_us` by between a third
+and a half. Isolation is the precondition here and the real-time kernel is
+the increment, which is the reverse of the order the two are usually
+presented in.
+
+The earlier generic-only matrix is preserved at
+[results/2026-09-17_5ec99fd-dirty/](results/2026-09-17_5ec99fd-dirty). It
+is superseded and it is not wrong: it is the generic arm alone, taken
+before the card was reflashed, and it was never paired.
 
 `bench-rt-image` was built on 16 September 2026, 78 MB compressed, with
 `CONFIG_PREEMPT_RT=y` verified in the `.config` before the compile began.
@@ -272,11 +281,11 @@ each, and where that stands today.
 
 | # | Criterion | Evidence | State |
 |---|---|---|---|
-| 1 | `/sys/kernel/realtime` reads 1 on the RT kernel and is absent on the generic one | the `realtime` column of every row, and `uname -v` beside it | **not started**, needs a board |
-| 2 | A 60 s capture at 100 kS/s with zero overruns, and 30000 +/- 1 rising edges | `ext_edges` in the row; `rt-capture` voids the run on any overrun | **not started** |
-| 3 | The external histogram reproduces the internal one in shape: spread a factor of sqrt(2) larger, maxima agreeing, and any excess reported as write-path variation | `rt-compare` per run, which `rt-run` calls at the end of one | **not started** on a board; the arithmetic is proven against a simulation in `tests/rt-compare-test.sh` |
-| 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **not started** |
-| 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **not started**. The original wording, "agrees to within the system-call cost", was not measurable: that cost cancels in an interval measurement |
+| 1 | `/sys/kernel/realtime` reads 1 on the RT kernel and is absent on the generic one | the `realtime` column of every row, and `uname -v` beside it | **superseded, and the criterion as worded cannot be met.** That file came from the out-of-tree RT patches and did not survive the merge into mainline for 6.12, so it is absent on **both** kernels here. `uname -v` is the authority instead, per decision 74, and the `realtime` column is derived from it: 10 rows `yes`, 8 rows `no` |
+| 2 | A 60 s capture at 100 kS/s with zero overruns, and 30000 +/- 1 rising edges | `ext_edges` in the row; `rt-capture` voids the run on any overrun | **measured, and the tolerance is not met.** No run was voided, so the overrun half holds across all 18 rows. `ext_edges` never reaches 30000: the 16 sound rows run 29984 to 29997, and two rows are genuinely short at 28941 and 29124 and both have repeats. A tolerance of +/- 1 was never achievable on this instrument and no cause is offered for the 3 to 16 edge shortfall, because none was investigated |
+| 3 | The external histogram reproduces the internal one in shape: spread a factor of sqrt(2) larger, maxima agreeing, and any excess reported as write-path variation | `rt-compare` per run, which `rt-run` calls at the end of one | **measured**, `rt-compare` ran at the end of every run and the ratio is discussed across the matrix in [results/README.md](results/README.md). One row, `rt-iso-aff-performance`, returns a ratio of 12.430 and a write-path figure of 7.653 us that are arithmetically correct and not usable, because its standard deviation is carried by a handful of excursions rather than by a distribution. That is recorded as a gap in `rt-compare` |
+| 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **measured, and not met on any of its three clauses.** RT `ext_p999_us` is 71.084 and 63.916 against a target below 50. `ext_max_us` is 1054.020 and 989.682 against a target below 150, and no row in the file is under 150 because of the unattributed pin excursion. The generic counterpart is 99.316, which is 1.4 times worse rather than five. The improvement PREEMPT_RT does deliver on this pair is a third, and the criterion set a bar this bench has not reached |
+| 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **columns present in all 18 rows, agreement not assessed.** The second clause is criterion 3 and is measured there. The first clause, `cyc_max_us` against `int_max_us`, is not evaluated anywhere in [results/README.md](results/README.md), and the two disagree substantially in the rows spot-checked. Whether that is instrument disagreement or the ordinary instability of a maximum is an open question and needs the series RC that criterion 5 already calls for |
 | 6 | Every row names kernel, isolation, affinity, governor, load and the throttle status before and after | the CSV header has 27 columns and `rt-run` fills all of them | **met in the code**, proven by `tests/rt-run-test.sh`, unproven on a board |
 | 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt-common -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host for both machines**, 16 Sep 2026: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them and the other three members of its choice block excluded. Evidence for [`raspberrypi4-64`](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [`raspberrypi3-64`](docs/evidence/kconfig-check-raspberrypi3-64.txt), each named for the machine it was captured on. Not yet confirmed against a running kernel. **Both captures are of the real-time arm and predate the 17 Sep fragment split. The control was never checked at all, which is how it came to receive no fragment, and re-running this criterion against both arms is part of the next cycle** |
 | 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt-common -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
@@ -289,19 +298,24 @@ cost, which is criterion 5. Criterion 5 needs the series RC.
 
 ## Results
 
-Eight of the sixteen rows are measured. The generic half was taken on
-17 September 2026 and lives in
-[results/results.csv](results/results.csv), with its histograms, figures
-and a full provenance note in
-[results/2026-09-17_5ec99fd-dirty/](results/2026-09-17_5ec99fd-dirty).
+All 18 rows are measured, eight generic and ten PREEMPT_RT, taken in one
+session on 17 September 2026 and living in
+[results/results.csv](results/results.csv). The full reading of them, the
+`ext_p999_us` comparison table, the two short rows, the one row where the
+standard deviation is not a summary, and the two rows deliberately not
+taken, are all in [results/README.md](results/README.md).
 
-**Read that provenance file before quoting any number from this half.** It
-records three things that qualify every row: the board ran a hand-patched
-`rt-capture`, the control kernel is not one symbol away from the real-time
-one, and the isolated rows carry `isolcpus` only because the kernel
-rejected `nohz_full` and `rcu_nocbs`. These are measurements of the stock
-Raspberry Pi kernel, which is a real baseline, and not yet the controlled
-comparison the matrix is for.
+**Read that file before quoting any number from this matrix.** Three
+things in it qualify what can be said. The excursion of several hundred
+microseconds to over a millisecond that appears at the pin in every single
+row, and in neither internal instrument, is **not attributed**: the
+candidates are the SPI path to the HAT, the recorder, and firmware
+activity under the kernel, and separating them needs an experiment this
+matrix does not contain. The 51 percent gain on the affinity-without-
+isolation pair rests on one generic row that reads as bad rather than as
+an effect. And the earlier generic-only matrix at
+[results/2026-09-17_5ec99fd-dirty/](results/2026-09-17_5ec99fd-dirty) is
+superseded, not deleted.
 
 ### Isolation is the whole story on this board
 

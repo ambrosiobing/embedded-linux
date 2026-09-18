@@ -346,3 +346,26 @@ has crossed a wire.
   anyway is deliberate, because a firmware that stopped sending that key
   has changed the sample shape and that should be noticed here rather than
   by a client wondering why a later key moved.
+
+## 13. An evidence index, and the one capture that needs no firmware
+
+**What happened.** A review across the repository found no `docs/evidence/`
+in this project, while the acceptance table names seven captures that would
+go in one. The project is blocked on firmware that is deliberately not
+written, so every row reads "not started" apart from the two met in CI.
+
+**What was done.** `docs/evidence/README.md` added, one row per criterion
+with the command that produces it.
+
+Writing it surfaced something the acceptance table does not make obvious.
+Six of the seven captures need a Nucleo streaming frames, and one does not:
+`busctl introspect` needs only the daemon running on a real bus. That is
+criterion 1, it is the cheapest row in the table, and it converts "written"
+into "owns a name on a system bus", which is the claim this project cannot
+currently make at all. It is noted at the foot of the index as the first
+one to take.
+
+**Why that and not the alternative.** The alternative was to wait for the
+firmware and write the index alongside the first real capture. Waiting
+would have kept the introspection row invisible behind six that are
+genuinely blocked, which is how a cheap piece of evidence stays untaken.
