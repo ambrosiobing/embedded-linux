@@ -64,10 +64,16 @@ fi
         ls -l /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
         dmesg | tail -20"
 
-[ -r "$DEVICE" ] && [ -w "$DEVICE" ] || die "cannot read and write $DEVICE.
+# An if rather than "A && B || C", which is SC2015 and is not
+# if-then-else: when A succeeds and B fails, C runs anyway. Here that
+# would be harmless, and the pattern has already cost this repository
+# thirteen red CI runs in one sitting, so it is not written at all.
+if [ ! -r "$DEVICE" ] || [ ! -w "$DEVICE" ]; then
+	die "cannot read and write $DEVICE.
     On Debian and Ubuntu the device belongs to group dialout:
         sudo usermod -aG dialout \"\$USER\"    # then log out and back in
     Check with: ls -l $DEVICE"
+fi
 
 # --- who else is holding it ----------------------------------------------
 #

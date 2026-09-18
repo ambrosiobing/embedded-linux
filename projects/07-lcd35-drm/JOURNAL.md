@@ -237,6 +237,10 @@ have either, for the reason in the next paragraph.
 2. `libdrm-dev` added to the CI workflow. **CI has its own package list,
    separate from `host-setup.sh`**, and nothing had noticed that the two
    had drifted. Without this the new step would have failed every run.
+
+   **This item was wrong when it was written. See entry 7.** CI does not
+   run `host-check.sh` at all, so there was no "new step" in CI to fail:
+   the package was installed for a step that did not exist there.
 3. `device-tree-compiler` added to the same CI list. The overlay suite's
    `dtc` section skips where `dtc` is absent, and its skip message says
    "CI installs device-tree-compiler and does compile it". That sentence
@@ -261,3 +265,127 @@ already had.
 the work. `host-setup.sh` gained `libdrm-dev`, and that made the compile
 step look present in every subsequent reading of the diff, including mine.
 The thing that caught it was grepping for the claim instead of trusting it.
+
+---
+
+## 7. The first CI run was red, and five of the eight findings were mine
+
+**What happened.** The commit went to `origin/main` and CI failed at the
+`Shell scripts` step, which is `shellcheck`. Eight findings, across four
+files. Five of them were in code written for this project:
+
+| File | Finding |
+|---|---|
+| `lcd35a-verify` line 63 | SC2010, `ls` piped into `grep` |
+| `lcd35a-verify` line 100 | SC2012, `ls` where a glob does the job |
+| `lcd35a-verify` line 133 | SC2043, a `for` loop over a single literal path |
+| `lcd35a-verify` line 136 | SC2086, unquoted expansion |
+| `lcd35a-overlay-test.sh` line 236 | SC1087, an **error**: `"$ov["` reads as an array expansion |
+
+The last one matters more than its one line. An error makes `shellcheck`
+give up on the rest of the file, so every assertion after it went
+unchecked. That is the same shape as the SC1073 another project hit the
+same day, and the reason the linter here was tightened an hour earlier.
+
+This is what having no `shellcheck` on the authoring laptop costs, stated
+plainly: `lint.py` checks three of its findings and the real tool found
+five more in one file.
+
+**What was done.** All five fixed at the cause rather than silenced. The
+`ls | grep` became a glob over the driver directory, which is what that
+directory actually is; the single-item loop became an `if`; the one
+genuine word split kept a `disable=SC2086` with a comment saying why it is
+deliberate.
+
+Three further findings were not from this project and were blocking the
+same run, so they were fixed too: two in Project 2's `flash-emmc.sh`
+(SC2154 on a variable assigned inside the trap body that reads it, and
+SC1010 on an unquoted `STATE=done`) and one in Project 9's
+`agent-proxy.sh`, an `A && B || C` that this repository has already lost
+thirteen CI runs to.
+
+**The finding that outlives the fixes.** Entry 6 said the CI workflow now
+compiles `drmfill`. It did not. **CI does not run `scripts/host-check.sh`
+at all**; it keeps its own step list, by hand, and the two drift. So the
+step added to `host-check.sh` runs for anyone typing `./go check` and has
+never run in CI, while `libdrm-dev` sat in the CI package list looking like
+the work was done.
+
+That is the identical mistake entry 6 was written about, one level up. In
+entry 6 the dependency was installed and the step was missing from
+`host-check.sh`. Here the dependency was installed and the step was missing
+from the workflow. Both times the installed dependency is what made the
+diff read as complete.
+
+So the workflow now has two steps of its own, `Compile drmfill` and
+`drmfill finds no panel on a runner`, the second exercising the
+card-walking path from entry 3. The comment on the first says why it exists
+twice, because the duplication is the thing a later reader will want to
+delete.
+
+**Why that and not the alternative.** The alternative is to make CI call
+`./go check` and delete its hand-kept list. That is the right shape and it
+is a change to every project's CI at once, made while `main` is red, which
+is the wrong moment. Worth doing deliberately later; noted here so it is
+not lost.
+
+**What is still unproven.** The `dtc` assertion and the `drmfill` compile
+have now run nowhere. The previous entry claimed one of them would; this
+one claims neither. The next CI run is the first evidence for either.
+
+---
+
+## 8. Five red runs, and the fix was a linter rule rather than a fix
+
+**What happened.** Five consecutive CI runs failed, and reading all five
+together rather than one at a time changed what the problem was.
+
+| Finding | In how many of the five runs |
+|---|---|
+| `flash-emmc.sh:66` SC2154 and `:247` SC1010 | **all five** |
+| `boot-energy-analyze-test.sh` SC2154 x3 | three |
+| `adxl345-driver-test.sh` SC1073 | two |
+| `lcd35a-verify` x4, `lcd35a-overlay-test.sh` SC1087, `agent-proxy.sh` SC2015 | one |
+
+The two in `flash-emmc.sh` arrived with the first red run and were never
+fixed, so every run after it was going to fail whatever anyone else pushed.
+Four sessions then pushed on top, each adding findings and each reading
+only its own run. Project 7 contributed five of the eight in the last one.
+
+**What was done.** All eight fixed, and then the actual problem addressed,
+which is not any of them. The authoring laptop has no `shellcheck`, so
+every one of these was invisible until a runner said so, which costs a
+push, a run, an email and a round trip each time.
+
+`scripts/lint.py` already carried three narrow rules for exactly this
+reason, for SC2086, SC2120 and SC1072/SC1073. Five more were added for the
+patterns that escaped this evening: SC2010, SC2012, SC2015, SC1087 and
+SC1010. Every one of them is a pattern a regex can see, which is why they
+are worth carrying and why the several hundred that are not remain CI's job.
+
+**The rules were proved in both directions before being trusted.** A
+fixture with all five defects produced five findings with the right codes;
+a fixture with the five legitimate forms that resemble them produced none.
+That second half mattered: the first version of the rules fired on three
+innocent lines in `scripts/build.sh`, `scripts/common.sh` and
+`tests/iio-probe-test.sh`, because `|| true` is not a pipe and
+`VAR=$(cd x && pwd) || exit 1` is not the `A && B || C` mistake. A linter
+that cries wolf on correct code is worse than no linter, because people
+learn to skip it.
+
+**Why that and not the alternative.** The alternative was to install
+`shellcheck` on the Windows laptop, which I proposed and which was wrong:
+`./go` and its checks run on the WSL laptop, and this one is for editing
+and committing. Growing the linter is the bench's own documented answer to
+a blind spot that has shipped twice, and it helps every future session on
+this machine rather than only this one.
+
+**What is still not covered.** SC2154, the finding that started all five
+runs, needs dataflow rather than a regex and is not among the five. The
+authoring laptop still cannot see the other several hundred, and the
+linter now says which eight it does check instead of implying it checks
+shell code generally.
+
+**Owed.** A `walkthrough/DECISIONS.md` entry for the principle, not written
+here because that file is shared and two sessions are active in the
+checkout; entries written in parallel have collided twice.

@@ -557,6 +557,88 @@ def check_shellcheck_directives() -> None:
                        f"the first word after the hash.")
 
 
+# The fourth, fifth, sixth and seventh shellcheck findings this machine
+# keeps shipping to CI, added after five consecutive red runs on 18
+# September. Each is a pattern shellcheck names and this laptop cannot see,
+# and each has a better form hiding behind it rather than a reason to
+# silence it.
+#
+# Deliberately narrow. Reimplementing shellcheck here would be foolish and
+# a rule that fires on legitimate code teaches people to skip the linter,
+# which is worse than not having it. Each pattern below was checked against
+# the whole tree before being added.
+SHELL_PATTERNS = (
+    (
+        # A real pipe is one bar. "|| true" is two and is not a pipe at
+        # all: writing this without the lookarounds made the rule fire on
+        # three innocent lines the first time it ran, which is the failure
+        # mode a linter cannot afford.
+        re.compile(r"^[^#]*\bls\b[^|]*(?<!\|)\|(?!\|)\s*grep\b"),
+        "SC2010",
+        "ls piped into grep. A glob with a [ -e ] test says the same thing "
+        "and survives a filename with a space in it",
+    ),
+    (
+        re.compile(r"^[^#]*\bls\b"
+                   r"(?![^|]*(?<!\|)\|(?!\|)\s*grep\b)"
+                   r"[^|]*(?<!\|)\|(?!\|)"),
+        "SC2012",
+        "ls piped into something. Use a glob, find, or stat -c %a, which "
+        "do not depend on how ls formats its output",
+    ),
+    (
+        # Not an assignment, and no command substitution on the line.
+        # "VAR=$(cd x && pwd) || exit 1" is the correct idiom for exactly
+        # this, and shellcheck does not flag it; the mistake is the bare
+        # "test && thing || fallback" at statement level.
+        re.compile(r"^(?!\s*[A-Za-z_][A-Za-z0-9_]*=)"
+                   r"(?!.*\$\()"
+                   r"[^#]*&&[^|]*(?<!\|)\|\|"),
+        "SC2015",
+        "A && B || C is not if-then-else: when A succeeds and B fails, C "
+        "runs anyway. This one has cost this repository thirteen red CI "
+        "runs in a single sitting",
+    ),
+    (
+        re.compile(r'"[^"]*\$[A-Za-z_][A-Za-z0-9_]*\['),
+        "SC1087",
+        "an expansion followed by a bracket reads as an array subscript. "
+        "Write ${name} so the brace ends the name. This one is an ERROR, "
+        "so shellcheck abandons the rest of the file and every check after "
+        "it silently does not run",
+    ),
+    (
+        re.compile(r"^\s*[A-Za-z_][A-Za-z0-9_]*="
+                   r"(?:done|then|fi|do|esac|elif|else|in)\s*$"),
+        "SC1010",
+        "an unquoted shell keyword as a value reads as the keyword. Quote "
+        "it",
+    ),
+)
+
+
+def check_shell_patterns() -> None:
+    """Four more shellcheck findings, none of them visible on this machine.
+
+    On 18 September five CI runs failed in a row. Eight findings across
+    four files, and every one of them was a pattern a regex can see: two
+    ls pipelines, an A && B || C, an unbraced expansion before a bracket,
+    and an unquoted keyword. None of them could be seen here, so each
+    round trip cost a push, a run and an email.
+
+    The rule this follows is the one in the bench notes: when a blind spot
+    ships twice, grow a narrow rule for it and prove the rule fires.
+    """
+    for path in shell_files():
+        for number, line in enumerate(text(path).splitlines(), start=1):
+            if re.match(r"^\s*#", line):
+                continue
+            for pattern, code, why in SHELL_PATTERNS:
+                if pattern.search(line):
+                    fail(path, f"line {number}: {why}, which shellcheck "
+                               f"rejects as {code}")
+
+
 def check_untracked_scripts() -> None:
     """A new script has no index entry, so the check above cannot see it.
 
@@ -655,6 +737,7 @@ def main() -> int:
         check_shell_exports,
         check_shell_unused_params,
         check_shellcheck_directives,
+        check_shell_patterns,
         check_busybox_compat,
         check_src_uri_installed,
         check_image_packages,
@@ -676,19 +759,24 @@ def main() -> int:
 
     # Say what was not checked.
     #
-    # This file carries two narrow rules for shellcheck findings, SC2086 and
-    # SC2120, because the authoring machine has no shellcheck and those two
-    # kept reaching CI. It does not carry the other several hundred, and
-    # "lint: clean" on a host without shellcheck has meant a red CI four
-    # times in one day: SC2015, SC2018, SC2019, SC2100 and SC2012 between
-    # them, none of which anything here can see.
+    # This file carries narrow rules for eight shellcheck findings, because
+    # the authoring machine has no shellcheck and each of these kept
+    # reaching CI. SC2086 and SC2120 came first; SC1072/SC1073 followed;
+    # SC2010, SC2012, SC2015, SC1087 and SC1010 were added on 18 September
+    # after five consecutive red runs, eight findings across four files,
+    # every one of them a pattern a regex can see.
+    #
+    # It does not carry the other several hundred. "lint: clean" on a host
+    # without shellcheck has meant a red CI four times in one day, and then
+    # five times in one evening.
     #
     # A clean result that does not say which questions were never asked is
     # the failure this repository keeps finding in its own tools. So it
     # says. One line, and it costs nothing on a host that has the tool.
     if not shutil.which("shellcheck"):
         print("note: no shellcheck on this host, so of its findings only")
-        print("      SC2086, SC2120 and SC1072/SC1073 are checked here.")
+        print("      SC2086, SC2120, SC1072/SC1073, SC2010, SC2012,")
+        print("      SC2015, SC1087 and SC1010 are checked here.")
         print("      CI runs the real thing.")
 
     print("lint: clean")

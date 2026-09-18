@@ -233,7 +233,10 @@ echo
 echo "--- the overrides, which are acceptance criterion 6"
 
 for ov in speed rotate swapxy; do
-	has "override $ov" "$DTS" "^[[:space:]]*$ov[[:space:]]*="
+	# Braces around the name, because "$ov[" reads as an array
+	# expansion. That is SC1087, an error rather than a warning, and an
+	# error makes the checker give up on the rest of the file.
+	has "override $ov" "$DTS" "^[[:space:]]*${ov}[[:space:]]*="
 done
 
 echo

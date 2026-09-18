@@ -63,6 +63,10 @@ case ${1:-} in
 esac
 
 STATE=start
+# shellcheck disable=SC2154
+# status is assigned at the head of this same trap body. shellcheck parses
+# the quoted string without carrying the assignment across, so it reports
+# a variable that is set one statement earlier.
 trap 'status=$?; [ "$status" -eq 0 ] || echo "flash-emmc: failed in state $STATE" >&2' EXIT
 
 die() {
@@ -244,7 +248,7 @@ copy
 bootconfig
 verify
 
-STATE=done
+STATE="done"
 trap - EXIT
 if [ "$dry" = yes ]; then
 	note "dry run, nothing written"

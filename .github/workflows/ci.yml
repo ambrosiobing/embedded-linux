@@ -155,6 +155,31 @@ jobs:
             exit 1
           fi
 
+      - name: Compile drmfill
+        # Project 7's DRM test program. It exists as a step here AND in
+        # scripts/host-check.sh because this workflow does not run that
+        # script: it keeps its own list, by hand, and the two drift.
+        #
+        # That drift is exactly how this step came to be missing. The
+        # libdrm-dev line was added to the install step above and to
+        # host-setup.sh, and both looked like the work was done, while
+        # nothing in CI ever compiled the program. A dependency installed
+        # for a step that does not exist is worse than an absent
+        # dependency, because it reads as done in every later diff.
+        run: |
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libdrm) meta-bench/recipes-bench/bench-lcd35a/files/drmfill.c -o /tmp/drmfill $(pkg-config --libs libdrm)
+
+      - name: drmfill finds no panel on a runner
+        # The card-walking path, which replaced a hard-coded
+        # /dev/dri/card1. A runner has no ili9486, so exit 1 is the
+        # correct answer and anything else means the search is wrong.
+        run: |
+          if /tmp/drmfill -t 1; then
+            echo "unexpected: this runner has a card driven by ili9486"
+            exit 1
+          fi
+          echo "reports no panel, as expected off-target"
+
       - name: Compile the SDK example
         run: make -C sdk/hello-gpiod
 

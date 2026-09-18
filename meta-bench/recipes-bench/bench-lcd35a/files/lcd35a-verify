@@ -60,8 +60,14 @@ for pair in "ili9486 spi0.0 panel" "ads7846 spi0.1 touch"; do
 	if [ -e "/sys/bus/spi/drivers/$drv/$dev" ]; then
 		ok "$what: $drv bound to $dev"
 	else
-		bound=$(ls "/sys/bus/spi/drivers/$drv" 2>/dev/null |
-			grep '^spi' | tr '\n' ' ')
+		# A glob rather than "ls | grep": the driver directory holds
+		# symlinks named for the devices bound to it, so the shell
+		# can select them directly.
+		bound=""
+		for b in "/sys/bus/spi/drivers/$drv"/spi*; do
+			[ -e "$b" ] || continue
+			bound="$bound$(basename "$b") "
+		done
 		if [ -n "$bound" ]; then
 			bad "$what: $drv is bound to [$bound], not $dev"
 		else
@@ -97,7 +103,12 @@ done
 
 # fbdev emulation, which is what criterion 2 rides on. Without it there is
 # a working panel and no framebuffer, so con2fbmap has nothing to map.
-fb=$(ls -d /sys/class/graphics/fb* 2>/dev/null | head -n 1)
+fb=""
+for g in /sys/class/graphics/fb*; do
+	[ -e "$g" ] || continue
+	fb=$g
+	break
+done
 if [ -n "$fb" ]; then
 	ok "fbdev emulation is present ($(basename "$fb") and possibly more)"
 else
@@ -130,13 +141,17 @@ section "the SPI clock the bus actually gave"
 # usage error rather than a wrong answer. Same reason as "head -n 1"
 # above, which the repository's linter checks for.
 got=""
-for d in /sys/bus/spi/devices/spi0.0; do
-	[ -e "$d/of_node/spi-max-frequency" ] || continue
-	bytes=$(od -An -tx1 "$d/of_node/spi-max-frequency" 2>/dev/null)
+freq=/sys/bus/spi/devices/spi0.0/of_node/spi-max-frequency
+if [ -e "$freq" ]; then
+	bytes=$(od -An -tx1 "$freq" 2>/dev/null)
+	# Word splitting is the entire point here: od prints four hex bytes
+	# and each one has to become its own positional parameter.
+	# shellcheck disable=SC2086
 	set -- $bytes
-	[ $# -ge 4 ] || continue
-	got=$(printf '%d' $((0x$1 * 16777216 + 0x$2 * 65536 + 0x$3 * 256 + 0x$4)))
-done
+	if [ $# -ge 4 ]; then
+		got=$((0x$1 * 16777216 + 0x$2 * 65536 + 0x$3 * 256 + 0x$4))
+	fi
+fi
 if [ -n "$got" ]; then
 	printf 'note     the tree asked for %s Hz\n' "$got"
 	dunno "what the controller rounded that to. spi-bcm2835 divides a
