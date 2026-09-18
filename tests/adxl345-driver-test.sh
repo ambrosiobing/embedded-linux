@@ -149,6 +149,17 @@ has "the SPI file imports it" "$SPI" "MODULE_IMPORT_NS(\"$core_ns\")"
 
 undefined=0
 duplicated=0
+# Word splitting is the point here, not an accident: the grep pattern
+# admits only [A-Z0-9_], so every match is one whitespace-free token and
+# splitting on whitespace yields exactly one symbol per iteration.
+#
+# shellcheck's suggested "while read" loop would be wrong rather than
+# merely different. The body increments two counters, and a while loop fed
+# by a pipe runs in a subshell, so both would come back zero and the two
+# assertions below would pass no matter what the header contained. That is
+# the worst outcome available: a check that reports success because it
+# counted in a scope nobody reads.
+# shellcheck disable=SC2013
 for sym in $(grep -o 'BENCH_ADXL345_[A-Z0-9_]*' "$CORE" | sort -u); do
 	defs=$(grep -c "^#define $sym\b" "$HDR" || true)
 	if [ "$defs" -eq 0 ]; then
