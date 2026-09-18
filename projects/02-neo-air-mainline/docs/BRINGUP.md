@@ -61,14 +61,18 @@ Start it now and leave it running.
 ## 2. Build, in this order
 
 ```
-. projects/02-neo-air-mainline/toolchain.env
-sh projects/02-neo-air-mainline/uboot/build.sh
-sh projects/02-neo-air-mainline/kernel/build.sh
-sudo -E sh projects/02-neo-air-mainline/rootfs/mkrootfs.sh
+./go neo-air uboot
+./go neo-air kernel
+sudo ./go neo-air rootfs
 ```
 
-`sudo -E`, because `sudo` keeps its own environment and the pins would be
-lost. The script refuses rather than building something unpinned.
+**Sudo goes on the entry point, never on the script.** `./go neo-air`
+sources `toolchain.env` itself, so with sudo in front of it the pins are
+established inside the sudo. Sourcing the file in your own shell and then
+running the script under sudo does not work: sudo resets the environment,
+and `-E` does not rescue it on a sudo that ignores `-E`, which this bench's
+build host has. The script refuses rather than building something
+unpinned, which is how that was found.
 
 The kernel before the root filesystem, and that order is not cosmetic.
 `brcmfmac` is a module; a root filesystem assembled before the modules
@@ -92,8 +96,8 @@ Two things to read in the build output rather than scroll past:
 
 ```
 lsblk
-sudo -E sh projects/02-neo-air-mainline/tools/sdcard.sh -n /dev/sdX
-sudo -E sh projects/02-neo-air-mainline/tools/sdcard.sh /dev/sdX
+sudo ./go neo-air card -n /dev/sdX
+sudo ./go neo-air card /dev/sdX
 ```
 
 The dry run first, always. The real run asks you to type the device path
@@ -216,7 +220,7 @@ and power on. `lsusb` on the host should show:
 Then:
 
 ```
-sudo -E sh projects/02-neo-air-mainline/tools/fel-boot.sh
+sudo ./go neo-air fel
 ```
 
 U-Boot appears on the console, running from SRAM and DRAM with nothing on

@@ -45,8 +45,12 @@ usage() {
 
 [ -r "$HERE/toolchain.env" ] || die "no toolchain.env beside $0"
 
-# Sourced here so that a caller does not have to, and exported so that a
-# sudo -E further down keeps it.
+# Sourced here so that a caller does not have to, and sourced INSIDE the
+# sudo for the steps that need root. That is the whole reason the
+# root-needing steps are documented as "sudo ./go neo-air ..." rather than
+# as sudo on the script: a sudo that resets the environment, and this host
+# has one, cannot carry toolchain.env across no matter what the caller
+# does first.
 # shellcheck source=/dev/null
 . "$HERE/toolchain.env"
 
@@ -131,16 +135,18 @@ kernel)
 rootfs)
 	require_space 3 "the root filesystem"
 	[ "$(id -u)" = 0 ] || die "rootfs needs root for debootstrap and chroot.
-       sudo -E ./go neo-air rootfs
-       The -E matters: without it sudo drops every pin from toolchain.env
-       and the build script refuses rather than building something else."
+       sudo ./go neo-air rootfs
+       Sudo on the entry point, not on the script: this sources
+       toolchain.env inside the sudo. Sourcing it in your own shell first
+       does not survive, and -E does not rescue it on a sudo that ignores
+       -E, which this host's does."
 	exec sh "$HERE/rootfs/mkrootfs.sh"
 	;;
 card)
 	shift
 	[ $# -ge 1 ] || die "which device? ./go neo-air card /dev/sdX
        lsblk lists the candidates. The device is never guessed."
-	[ "$(id -u)" = 0 ] || die "card needs root. sudo -E ./go neo-air card $1"
+	[ "$(id -u)" = 0 ] || die "card needs root. sudo ./go neo-air card $*"
 	exec sh "$HERE/tools/sdcard.sh" "$@"
 	;;
 fel)
@@ -154,7 +160,7 @@ all)
 	sh "$HERE/kernel/build.sh"
 	echo "--- uboot and kernel done."
 	echo "--- rootfs needs root and is not run from 'all' for that reason:"
-	echo "---   sudo -E ./go neo-air rootfs"
+	echo "---   sudo ./go neo-air rootfs"
 	;;
 *)
 	usage

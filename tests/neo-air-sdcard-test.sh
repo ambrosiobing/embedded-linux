@@ -147,7 +147,7 @@ reset
 rc=0
 out=$(NEO_OUT=$OUT sh "$SUT" /dev/sdz 2>&1) || rc=$?
 check "an unsourced toolchain.env is a refusal" "$rc" "1"
-contains "and mentions sudo -E, which is how it gets lost" "$out" "sudo -E"
+contains "and names the entry point that sources it" "$out" "./go neo-air card"
 
 # The kernel's own answer, not the name's. An internal disk reports 0 here
 # and a card reader reports 1, which is a better question than whether the

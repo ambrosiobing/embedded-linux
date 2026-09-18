@@ -99,14 +99,16 @@ Nothing here runs without the pins:
 Then, on the WSL2 build host:
 
 ```
-sh projects/02-neo-air-mainline/uboot/build.sh
-sh projects/02-neo-air-mainline/kernel/build.sh
-sudo -E sh projects/02-neo-air-mainline/rootfs/mkrootfs.sh
-sudo -E sh projects/02-neo-air-mainline/tools/sdcard.sh /dev/sdX
+./go neo-air uboot
+./go neo-air kernel
+sudo ./go neo-air rootfs
+sudo ./go neo-air card /dev/sdX
 ```
 
-`sudo -E`, because `sudo` keeps its own environment and `toolchain.env`
-would be lost. Both scripts refuse rather than build something unpinned.
+Sudo on the entry point, never on the script: `./go neo-air` sources
+`toolchain.env` inside the sudo. Sourcing it in your own shell first does
+not survive, and `-E` does not rescue it on a sudo that ignores `-E`. Both
+scripts refuse rather than build something unpinned.
 
 Sources and artefacts go to `$NEO_WORK`, which defaults to
 `$BENCH_WORK/neo-air` and is outside the checkout. That is a departure from
@@ -172,7 +174,7 @@ that the discovery and the filesystem work can be pointed at fixtures.
 | `brcmfmac` is a module, and a rootfs built before the modules exist has no Wi-Fi and no message | `mkrootfs.sh` refuses without `$NEO_OUT/kernel-version`, and asserts `brcmfmac` is in `modules.dep` after `depmod` |
 | The NVRAM file `brcmfmac` needs is not a kernel option | recorded as the only vendor artefact in the project, with its origin and checksum, in `docs/BRINGUP.md` |
 | The device-tree path moved in 6.5 | `kernel/build.sh` looks in both and says which it found; a missing `.dtb` gives a board that stops after `Starting kernel ...` with nothing further |
-| `sudo` drops the pinned environment | both root-needing scripts refuse without the marker and name `sudo -E` |
+| `sudo` drops the pinned environment, and some sudo implementations ignore `-E` while saying so only on stderr | the root-needing steps go through `./go neo-air`, which sources `toolchain.env` inside the sudo, and `$NEO_WORK` is derived from `SUDO_USER` rather than from `$HOME` |
 
 ## Where the rest is
 

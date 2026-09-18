@@ -7,7 +7,7 @@
 # rather than to its power supply.
 #
 #   . projects/02-neo-air-mainline/toolchain.env
-#   sudo -E sh projects/02-neo-air-mainline/tools/fel-boot.sh
+#   sudo ./go neo-air fel
 #
 # THIS IS THE ANSWER TO "I BRICKED IT".
 #
@@ -76,7 +76,8 @@ if ! sunxi-fel version >/dev/null 2>&1; then
           than to this PC. It is one port with two jobs.
 
        3. Permissions. lsusb should show 1f3a:efe8; if it does and this
-          still fails, run with sudo -E or add a udev rule."
+          still fails, run it as root with sudo ./go neo-air fel, or
+          add a udev rule."
 fi
 
 note "board      $(sunxi-fel version)"

@@ -591,3 +591,124 @@ shape and have never been checked for it, and their symptom would be the
 same: a feature absent from a board that boots perfectly.
 
 Recorded as decision 102.
+
+## 11. The host moved again, and this time it moved under an instruction
+
+Two days, two pinned-input-meets-moving-host failures. The first was SWIG
+against U-Boot's vendored dtc and cost a tag. This one cost twenty-one
+lines of documentation, because what moved was not an input. It was an
+instruction this repository gives in nine files.
+
+    $ sudo -E ./go neo-air rootfs
+    sudo: preserving the entire environment is not supported,
+    '-E' is ignored
+    [sudo: authenticate] Password:
+    mkrootfs: no /root/bench/neo-air/out/kernel-version.
+           Build the kernel first: kernel/build.sh writes it.
+
+Read the path. `/root/bench`, not `/home/bing/bench`. The kernel had been
+built forty minutes earlier and the script could not see it.
+
+### What actually happened
+
+`toolchain.env` derived the work tree from `$HOME`:
+
+    export NEO_WORK=${NEO_WORK:-${BENCH_WORK:-$HOME/bench}/neo-air}
+
+Under `sudo`, `$HOME` is root's. `sudo -E` was the answer to that and had
+been since the file was written. The build host's sudo does not implement
+`-E`. It says so, on stderr, and then **runs the command anyway**.
+
+So the warning scrolled past above a password prompt, every pin from
+`toolchain.env` was gone, `$HOME` became `/root`, and the script went
+looking for a kernel in a directory that has never existed.
+
+### The refusal was the good part
+
+`mkrootfs.sh` refuses without `$NEO_OUT/kernel-version`, and the comment
+beside that refusal explains why: a root filesystem assembled before the
+modules exist has an empty `/lib/modules/<version>/`, and the board then
+boots perfectly with no wireless interface and nothing in `dmesg` naming a
+cause.
+
+That guard was written to catch a wrong **order**. It caught a wrong
+**environment** instead, and named the state precisely enough that the
+absolute path in the message was the whole diagnosis. A guard that prints
+what it looked for, rather than only that it failed, costs one line and
+answered a question nobody had thought to ask.
+
+Worth setting against the tally in entry 8. Four guards in this repository
+have refused on evidence they should not have. This is the first one to
+refuse on evidence it was not written for and still be right.
+
+### The fix, and the one that was rejected
+
+**Rejected: tell the operator to use a different incantation.**
+`sudo env NEO_WORK="$HOME/bench/neo-air" ./go neo-air rootfs` works
+everywhere, because `env` is a program rather than a sudo feature. It is
+also a thing to remember and get right at the exact moment somebody is
+typing a password, which is the category of problem `./go` exists to
+remove. A workaround that lives in a human's memory is not a fix.
+
+**Chosen: stop reading `$HOME` and recover the invoking user instead.**
+
+    _neo_home=$HOME
+    if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ]; then
+            _neo_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+            [ -n "$_neo_home" ] || _neo_home=$HOME
+    fi
+
+`SUDO_USER` is set by sudo itself and survives an environment reset,
+because the reset is what sets it. Asking `getent` rather than assuming
+`/home/<user>` matters on a host where a home directory is somewhere else,
+which is most build machines eventually.
+
+Exercised in four states before it was believed, rather than read:
+
+| State | NEO_WORK |
+|---|---|
+| root, `SUDO_USER=bing` | `/home/bing/bench/neo-air` |
+| ordinary user | `/home/bing/bench/neo-air` |
+| explicit `NEO_WORK` under sudo | honoured, unchanged |
+| `BENCH_WORK=/srv/bench` | `/srv/bench/neo-air` |
+
+### And the documentation, which was the larger half
+
+`sudo -E` appeared twenty-one times: usage headers, refusal messages, both
+READMEs, `BRINGUP.md`, and one test asserting that a refusal mentions it.
+Every one of them told the operator to do something that does not work on
+the machine this project is being built on.
+
+They now say the same thing in one form: **sudo goes on the entry point,
+never on the script.**
+
+    sudo ./go neo-air rootfs
+    sudo ./go neo-air card /dev/sdX
+    sudo ./go neo-air fel
+
+`./go neo-air` sources `toolchain.env` itself, so with sudo in front of it
+the pins are established **inside** the sudo, where nothing can reset them.
+That property was already in `build.sh`, written for a different reason,
+and the comment above it said the environment was "exported so that a
+sudo -E further down keeps it". The mechanism was right and the explanation
+was wrong, and the explanation was what everything else was written from.
+
+The test that asserted the refusal mentions `sudo -E` now asserts it names
+`./go neo-air card`. That assertion existed to check the message is
+actionable, and an actionable message that names a broken form is worse
+than none.
+
+### The shape worth keeping
+
+A tool that warns and continues is more dangerous than one that fails.
+`-E` refused to do its job, said so in one line, and then handed control to
+a script that had every reason to believe its environment. Had sudo exited
+non-zero, the failure would have been at the door with the reason attached.
+Instead it arrived forty seconds later as a missing file in a directory
+nobody recognised.
+
+Recorded as decision 103.
+
+*(The sudo implementation has not been named here on purpose. The message
+is the observable fact; which sudo prints it is a version string nobody has
+read yet, and this entry is not the place to guess.)*

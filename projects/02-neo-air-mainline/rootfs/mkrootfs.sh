@@ -5,7 +5,7 @@
 # RUNS ON THE HOST, needs root for debootstrap and chroot.
 #
 #   . projects/02-neo-air-mainline/toolchain.env
-#   sudo -E sh projects/02-neo-air-mainline/rootfs/mkrootfs.sh
+#   sudo ./go neo-air rootfs
 #
 # Produces $NEO_OUT/rootfs.tar, which tools/sdcard.sh extracts onto
 # partition 2.
@@ -37,14 +37,17 @@ note() {
 }
 
 [ "${NEO_ENV:-}" = 1 ] || die "toolchain.env has not been sourced.
-       . projects/02-neo-air-mainline/toolchain.env
-       sudo keeps its own environment, so use sudo -E."
+       sudo ./go neo-air rootfs
+       That sources it inside the sudo, which is the only form that
+       works. Sourcing it in your own shell does not survive sudo, and
+       -E does not rescue it on a sudo that ignores -E."
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 OVERLAY=$HERE/overlay
 [ -d "$OVERLAY" ] || die "no overlay at $OVERLAY"
 
-[ "$(id -u)" = 0 ] || die "debootstrap and chroot need root. Use sudo -E."
+[ "$(id -u)" = 0 ] || die "debootstrap and chroot need root.
+       sudo ./go neo-air rootfs"
 
 for tool in debootstrap chroot tar depmod; do
 	command -v "$tool" >/dev/null 2>&1 ||

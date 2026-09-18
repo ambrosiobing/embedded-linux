@@ -3066,3 +3066,69 @@ nonexistent symbol leaves no trace, and when the thing it was reaching for
 happens to be on anyway, the line is inert for the life of the project with
 nothing ever disagreeing. Only a check that compares requests against
 results can see that, because there is no failure to observe.
+
+## 103. Under sudo, ask who invoked you; never read $HOME
+
+**Context.** Project 2 derives its work tree from `$HOME`. The one step
+that needs root, building the root filesystem, therefore looked in
+`/root/bench` and could not see the kernel built forty minutes earlier by
+the ordinary user. `sudo -E` had carried the environment across since the
+file was written. The build host's sudo does not implement `-E`: it prints
+
+    sudo: preserving the entire environment is not supported,
+    '-E' is ignored
+
+and runs the command anyway.
+
+**Decision.** Any script that can be run under sudo and needs the invoking
+user's paths recovers them from `SUDO_USER`, not from `$HOME`:
+
+    _home=$HOME
+    if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ]; then
+            _home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+            [ -n "$_home" ] || _home=$HOME
+    fi
+
+`SUDO_USER` is set by sudo itself, so it survives an environment reset for
+the same reason the reset exists. `getent` rather than `/home/$SUDO_USER`,
+because a home directory is not always under `/home` and assuming so is the
+same class of error one layer down.
+
+And where a script needs a whole pinned environment rather than one path,
+**sudo goes on the entry point, never on the script.** An entry point that
+sources its own configuration establishes it inside the sudo, where nothing
+can reset it. That is a structural answer; `-E` is a request the
+environment is free to decline.
+
+**Rejected.** Documenting a working incantation,
+`sudo env VAR=value ./entry`, which does work everywhere because `env` is a
+program rather than a sudo feature. It is one more thing to remember and
+type correctly while a password prompt is waiting, and this repository
+already decided that a step nobody can get wrong beats a step documented
+well. A workaround that lives in a human's memory is not a fix.
+
+Also rejected: detecting the broken sudo and warning. That adds a second
+thing that can be wrong and fixes nothing.
+
+**Why.** The deeper hazard is not sudo. It is that **a tool which warns and
+continues is more dangerous than one that fails.** `-E` declined its job,
+said so in one line above a password prompt, and handed control to a script
+with every reason to trust its environment. A non-zero exit would have put
+the failure at the door with its reason attached. Instead it surfaced forty
+seconds later as a missing file in a directory nobody recognised, and the
+only reason it surfaced at all is that the script prints the absolute path
+it looked in.
+
+That last detail is the transferable half. **A refusal that names what it
+looked for diagnoses failures it was not written for.** The guard here
+exists to catch a wrong build *order*; it caught a wrong *environment*,
+because the path in its message was the whole answer.
+
+**Consequence.** Every root-needing path in this repository takes sudo on
+the entry point. Anything deriving a path from `$HOME` that can run as root
+is suspect: the Yocto side's `scripts/common.sh` computes `KAS_WORK_DIR`
+the same way, and while nothing there runs under sudo today, nothing
+prevents it either.
+
+And every guard gets read once more with this question: if it refuses, does
+its message contain enough to diagnose a cause nobody anticipated?

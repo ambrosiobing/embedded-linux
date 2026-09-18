@@ -6,8 +6,8 @@
 # RUNS ON THE HOST, with the card in a reader. Not on the board.
 #
 #   . projects/02-neo-air-mainline/toolchain.env
-#   sudo -E sh projects/02-neo-air-mainline/tools/sdcard.sh /dev/sdX
-#   sudo -E sh projects/02-neo-air-mainline/tools/sdcard.sh -n /dev/sdX
+#   sudo ./go neo-air card /dev/sdX
+#   sudo ./go neo-air card -n /dev/sdX
 #
 # THE DEVICE IS NEVER GUESSED. It is an argument, it is checked against a
 # list of things that are almost certainly not a card, and the operator
@@ -59,8 +59,10 @@ DEV=${1:-}
        lsblk lists the candidates. The device is never guessed."
 
 [ "${NEO_ENV:-}" = 1 ] || die "toolchain.env has not been sourced.
-       . projects/02-neo-air-mainline/toolchain.env
-       sudo keeps its own environment, so use sudo -E."
+       sudo ./go neo-air card /dev/sdX
+       That sources it inside the sudo, which is the only form that
+       works. Sourcing it in your own shell does not survive sudo, and
+       -E does not rescue it on a sudo that ignores -E."
 
 # ------------------------------------------------------- what it refuses
 
