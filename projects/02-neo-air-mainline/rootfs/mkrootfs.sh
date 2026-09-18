@@ -154,32 +154,57 @@ chroot "$ROOT" apt-get install -y --no-install-recommends \
 	systemd-sysv udev openssh-server wpasupplicant firmware-brcm80211 \
 	iproute2 iputils-ping e2fsprogs rsync fdisk
 
-# What the radio will actually find at boot, listed here rather than
-# discovered on the board with a console and no network.
+# The NVRAM, under the name the driver will actually ask for.
 #
-# brcmfmac wants two files and Debian packages only one of them. The .bin
-# comes from firmware-brcm80211. The NVRAM .txt beside it is board
-# specific, Debian does not carry the AP6212 one, and without it the
-# driver loads the firmware and then times out bringing the SDIO clock up.
-# That failure reads exactly like broken hardware.
+# brcmfmac needs two files. The .bin is unambiguous. The NVRAM is not: the
+# driver builds its filename from the board type, which it takes from the
+# device tree's root compatible string, and falls back to a generic name:
 #
-# This prints rather than refuses. The .txt is the one input this project
-# cannot pin, so a refusal here would block a build over something that is
-# fetched by hand afterwards. docs/BRINGUP.md section 5 says from where.
-note "brcm firmware for this chip:"
-fw=$(find "$ROOT/lib/firmware/brcm" -name 'brcmfmac43430*' \
-	-printf '%f\n' 2>/dev/null | sort)
-if [ -n "$fw" ]; then
-	printf '%s\n' "$fw" | sed 's/^/---            /'
+#   brcmfmac43430-sdio.friendlyarm,nanopi-neo-air.txt   asked for first
+#   brcmfmac43430-sdio.txt                              tried next
+#
+# firmware-brcm80211 ships neither of those names. It does ship
+# brcmfmac43430-sdio.AP6212.txt, and the AP6212 is the module on this
+# board: a BCM43430 with Bluetooth on one SDIO bus. NVRAM is a property of
+# the module, its crystal and its antenna path, rather than of the carrier
+# it is soldered to, which is why the vendor name is the useful one and why
+# Debian ships it that way.
+#
+# So the file this project was going to fetch by hand from a vendor image
+# has been in the archive the whole time, under a name the driver will
+# never request. Installing it under the name the driver does request
+# removes the only unpinned input in Project 2.
+#
+# The first version of this check asked whether any .txt existed in that
+# directory. Fourteen do, for Raspberry Pis and Banana Pis and two
+# tablets, and none of them is the one this board needs. It reported
+# success. Same failure as the config checks: a narrower question than the
+# claim above it.
+FWDIR=$ROOT/lib/firmware/brcm
+FWBIN=$FWDIR/brcmfmac43430-sdio.bin
+NVWANT=$FWDIR/brcmfmac43430-sdio.$BOARD_COMPATIBLE.txt
+NVFALLBACK=$FWDIR/brcmfmac43430-sdio.txt
+NVSRC=$FWDIR/brcmfmac43430-sdio.AP6212.txt
+
+note "brcm firmware:"
+[ -f "$FWBIN" ] || die "firmware-brcm80211 installed and $FWBIN is not there.
+       The package moved its contents or the install did not do what it
+       said. Without the firmware there is no radio at all."
+note "           brcmfmac43430-sdio.bin"
+
+if [ -f "$NVWANT" ] || [ -f "$NVFALLBACK" ]; then
+	note "           nvram already present under a name the driver asks for"
+elif [ -f "$NVSRC" ]; then
+	cp "$NVSRC" "$NVWANT"
+	note "           nvram installed from brcmfmac43430-sdio.AP6212.txt as"
+	note "           brcmfmac43430-sdio.$BOARD_COMPATIBLE.txt"
+	note "           sha256 $(sha256sum "$NVWANT" | cut -d' ' -f1)"
 else
-	note "           none at all, so brcmfmac will find no firmware"
+	note "           NO NVRAM under any name this driver asks for."
+	note "           brcmfmac will load the firmware and then time out"
+	note "           bringing the SDIO clock up, which reads exactly like"
+	note "           broken hardware. See docs/BRINGUP.md section 5."
 fi
-case $fw in
-*.txt*) ;;
-*)
-	note "           no NVRAM .txt here. It is the one vendor artefact in"
-	note "           this project: see docs/BRINGUP.md section 5." ;;
-esac
 
 # ------------------------------------------------- the modules, then depmod
 
@@ -221,6 +246,19 @@ EOF
 
 chroot "$ROOT" systemctl enable systemd-networkd
 chroot "$ROOT" systemctl enable wpa_supplicant@wlan0 || true
+
+# The ssh host keys openssh-server's postinst generated a moment ago are
+# this build machine's keys, made inside the chroot. Left in the tar they
+# become the keys of every board ever written from it, and the private
+# half travels with the image. A private key everything shares is not a
+# key, and the comment field carries the build host's name as well.
+#
+# Deleted here, regenerated on the board at first boot by a unit in the
+# overlay. ssh-keygen -A writes only what is missing, so it is idempotent
+# and a reflashed board does it once.
+note "removing the build host's ssh host keys"
+rm -f "$ROOT"/etc/ssh/ssh_host_*
+chroot "$ROOT" systemctl enable regenerate-ssh-host-keys
 
 # Root has no password and no console login is possible without one. This
 # is a bench board on an isolated network, and the console is a cable

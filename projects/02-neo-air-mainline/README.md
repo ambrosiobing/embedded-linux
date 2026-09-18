@@ -172,7 +172,7 @@ that the discovery and the filesystem work can be pointed at fixtures.
 | Pin 2 of the debug header carries 5 V onto a 3.3 V line | the red lead is taped rather than merely unused, and `docs/DESIGN.md` gives the wiring per pin |
 | Block device names are assigned in probe order | the eMMC is found by sysfs type, never by name, and `root=` is by `PARTUUID` |
 | `brcmfmac` is a module, and a rootfs built before the modules exist has no Wi-Fi and no message | `mkrootfs.sh` refuses without `$NEO_OUT/kernel-version`, and asserts `brcmfmac` is in `modules.dep` after `depmod` |
-| The NVRAM file `brcmfmac` needs is not a kernel option | recorded as the only vendor artefact in the project, with its origin and checksum, in `docs/BRINGUP.md` |
+| The NVRAM file `brcmfmac` needs is not a kernel option, and Debian ships it under a name the driver never asks for | `mkrootfs.sh` installs `brcmfmac43430-sdio.AP6212.txt` under the board-specific name and prints its `sha256sum`, so the project has no unpinned input |
 | The device-tree path moved in 6.5 | `kernel/build.sh` looks in both and says which it found; a missing `.dtb` gives a board that stops after `Starting kernel ...` with nothing further |
 | `sudo` drops the pinned environment, and some sudo implementations ignore `-E` while saying so only on stderr | the root-needing steps go through `./go neo-air`, which sources `toolchain.env` inside the sudo, and `$NEO_WORK` is derived from `SUDO_USER` rather than from `$HOME` |
 

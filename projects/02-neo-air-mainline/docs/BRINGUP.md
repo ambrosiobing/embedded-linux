@@ -129,6 +129,11 @@ of this project is not possible until it does. That is criterion 1.
 
 Then let it boot. `neo-air login:` is the second milestone.
 
+The first boot generates this board's ssh host keys, which takes a few
+seconds and happens once. The image deliberately ships without them: they
+would otherwise be the build machine's keys, identical on every board
+written from the same tar.
+
 **Capture the whole thing to `docs/bootlog-sd.txt`.** `picocom -g` logs to
 a file; so does `script`. Complete, from the SPL banner, not excerpted:
 Project 3 measures and shortens this boot and cannot do either from a log
@@ -156,13 +161,28 @@ brcmfmac43430-sdio.friendlyarm,nanopi-neo-air.txt      preferred
 brcmfmac43430-sdio.txt                                 fallback
 ```
 
-If Debian's `firmware-brcm80211` does not carry one, the AP6212 `nvram.txt`
-from the FriendlyElec vendor image or from `armbian/firmware` goes in under
-the board-specific name.
+**`mkrootfs.sh` already installed it, and this is worth knowing about.**
 
-**This is the only vendor artefact in the project.** Record where it came
-from and its `sha256sum` in this file when it is installed, because it is
-the one input that is not pinned by `toolchain.env`.
+`firmware-brcm80211` carries neither of those two names. It carries
+`brcmfmac43430-sdio.AP6212.txt`, and the AP6212 is the module on this
+board: a BCM43430 with Bluetooth on one SDIO bus. NVRAM describes the
+module, its crystal and its antenna path, not the carrier it is soldered
+to, which is why the vendor name is the useful one.
+
+So the file is copied to the board-specific name during the root filesystem
+build, and the script prints its `sha256sum` when it does. There is no
+vendor image to download and nothing unpinned left in this project.
+
+If `dmesg` still shows the SDIO timeout, check the name the driver asked
+for rather than assuming the file is wrong:
+
+```
+dmesg | grep -i 'brcmfmac.*\(nvram\|txt\|failed\)'
+```
+
+A name other than `brcmfmac43430-sdio.friendlyarm,nanopi-neo-air.txt` means
+the device tree's root compatible is not what `BOARD_COMPATIBLE` in
+`toolchain.env` says, and that is the thing to fix.
 
 Then:
 

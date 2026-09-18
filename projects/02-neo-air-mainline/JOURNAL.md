@@ -823,3 +823,133 @@ that line would have had to work out why it was written that way.
 Fixed by running the edit from a file instead, with the backslashes built
 from `chr(92)` and an `assert` on every anchor, which is what the skill says
 to do when a script must do it at all.
+
+## 13. The vendor artefact was in the archive all along, and my own check missed it
+
+*19 September 2026. The session ran past midnight; everything before this
+entry is the 18th.*
+
+`rootfs.tar`, 393 MB. All three artefacts now exist. And the listing I
+added one commit earlier, specifically so that the firmware situation would
+be visible at build time rather than on the board, printed this:
+
+    ---            brcmfmac43430-sdio.AP6212.txt
+    ---            brcmfmac43430-sdio.Hampoo-D2D3_Vi8A1.txt
+    ---            brcmfmac43430-sdio.MUR1DX.txt
+    ---            brcmfmac43430-sdio.bin
+    ---            brcmfmac43430-sdio.clm_blob
+    ---            brcmfmac43430-sdio.raspberrypi,3-model-b.txt
+    ---            brcmfmac43430-sdio.raspberrypi,model-zero-w.txt
+    ---            brcmfmac43430-sdio.sinovoip,bpi-m2-plus.txt
+    ---            ... and six more
+
+Two things are true about that list and they point in opposite directions.
+
+### The good one: there is no vendor artefact
+
+`docs/BRINGUP.md` has said since the first day that the NVRAM is the only
+input this project cannot pin, to be fetched by hand from a FriendlyElec
+vendor image or from `armbian/firmware`, with its origin and `sha256sum`
+recorded because nothing else could vouch for it.
+
+`brcmfmac43430-sdio.AP6212.txt` is in `firmware-brcm80211`. The **AP6212 is
+the module on this board**: a BCM43430 with Bluetooth on one SDIO bus.
+NVRAM describes the module, its crystal and its antenna path, not the
+carrier it happens to be soldered to, which is exactly why the vendor's
+name for it is the useful one and why Debian ships it that way.
+
+So the file was in the archive the whole time, packaged and versioned,
+under a name the driver will never ask for. Copy it to the name the driver
+does ask for and Project 2 has **no unpinned input at all**. That is a
+better state than the one the design document assumed was unavoidable, and
+it came from printing a directory listing.
+
+### The bad one: my check said everything was fine
+
+The check I wrote ended like this:
+
+    case $fw in
+    *.txt*) ;;
+    *)  note "           no NVRAM .txt here." ;;
+    esac
+
+Fourteen `.txt` files are in that directory. Not one of them is the file
+this board needs. The check asked **is there any .txt** and the sentence
+above it claimed to answer **will the radio work**, and it printed nothing
+because a Raspberry Pi Zero W's NVRAM is a `.txt`.
+
+That is decision 101, committed by the person who wrote decision 101, in
+the commit immediately after it. The tally of guards answering a narrower
+question than their own claim is now five, and this one is mine from
+today rather than inherited from a previous week.
+
+The honest reading is that writing the decision down does not install the
+habit. What would have caught it is the thing the decision actually says:
+take the sentence above the check, ask what a failure would look like, and
+check whether this code would see it. "No NVRAM" and "no `.txt` at all" are
+different failures and only one of them was being looked for.
+
+### What the driver actually asks for
+
+    brcmfmac43430-sdio.friendlyarm,nanopi-neo-air.txt   first
+    brcmfmac43430-sdio.txt                              then this
+
+The first name is built from the device tree's root compatible string. It
+is now `BOARD_COMPATIBLE` in `toolchain.env`, beside `BOARD_DTB`, because
+it is the same fact written for a different consumer, and a string like
+that duplicated in two files drifts.
+
+The check now looks for those two names and nothing else, copies the
+AP6212 file to the first one when neither exists, and prints the
+`sha256sum` of what it installed. Exercised in five states, including the
+one that caught this: `.txt` files present, none of them usable. That state
+is in the harness precisely because it is the bug.
+
+If the board still shows the SDIO timeout, `BRINGUP.md` now says to read
+the name the driver asked for rather than assume the file is wrong. A
+different name means `BOARD_COMPATIBLE` disagrees with the device tree,
+which is a one-line fix in the right place instead of an evening with a
+vendor image.
+
+### A second thing the build output confessed
+
+    Creating SSH2 ED25519 key; this may take some time ...
+    256 SHA256:wj+DEdTiHXZ1kObreZV/+t6LSSimHTo+bl9DiZBmTxE root@JPTOUPM678
+
+`openssh-server`'s postinst generates host keys when it is installed, and
+it was installed inside a chroot on the build machine. Those keys went into
+the tar. Every board ever written from that image would present the same
+host key, with the private half travelling inside a 393 MB file that gets
+copied to desktops and archives, and the comment field naming the build
+host.
+
+A private key that everything shares is not a key.
+
+The keys are now deleted before packing and regenerated on the board at
+first boot by a unit in the overlay. `ssh-keygen -A` writes only what is
+missing and the unit has a `ConditionPathExists` on the ed25519 key, so a
+board that already has them does nothing.
+
+Nobody asked for this and it was not in the specification. It was in the
+build output, in plain text, and it had been there on the previous run too.
+The difference today is that the output was read rather than scrolled.
+
+### Noise that is not a problem
+
+`E: Can not write log (Is /dev/pts mounted?) - posix_openpt` and
+`invoke-rc.d: could not determine current runlevel` are both chroot
+artefacts. There is no pty and no running init inside a `debootstrap`
+target, `dpkg` says so and carries on, and every package configured
+correctly. Recorded here so the next reader does not spend time on them.
+
+### Where Project 2 stands
+
+| Artefact | State |
+|---|---|
+| `u-boot-sunxi-with-spl.bin` | built, 513912 bytes |
+| `zImage` and the board dtb | built, 6.12.0 |
+| `modules/lib/modules/6.12.0` | built, `brcmfmac` in `modules.dep` |
+| `rootfs.tar` | built, 393 MB, rebuilding for the two fixes above |
+
+Nothing has touched hardware. The next command writes a card, and the one
+after that is the first time this project meets the board.

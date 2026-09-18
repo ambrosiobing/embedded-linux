@@ -1,0 +1,30 @@
+# Regenerate the SSH host keys on the board, once.
+#
+# openssh-server's postinst generates host keys when it is installed, and
+# it is installed inside a chroot on the build machine. Those keys are
+# therefore built into the image: every board written from one tar would
+# present the same host key, and the private half of it sits in a 393 MB
+# file that gets copied around. A private key that every board shares is
+# not a key. The comment field even carries the build machine's hostname.
+#
+# mkrootfs.sh deletes them before packing and enables this unit, which
+# puts the generation back where it belongs: on the board, at first boot,
+# once.
+#
+# ssh-keygen -A writes only the key types that are missing, so this is
+# idempotent, and the condition below means it does not even run on a
+# board that already has them.
+
+[Unit]
+Description=Regenerate the SSH host keys this image was deliberately built without
+Documentation=man:ssh-keygen(1)
+Before=ssh.service
+ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ssh-keygen -A
+
+[Install]
+WantedBy=multi-user.target
