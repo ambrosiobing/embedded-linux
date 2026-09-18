@@ -140,15 +140,15 @@ beside it. That is the whole derivation.
           |  MCC 118 DAQ HAT                          |
           |  +-------------------------------------+  |
           |  | CH0 CH1 CH2 ... CH7  GND   (screws) |  |
-          |  +--^-------------------^--------------+  |
-          |     | signal               | ground       |
-          |     |                      |              |
+          |  +--^--------------------^-------------+  |
+          |     | blue               | green          |
+          |     |                    |                |
           |  [stacking header, pins 38 and 39 at this end]
-          +-----|----------------------|--------------+
-                |                      |
-                |   short jumpers      |
-                |                      |
-          +-----|----------------------|--------------+
+          +-----|--------------------|----------------+
+                |                    |
+                |   short jumpers    |
+                |                    |
+          +-----|--------------------|----------------+
           |  [40 pin header]                          |
           |                                           |
           |  Raspberry Pi                      [ETH]  |
@@ -188,17 +188,18 @@ address jumper block `W1`; and the four-wire USB to TTL cable entering from
 the left. The Pi is identifiable as a 4 by its two USB 3 ports and its
 Ethernet magnetics.
 
-Two things the photograph does **not** settle, and neither should be read
-out of it. Which header pin each jumper occupies cannot be resolved at this
-angle, so the pin table in the schematic above remains the only authority
-for that. And which of the two wires is signal and which is ground is not
-visible either, which is why the drawing now labels them by function.
+What the photograph does **not** settle: which header pin each jumper
+occupies cannot be resolved at this angle, so the pin table in the
+schematic above remains the only authority for that.
 
-One disagreement is already visible and is recorded rather than tidied
-away: the drawing called the jumpers orange and black, and the bench uses
-blue and teal. The colours were only ever there to tell the two wires
-apart, so the drawing now says `signal` and `ground`, which is true whatever
-is in the drawer.
+The wire colours in the bench layout above were corrected against this
+photograph and then against the bench itself. The drawing originally said
+orange and black, which no longer matched anything; the photograph showed
+blue and green but could not say which went where, because neither wire can
+be followed from its housing to its terminal in a single frame. **Blue to
+CH0 and green to GND is reported by the person holding the board, not read
+out of the image**, and it is written down here in those terms so that a
+later reader knows which of the two it rests on.
 
 ## One run as an activity diagram
 

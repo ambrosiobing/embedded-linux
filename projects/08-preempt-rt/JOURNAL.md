@@ -3687,3 +3687,53 @@ What can be shown on that host is narrower and worth stating as exactly
 that: where the old literal was correct, the derived value equals it, so the
 change cannot regress a machine that was already passing. The proof that it
 fixes the failure has to be run where the failure lives.
+
+---
+
+## 65. The ground wire in the bench drawing was never connected to anything
+
+**What happened.** The photograph went in with the two jumpers labelled by
+function rather than by colour, because the image cannot show which wire
+lands on which terminal. Told from the bench that blue goes to CH0 and
+green to GND, the labels went back to colours, and putting them there meant
+counting columns in the figure.
+
+Which found a defect that had been in the drawing since it was written. The
+arrow into `GND` sits at column 37. The vertical line for that wire sat at
+column 39. **The ground wire descended from two columns to the right of the
+terminal it serves, connected to nothing**, and continued that way down
+through the jumper run and both box edges. The signal wire was correct at
+column 16 the whole time, which is why nothing looked wrong: one wire lined
+up, the other was off by an amount the eye reads as drawing slack.
+
+**What was done.** The whole right-hand run moved to column 37, so the arrow
+into `GND`, the wire label, the jumper run and the terminal name now agree.
+Checked by extracting the column index of each from the file rather than by
+looking:
+
+```
+CH0 / GND    [16, 37]
+arrows       [16, 37]
+wire labels  [16, 37]
+jumper run   [16, 37]
+```
+
+The first attempt at the move was done by shifting characters and it left
+the `green` label three columns adrift and trailing whitespace on three
+lines. Fixed, and the column check above is the reason that was noticed at
+all.
+
+**Why that and not the alternative.** The alternative was to move the arrow
+right to meet the wire. That lines the figure up too and points the arrow
+past the end of `GND` at empty silkscreen, which is worse than the defect:
+it would make the drawing say the ground jumper goes to no terminal, and
+say it neatly.
+
+**What this says about the format.** These figures are chosen over rendered
+images because they diff and grep, and the cost is that nothing validates
+them. A mermaid block that does not parse fails to render; an ASCII box
+with a line in the wrong column renders perfectly and is wrong. This one
+survived being written, reviewed, published and read back several times,
+and was caught only because a photograph arrived and forced someone to
+count. Worth remembering before trusting an ASCII pin diagram that has
+never been checked against hardware.
