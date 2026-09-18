@@ -1,0 +1,34 @@
+[Unit]
+Description=Raise the boot-complete marker on PA6 when startup has finished
+Documentation=https://github.com/ambrosiobing/embedded-linux
+
+# NOT "After=multi-user.target". A unit that is wanted by a target and also
+# ordered after it is an ordering cycle, and systemd breaks a cycle by
+# dropping a unit from the transaction. The unit it drops may be this one,
+# in which case the marker never rises and the run is indistinguishable
+# from a board that failed to boot, which is the exact thing this marker
+# exists to detect. The waiting is done at runtime instead, below.
+DefaultDependencies=no
+After=basic.target
+
+[Service]
+Type=simple
+
+# is-system-running --wait returns when the startup job queue is empty,
+# which is the same definition of "boot complete" that systemd-analyze time
+# reports. That is what lets the electrical number and the console number
+# be compared at all.
+#
+# It returns "running" OR "degraded", and the marker rises either way, on
+# purpose: a degraded startup is still a finished startup, its duration is
+# a real measurement, and the degradation is visible in the journal.
+# Raising the marker only on "running" would silently discard the runs most
+# worth looking at.
+#
+# One line rather than a backslash continuation. Both are valid to systemd;
+# this repository has lost four edits to swallowed continuations, so the
+# one-line spelling is preferred wherever it fits.
+ExecStart=/bin/sh -c 'systemctl is-system-running --wait >/dev/null; echo 1 > /sys/class/leds/boot-marker/brightness'
+
+[Install]
+WantedBy=basic.target

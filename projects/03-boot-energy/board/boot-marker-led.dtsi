@@ -1,0 +1,65 @@
+/*
+ * Project 3: the boot-complete marker, PA6, header pin 12.
+ *
+ * WHY THIS IS A .dtsi AND NOT THE 0001-dts-boot-marker-led.patch THE
+ * SECTION ASKS FOR.
+ *
+ * A patch is a diff against specific lines of a specific tree. Project 2
+ * has not checked out or built a kernel yet, so there is no such tree in
+ * this repository, and writing a unified diff would mean inventing hunk
+ * headers and context lines that
+ * have never been compared against the file they claim to describe. That
+ * is a fabrication wearing the format of evidence, and this repository has
+ * already paid once for reasoning written in the same voice as an
+ * observation.
+ *
+ * So the node is kept in the form that can be checked now, and the patch
+ * is generated in Project 2 against the real tree:
+ *
+ *     cp board/boot-marker-led.dtsi <tree>/arch/arm/boot/dts/
+ *     # add the &leds block below to sun8i-h3-nanopi-neo-air.dts
+ *     git -C <tree> format-patch -1 -o <here>/board/
+ *
+ * The leds node already exists in sun8i-h3-nanopi.dtsi with the board's
+ * power and status LEDs. This adds a child to it; it does not create it.
+ *
+ * WHY AN LED AND NOT A RAW GPIO. The marker is written by a systemd unit,
+ * and the LED class gives it a file to write with no tool installed:
+ * /sys/class/leds/boot-marker/brightness. A raw GPIO would need libgpiod
+ * on the rootfs, which is a package in the boot path of the thing being
+ * timed. It also gives the visible green LED on the breadboard for free,
+ * on the same pin, so a failed run is obvious from across the desk.
+ *
+ * Ownership, from docs/DESIGN.md: PA6 belongs to the kernel as this LED.
+ * Nothing else writes it, and in particular no gpioset during a
+ * measurement, because two writers on the marker line is two answers to
+ * when the boot finished.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+&leds {
+	led-boot-marker {
+		label = "boot-marker";
+
+		/*
+		 * PA6. Bank 0 is PA, pin 6, which is pin 12 on the 24-pin
+		 * header and the pin the PPK2 reads as D0.
+		 *
+		 * ACTIVE_HIGH because the marker is an event and not a
+		 * state: the PPK2 looks for a rising edge, so the line has
+		 * to start low and go high exactly once. default-state
+		 * below is what guarantees the "starts low" half.
+		 */
+		gpios = <&pio 0 6 GPIO_ACTIVE_HIGH>;
+
+		/*
+		 * NOT "keep", and not omitted. An LED that comes up in an
+		 * undefined state, or that keeps whatever the previous boot
+		 * left, gives analyze.py no rising edge to find and the run
+		 * is discarded as "D0 never rose" when in fact it never
+		 * fell.
+		 */
+		default-state = "off";
+	};
+};

@@ -1,0 +1,22 @@
+# unit                                 action   reason
+#
+# NOTHING IS REMOVED WITHOUT A LINE HERE. The reason column is what makes
+# the change reversible by someone who was not present, and the last column
+# of the section's own table is the one people leave out.
+#
+# This file is a TEMPLATE until Project 2 produces a system. The units below
+# are the candidates the section names for a Debian system that is not a
+# desktop; which of them exist on the actual rootfs is not known yet, and a
+# unit listed here that was never present would be a claim about a system
+# nobody has booted.
+
+systemd-networkd-wait-online.service   mask     nothing at boot needs the network
+e2scrub_reap.service                   disable  no LVM, nothing to reap
+apt-daily.timer                        disable  no unattended package work on a bench board
+apt-daily-upgrade.timer                disable  same
+fake-hwclock.service                   disable  only if a real RTC is present, and it is not here
+ModemManager.service                   disable  pulled in by a dependency, no modem on this board
+systemd-journald                       config   Storage=volatile, no journal writes to the eMMC during boot
+wpa_supplicant@wlan0.service           keep     started, but nothing is ordered after it, so it holds no
+                                     #          place in the critical chain and the marker does not wait
+                                     #          for an access point. Measured both ways in 40-final.

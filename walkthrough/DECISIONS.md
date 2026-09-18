@@ -2807,3 +2807,37 @@ at all, and `results/README.md` says so rather than drawing one from summary
 columns. The second is that a photograph, once admitted, does not diff and
 does not grep, which is a real departure and is why it is confined to
 evidence.
+
+## 97. A document that describes a program is a claim about it, and nothing tests it
+
+Project 3's design document carried a data-flow block saying
+`analyze.py -> results/<variant>/summary.md`, and named
+`docs/before-after.md` beside it. The program printed its summary to stdout
+and wrote no file. The other document did not exist. Both were written in
+the same hour as the code they described, by the same hand, and both were
+wrong the moment they were written.
+
+Nothing caught it. The linter checks links, not claims. The test suite
+asserted on the program's behaviour and had no opinion about any document.
+Thirty-nine assertions passed while the design document described a program
+that did not exist. It surfaced only because someone asked whether the
+project was finished and the answer required going to look.
+
+This repository already knows the shape from the other direction: a claim
+written when it was true and left standing after the thing changed, which
+is what Project 8's "the difference is the cost of a GPIO write" was and
+what "Project 2 has not been done" became inside a single session. This is
+the same failure with the arrow reversed. The claim was never true, and
+being new is no protection at all.
+
+The rule is not "write fewer documents". The design document was right and
+the program was behind it: `summary.md` is what the Makefile needs and what
+the before-and-after table is assembled from, so the fix was to write the
+file, not to soften the sentence. Choosing the other direction is the real
+hazard, because editing a document to match the code is always the faster
+option and it silently lowers what the project set out to do.
+
+So: **when a document names an artefact, go and look for it.** Not as a
+lint rule, because a lint rule would only find paths, and the claims worth
+checking are behavioural. As a step, at the point where the work is called
+finished, and before it is called finished to anyone else.

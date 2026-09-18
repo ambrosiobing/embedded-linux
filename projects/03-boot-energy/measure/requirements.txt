@@ -1,0 +1,9 @@
+# Host side only. Nothing here goes on the board.
+#
+# ppk2-api has renamed its digital-channel helpers between releases, and
+# measure/ppk2_boot.py calls get_samples() and digital_channels(). Pin the
+# version that was verified on this bench rather than tracking the tip,
+# and record in the journal which one it was.
+ppk2-api
+numpy
+matplotlib
