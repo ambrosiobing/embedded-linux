@@ -66,6 +66,40 @@ for tool in bison flex swig dtc make; do
 		die "$tool is missing. See docs/BRINGUP.md for the package list."
 done
 
+# Headers, which command -v cannot see.
+#
+# This check exists because the loop above claimed to name whichever
+# dependency was missing, and then a build failed forty seconds in with
+#
+#   tools/mkeficapsule.c:20:10: fatal error: gnutls/gnutls.h:
+#   No such file or directory
+#
+# command -v answers a question about executables. U-Boot's host tools also
+# need development headers, and a missing header is invisible to it. The
+# check was true about the thing it looked at and silent about the rest,
+# which is this repository's oldest recurring shape.
+#
+# pkg-config rather than a path test, because the include directory is
+# multiarch and differs between distributions, and a hardcoded
+# /usr/include/gnutls would be a second wrong answer.
+if command -v pkg-config >/dev/null 2>&1; then
+	for lib in gnutls openssl; do
+		pkg-config --exists "$lib" 2>/dev/null ||
+			die "the $lib development headers are missing.
+
+       U-Boot builds mkeficapsule and other host tools that include them,
+       and a missing header is not visible to a check that looks for
+       executables, so this fails partway through the build rather than
+       at the start.
+
+       sudo apt install libgnutls28-dev libssl-dev"
+	done
+else
+	note "pkg-config is absent, so the header check is skipped"
+	note "           a missing development header will surface as a"
+	note "           compile error partway through the build"
+fi
+
 TREE=$NEO_SRC/u-boot
 mkdir -p "$NEO_SRC" "$NEO_OUT"
 

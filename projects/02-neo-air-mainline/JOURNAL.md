@@ -369,3 +369,118 @@ uses recording stubs has the same exposure, and the failure mode is not a
 false pass. It is a **false accusation**: a correct program reported as
 broken, whose natural fix on the next reading is to weaken the assertion
 rather than to widen the stub.
+
+## 9. The dependency check could only see executables, and the first artefact
+
+The bootloader builds. `u-boot-sunxi-with-spl.bin`, 513912 bytes, is the
+first artefact this project has produced, and the last three failures
+before it were all the same failure wearing different clothes.
+
+### What happened, in order
+
+With `UBOOT_TAG` moved to `v2025.10`, SWIG was satisfied and `pylibfdt`
+disappeared from the output entirely. The build got as far as the host
+tools and stopped:
+
+    tools/mkeficapsule.c:20:10: fatal error: gnutls/gnutls.h:
+    No such file or directory
+    make[1]: *** [scripts/Makefile.host:114: tools/mkeficapsule.o] Error 1
+
+Forty seconds in. `sudo apt install -y libgnutls28-dev` pulled twelve
+packages, 13.4 MB, and the next run went all the way through.
+
+### The finding, which is not the package
+
+`uboot/build.sh` says in its own header that it names whichever dependency
+is missing rather than failing partway through a make. Then it failed
+partway through a make.
+
+The check was this:
+
+    for tool in bison flex swig dtc make; do
+        command -v "$tool" >/dev/null 2>&1 || die ...
+    done
+
+`command -v` answers a question about **executables**. U-Boot's host tools
+also need development headers, and a header is not an executable, so the
+entire class was outside what the check could see. It was true about the
+thing it looked at and silent about the rest.
+
+That is this repository's oldest recurring shape, and it now has four
+instances. The kernel-config check that passed vacuously on Project 8's
+control arm. `newest_path` ranking a symlink against its own target. The
+merge guard reading `merge_config.sh`'s prose instead of the produced
+`.config`, yesterday. And this. Every one of them reported honestly on a
+narrower question than the one being asked.
+
+### The fix, and the option that was rejected
+
+Two ways to test for a header from a shell script.
+
+**A path test**, `[ -r /usr/include/gnutls/gnutls.h ]`. Rejected. The
+include directory is multiarch, differs between distributions, and a
+hardcoded path is a second wrong answer that happens to be right on one
+machine. The failure mode is worse than the one being fixed: a guard that
+refuses on a host where the header is present and simply lives elsewhere.
+
+**`pkg-config --exists`**, which asks the system where its headers are
+rather than assuming. Chosen. `gnutls` and `openssl` are both checked,
+because `libssl-dev` is the same exposure and was in the package list only
+by luck.
+
+`pkg-config` can itself be absent, and there the script says so out loud:
+
+    --- pkg-config is absent, so the header check is skipped
+    ---            a missing development header will surface as a
+    ---            compile error partway through the build
+
+A skipped check that announces the skip is a different object from a check
+that quietly passes. The second is what produced the Project 8 control
+problem in the first place.
+
+### Exercised before it was believed
+
+The new check was run in all three states with a standalone harness rather
+than by reading it:
+
+| State | Result |
+|---|---|
+| library absent | dies, names the library, prints the apt line |
+| both present | passes, build continues |
+| `pkg-config` itself absent | notes the skip, continues |
+
+The middle row is the one that is easy to skip and the one that would have
+turned a fix into a new blocker.
+
+### What the successful build says, for the next reader
+
+Worth reading in that output rather than scrolling:
+
+- `Value of CONFIG_MMC_SUNXI_SLOT_EXTRA is redefined by fragment`, then
+  `Previous value: -1`, `New value: 2`. That is the fragment overriding the
+  defconfig on the one option that makes U-Boot see the eMMC. Yesterday
+  this line was treated as an error and refused a correct build. Today it
+  is printed and ignored, and the check that follows it,
+  `every fragment option is present in .config`, is the one that carries
+  the claim.
+- `DTC arch/arm/dts/sun8i-h3-nanopi-neo-air.dtb`, in a list of twenty-six
+  sunxi boards. U-Boot builds every board in the family and picks one.
+- `MKIMAGE spl/sunxi-spl.bin`, then `MKIMAGE u-boot.img`, then `BINMAN`.
+  Binman is what concatenates SPL and U-Boot proper into the single file
+  written to byte 8192, and binman is why `pylibfdt` was not skippable and
+  why the tag had to move.
+- `HOSTLD tools/mkeficapsule` now appears in the first twenty lines, near
+  the top of the host-tool phase. That is how early the failure was, and
+  how cheap a start-of-run check would have been.
+
+### 513912 bytes, and what is in them
+
+Not a round number and not meant to be. SPL is the first 32 KiB of it, the
+part the boot ROM copies into SRAM before there is any DRAM; U-Boot proper
+is the rest, running from DRAM the SPL has just initialised. One file,
+written to one address, because the boot ROM only knows one address.
+
+Nothing has touched hardware yet. The next artefact is the kernel, then the
+root filesystem, and the root filesystem cannot be built before the kernel
+because `brcmfmac` is a module and a filesystem built first is a board with
+no Wi-Fi and nothing in `dmesg` to say why.

@@ -2955,3 +2955,55 @@ stale.
 
 This will happen again. Every pinned input in this repository is a bet that
 the host stays still, and hosts do not.
+
+## 101. A check's scope is part of its claim, and has to be stated or widened
+
+**Context.** `uboot/build.sh` opens by saying it names whichever dependency
+is missing rather than failing partway through a make. Its check was a loop
+over `command -v` for five tools. On 18 September 2026 it passed, and the
+build then died forty seconds later on
+`tools/mkeficapsule.c:20:10: fatal error: gnutls/gnutls.h`.
+
+`command -v` answers a question about executables. Development headers were
+never in its field of view. The check was completely correct about the
+thing it looked at and completely silent about the rest, and the header
+sits at the top of a mandatory host tool.
+
+**Decision.** A check that cannot cover the claim above it is either
+widened until it can, or the claim is narrowed to what it actually covers.
+Here it was widened: `pkg-config --exists` for `gnutls` and `openssl`,
+asking the system where its headers live rather than assuming.
+
+Where the widening itself can be unavailable, the gap is announced. If
+`pkg-config` is absent the script prints that the header check is skipped
+and that a missing header will surface as a compile error. A skipped check
+that says so is a different object from a check that quietly passes.
+
+**Rejected.** A path test, `[ -r /usr/include/gnutls/gnutls.h ]`. The
+include directory is multiarch and differs between distributions, so this
+is a second wrong answer that is right on one machine, and its failure mode
+is worse than the one being fixed: refusing to build on a host where the
+header is present and merely elsewhere.
+
+**Why.** This is the fourth guard in this repository to report honestly on
+a narrower question than the one being asked:
+
+| Guard | Answered | Was asked |
+|---|---|---|
+| Project 8 kernel-config check | is the fragment listed | did the option reach the built kernel |
+| newest_path | which path is newest | which distinct artefact is newest |
+| uboot merge guard | what did merge_config.sh say | is the option in .config |
+| uboot dependency loop | are these executables on PATH | can this build start |
+
+None of them is a bug in the ordinary sense. Every one returned the truth.
+The defect is the gap between the question the code asks and the sentence
+written above it, and that gap is invisible while the check is passing.
+
+**Consequence.** When a script's header makes a promise, the promise is the
+specification for its guards, not a description of them. The cheap
+discipline: read the comment, then ask what a failure would look like if
+the comment were wrong, and check whether the guard would catch it.
+
+The corollary is the reason the skip message exists. An unavailable check
+must never be indistinguishable from a satisfied one, which is exactly what
+Project 8's control arm cost, twice.

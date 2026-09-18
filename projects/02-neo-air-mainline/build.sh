@@ -114,7 +114,7 @@ need_toolchain() {
        sudo apt install gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf \\
            bison flex swig device-tree-compiler u-boot-tools bc \\
            libncurses-dev libssl-dev rsync picocom debootstrap \\
-           qemu-user-binfmt sunxi-tools"
+           qemu-user-binfmt sunxi-tools libgnutls28-dev pkg-config"
 }
 
 case "${1:-}" in
