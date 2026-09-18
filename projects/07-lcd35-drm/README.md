@@ -21,9 +21,12 @@ transactions with damage tracking. Project 6 introduced the overlay
 technique for I2C peripherals; this applies it to two SPI chip selects on
 one bus, one of them with an interrupt line.
 
-**State: software complete, no board work yet.** The image has never been
-built and no board has been powered on. Everything below that says
-"measured" says so; everything else says what it actually is.
+**State: written, not yet built.** The image has never been built and no
+board has been powered on. The label is deliberate: the root README
+reserves "software complete" for a project whose image BitBake has
+actually parsed and produced, and nothing here has checked that it can.
+Everything below that says "measured" says so; everything else says
+what it actually is.
 
 ## What makes this panel not routine
 
@@ -96,7 +99,7 @@ did so.
 | 3 | `modetest -v` reports at least 8 frames per second at 32 MHz, and the achieved SPI clock matches the overlay | **Not measured.** `libdrm-tests` is in the image. The ceiling is arithmetic: a 480x320 RGB565 frame is 2.46 Mbit, so 32 MHz allows about 12 full frames per second and nothing beats that |
 | 4 | `drmfill` paints the gradient from an SSH session, and a run against the other card fails with a clear error rather than painting the wrong output by accident | **Half met without a board.** `drmfill` finds the panel by driver name and refuses an explicit device whose driver is not `ili9486`, so the second half is structural rather than hoped for. The painting has never happened |
 | 5 | After calibration, `libinput debug-events` reports each of the four corners within 3 pixels and the centre within 2 pixels | **Not measured, and it needs a finger.** The arithmetic that turns four raw readings into a matrix is `lcd35a-corners`, which is fully tested |
-| 6 | The overlay compiles without warnings under `dtc -@`, and the `speed`, `rotate` and `swapxy` overrides take effect from `config.txt` | **Half met.** The three overrides are asserted present. The compile is asserted by the test suite only where `dtc` exists, which is CI and not the authoring laptop. Whether the overrides take effect needs a board |
+| 6 | The overlay compiles without warnings under `dtc -@`, and the `speed`, `rotate` and `swapxy` overrides take effect from `config.txt` | **Half met, and this half is measured.** CI compiled the overlay with `dtc -@` and reported no warnings, and confirmed it carries a symbol table so `dtoverlay` can resolve `&spi0` and `&gpio` on the board. The three overrides are asserted present as text; whether they take effect needs a board |
 
 ## What is tested without hardware
 
@@ -110,7 +113,7 @@ error anywhere.
 |---|---|---|
 | Overlay, fragment, image and design against each other | `sh tests/lcd35a-overlay-test.sh` | Both `spidev` nodes disabled, `/bits/ 16` on all six `ti,*` properties, every symbol `=y`, `bench-status` removed, the driver name agreeing across three files, every GPIO present in the design's wiring table, `dtc -@` where `dtc` exists |
 | Calibration arithmetic | `sh tests/lcd35a-corners-test.sh` | The identity case, the overlay's own limits, five refusals, and the warning that fires when the matrix says the overlay is wrong |
-| Compile | `./go check` | `drmfill` with `-Werror` against the host libdrm |
+| Compile | `./go check`, and CI | `drmfill` with `-Werror` against the host libdrm. CI also runs the binary and requires it to find no `ili9486` card, which exercises the search that replaced a hard-coded device path |
 
 Each of the four sharpest assertions was proved by breaking the thing it
 checks and watching it fail, then restoring it. A check that has never
