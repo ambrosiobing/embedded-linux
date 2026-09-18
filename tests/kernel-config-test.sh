@@ -94,12 +94,31 @@ EOF
 touch -d "2026-09-15 17:56" "$OLD/.config"
 touch -d "2026-09-16 06:55" "$NEW/.config"
 
+# What the script should report, read back from the file rather than
+# repeated as a literal.
+#
+# The literal used to be "2026-09-16 06:55", and it made this test pass in
+# some time zones and fail in others. On one Ubuntu host in CEST, touch
+# parsed that bare string as UTC, so the file landed at 08:55 local, and
+# the script dutifully reported 08:55. Both stat and date -r agreed with
+# each other and with the file; the fixture was the only thing that was
+# wrong, and the test blamed the script.
+#
+# The assertion is meant to say "the script reports this file's mtime".
+# Written as a literal it also said "and touch round-trips a bare
+# timestamp through this platform's local time", which is not this test's
+# subject and is not true everywhere. Asking the file removes the second
+# claim and keeps the first. The other touch commands here only establish
+# which file is newer, and a zone shift moves both equally, so they need
+# no such care.
+want=$(date -r "$NEW/.config" '+%Y-%m-%d %H:%M')
+
 rc=0
 out=$(sh "$SUT" -f rt 2>&1) || rc=$?
 check "the newest .config is used, not the last one alphabetically" "$rc" "0"
 contains "and it is the 6.12 tree" "$out" "6.12.93+git"
 contains "PREEMPT_RT is found there" "$out" "ok        CONFIG_PREEMPT_RT=y"
-contains "and the build time is reported" "$out" "2026-09-16 06:55"
+contains "and the build time is reported" "$out" "$want"
 
 # Reverse the ages. The same two trees, the same names, and now the 6.6
 # build is the recent one, so that is what should be checked, and it should

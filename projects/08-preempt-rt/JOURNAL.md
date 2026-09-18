@@ -3619,3 +3619,71 @@ summary columns, which is correct and is also the only reason the gap is
 visible at all. `results/README.md` now says so. The superseded directory is
 worth more than its label suggests: it is the only place left where the
 distribution behind a number can be looked at.
+
+---
+
+## 64. A test that could only pass in some time zones
+
+**What happened.** The full suite was run on the Linux laptop for the first
+time since the figure work, and `./go check` failed. Two things, and only
+one of them was a defect.
+
+The first was `libsystemd-dev` and `libcbor-dev` missing, so the sensor hub
+daemon did not compile. A host that never had them, not a fault in the tree,
+and `./go check` refusing to report success because a compile was skipped is
+the behaviour Project 1 entry 7 put there on purpose.
+
+The second was `kernel-config-test.sh`, one assertion of thirteen:
+
+```
+FAILED   and the build time is reported: '2026-09-16 06:55' not in output
+--- built    2026-09-16 08:55
+```
+
+Exactly two hours, which is this bench's offset from UTC in September.
+
+**What was done.** The cause was established before anything was changed,
+because the two candidates lead to opposite fixes. If `date -r` in
+`check-kernel-config.sh` were misreporting, the script would be lying to
+anyone reading `built` to decide whether they are checking a week-old tree,
+and the fix would belong in the script. If the fixture were wrong, the
+script was honest and the test was at fault.
+
+One probe settled it:
+
+```
+date -r : 2026-09-16 08:55
+stat %y : 2026-09-16 08:55:00.000000000 +0200
+zone    : CEST +0200
+```
+
+`date -r` and `stat` agree, and `stat` names the offset. The file really was
+at 08:55 local, so the script reported it correctly. `touch -d` had parsed
+the bare string as UTC and put the file two hours from where the test
+believed it was. **The script was honest and the test blamed it.**
+
+So the literal was replaced by the file's own mtime, read with the same
+command the script uses. The assertion is meant to say "the script reports
+this file's mtime"; as a literal it also said "and `touch` round-trips a
+bare timestamp through this platform's local time", which is not the
+subject and is not true everywhere. The other `touch -d` calls in the suite
+establish only which file is newer, and a zone shift moves both equally, so
+they needed nothing.
+
+**Why that and not the alternative.** The alternative was to pin the fixture
+with an explicit zone, `touch -d "2026-09-16 06:55 UTC"`, which also works
+and keeps a literal in the assertion. It was rejected because it fixes this
+line and leaves the habit: the next test that formats a time will hardcode
+it again. Asking the file is the form that cannot be got wrong.
+
+**What this cost in verification, and a correction.** The failure does not
+reproduce on the authoring laptop, and the reason turned out to matter. Git
+Bash there ships no time zone database: `TZ=Europe/Vienna date +%Z` answers
+`GMT`, as does every other zone. A run of the suite across five zones was
+reported as evidence that the fix was zone-independent, and it was nothing
+of the kind, because all five executed in GMT. That claim was withdrawn.
+
+What can be shown on that host is narrower and worth stating as exactly
+that: where the old literal was correct, the derived value equals it, so the
+change cannot regress a machine that was already passing. The proof that it
+fixes the failure has to be run where the failure lives.
