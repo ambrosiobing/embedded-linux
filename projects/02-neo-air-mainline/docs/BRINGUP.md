@@ -109,7 +109,7 @@ Card in, antenna on, `picocom` already running, then power.
 
 What to expect, in order:
 
-- `U-Boot SPL 2024.10` within about a second
+- `U-Boot SPL 2025.10` within about a second, matching `UBOOT_TAG`
 - `DRAM: 512 MiB`
 - a two second countdown, then `=>`
 

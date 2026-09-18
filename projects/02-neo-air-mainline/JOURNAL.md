@@ -144,3 +144,77 @@ The order that follows is deliberate and is in
 `picocom` is already running before the board is first powered, so the SPL
 banner is captured rather than missed. It is the first line of evidence in
 the project and it appears about a second after power, once.
+
+## 7. The first build, and two guards that were wrong before the compiler was
+
+The cross toolchain went onto JPTOUPM678 and `./go neo-air uboot` ran for
+the first time. Three things went wrong before a single object compiled,
+and two of them were mine.
+
+**`qemu-user-static` does not exist on Ubuntu 26.04.** It is a virtual
+package now, provided by `qemu-user-binfmt`, and `apt` refuses to pick a
+provider for you. The whole install failed on that one name, so nothing was
+installed at all.
+
+The consequence in `mkrootfs.sh` was worse than the apt message, because it
+was silent. The script copied `$(command -v qemu-arm-static)` into the
+chroot with a `|| true` after it, and on this release there is no such
+binary: only a dynamically linked `/usr/bin/qemu-arm`. So it would have
+copied nothing and said nothing, and whether the second stage worked would
+have come down to a binfmt flag the script never looked at.
+
+It now reads the flag. A registration carrying `F` keeps the interpreter
+open across a chroot and nothing needs copying; without it, a binary is
+copied, preferring the static one and falling back to the dynamic. The
+board's registration exists and the flag is the next thing to check when
+the rootfs step runs.
+
+**My own U-Boot guard refused a build that had just done the right thing.**
+`merge_config.sh` printed
+
+    Value of CONFIG_MMC_SUNXI_SLOT_EXTRA is redefined by fragment ...
+    Previous value: CONFIG_MMC_SUNXI_SLOT_EXTRA=-1
+    New value: CONFIG_MMC_SUNXI_SLOT_EXTRA=2
+
+and the script treated the word "redefined" as failure. That line is the
+fragment overriding the defconfig, which is the entire purpose of the
+fragment, and that particular symbol is the one that makes U-Boot see the
+eMMC at all. So the guard fired on success, on the single most important
+line in the file.
+
+It was also redundant. The check immediately after it compares every
+fragment line against the produced `.config`, which is the question that
+matters: not what the merge said about its work, but whether the option is
+there. That check passed on the next run and printed `every fragment option
+is present in .config`.
+
+This repository has now documented four guards that refuse on evidence they
+should not, three of them in other people's scripts and this one in mine,
+written the day after writing the decision that names the pattern.
+
+**Then the compiler, and this one is not a bug anywhere.** The build
+stopped in `scripts/dtc/pylibfdt`:
+
+    libfdt_wrap.c: error: too few arguments to function
+    'SWIG_Python_AppendOutput'; expected 3, have 2
+
+SWIG 4.3 added a third argument to that function. U-Boot `v2024.10` carries
+a copy of dtc whose typemaps still call the two-argument form, and Ubuntu
+26.04 ships SWIG 4.4. `pylibfdt` is not skippable here, because
+`u-boot-sunxi-with-spl.bin` is a binman image and binman needs it.
+
+Three options, and only one of them leaves the project honest:
+
+- patch the vendored dtc inside a pinned tree, which makes the pin a lie
+- hold the host's SWIG back, which makes the build depend on an apt pin
+  that nothing in this repository can state
+- move the tag, and record why
+
+`UBOOT_TAG` is now `v2025.10`, which is also the vintage of the host's own
+`u-boot-tools`. The reason is written where the pin is, not only here,
+because the next person to read `toolchain.env` will be looking at the
+number rather than at this file.
+
+The expected SPL banner in `docs/BRINGUP.md` moved with it. A milestone
+that names a version is a claim, and it was one line away from being a
+stale one.
