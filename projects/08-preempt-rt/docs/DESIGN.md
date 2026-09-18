@@ -4,13 +4,15 @@ The drawings before the results. Everything here is the plan the code was
 written against, so a reader can disagree with the design without first
 reverse engineering it from four scripts.
 
-Five views, each answering a different question:
+Five views, each answering a different question, and a photograph of the
+thing they describe:
 
 | View | Question |
 |---|---|
 | [Architecture](#architecture) | What runs where, and what does it touch |
 | [Schematic](#schematic) | Which pin goes to which terminal, and why that pin |
 | [Bench layout](#bench-layout) | What does it look like on the table |
+| [The assembled bench](#the-assembled-bench) | What it actually looked like, as a photograph rather than a claim |
 | [Activity](#one-run-as-an-activity-diagram) | What happens during one run, in what order |
 | [Data flow](#data-flow) | What turns into what, from a wake-up to a table row |
 
@@ -139,7 +141,7 @@ beside it. That is the whole derivation.
           |  +-------------------------------------+  |
           |  | CH0 CH1 CH2 ... CH7  GND   (screws) |  |
           |  +--^-------------------^--------------+  |
-          |     | orange               | black        |
+          |     | signal               | ground       |
           |     |                      |              |
           |  [stacking header, pins 38 and 39 at this end]
           +-----|----------------------|--------------+
@@ -167,6 +169,36 @@ cores the network stack runs on, so under `stress-ng` an ssh session is the
 first thing to stall. A console that survives the test is not a
 convenience here, it is the only way to see what happened during the run
 that went wrong.
+
+### The assembled bench
+
+![The MCC 118 stacked on the Raspberry Pi 4, with the two jumpers and the USB to TTL cable](figures/bench.jpg)
+
+**The drawing above is the diagram of record and this photograph is not.**
+Where the two disagree, the drawing states the intent and the photograph
+states what was on the table on 18 September 2026, and the difference is
+something to resolve rather than to average.
+
+What the photograph shows, as distinct from what is known from the drawing:
+the HAT stacked on the 40-pin header with its pass-through pins exposed;
+two jumper wires running from a housing at the pin 39 and 40 end of that
+header down to the screw terminals; the `CH0 CH1 GND CH2 CH3 GND` block on
+one edge and `CH4 CH5 CH6 CH7 GND CLK TRIG GND` along the other; the
+address jumper block `W1`; and the four-wire USB to TTL cable entering from
+the left. The Pi is identifiable as a 4 by its two USB 3 ports and its
+Ethernet magnetics.
+
+Two things the photograph does **not** settle, and neither should be read
+out of it. Which header pin each jumper occupies cannot be resolved at this
+angle, so the pin table in the schematic above remains the only authority
+for that. And which of the two wires is signal and which is ground is not
+visible either, which is why the drawing now labels them by function.
+
+One disagreement is already visible and is recorded rather than tidied
+away: the drawing called the jumpers orange and black, and the bench uses
+blue and teal. The colours were only ever there to tell the two wires
+apart, so the drawing now says `signal` and `ground`, which is true whatever
+is in the drawer.
 
 ## One run as an activity diagram
 
