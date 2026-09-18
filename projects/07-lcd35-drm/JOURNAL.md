@@ -389,3 +389,69 @@ shell code generally.
 **Owed.** A `walkthrough/DECISIONS.md` entry for the principle, not written
 here because that file is shared and two sessions are active in the
 checkout; entries written in parallel have collided twice.
+
+---
+
+## 9. The sixth run went further, and found a bug this laptop cannot see
+
+**What happened.** With the eight shellcheck findings fixed, CI got past
+`Shell scripts` for the first time in six runs and failed at `Tests`
+instead. The failing assertion was Project 3's:
+
+```
+FAILED   the header is the one analyze.py checks by name:
+         wanted 't_s,i_ua,d0,d1,d2', got 't_s,i_ua,d0,d1,d2
+```
+
+Two strings that print identically. The closing quote is missing from the
+second because the value ends in a carriage return, which the terminal
+swallowed.
+
+**The cause, read rather than guessed.** `ppk2_boot.py` wrote its CSV with
+`csv.writer(handle)`. Python's csv module defaults to `lineterminator =
+"\r\n"`, confirmed by running it rather than recalling it, so the
+measurement file a Linux board produces comes out CRLF. Everything
+downstream reads it with `head`, `sed` and `cut`.
+
+**Why it had never been caught.** The first attempt to reproduce it here
+passed. So did a run with the defect deliberately put back, which is what
+said the reproduction was wrong rather than the fix. The reason is that
+**this laptop's shell strips a trailing carriage return in command
+substitution**:
+
+```
+printf 'a\r\n' > f; x=$(head -n 1 f); [ "$x" = "a" ]   # true here
+```
+
+So `"$(head -n 1 out.csv)"` compares equal on Windows and unequal on
+Linux, and the local suite cannot see this class of bug at all. Verified
+by testing the shell directly, not inferred.
+
+**What was done.** `lineterminator="\n"` on the writer, proved in both
+directions at the byte level, which is the only level where this machine
+can tell the difference:
+
+```
+with the defect:   header ends with CR: True
+with the fix:      header ends with CR: False
+```
+
+And a `scripts/lint.py` rule for `csv.writer` without an explicit
+lineterminator, proved to fire and then go quiet. Same argument as the
+shellcheck rules in entry 8: a blind spot that has shipped once gets a
+narrow rule rather than a resolution to be careful.
+
+**The other thing this run showed.** CI's test loop is `sh "$t" || exit 1`,
+so everything alphabetically after the first failure never runs. Six runs
+had therefore said nothing about two thirds of the suite. A `python3` shim
+on PATH turns 16 locally unrunnable suites into runnable ones, and with it
+42 of 46 pass here. The four that do not are this machine: two need stubs
+that native Windows Python cannot exec, one needs a C compiler, and
+`rt-plot` fails because native Windows Python cannot resolve the MSYS
+`/tmp/...` path the shell just wrote to, which is an artefact of the shim
+rather than a fault in the test.
+
+**Why that and not the alternative.** The alternative was to strip the
+carriage return in the test. That makes the suite green and leaves every
+consumer of the CSV reading a CRLF file, which is the wrong half of the
+problem to fix: the test was right and the producer was wrong.

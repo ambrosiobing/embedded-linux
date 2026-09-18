@@ -639,6 +639,37 @@ def check_shell_patterns() -> None:
                                f"rejects as {code}")
 
 
+def check_csv_line_endings() -> None:
+    """csv.writer defaults to CRLF, and this laptop cannot see the result.
+
+    Python's csv module writes "\\r\\n" unless told otherwise, so a
+    measurement file written on a Linux board comes out with CRLF. That is
+    wrong for a file the rest of the bench reads with head, sed and cut.
+
+    What makes it worth a rule rather than a fix is where it hid. The
+    authoring laptop's shell STRIPS a trailing carriage return in command
+    substitution, so "$(head -n 1 file)" compares equal either way and the
+    test passes here and fails on the runner. The failure even prints the
+    two strings looking identical, because the CR eats the closing quote:
+
+        wanted 't_s,i_ua,d0,d1,d2', got 't_s,i_ua,d0,d1,d2
+
+    So the local test suite cannot catch this class at all, which is the
+    same argument as the shellcheck rules above.
+    """
+    for path in ROOT.rglob("*.py"):
+        if ".git" in path.parts or path.name == "lint.py":
+            continue
+        for number, line in enumerate(text(path).splitlines(), start=1):
+            if "csv.writer(" not in line:
+                continue
+            if "lineterminator" in line:
+                continue
+            want = 'lineterminator="' + chr(92) + 'n"'
+            fail(path, f"line {number}: csv.writer without an explicit "
+                       f"lineterminator writes CRLF. Pass {want}")
+
+
 def check_untracked_scripts() -> None:
     """A new script has no index entry, so the check above cannot see it.
 
@@ -738,6 +769,7 @@ def main() -> int:
         check_shell_unused_params,
         check_shellcheck_directives,
         check_shell_patterns,
+        check_csv_line_endings,
         check_busybox_compat,
         check_src_uri_installed,
         check_image_packages,

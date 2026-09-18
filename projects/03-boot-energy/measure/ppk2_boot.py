@@ -101,8 +101,15 @@ def write_csv(path, currents, digital):
     returned and the caller reports it.
     """
     n = min(len(currents), len(digital))
+    # lineterminator is given explicitly because the csv module's default
+    # is "\r\n", not "\n". The pair of newline="" and csv.writer is the
+    # documented idiom and it produces a CRLF file on every platform,
+    # which for a measurement file written on a Linux board is wrong: a
+    # reader doing "head -n 1" gets a trailing carriage return, and the
+    # mismatch prints identically to what it wanted, so the diagnostic
+    # looks like a tool that cannot compare two equal strings.
     with open(path, "w", newline="") as handle:
-        writer = csv.writer(handle)
+        writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(["t_s", "i_ua"] + list(DIGITAL))
         for i in range(n):
             writer.writerow(["%.5f" % (i * SAMPLE_DT),
