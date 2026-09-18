@@ -317,7 +317,44 @@ an effect. And the earlier generic-only matrix at
 [results/2026-09-17_5ec99fd-dirty/](results/2026-09-17_5ec99fd-dirty) is
 superseded, not deleted.
 
+### The whole matrix in one figure
+
+![ext_p999_us for every configuration, generic against PREEMPT_RT](results/ext-p999-matrix.svg)
+
+Seven configurations, eighteen runs, drawn from
+[results/results.csv](results/results.csv) by `./go matrix`. Each row is one
+configuration; the upper mark of a pair is the generic kernel and the lower
+one PREEMPT_RT, so the **slope of the connector is the effect**: near
+vertical is no effect, a long diagonal is a large one.
+
+**Every repeat is its own mark, and nothing is averaged.** That is what
+makes the figure readable against the caution above rather than around it.
+Where a row shows two marks of one colour far apart, the spread between two
+runs of the same kernel is doing more work than the difference between the
+two kernels, and the pair is not evidence of much.
+
+Three things to read off it, in the order they matter:
+
+1. **The top band is flat.** With CPU 3 still in the scheduler's general
+   pool, the connectors are vertical or nearly so. `performance, load` is
+   the extreme case: both kernels at exactly 100.419, drawn as two marks in
+   the same column.
+2. **The bottom band separates.** Every configuration with `isolcpus` and
+   `nohz_full` covering the measured core shows a visible diagonal.
+   Isolation is the precondition and the real-time kernel is the increment,
+   which is the reverse of the order the two are usually presented in.
+3. **The longest diagonal is the one to distrust.** `aff, performance,
+   load` spans from 110 to 227 us and sits in the *unisolated* band. It is
+   the 51 percent pair, and it rests on a single generic row with no repeat.
+   The figure draws it at full length because that is what was measured; the
+   reason not to quote it is in [results/README.md](results/README.md).
+
 ### Isolation is the whole story on this board
+
+The two figures in this section are from the **superseded** generic-only run
+of 17 September, kept because they are the only per-configuration histograms
+this project has. See the note at the end of
+[results/README.md](results/README.md).
 
 ![cyclictest wake-up latency under load](results/2026-09-17_5ec99fd-dirty/cyclictest-loaded.svg)
 
@@ -359,11 +396,24 @@ that matter need repeats before any of them is quoted as a figure.
 
 ```
 ./go plot -o FIG.svg -t TITLE FILE[:LABEL] ...
+./go matrix -o FIG.svg RESULTS.CSV
 ```
 
-They are generated from the instrument's own histogram files and never
-drawn by hand, so a figure can always be traced back to the capture that
-produced it. See decision 86.
+`plot` draws a histogram from one instrument's own file; `matrix` draws the
+paired comparison from a whole `results.csv`. Neither is ever drawn by hand,
+so a figure can always be traced back to the capture that produced it. See
+decision 86.
+
+To regenerate the matrix figure in this README:
+
+```
+./go matrix -o projects/08-preempt-rt/results/ext-p999-matrix.svg \
+    projects/08-preempt-rt/results/results.csv
+```
+
+and `tests/rt-matrix-test.sh` fails if the committed figure and the
+committed `results.csv` have drifted apart, so a figure cannot go stale
+quietly. `--metric` draws any other column of the schema the same way.
 
 ### The schema
 

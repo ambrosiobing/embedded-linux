@@ -31,6 +31,7 @@
 #   ./go reproduce    build the same commit again and diff the package lists
 #   ./go packages     the image package list, for the README table
 #   ./go plot -o FIG.svg FILE[:LABEL]...   a histogram figure from a run
+#   ./go matrix -o FIG.svg RESULTS.CSV     the paired matrix, kernel against kernel
 #   ./go lint         static checks that need no Yocto host
 #   ./go projects     list the projects and where each one lives
 #   ./go shell [CFG]  a BitBake shell inside the kas environment
@@ -69,6 +70,7 @@ kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
 reproduce)  shift; exec sh ./scripts/reproduce.sh "$@" ;;
 packages)   exec sh ./scripts/packages.sh ;;
 plot)       shift; exec python3 ./scripts/rt-plot.py "$@" ;;
+matrix)     shift; exec python3 ./scripts/rt-matrix.py "$@" ;;
 lint)       exec python3 ./scripts/lint.py ;;
 projects)
 	for d in projects/*/; do

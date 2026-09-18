@@ -341,6 +341,35 @@ sequenceDiagram
 instruments is `S`, the cost of the GPIO ioctl. That is wrong, and the
 algebra is worth following because the wrong version is the intuitive one.**
 
+Two consecutive periods, with the three instants that matter in each:
+
+```
+       t_n                                     t_n + T
+        |                                         |
+        v                                         v
+   -----+-----------------------------------------+------
+        |<------------------ T ------------------>|
+        :                                         :
+         L_i   S_i                                   L_i+1   S_i+1
+        :<--->:<--->:                             :<------->:<--->:
+   -----+-----o-----#-----------------------------+---------o-----#----
+                    |                                             |
+                    |<------------------- P_i ------------------->|
+
+   +  the instant the scheduler owed a wake-up, t_n and t_n + T
+   o  the instant the task actually ran, late by L
+   #  the instant the level changed at the pin, a further S later
+```
+
+Read the bottom bar against the top one. `P_i` starts at the first `#` and
+ends at the second, so it is `T` stretched by however much later the second
+wake-up was and shrunk by however much quicker the second write was. Draw
+the second period with the same `L` and the same `S` as the first and the
+two bars come out the same length: **every constant in the output path
+cancels, and only the differences survive.** That is the whole of the
+algebra below, and it is why the second `S_i+1` bracket being drawn the same
+width as the first is the point rather than a convenience of the drawing.
+
 The external instrument does not measure an edge time, it measures the
 interval between two of them. Edge `i` leaves the pin at
 `i*T + L_i + S_i`, so the interval is

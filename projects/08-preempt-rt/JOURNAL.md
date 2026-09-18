@@ -3515,3 +3515,107 @@ here is exactly the fault decision 55 forbids.
 one per project and one global, both happen to have reached 55. Fixed
 before the commit and recorded because the next cross-reference between
 the two will be just as easy to get wrong.
+
+---
+
+## 63. A figure of the matrix, and three defects the drawing found
+
+All entries from here are 18 September 2026.
+
+**What happened.** Asked how to use one of the free browser circuit
+simulators for this project's diagrams. The honest answer turned out to be
+that nine of the ten cannot represent this bench at all: Tinkercad has no
+Raspberry Pi of any kind, Wokwi has the Pico rather than a Pi 4, and
+Falstad, EasyEDA, CircuitLab and EveryCircuit are analog and PCB tools with
+no concept of a HAT on a 40-pin header. None of them has an MCC 118. The one
+genuine use is narrow: Falstad would draw the optional 1 kOhm and 10 nF
+low-pass that METHOD.md reasons about, which is a circuit rather than a
+bench.
+
+Looking for what was actually missing turned up something better. The
+project's headline finding, that isolation is the precondition and the
+real-time kernel the increment, was carried by a table of eighteen rows,
+while the two pictures on the page came from the **superseded** generic-only
+run. The finding had no figure.
+
+**What was done.** `scripts/rt-matrix.py`, behind `./go matrix`, drawing the
+paired comparison from `results.csv`: one row per configuration, generic
+above and PREEMPT_RT below, the slope of the connector carrying the effect.
+Decision 86 already required a figure to come from a file the board
+produced, and `results.csv` is one, so this needed no exception, only an
+extension of the rule from captures to tables. Recorded as decision 96.
+
+Shared scaffolding went to `scripts/svgkit.py` rather than being copied:
+the palette, the XML escaper, the tick chooser and the header. Decision 59
+exists because the same picker bug was written five times, and a second
+copy of an escaper is that mistake with a different subject. The axis
+emitters were deliberately *not* shared. One axis is logarithmic counts and
+the other categorical rows, and a shared function serving both would take
+more flags than either needs.
+
+**Three defects, and only one of them had a test that could have caught it.**
+
+*The figure hid its own argument.* Drawn with both kernels on one centre
+line, two runs with the same value land on the same coordinate and the
+second mark covers the first. The rows where that happens are the rows where
+the two kernels agree, which is the finding: `performance, load` has both at
+exactly 100.419 and rendered as a single orange dot, indistinguishable from
+a missing run. Every assertion in the new test passed on that layout,
+because each asked whether a mark was present and it was. This is entry 55's
+lesson arriving again in a new figure: nothing catches it except looking at
+the picture. The arms now sit on separate half-rows, and the test asserts a
+coordinate rather than a sentiment, two marks at one value must differ in y.
+Reintroducing `ARM_OFFSET = 0` fails exactly that assertion and nothing
+else, which is how it was confirmed to be a working check rather than a
+present one.
+
+*The determinism claim was true by accident.* Both generators wrote with
+Python's default text mode, which is CRLF on Windows and LF everywhere
+else, so "regenerating from unchanged inputs gives a byte-identical file"
+held only if you regenerated on the same kind of machine as last time.
+
+The evidence was already sitting in the tree. Git stores these figures as
+LF and `.gitattributes` checks them out as LF, but the working copies of
+both committed histogram SVGs on the authoring laptop had drifted to CRLF,
+which can only have come from a regeneration there. It never showed as a
+diff, because `text=auto` normalises on the way in and the blob was
+unchanged. So the mismatch existed, was invisible to git by design, and was
+waiting for the first person to run a local comparison and be told a figure
+was stale when it was not.
+
+Both generators now write `newline="\n"` explicitly, and the two drifted
+working copies were put back to LF. Nothing changed in git.
+
+**A correction within this entry.** The first version of it said the
+committed blobs were CRLF in the object database. That was wrong, and the
+mistake was mine: I read the blob through a shell redirect that translated
+the line endings on the way past, and believed the result. `git cat-file`
+says LF and always did. The defect was drift in the working tree, not in
+the repository, which is a smaller fault and a more interesting one,
+because git hiding it is the reason it could persist.
+
+*A dash in a title was a traceback.* Figures are written as ASCII, which is
+what lets the repository's no-dash rule see inside them. A typographic dash
+pasted into `-t` therefore raised a `UnicodeEncodeError` naming a byte
+offset into a file that was never created. Both generators now refuse it in
+a sentence, and `scripts/lint.py` grew a branch so that a dash found in an
+`.svg` says it is a generated figure and names the argument to fix, instead
+of sending the reader to hunt for a mistake at a line number in XML that
+nobody wrote.
+
+**Why that and not the alternative.** The alternative for the figure was a
+bar chart of the eighteen rows, which is the obvious shape and the wrong
+one: it puts generic and real-time side by side as independent bars and
+leaves the reader to pair them by eye. Pairing is the entire question. The
+alternative for the repeats was to average them, which would have drawn
+seven tidy pairs and deleted the evidence that several of the differences
+are smaller than the spread between two runs of one kernel. Every run is a
+mark for that reason.
+
+**What is still missing, and cannot be fixed by drawing.** No histogram of
+the paired matrix can be drawn, because the per-run instrument files were
+not copied back with the rows. Decision 86 forbids inventing one from the
+summary columns, which is correct and is also the only reason the gap is
+visible at all. `results/README.md` now says so. The superseded directory is
+worth more than its label suggests: it is the only place left where the
+distribution behind a number can be looked at.

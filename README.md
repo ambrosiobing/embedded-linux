@@ -126,6 +126,15 @@ same four files are expected of all twenty:
 | `docs/DESIGN.md` | The methodology before the results: system architecture, the wiring and its pin table, the bench layout, and the software's structure, all drawn as ASCII or mermaid so they diff and grep |
 | `JOURNAL.md` | What actually happened in order, failures included. Each entry says what happened, what was done, and why that rather than the alternative |
 | `docs/evidence/` | The raw output behind every number claimed: build logs, boot timings, package manifests, reproducibility diffs |
+| `results/` | Where a project measures something: the board's own CSV, the per-run instrument files behind it, and any figure drawn from them |
+
+**A figure is generated from a file the board produced, or it is not in the
+repository.** Plots come from the instruments' own output through `./go plot`
+and `./go matrix`, and are committed as ASCII SVG, which renders on GitHub
+and still diffs and greps like the text it is. Explanatory diagrams stay
+ASCII or mermaid in `docs/DESIGN.md`. A photograph is allowed as evidence of
+assembled hardware and is never the diagram of record. Nothing is hosted
+anywhere but here.
 
 Choices that outlive one project go in
 [walkthrough/DECISIONS.md](walkthrough/DECISIONS.md) instead, each entry

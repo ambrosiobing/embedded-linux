@@ -64,7 +64,19 @@ def check_dashes() -> None:
             # Spelled as escapes so that this file passes its own check.
             # Built with chr() so that this file passes its own check.
             if DASHES[0] in line or DASHES[1] in line:
-                fail(path, f"line {number}: em or en dash")
+                if path.suffix == ".svg":
+                    # A generated figure is not edited by hand, so a line
+                    # number in its XML sends the reader to look for a
+                    # mistake in a file nobody wrote. The dash came in
+                    # through the title or an axis label on the command
+                    # line that produced it, and that is where it has to
+                    # be fixed, followed by regenerating the figure.
+                    fail(path, f"line {number}: em or en dash. This is a "
+                               "generated figure, so the dash came from the "
+                               "-t or -x text it was drawn with. Fix that "
+                               "and regenerate.")
+                else:
+                    fail(path, f"line {number}: em or en dash")
 
 
 # LIC_FILES_CHKSUM uses file:// too, and means something else by it: a path

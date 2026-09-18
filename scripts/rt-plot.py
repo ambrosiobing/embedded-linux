@@ -38,16 +38,8 @@ import math
 import os
 import sys
 
-# Two categorical hues, checked for colour-vision deficiency separation
-# against the light surface this SVG paints for itself. Assigned in fixed
-# order, never cycled: a third and fourth series take the later entries,
-# and a fifth is a sign that the figure should be two figures.
-SERIES_COLOURS = ["#2a78d6", "#eb6834", "#3f8f4a", "#8a5cd0"]
-
-INK = "#1f2328"
-MUTED = "#57606a"
-GRID = "#d8dee4"
-SURFACE = "#ffffff"
+from svgkit import (GRID, INK, MUTED, SERIES_COLOURS, escape, header,
+                    nice_ticks, non_ascii)
 
 WIDTH = 720
 HEIGHT = 360
@@ -127,30 +119,6 @@ def parse_input(argument):
     return argument, os.path.basename(argument)
 
 
-def nice_ticks(low, high, target=8):
-    """Tick positions at 1, 2 or 5 times a power of ten."""
-    if high <= low:
-        return [low]
-    raw = (high - low) / float(target)
-    magnitude = 10.0 ** math.floor(math.log10(raw))
-    for multiple in (1.0, 2.0, 5.0, 10.0):
-        if raw <= magnitude * multiple:
-            step = magnitude * multiple
-            break
-    first = math.ceil(low / step) * step
-    ticks = []
-    value = first
-    while value <= high + step * 0.001:
-        ticks.append(round(value, 10))
-        value += step
-    return ticks
-
-
-def escape(text):
-    return (text.replace("&", "&amp;").replace("<", "&lt;")
-            .replace(">", "&gt;").replace('"', "&quot;"))
-
-
 def build_svg(series, title, xlabel):
     """series is a list of (label, {bin: count}) in draw order."""
     plot_width = WIDTH - MARGIN_LEFT - MARGIN_RIGHT
@@ -193,15 +161,8 @@ def build_svg(series, title, xlabel):
         return (MARGIN_TOP + plot_height
                 - (math.log10(count) + 1.0) / (decades + 1.0) * plot_height)
 
-    out = []
+    out = header(WIDTH, HEIGHT, title, MARGIN_LEFT)
     add = out.append
-    add('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" '
-        'viewBox="0 0 %d %d" role="img">' % (WIDTH, HEIGHT, WIDTH, HEIGHT))
-    add('<title>%s</title>' % escape(title))
-    add('<rect width="%d" height="%d" fill="%s"/>' % (WIDTH, HEIGHT, SURFACE))
-    add('<text x="%d" y="24" font-family="system-ui,sans-serif" '
-        'font-size="14" font-weight="600" fill="%s">%s</text>'
-        % (MARGIN_LEFT, INK, escape(title)))
 
     # Horizontal grid at each decade, drawn first so marks sit above it.
     for decade in range(decades + 1):
@@ -316,8 +277,23 @@ def main(argv):
     if title is None:
         title = series[0][0] if len(series) == 1 else "Latency histogram"
 
-    with open(args.out, "w", encoding="ascii") as handle:
-        handle.write(build_svg(series, title, args.xlabel))
+    drawing = build_svg(series, title, args.xlabel)
+    bad = non_ascii(drawing)
+    if bad is not None:
+        raise PlotError(
+            "the figure text carries %r (U+%04X) and a figure is written as "
+            "ASCII. A dash or a quote pasted out of a document is the usual "
+            "cause; check --title, --xlabel and the labels." % (bad, ord(bad)))
+
+    # newline="\n" rather than the platform default, because the promise
+    # this script makes is byte-identical regeneration and the default
+    # breaks it across machines: text mode on Windows turns every "\n" into
+    # CRLF, so the same input regenerated on the authoring laptop differs
+    # from the committed figure in every single line. .gitattributes then
+    # normalises on the way in, which hides the mismatch in git and leaves
+    # it in front of anyone running a comparison locally.
+    with open(args.out, "w", encoding="ascii", newline="\n") as handle:
+        handle.write(drawing)
     total = sum(sum(bins.values()) for _, bins in series)
     sys.stderr.write("%s: %d series, %d samples\n"
                      % (args.out, len(series), total))
