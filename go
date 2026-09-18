@@ -15,6 +15,7 @@
 #   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
 #   ./go iio          build bench-iio-image, the IIO sensor lab of Project 10
+#   ./go adxl345      build bench-adxl345-image, the ADXL345 driver of Project 5
 #   ./go explorer     build bench-explorer-image, the Explorer 700 of Project 6
 #   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
 #   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
@@ -57,6 +58,7 @@ rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
 ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
 iio)        exec sh ./scripts/build.sh bench-iio ;;
+adxl345)    exec sh ./scripts/build.sh bench-adxl345 ;;
 explorer)   exec sh ./scripts/build.sh bench-explorer ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
 tee)        exec sh ./scripts/build.sh bench-tee ;;

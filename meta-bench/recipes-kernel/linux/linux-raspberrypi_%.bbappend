@@ -115,3 +115,18 @@ SRC_URI += '${@"file://iio.cfg" if d.getVar("BENCH_IIO_KERNEL") == "1" else ""}'
 # cost one driver, it costs the whole I2C bus and four parts at once.
 BENCH_EXPLORER_KERNEL ?= "0"
 SRC_URI += '${@"file://explorer.cfg" if d.getVar("BENCH_EXPLORER_KERNEL") == "1" else ""}'
+
+# And Project 5's accelerometer driver, same switch pattern.
+#
+# What this fragment turns on is unusual and worth a sentence here rather
+# than only in the file: as well as the regmap glue that Project 5's own
+# out-of-tree driver needs, it enables mainline's ADXL345 driver. That is
+# deliberate. The two claim different compatible strings, so only one can
+# match a node and the overlay decides which, which makes the in-tree
+# driver a control for the one this project writes.
+#
+# Opt in, because every image that does not have an ADXL345 on its header
+# would otherwise carry two drivers for a part that is not there, and
+# Project 3 would be measuring them in its kernel size column.
+BENCH_ADXL345_KERNEL ?= "0"
+SRC_URI += '${@"file://adxl345.cfg" if d.getVar("BENCH_ADXL345_KERNEL") == "1" else ""}'
