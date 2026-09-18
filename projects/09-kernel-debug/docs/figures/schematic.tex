@@ -1,0 +1,81 @@
+% Two wires and an LED that means something.
+%
+% The wiring for this project is almost nothing, and the drawing is here
+% for the two facts that are not obvious from it: which UART is actually
+% on those pins, and why the red lead of the adapter is left open.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small]
+
+  %% ---------------- the header ----------------
+  \node[hw, minimum width=44mm, minimum height=52mm, align=center] (hdr) {};
+  \node[font=\sffamily\small\bfseries, anchor=north] at ($(hdr.north)+(0,-2mm)$)
+       {Raspberry Pi 3B+};
+  \node[font=\sffamily\scriptsize, anchor=north] at ($(hdr.north)+(0,-7mm)$)
+       {40 pin header};
+
+  \coordinate (p8)  at ($(hdr.east)+(0,14mm)$);
+  \coordinate (p10) at ($(hdr.east)+(0,9mm)$);
+  \coordinate (p6)  at ($(hdr.east)+(0,4mm)$);
+  \coordinate (p11) at ($(hdr.east)+(0,-7mm)$);
+  \coordinate (p9)  at ($(hdr.east)+(0,-17mm)$);
+
+  \foreach \p/\name in {p8/{pin 8\ \ GPIO14}, p10/{pin 10\ GPIO15},
+                        p6/{pin 6\ \ GND}, p11/{pin 11\ GPIO17},
+                        p9/{pin 9\ \ GND}} {
+    \fill[linecol] (\p) circle (0.6mm);
+    \node[font=\sffamily\scriptsize, anchor=east, inner sep=1pt]
+         at ($(\p)+(-1mm,0)$) {\name};
+  }
+
+  %% ---------------- the console cable ----------------
+  \draw[thick] (p8)  -- ++(26mm,0) coordinate (t8);
+  \draw[thick] (p10) -- ++(26mm,0) coordinate (t10);
+  \draw[thick] (p6)  -- ++(26mm,0) coordinate (t6);
+
+  \node[font=\sffamily\scriptsize, anchor=south west, inner sep=1pt]
+       at ($(p8)+(3mm,0.5mm)$)  {TXD};
+  \node[font=\sffamily\scriptsize, anchor=south west, inner sep=1pt]
+       at ($(p10)+(3mm,0.5mm)$) {RXD};
+  \node[font=\sffamily\scriptsize, anchor=south west, inner sep=1pt]
+       at ($(p6)+(3mm,0.5mm)$)  {GND};
+
+  \node[host, right=0mm of t10, anchor=west, align=left, minimum height=20mm]
+       (ttl) {USB/TTL adapter\\[-1pt]
+              \scriptsize white = RX\\[-2pt]
+              \scriptsize green = TX\\[-2pt]
+              \scriptsize black = GND\\[-2pt]
+              \scriptsize \textcolor{badcol}{red = 5V, LEFT OPEN}};
+
+  %% ---------------- the heartbeat LED ----------------
+  \draw[thick] (p11) -- ++(10mm,0) coordinate (r1);
+  \draw (r1) to[R, l=\SI{330}{\ohm}, *-*] ++(20mm,0) coordinate (r2);
+  \draw (r2) to[leD, l_=green, *-] ++(0,-10mm) coordinate (lk);
+  \draw[thick] (lk) -- ($(lk)+(0,-6mm)$) coordinate (gnd);
+  \draw[thick] (gnd) -| (p9);
+  \node[circ] at (p9) {};
+
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(r2)+(6mm,-16mm)$) {\texttt{ledtrig-heartbeat}};
+
+  %% ---------------- the two notes that matter ----------------
+  \node[umlnote, anchor=north west, text width=86mm, align=left]
+       at ($(hdr.south west)+(0,-6mm)$)
+       {\textbf{GPIO14 and GPIO15 carry the PL011 only after}
+        \texttt{dtoverlay=disable-bt}\textbf{.} By default they carry the
+        mini UART (\texttt{ttyS0}), whose baud rate follows the core clock
+        and whose FIFO is four bytes deep. A debugger channel wants the
+        PL011: \texttt{kgdboc=ttyAMA0} on a board without the overlay
+        attaches to a UART that is not on the header, and debugs nothing,
+        silently.};
+
+  \node[umlnote, anchor=north west, text width=86mm, align=left]
+       at ($(hdr.south west)+(0,-32mm)$)
+       {\textbf{The red 5V lead stays open.} The board has its own supply,
+        and a second source on the same rail is the usual way a USB/TTL
+        adapter and sometimes the board are destroyed.};
+
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,72 @@
+% What is on the table.
+%
+% The point of the drawing is that there are two paths to the board and
+% the project needs both at once: the serial line works when the kernel
+% has stopped, and Ethernet is the only one that can move a trace file.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, node distance=6mm]
+
+  %% ---------------- breadboard ----------------
+  \node[hw, minimum width=30mm, minimum height=26mm, align=center] (bb)
+       {breadboard\\[-1pt]\scriptsize 330R and the LED};
+
+  %% ---------------- the board ----------------
+  \node[hw, right=22mm of bb, minimum width=46mm, minimum height=34mm,
+        align=center] (pi) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(pi.north)+(0,-2mm)$) {Raspberry Pi 3B+};
+  \node[user, anchor=north, minimum height=6mm, font=\sffamily\scriptsize]
+       at ($(pi.north)+(0,-8mm)$) (hdr) {40 pin header};
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(pi.north)+(0,-17mm)$)
+       {BCM2837, four cores\\[-1pt] microSD, micro USB power};
+
+  \draw[bus] (bb.east) -- node[lbl, align=center]
+       {GPIO17\\GND} (pi.west);
+
+  %% ---------------- the two paths off the board ----------------
+  \node[host, below=16mm of pi, minimum width=104mm, minimum height=30mm,
+        align=center] (host) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(host.north)+(0,-2mm)$) {Host};
+
+  \node[tool, anchor=north west, font=\sffamily\scriptsize, align=left,
+        minimum height=7mm] at ($(host.north west)+(3mm,-8mm)$) (proxy)
+       {\texttt{agent-proxy} owns \texttt{/dev/ttyUSB0}};
+  \node[host, anchor=north west, font=\sffamily\scriptsize, align=left,
+        minimum height=6mm] at ($(host.north west)+(8mm,-16mm)$) (t1)
+       {tcp 5550 \ \texttt{picocom}, logged};
+  \node[host, anchor=north west, font=\sffamily\scriptsize, align=left,
+        minimum height=6mm] at ($(host.north west)+(8mm,-23mm)$) (t2)
+       {tcp 5551 \ \texttt{gdb-multiarch vmlinux}};
+
+  \node[host, anchor=north east, font=\sffamily\scriptsize, align=left,
+        minimum height=7mm] at ($(host.north east)+(-3mm,-8mm)$) (rep)
+       {\texttt{trace-cmd report}, \texttt{perf report}};
+  \node[host, anchor=north east, font=\sffamily\scriptsize, align=left,
+        minimum height=6mm] at ($(host.north east)+(-3mm,-18mm)$) (sym)
+       {\texttt{vmlinux}, \texttt{System.map}, \texttt{buggy.ko}\\[-2pt]
+        \textbf{from the same build as the running kernel}};
+
+  %% ---------------- the two cables ----------------
+  \draw[wire] ($(pi.south)+(-14mm,0)$) -- node[lbl, align=center, pos=0.5]
+       {USB/TTL\\TX, RX, GND\\115200} ($(proxy.north)+(6mm,0)$);
+
+  \draw[bus, dashed] ($(pi.south east)+(-6mm,0)$) to[out=-90, in=90]
+       node[lbl, align=center, pos=0.55] {Ethernet\\\texttt{scp} of traces}
+       ($(rep.north)+(0,0)$);
+
+  \node[umlnote, below=5mm of host, text width=100mm, align=left]
+       {\textbf{Two paths, on purpose.} The serial line is the one that
+        still works when the kernel is stopped in the debugger, wedged
+        with interrupts off, or panicking, which is exactly when Ethernet
+        is gone. Ethernet is the one that can move a 20 MB
+        trace file; at 115200 baud the serial line would take
+        about half an hour and would perturb the thing being traced.
+        Neither replaces the other.};
+
+\end{tikzpicture}
+\end{document}

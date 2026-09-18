@@ -1,0 +1,73 @@
+# Project 7: a Waveshare 3.5 inch RPi LCD (A) as a DRM device with touch.
+#
+#   kas build kas/bench-lcd35a.yml    or  ./go lcd35a
+#
+# Its own configuration because the kernel needs a DRM core, two SPI
+# display drivers and the fbdev shim built in, none of which any other
+# image here wants, and because config.txt has to say two things: enable
+# the SPI bus, and load an overlay this repository compiled.
+#
+# It includes bench-rpi3.yml because the specification puts this project on
+# a Raspberry Pi 3B+ and that file already exists to say so. The 3B and the
+# 3B+ are both cortexa53, so this shares shared state with Project 6 and
+# costs nothing extra to add.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-lcd35a-image
+
+repos:
+  # evtest comes from meta-oe (recipes-test). libdrm and its libdrm-tests
+  # package are in poky and need no extra layer.
+  meta-openembedded:
+    layers:
+      meta-oe:
+
+local_conf_header:
+  lcd35a: |
+    # The switch that adds recipes-kernel/linux/files/lcd35a.cfg. Opt in
+    # for the reason in the bbappend and in the fragment's own header: it
+    # forces DRM built in, which no other image in this repository has a
+    # use for.
+    BENCH_LCD35A_KERNEL = "1"
+
+    # Writes "dtparam=spi=on". Without it there is no spi0 node for the
+    # overlay to attach to, and the overlay loads with both devices
+    # silently missing. The overlay also sets spi0 status okay itself, so
+    # this is belt and braces rather than strictly required; it is here
+    # because the failure it prevents is invisible and the line is free.
+    ENABLE_SPI_BUS = "1"
+
+    # A deliberate REPLACEMENT of the line in bench-rpi4.yml rather than an
+    # addition to it.
+    #
+    # The DSI panel overlay is gone: this board has a 26-pin socket covering
+    # the header and no DSI display, and Project 8 measured what an overlay
+    # for absent hardware costs, which is a deferred probe retrying for
+    # ever.
+    RPI_EXTRA_CONFIG = "dtoverlay=bench-lcd35a"
+
+    # The console on the panel, which is acceptance criterion 2.
+    #
+    # fbcon binds to the first framebuffer by default, and with vc4 active
+    # that is HDMI. map:1 moves virtual console 1 to /dev/fb1, which is the
+    # panel. The 8x8 font gives 60x40 characters on 480x320, which is
+    # enough for a login prompt and a readable dmesg.
+    #
+    # THE 1 IN map:1 IS AN ASSUMPTION, not a fact, and it is the one line
+    # in this file most likely to be wrong on the first boot. Which
+    # framebuffer is the panel depends on probe order, and with vc4
+    # disabled the panel becomes fb0 and this line points fbcon at a device
+    # that does not exist. con2fbmap 1 N at run time settles it in a second
+    # without a rebuild, and lcd35a-verify prints which cards exist. Fix
+    # this line once the board has said which number it is.
+    CMDLINE:append = " fbcon=map:1 fbcon=font:VGA8x8"
+
+    # The kernel's work directory has to survive, because ./go kconfig
+    # reads the .config it produced and that is the only evidence that the
+    # nine symbols in lcd35a.cfg arrived. bench-lcd35a-overlay is kept for
+    # the same reason one step down: when a node does not probe, the first
+    # useful thing to do is read the compiled overlay back with dtc -I dtb.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-lcd35a bench-lcd35a-overlay"

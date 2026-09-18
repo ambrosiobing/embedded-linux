@@ -206,6 +206,46 @@ else
 	make -C sdk/hello-gpiod clean >/dev/null 2>&1 || true
 fi
 
+step "compile drmfill against host libdrm"
+# Project 7's DRM test program. Its own step rather than one more block
+# inside the libgpiod branch above, because it needs libdrm and nothing
+# else: a host with libgpiod and no libdrm should still check everything
+# it can, and say what it could not.
+#
+# libdrm on any current distribution is the same API the target has, so
+# the host compiler catches a mistake in the DRM calls long before BitBake
+# would. That is the whole argument for this file.
+if ! command -v pkg-config >/dev/null 2>&1; then
+	echo "pkg-config is not installed. Run scripts/host-setup.sh."
+	fail=1
+elif ! pkg-config --exists libdrm; then
+	echo "libdrm development files are not installed."
+	echo "Run scripts/host-setup.sh, or: sudo apt-get install -y libdrm-dev"
+	fail=1
+else
+	echo "libdrm $(pkg-config --modversion libdrm)"
+	out=$(mktemp -d)/drmfill
+	drm_src=meta-bench/recipes-bench/bench-lcd35a/files/drmfill.c
+	# Word splitting on the pkg-config output is intended: it returns a
+	# list of flags, not one argument.
+	# shellcheck disable=SC2046
+	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libdrm) \
+		"$drm_src" -o "$out" $(pkg-config --libs libdrm); then
+		echo "compiled clean with -Werror"
+		# No panel on any build host, so this finds no ili9486 card and
+		# exits 1. That is the correct answer here, and it exercises the
+		# card-walking path that replaced the specification's hard-coded
+		# /dev/dri/card1.
+		if timeout 5 "$out" -t 1; then
+			echo "note: this host has a card driven by ili9486"
+		else
+			echo "runs and reports no panel, as expected off-target"
+		fi
+	else
+		fail=1
+	fi
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then
 	echo "host checks passed. Next: ./go build"

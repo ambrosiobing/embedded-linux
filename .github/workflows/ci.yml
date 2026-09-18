@@ -53,7 +53,16 @@ jobs:
           # sd-bus plus libcbor, and the sd-bus vtable is a table of
           # macros whose mistakes are compile errors. Nothing short
           # of a board can check an interface declaration; this can.
-          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev
+          # libdrm-dev: Project 7's drmfill, compiled here with -Werror.
+          # The host libdrm is the same API the target has, so a mistake
+          # in the DRM calls is caught here rather than by a board.
+          # device-tree-compiler: Project 7's overlay is compiled with
+          # dtc -@ by tests/lcd35a-overlay-test.sh, and its acceptance
+          # criterion is that it compiles WITHOUT WARNINGS. That test
+          # skips where dtc is absent, so without this package the
+          # assertion would be written and never run, which is worse
+          # than not having it.
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev device-tree-compiler
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so

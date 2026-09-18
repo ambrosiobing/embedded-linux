@@ -116,6 +116,32 @@ SRC_URI += '${@"file://iio.cfg" if d.getVar("BENCH_IIO_KERNEL") == "1" else ""}'
 BENCH_EXPLORER_KERNEL ?= "0"
 SRC_URI += '${@"file://explorer.cfg" if d.getVar("BENCH_EXPLORER_KERNEL") == "1" else ""}'
 
+# And the debugging toolbox, same switch pattern. Project 9 is the lab
+# that exists to find faults rather than to run a product, and it is the
+# most expensive fragment in this directory by a distance: DEBUG_INFO
+# takes vmlinux past 100 MB, the function tracer puts a call at the top
+# of every kernel function, and lockdep does work on every lock taken.
+#
+# Opt in matters more here than anywhere else in this file, because
+# Project 3 measures boot time and kernel size and Project 8 measures
+# scheduling latency. With this on by default, both would be measuring
+# this fragment and would have no column that said so.
+BENCH_DEBUG_KERNEL ?= "0"
+SRC_URI += '${@"file://debug.cfg" if d.getVar("BENCH_DEBUG_KERNEL") == "1" else ""}'
+
+# And KASAN, which is the second switch for the same project and is here
+# for the reason BENCH_RT_LAB is: a switch that gates a file gates
+# everything in the file, so a single BENCH_DEBUG_KERNEL covering both
+# fragments would mean every kgdb session also paid 128 MB of shadow
+# memory and a factor of two in speed.
+#
+# kasan.cfg is additive to debug.cfg and is not usable alone: a KASAN
+# kernel with no symbols, no console and no pstore reports a use after
+# free to nobody. kas/bench-debug-kasan.yml therefore sets both switches,
+# and setting only this one gives a detector that cannot be read.
+BENCH_KASAN_KERNEL ?= "0"
+SRC_URI += '${@"file://kasan.cfg" if d.getVar("BENCH_KASAN_KERNEL") == "1" else ""}'
+
 # And Project 5's accelerometer driver, same switch pattern.
 #
 # What this fragment turns on is unusual and worth a sentence here rather
@@ -130,3 +156,21 @@ SRC_URI += '${@"file://explorer.cfg" if d.getVar("BENCH_EXPLORER_KERNEL") == "1"
 # Project 3 would be measuring them in its kernel size column.
 BENCH_ADXL345_KERNEL ?= "0"
 SRC_URI += '${@"file://adxl345.cfg" if d.getVar("BENCH_ADXL345_KERNEL") == "1" else ""}'
+
+# And the 3.5 inch panel, same switch pattern. Project 7 binds a Waveshare
+# RPi LCD (A) to the in-tree ili9486 tiny DRM driver and its XPT2046 touch
+# controller to ads7846, both on SPI0.
+#
+# Opt in for the usual reason and one extra. The usual one: no other image
+# here has this panel, and the fragment forces DRM built in, which drags
+# the KMS helpers, the GEM DMA helper and the backlight class along with
+# it.
+#
+# The extra one is that the fragment also pins CONFIG_HWMON=y. That is not
+# about hardware monitoring: TOUCHSCREEN_ADS7846 is declared
+# "depends on HWMON = n || HWMON", so the touch driver cannot be built in
+# unless HWMON is. Pinning a subsystem on for a reason that has nothing to
+# do with the subsystem is exactly the kind of line that gets deleted as
+# noise later, which is why it is explained in two places.
+BENCH_LCD35A_KERNEL ?= "0"
+SRC_URI += '${@"file://lcd35a.cfg" if d.getVar("BENCH_LCD35A_KERNEL") == "1" else ""}'

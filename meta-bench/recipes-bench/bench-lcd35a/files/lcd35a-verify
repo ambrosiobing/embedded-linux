@@ -1,0 +1,180 @@
+#!/bin/sh
+#
+# lcd35a-verify - what can be checked about the panel from the board
+# itself, without a finger and without a camera.
+#
+# The acceptance criteria for this project split into three kinds and this
+# script is honest about which is which:
+#
+#   - things a command can settle: did both drivers bind, is there a DRM
+#     device, is there an input device, what clock did the bus get
+#   - things that need an eye: is there a login prompt on the glass, is
+#     the picture whole rather than shifted
+#   - things that need a finger: does a touch land where it looks
+#
+# It reports the first kind, and NAMES the other two rather than leaving
+# them out, because a check that silently narrows its question teaches you
+# to trust it more than it deserves.
+#
+# SPDX-License-Identifier: MIT
+
+set -u
+
+pass=0
+fail=0
+unknown=0
+
+ok() {
+	printf 'ok       %s\n' "$1"
+	pass=$((pass + 1))
+}
+
+bad() {
+	printf 'FAILED   %s\n' "$1"
+	fail=$((fail + 1))
+}
+
+dunno() {
+	printf 'unknown  %s\n' "$1"
+	unknown=$((unknown + 1))
+}
+
+section() {
+	printf '\n--- %s\n' "$1"
+}
+
+section "the two drivers bound"
+
+# Criterion 1. This is the one that says the overlay loaded AND that both
+# nodes found their drivers, which are two different failures with the
+# same symptom.
+for pair in "ili9486 spi0.0 panel" "ads7846 spi0.1 touch"; do
+	drv=$(echo "$pair" | cut -d' ' -f1)
+	dev=$(echo "$pair" | cut -d' ' -f2)
+	what=$(echo "$pair" | cut -d' ' -f3)
+
+	if [ ! -d "/sys/bus/spi/drivers/$drv" ]; then
+		bad "$what: no driver $drv at all. Is it in the kernel?"
+		continue
+	fi
+	if [ -e "/sys/bus/spi/drivers/$drv/$dev" ]; then
+		ok "$what: $drv bound to $dev"
+	else
+		bound=$(ls "/sys/bus/spi/drivers/$drv" 2>/dev/null |
+			grep '^spi' | tr '\n' ' ')
+		if [ -n "$bound" ]; then
+			bad "$what: $drv is bound to [$bound], not $dev"
+		else
+			bad "$what: $drv exists and is bound to nothing"
+		fi
+	fi
+done
+
+# The commonest cause of the above failing, checked separately so the
+# message is about the cause rather than the symptom.
+if [ -e /dev/spidev0.0 ] || [ -e /dev/spidev0.1 ]; then
+	bad "spidev is still on the bus. The overlay must disable spidev0
+         and spidev1; with them enabled the panel node never binds and
+         dmesg says only that chipselect 0 is already in use."
+fi
+
+section "the DRM device"
+
+card=""
+for c in /dev/dri/card*; do
+	[ -e "$c" ] || continue
+	n=$(basename "$c")
+	drv=$(readlink -f "/sys/class/drm/$n/device/driver" 2>/dev/null)
+	drv=$(basename "${drv:-none}")
+	if [ "$drv" = "ili9486" ]; then
+		card=$c
+		ok "$n is the panel, driver ili9486"
+	else
+		printf 'note     %s is driver %s, not the panel\n' "$n" "$drv"
+	fi
+done
+[ -n "$card" ] || bad "no /dev/dri/card* is driven by ili9486"
+
+# fbdev emulation, which is what criterion 2 rides on. Without it there is
+# a working panel and no framebuffer, so con2fbmap has nothing to map.
+fb=$(ls -d /sys/class/graphics/fb* 2>/dev/null | head -n 1)
+if [ -n "$fb" ]; then
+	ok "fbdev emulation is present ($(basename "$fb") and possibly more)"
+else
+	bad "no /dev/fb*. CONFIG_DRM_FBDEV_EMULATION did not reach the kernel,
+         so the console cannot be put on the panel at all."
+fi
+
+section "the input device"
+
+ev=$(grep -l 'ADS7846' /sys/class/input/event*/device/name 2>/dev/null |
+	head -n 1)
+if [ -n "$ev" ]; then
+	node=$(echo "$ev" | sed 's|/sys/class/input/\(event[0-9]*\)/.*|\1|')
+	ok "touch controller is /dev/input/$node"
+else
+	bad "no input device named ADS7846. If ili9486 bound and this did not,
+         check CONFIG_HWMON: ads7846 depends on HWMON = n || HWMON, so
+         with HWMON=m the =y line for the driver is silently dropped."
+fi
+
+section "the SPI clock the bus actually gave"
+
+# Criterion 3 has two halves and this is the half a command can answer.
+# The other half is the frame rate, which needs modetest and a mode set,
+# and therefore needs the console switched away.
+#
+# The value is four raw big-endian bytes in the of_node file. It is
+# decoded a byte at a time on purpose: "od --endian=big" is a GNU
+# extension and this script runs on a BusyBox userland, where it is a
+# usage error rather than a wrong answer. Same reason as "head -n 1"
+# above, which the repository's linter checks for.
+got=""
+for d in /sys/bus/spi/devices/spi0.0; do
+	[ -e "$d/of_node/spi-max-frequency" ] || continue
+	bytes=$(od -An -tx1 "$d/of_node/spi-max-frequency" 2>/dev/null)
+	set -- $bytes
+	[ $# -ge 4 ] || continue
+	got=$(printf '%d' $((0x$1 * 16777216 + 0x$2 * 65536 + 0x$3 * 256 + 0x$4)))
+done
+if [ -n "$got" ]; then
+	printf 'note     the tree asked for %s Hz\n' "$got"
+	dunno "what the controller rounded that to. spi-bcm2835 divides a
+         250 MHz core clock by an even integer, so an asked-for 32 MHz is
+         not necessarily a delivered 32 MHz. dmesg or the spi debugfs
+         directory is the place to look, and neither is guaranteed to
+         exist on a minimal image."
+else
+	dunno "no spi-max-frequency in the device tree node. Either the node
+         did not bind or of_node is not exposed on this kernel."
+fi
+
+section "what this script cannot check"
+
+dunno "criterion 2, a login prompt on the glass within 10 s. Needs an eye.
+         con2fbmap 1 1 and chvt 1 put it there; fbcon=map:1 on the kernel
+         command line makes it permanent."
+dunno "criterion 3's frame rate. Run modetest -M ili9486 -s CONN:480x320 -v
+         with the console switched away, and read the achieved rate. The
+         ceiling is arithmetic: a 480x320 RGB565 frame is 2.46 Mbit, so
+         32 MHz allows about 12 full frames per second and nothing beats
+         that."
+dunno "criterion 4, that drmfill paints the gradient. Run it: drmfill.
+         It finds the card by driver name, so it cannot paint the wrong
+         output by accident, which is the other half of that criterion."
+dunno "criterion 5, touch accuracy. Needs a finger. evtest for raw values,
+         then lcd35a-corners to turn four corner readings into a
+         calibration matrix, then libinput debug-events to confirm."
+
+if grep -rqs LIBINPUT_CALIBRATION_MATRIX /etc/udev/rules.d/; then
+	ok "a calibration matrix is installed in /etc/udev/rules.d"
+else
+	printf 'note     no calibration matrix yet. libinput defaults to the
+         identity, which is usable and not calibrated. See
+         lcd35a-corners -h.\n'
+fi
+
+printf '\n%d checked, %d failed, %d need hardware or an eye\n' \
+	"$pass" "$fail" "$unknown"
+
+[ "$fail" -eq 0 ]

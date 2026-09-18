@@ -1,0 +1,85 @@
+% Given a symptom rather than a known fault, which tool to reach for.
+%
+% The four faults in this project are labelled, so the matrix figure can
+% be read off them. This one starts from the situation you are actually
+% in, where nobody has told you which fault it is, and the first question
+% is not about the bug: it is whether the board is still running.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, node distance=8mm]
+
+  \node[qst] (alive) {is the board still\\running?};
+
+  %% ================ branch A: it is not ================
+  \node[qst, below left=12mm and 30mm of alive] (oops)
+       {did the console print\\an oops or a panic?};
+  \draw[trans] (alive) -| node[ans, pos=0.25, above] {no, dead or rebooting} (oops);
+
+  \node[fix, below left=12mm and 8mm of oops] (decode)
+       {\texttt{decode\_stacktrace.sh}\\
+        \scriptsize against the \textbf{matching} \texttt{vmlinux}};
+  \draw[trans] (oops) -| node[ans, pos=0.25, above] {yes} (decode);
+
+  \node[fix, below=8mm of decode] (pstore)
+       {\texttt{/sys/fs/pstore/}\\
+        \scriptsize it rebooted before you could read it};
+  \draw[trans] (decode) -- (pstore);
+
+  \node[fix, below=8mm of pstore] (kgdb1)
+       {kgdb, break, reproduce\\
+        \scriptsize when you want the registers, not the trace};
+  \draw[trans] (pstore) -- (kgdb1);
+
+  \node[fix, below right=12mm and 2mm of oops, fill=quietcol] (silent)
+       {pstore is the only witness\\
+        \scriptsize it died before the console came up, or\\
+        \scriptsize wedged with interrupts off. LED dark.};
+  \draw[trans] (oops) -| node[ans, pos=0.25, above] {no} (silent);
+
+  %% ================ branch B: it is running, badly ================
+  \node[qst, below right=12mm and 24mm of alive] (slow)
+       {one long stall,\\or many short ones?};
+  \draw[trans] (alive) -| node[ans, pos=0.25, above] {yes, but slow} (slow);
+
+  \node[fix, below=10mm of slow] (irqsoff)
+       {\texttt{irqsoff} / \texttt{preemptoff} tracer\\
+        \scriptsize keeps the longest section and its stack};
+  \draw[trans] (slow) -- node[ans, right] {one long} (irqsoff);
+
+  \node[fix, right=8mm of irqsoff] (perf)
+       {\texttt{perf record -g}\\
+        \scriptsize where the time goes, not where it stopped};
+  \draw[trans] (slow.east) to[out=0, in=90] node[ans, above right] {many short} (perf.north);
+
+  \node[fix, below=8mm of irqsoff] (fgraph)
+       {\texttt{trace-cmd record -p function\_graph}\\
+        \scriptsize the call sequence rather than the duration};
+  \draw[trans] (irqsoff) -- (fgraph);
+
+  %% ================ branch C: it is fine and wrong ================
+  \node[qst, right=34mm of slow, fill=quietcol] (fine)
+       {running fine and\\something is still wrong?};
+  \draw[trans] (alive.east) to[out=0, in=90] (fine.north);
+
+  \node[fix, below=10mm of fine, align=left] (quiet)
+       {memory grows without bound \ \ \ \ \ \ \texttt{kmemleak}, then scan\\
+        occasional impossible values \ \ \ \ \ \texttt{KASAN} kernel\\
+        a lock taken in a bad order \ \ \ \ \ \ \ \texttt{lockdep}, no trigger needed\\
+        only happens in production \ \ \ \ \ \ \ \texttt{KFENCE}, cheap enough to leave on};
+  \draw[trans] (fine) -- (quiet);
+
+  %% ---------------- the reading of it ----------------
+  \node[umlnote, anchor=north, text width=124mm, align=left]
+       at ($(fgraph.south)+(18mm,-10mm)$)
+       {\textbf{The split down the middle is the thing to take away.} The
+        left branch asks \emph{what is the state now}, and a debugger
+        answers it. The middle branch asks \emph{what happened before
+        now}, and only a tracer answers that: by the time you have a
+        prompt, the three seconds you care about are gone. The right
+        branch is the one nobody reaches for in time, because it has no
+        symptom to prompt it.};
+
+\end{tikzpicture}
+\end{document}

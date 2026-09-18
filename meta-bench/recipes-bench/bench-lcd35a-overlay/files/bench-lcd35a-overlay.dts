@@ -1,0 +1,143 @@
+// Project 7: the Waveshare 3.5 inch RPi LCD (A) on SPI0.
+//
+// Two slaves on one bus. The panel is an ILI9486 behind a shift-register
+// bridge on CE0; the touch controller is an XPT2046, register compatible
+// with the TI ADS7846, on CE1 with a pen-down interrupt on GPIO17.
+//
+// Wiring, and the reason each GPIO is the one it is, is in
+// projects/07-lcd35-drm/docs/DESIGN.md. Header pins, for reading against
+// the board: 18 is GPIO24, 22 is GPIO25, 11 is GPIO17.
+//
+// SPDX-License-Identifier: MIT
+
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2835";
+
+    // The bus itself. dtparam=spi=on in config.txt does the same thing;
+    // saying it here as well means the overlay is correct on a board
+    // whose config.txt somebody has edited.
+    fragment@0 {
+        target = <&spi0>;
+        __overlay__ {
+            status = "okay";
+        };
+    };
+
+    // Both spidev nodes off, and this is the fragment most likely to be
+    // left out by someone adapting this file.
+    //
+    // Leaving them enabled produces a bus conflict at probe: the panel
+    // node never binds and the only thing dmesg says is that chip select
+    // 0 is already in use, which does not sound like what it is.
+    fragment@1 {
+        target = <&spidev0>;
+        __overlay__ {
+            status = "disabled";
+        };
+    };
+
+    fragment@2 {
+        target = <&spidev1>;
+        __overlay__ {
+            status = "disabled";
+        };
+    };
+
+    // The three GPIOs that are not part of the SPI bus. PENIRQ needs the
+    // pull-up because it is an open line between interrupts; the panel
+    // board has one too, and both is correct rather than redundant.
+    fragment@3 {
+        target = <&gpio>;
+        __overlay__ {
+            lcd35a_pins: lcd35a_pins {
+                brcm,pins = <17 24 25>;
+                brcm,function = <0 1 1>;    /* in, out, out */
+                brcm,pull = <2 0 0>;        /* pull-up on PENIRQ */
+            };
+        };
+    };
+
+    fragment@4 {
+        target = <&spi0>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            lcd35a: lcd35a@0 {
+                // The first string is what the driver matches on. It is
+                // in ili9486_of_match in drivers/gpu/drm/tiny/ili9486.c,
+                // which is the whole reason this panel needs no vendor
+                // driver.
+                compatible = "waveshare,rpi-lcd-35", "ilitek,ili9486";
+                reg = <0>;
+                pinctrl-names = "default";
+                pinctrl-0 = <&lcd35a_pins>;
+
+                // 32 MHz is for a panel plugged straight onto the header.
+                // Jumper wires do not carry it cleanly and the symptom is
+                // a partially drawn or shifted picture rather than an
+                // error. Use the speed override below to drop to 16 MHz.
+                spi-max-frequency = <32000000>;
+
+                dc-gpios = <&gpio 24 0>;
+
+                // Flag 0, active high, as in the binding example. The
+                // driver drives the line low itself during
+                // mipi_dbi_hw_reset; the line is active low in hardware
+                // and that is the driver's business, not the tree's.
+                reset-gpios = <&gpio 25 0>;
+
+                rotation = <90>;
+            };
+
+            lcd35a_ts: lcd35a_ts@1 {
+                compatible = "ti,ads7846";
+                reg = <1>;
+                spi-max-frequency = <2000000>;
+
+                interrupt-parent = <&gpio>;
+                interrupts = <17 2>;            /* falling edge */
+                pendown-gpio = <&gpio 17 0>;
+
+                // The /bits/ 16 prefix is load bearing on every line it
+                // appears on. The ads7846 binding declares these as
+                // 16-bit cells and the driver reads them with
+                // device_property_read_u16. Without the prefix they are
+                // 32-bit cells and the driver reads the wrong half of
+                // each one, which gives a touchscreen that reports
+                // nonsense rather than one that fails to probe.
+                ti,x-plate-ohms = /bits/ 16 <60>;
+                ti,pressure-max = /bits/ 16 <255>;
+                ti,x-min = /bits/ 16 <200>;
+                ti,x-max = /bits/ 16 <3900>;
+                ti,y-min = /bits/ 16 <200>;
+                ti,y-max = /bits/ 16 <3900>;
+
+                // Chosen for rotation = <90> above. Rotation in the panel
+                // driver does not rotate touch coordinates, so these two
+                // properties and the calibration matrix must all be
+                // chosen for the same rotation. If X grows while a finger
+                // moves along the short edge, this is the wrong way round
+                // and the swapxy override below flips it without an edit.
+                ti,swap-xy;
+
+                ti,keep-vref-on;
+            };
+        };
+    };
+
+    // Configuration that legitimately varies, exposed so that config.txt
+    // carries parameters and not a second copy of this overlay.
+    //
+    //   dtoverlay=bench-lcd35a,speed=16000000
+    //   dtoverlay=bench-lcd35a,rotate=270
+    //   dtoverlay=bench-lcd35a,swapxy=0
+    __overrides__ {
+        speed  = <&lcd35a>, "spi-max-frequency:0";
+        rotate = <&lcd35a>, "rotation:0";
+        swapxy = <&lcd35a_ts>, "ti,swap-xy?";
+    };
+};

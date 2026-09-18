@@ -1,0 +1,92 @@
+% What is built where, and the two firsts this project introduces.
+%
+% Both firsts are in the drawing and both are easy to get wrong. The
+% module is the layer's first recipe that inherits the module class, and
+% its package is not named after its recipe. The host tools are the first
+% thing in this repository that is deliberately not in any image.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[node distance=6mm, font=\sffamily\small]
+
+  %% ---------------- the layer ----------------
+  \node[kern, align=left] (dbg)
+       {\texttt{debug.cfg}\\[-1pt]\scriptsize kgdb, ftrace, perf, pstore, lockdep};
+  \node[kern, below=5mm of dbg, align=left] (kasan)
+       {\texttt{kasan.cfg}\\[-1pt]\scriptsize the expensive half, its own image};
+  \node[user, below=5mm of kasan, align=left] (rec)
+       {\texttt{bench-buggy}\\[-1pt]\scriptsize \textbf{inherit module}};
+  \node[user, below=5mm of rec, align=left] (img)
+       {\texttt{bench-debug-image}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fill=kerncol!20, fit=(dbg)(kasan)(rec)(img)] (lay) {};
+  \end{scope}
+  \node[layerlabel, anchor=south west] at (lay.north west)
+       {\texttt{meta-bench}, built by BitBake};
+
+  %% ---------------- on the target ----------------
+  \node[kern, right=34mm of dbg, align=left] (ko)
+       {\texttt{buggy.ko}\\[-1pt]\scriptsize four faults, trigger driven};
+  \node[user, below=5mm of ko, align=left] (tools)
+       {\texttt{trace-cmd}, \texttt{perf}\\[-1pt]\scriptsize write to \texttt{/dev/shm}};
+  \node[hw, below=5mm of tools, align=left] (led)
+       {heartbeat on GPIO17};
+  \node[hw, below=5mm of led, align=left] (vm)
+       {\texttt{vmlinux}, \texttt{System.map}\\[-1pt]
+        \scriptsize build products, not on the card};
+
+  \begin{scope}[on background layer]
+    \node[layer, fill=usercol!20, fit=(ko)(tools)(led)(vm)] (tgt) {};
+  \end{scope}
+  \node[layerlabel, anchor=south west] at (tgt.north west) {on the target};
+
+  %% ---------------- on the host ----------------
+  \node[host, right=30mm of ko, align=left] (proxy)
+       {\texttt{host/agent-proxy.sh}};
+  \node[host, below=5mm of proxy, align=left] (gi)
+       {\texttt{gdbinit}\\[-1pt]\scriptsize \texttt{lx-} scripts, \texttt{target remote}};
+  \node[host, below=5mm of gi, align=left] (dec)
+       {\texttt{host/decode.sh}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fill=hostcol!30, fit=(proxy)(gi)(dec)] (hst) {};
+  \end{scope}
+  \node[layerlabel, anchor=south west] at (hst.north west)
+       {on the host, \textbf{in no image}};
+
+  %% ---------------- edges ----------------
+  \draw[flow] (dbg.east) to[out=0, in=180] (ko.west);
+  \draw[flow] (kasan.east) to[out=0, in=180] (ko.west);
+  \draw[flow] (rec.east) to[out=0, in=185]
+       node[lbl, pos=0.55, align=center]
+       {packaged as\\\texttt{kernel-module-buggy}} (ko.west);
+  \draw[flow] (img.east) to[out=0, in=190] (tools.west);
+  \draw[flow] (dbg.east) to[out=-10, in=180] (vm.west);
+
+  \draw[bus] (vm.east) -- node[lbl, align=center]
+       {the same build,\\or the symbols lie} (dec.west);
+  \draw[flow] (proxy) -- (gi);
+
+  %% ---------------- the two notes ----------------
+  \node[umlnote, anchor=north west, text width=72mm, align=left]
+       at ($(lay.south west)+(0,-8mm)$)
+       {\textbf{First of its kind here.} Every other recipe in
+        \texttt{recipes-bench/} builds userspace. A module recipe inherits
+        the \texttt{module} class, builds against the kernel staging
+        directory, and \textbf{its package is named
+        \texttt{kernel-module-buggy}, not after the recipe}. An image that
+        installs \texttt{bench-buggy} gets nothing and says nothing.};
+
+  \node[umlnote, anchor=north east, text width=72mm, align=left]
+       at ($(hst.south east)+(0,-8mm)$)
+       {\textbf{Also a first.} \texttt{agent-proxy}, \texttt{gdb-multiarch}
+        and \texttt{decode\_stacktrace.sh} run on the developer's machine,
+        so they live under \texttt{projects/09-kernel-debug/host/} rather
+        than in a recipe. The instinct is to package everything, and here
+        that would put a debugger on a board that is about to stop
+        running.};
+
+\end{tikzpicture}
+\end{document}

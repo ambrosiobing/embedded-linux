@@ -1,0 +1,73 @@
+% The same fault captured twice: once after the fact, once live.
+%
+% The top half is what you get when nobody was watching, and it is the
+% common case. The bottom half is what a debugger is for. The notebook
+% keeps them separate because they answer different questions.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\scriptsize]
+
+  \def\ytop{0}
+  \def\ybot{-15.6}
+
+  %% ---------------- participants ----------------
+  \foreach \x/\txt in {
+      0/{developer},
+      3.0/{console, tcp 5550},
+      6.0/{gdb, tcp 5551},
+      9.2/{kernel \texttt{+ buggy.ko}},
+      12.2/{ramoops region},
+      15.0/{\texttt{/sys/fs/pstore}}} {
+    \node[actor] at (\x,\ytop) {\txt};
+    \draw[lifeline] (\x,-0.5) -- (\x,\ybot);
+  }
+
+  %% ================ part one: nobody was watching ================
+  \node[anchor=west, font=\sffamily\scriptsize\bfseries, text=linecol]
+       at (-1.4,-1.1) {PART ONE: the crash nobody was watching};
+
+  \draw[msg] (0,-1.8) -- node[lbl, above] {\texttt{echo null > .../buggy/trigger}} (9.2,-1.8);
+  \draw[msg] (9.2,-2.6) -- node[lbl, above] {\texttt{Unable to handle kernel NULL pointer dereference}} (3.0,-2.6);
+  \draw[msg] (9.2,-3.4) -- node[lbl, above] {\texttt{panic\_on\_oops}: dmesg into slot 0} (12.2,-3.4);
+
+  \node[umlnote, anchor=north west, text width=58mm] at (3.3,-4.0)
+       {\texttt{panic\_timeout=10}, then the board reboots and the console
+        scrolls past the oops. \textbf{This is why the terminal session is
+        always logged to a file.} A crash you cannot re-read is a crash you
+        have to reproduce.};
+
+  \draw[msg] (12.2,-6.4) -- node[lbl, above] {survives the reboot, uncleared RAM} (15.0,-6.4);
+  \draw[reply] (15.0,-7.2) -- node[lbl, above] {\texttt{dmesg-ramoops-0}} (0,-7.2);
+  \node[anchor=west, lbl] at (0.1,-7.9)
+       {\texttt{decode\_stacktrace.sh vmlinux auto ./buggy} \ \ resolves the addresses};
+
+  %% ================ part two: the same fault, live ================
+  \node[anchor=west, font=\sffamily\scriptsize\bfseries, text=linecol]
+       at (-1.4,-8.8) {PART TWO: the same fault, live};
+
+  \draw[msg] (0,-9.5) -- node[lbl, above] {\texttt{echo g > /proc/sysrq-trigger}} (9.2,-9.5);
+  \node[umlnote, anchor=north east, text width=40mm] at (8.9,-9.9)
+       {The heartbeat LED freezes here. It is the only instrument that
+        still reports once the kernel has stopped.};
+
+  \draw[msg] (9.2,-11.3) -- node[lbl, above] {\texttt{kgdboc} takes the UART, polled mode} (6.0,-11.3);
+  \draw[msg] (0,-12.0) -- node[lbl, above] {\texttt{target remote :5551}} (6.0,-12.0);
+  \draw[msg] (0,-12.7) -- node[lbl, above] {\texttt{lx-symbols ./buggy}, \ \texttt{break fault\_null}} (6.0,-12.7);
+  \draw[msg] (6.0,-13.4) -- node[lbl, above] {\texttt{Z0} breakpoint, then \texttt{c}} (9.2,-13.4);
+  \draw[msg] (0,-14.1) -- node[lbl, above] {\texttt{echo null > trigger}, from the console session} (3.0,-14.1);
+  \draw[msg] (3.0,-14.1) -- (9.2,-14.1);
+  \draw[reply] (9.2,-14.8) -- node[lbl, above] {\texttt{T05} stop} (6.0,-14.8);
+  \draw[reply] (6.0,-15.4) -- node[lbl, above] {\texttt{bt}, \ \texttt{info registers}, \ \texttt{print it} \ gives \ \texttt{0x0}} (0,-15.4);
+
+  %% ---------------- the reading of it ----------------
+  \node[umlnote, anchor=north west, text width=140mm] at (-1.4,-16.2)
+       {\textbf{Two halves, two questions.} Pstore says \emph{that} it
+        happened and roughly where, from a board that is no longer in that
+        state. kgdb says what the registers held while it was still in it.
+        Neither answers the other's question, and the notebook records them
+        as separate entries for that reason.};
+
+\end{tikzpicture}
+\end{document}

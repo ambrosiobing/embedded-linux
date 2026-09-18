@@ -17,8 +17,12 @@
 #   ./go iio          build bench-iio-image, the IIO sensor lab of Project 10
 #   ./go adxl345      build bench-adxl345-image, the ADXL345 driver of Project 5
 #   ./go explorer     build bench-explorer-image, the Explorer 700 of Project 6
+#   ./go lcd35a       build bench-lcd35a-image, the DRM panel of Project 7
 #   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
 #   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
+#   ./go debug        build bench-debug-image, the debugging lab of Project 9
+#   ./go debug-kasan  the same lab with KASAN on, which is a second kernel
+#   ./go proxy        split the console cable into a gdb port and a terminal
 #   ./go armstub      put the secure world on a card the image is already on
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
@@ -60,8 +64,12 @@ hub)        exec sh ./scripts/build.sh bench-hub ;;
 iio)        exec sh ./scripts/build.sh bench-iio ;;
 adxl345)    exec sh ./scripts/build.sh bench-adxl345 ;;
 explorer)   exec sh ./scripts/build.sh bench-explorer ;;
+lcd35a)     exec sh ./scripts/build.sh bench-lcd35a ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
 tee)        exec sh ./scripts/build.sh bench-tee ;;
+debug)      exec sh ./scripts/build.sh bench-debug ;;
+debug-kasan) exec sh ./scripts/build.sh bench-debug-kasan ;;
+proxy)      shift; exec sh ./projects/09-kernel-debug/host/agent-proxy.sh "$@" ;;
 armstub)    shift; exec sh ./scripts/optee-armstub.sh "$@" ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;

@@ -1,0 +1,263 @@
+# Journal: Project 07
+
+What actually happened, in order, including the things that were wrong
+first. [DECISIONS.md](../../walkthrough/DECISIONS.md) is the distilled list
+of choices; this is the path that produced them.
+
+Format for each entry: **what happened**, **what was done**, **why that and
+not the alternative**.
+
+All entries are 18 September 2026 unless noted.
+
+---
+
+## 1. The design was written first, and it found two things
+
+**What happened.** The specification and its four figures were read before
+any recipe existed, which is the order Projects 15, 04 and 06 established.
+Reading them against this bench rather than against a Raspberry Pi OS
+install turned up two things that would otherwise have been found during a
+build or on a board.
+
+The first is that six of the specification's steps do not survive contact
+with a Yocto image at all. It installs tools with `apt`, runs `dtc` on the
+target, and edits `/boot/firmware/config.txt` and `cmdline.txt` by hand.
+None of those exist here: there is no package manager on the target, a board
+that compiles its own device tree has a boot that depends on a tool being
+installed, and a hand-edited boot partition does not survive a reflash. The
+translation is a table in [docs/DESIGN.md](docs/DESIGN.md) rather than six
+surprises.
+
+The second is in the next entry, because it deserves its own.
+
+**What was done.** [docs/DESIGN.md](docs/DESIGN.md), with all four specified
+figures redrawn as text, an ownership table, and the six acceptance criteria
+written out in full. No recipe yet.
+
+**Why that and not the alternative.** The alternative is what Project 1 did:
+build the thing, then reconstruct the design from the thing. That produces
+documentation describing the implementation rather than the intent, and it
+structurally cannot catch the case where the implementation drifted from
+what was asked for. It also defers every incompatibility to the point where
+a build is already running.
+
+---
+
+## 2. Four kernel symbols checked against the source, and one has a trap
+
+**What happened.** The specification asks for three kernel symbols:
+
+```
+CONFIG_TINYDRM_ILI9486=m
+CONFIG_TOUCHSCREEN_ADS7846=m
+CONFIG_DRM_FBDEV_EMULATION=y
+```
+
+This repository has a rule about believing symbol names, written after three
+invented netfilter symbols survived review, CI and a 178 minute build. So
+all of them were read out of `v6.12` rather than recalled. All three exist,
+and so does `DRM_MIPI_DBI`, which was the fourth candidate.
+
+Two findings came out of reading the stanzas rather than only checking that
+the names resolve.
+
+**`TINYDRM_ILI9486` selects four symbols**, `DRM_KMS_HELPER`,
+`DRM_GEM_DMA_HELPER`, `DRM_MIPI_DBI` and `BACKLIGHT_CLASS_DEVICE`. Naming
+any of them in the fragment would be noise that somebody later has to keep
+true.
+
+**`TOUCHSCREEN_ADS7846` depends on `HWMON = n || HWMON`.** That is a
+tristate dependency, and it means the driver can be built in only when
+`HWMON` is itself built in or absent entirely. If the Raspberry Pi defconfig
+carries `CONFIG_HWMON=m`, then `CONFIG_TOUCHSCREEN_ADS7846=y` is not a valid
+configuration and Kconfig drops it without a word. The build succeeds, the
+option is absent, and the board has no touch input with nothing anywhere
+saying why. That is the exact failure shape this bench keeps meeting.
+
+**What was done.** Recorded in the design's kernel section with the file and
+line each symbol was found at, and marked as the first thing to check on the
+build host, with the two commands that check it:
+
+```
+./go ksym -f lcd35a        every line names a symbol that exists
+./go kconfig -f lcd35a     every line reached the .config
+```
+
+**Why that and not the alternative.** The alternative is to write the
+fragment and let the build find out. The build cannot find out: a fragment
+line that Kconfig drops produces no error, which is the whole reason those
+two checks exist. Checking the stanza costs one command and answers the
+question before a card is written.
+
+**What this entry does not claim.** The `HWMON` interaction is reasoning
+from the Kconfig stanza. Nobody has read the Raspberry Pi 3 defconfig to see
+what `HWMON` is set to there, because that needs a kernel tree and the
+laptop this was written on has none. It predicts a failure; it has not seen
+one.
+
+---
+
+## 3. The specification hard-codes the device its own pitfall list warns about
+
+**What happened.** The specification's `drmfill.c` opens `/dev/dri/card1`,
+and the same specification's pitfall list says this:
+
+> If `vc4-kms-v3d` is disabled the panel becomes `card0` and `fb0`;
+> hard-coded device paths in scripts then point at the wrong device. Match
+> on the driver name or the sysfs modalias instead.
+
+Both are correct advice and they contradict each other in the same
+document. Worse, one of the acceptance criteria is that running against
+the wrong card "fails with a clear error rather than painting the HDMI
+output by accident", which the hard-coded version cannot satisfy: opening
+`card1` when `card1` is HDMI succeeds and paints HDMI.
+
+**What was done.** `drmfill` walks `/dev/dri/card*`, reads each one's
+driver name with `drmGetVersion`, and uses the first that reports
+`ili9486`. It prints every card it looked at and what it rejected. An
+explicit `-d` is checked against the same name and refused unless `-f` is
+given.
+
+That turns criterion 4 from a thing you hope about into a property of the
+program. It also follows the rule this bench arrived at the hard way: a
+tool that chooses its own input has to say what it chose, and a refusal
+without evidence cannot be argued with, so the refusal names the driver it
+found and the one it wanted.
+
+**Why that and not the alternative.** The alternative is to keep the path
+and document the risk, which is what the specification does. Documentation
+does not survive a board configured differently; forty lines of C does.
+
+---
+
+## 4. Two tests, and then the tests were broken on purpose
+
+**What happened.** The suite came out green on the first run: 48
+assertions, 0 failures. That is the least informative possible result. A
+check that has never failed is indistinguishable from a check that does
+nothing, and this repository has already shipped three of those: one
+defined and never added to the linter's list, one whose regex matched its
+own file's comments and silenced itself, and one whose failure branch
+reported a new refusal as a pass.
+
+**What was done.** Four defects were introduced deliberately, the suite
+was run, and each was watched to fail with a message naming the actual
+fault rather than the symptom:
+
+| Defect introduced | What fired |
+|---|---|
+| `/bits/ 16` removed from `ti,x-max` | `ti,x-max has no /bits/ 16` / `the driver will read the wrong half of the cell` |
+| `CONFIG_TOUCHSCREEN_ADS7846` set to `=m` | two failures, the blanket no-modules rule and the specific one |
+| `IMAGE_INSTALL:remove = "bench-status"` deleted | `the image removes bench-status` |
+
+Then the files were restored from a backup and the suite went green again.
+Both directions, which is the part that is usually skipped.
+
+**Why that and not the alternative.** The alternative is to trust a green
+run. The three shipped non-checks above are what that is worth here.
+
+**What this did not cover.** The `dtc` section is skipped on this laptop,
+which has no `dtc`, so the compile assertion has never run in either
+direction. `device-tree-compiler` was added to `scripts/host-setup.sh` so
+that CI runs it, and until a CI run happens that assertion is written and
+unproven. It is skipped loudly rather than quietly, which is the least that
+can be done about it from here.
+
+---
+
+## 5. Three shared files, one of them hot
+
+**What happened.** Project 7 needs three files that belong to no project:
+`linux-raspberrypi_%.bbappend` for its kernel switch, `go` for its target,
+and `scripts/host-setup.sh` for `libdrm-dev` and `device-tree-compiler`.
+The bbappend had been written by another session within the previous eight
+minutes, adding Project 5's `BENCH_ADXL345_KERNEL`.
+
+That file is the one where a lost write is expensive rather than annoying.
+It already carries eleven switches, and adding a twelfth moves the kernel
+recipe's basehash whether the switch is on or off, because a basehash
+covers the expression and not what it evaluated to.
+
+**What was done.** The three shared files were left until last, so the
+window between writing and checking was as short as possible. The bbappend
+edit was anchored on the exact two lines of Project 5's switch rather than
+appended blind, and immediately afterwards every switch in the file was
+counted:
+
+```
+BENCH_ROUTER_KERNEL BENCH_RT_KERNEL BENCH_RT_LAB BENCH_BLE_KERNEL
+BENCH_NETBOOT_KERNEL BENCH_TEE_KERNEL BENCH_IIO_KERNEL
+BENCH_EXPLORER_KERNEL BENCH_DEBUG_KERNEL BENCH_KASAN_KERNEL
+BENCH_ADXL345_KERNEL BENCH_LCD35A_KERNEL
+```
+
+Twelve, with nothing lost.
+
+**Why that and not the alternative.** The alternative is to write the
+shared file first and trust it. A concurrent write to the same file does
+not announce itself, and the way this repository has met that class of
+failure before is a `str.replace` that matched nothing, returned the string
+unchanged, and wrote it back unchanged with no error. Counting afterwards
+costs one command.
+
+**What follows from this for whoever builds it.** Adding a switch to that
+bbappend stops any build already running on the other laptop, with an error
+that blames the metadata. Check that nothing is building before pulling
+this.
+
+---
+
+## 6. The README claimed a check that did not exist
+
+**What happened.** Asked whether the project was ready to commit, the
+honest way to answer was to re-read the claims rather than repeat them. The
+README's table of what is tested without hardware said:
+
+| Check | Command | Covers |
+|---|---|---|
+| Compile | `./go check` | `drmfill` with `-Werror` against the host libdrm |
+
+`./go check` runs `scripts/host-check.sh`, and `grep drmfill` on that file
+returned nothing. The claim had never been true. `libdrm-dev` had been
+added to `scripts/host-setup.sh` in the same sitting, which is the half of
+the job that makes the other half look done: the dependency was installed
+for a step that was never written.
+
+So `drmfill` had not been compiled by anything, anywhere. This laptop has
+no C compiler, so nothing local had caught it, and nothing remote would
+have either, for the reason in the next paragraph.
+
+**What was done.** Three fixes, because pulling the thread found two more.
+
+1. A `compile drmfill against host libdrm` step in `host-check.sh`. It is
+   its own step rather than another block inside the libgpiod branch,
+   because a host with libgpiod and no libdrm should still check what it
+   can and say what it could not. It runs the binary afterwards and expects
+   it to find no panel, which exercises the card-walking path from entry 3.
+2. `libdrm-dev` added to the CI workflow. **CI has its own package list,
+   separate from `host-setup.sh`**, and nothing had noticed that the two
+   had drifted. Without this the new step would have failed every run.
+3. `device-tree-compiler` added to the same CI list. The overlay suite's
+   `dtc` section skips where `dtc` is absent, and its skip message says
+   "CI installs device-tree-compiler and does compile it". That sentence
+   was also false. An assertion that is written and never runs is the third
+   non-check this repository has shipped, and this one was caught before it
+   shipped rather than after.
+
+**Why that and not the alternative.** The alternative is to correct the
+README to say that `drmfill` is not compiled by anything. That is honest
+and it is the wrong repair: the program is forty lines of ioctl calls
+against an API this bench cannot otherwise exercise, and compiling it with
+`-Werror` is the only check available for it short of a panel.
+
+**What this entry does not claim.** None of the three fixes has run.
+`drmfill` still has not been compiled, and the overlay still has not been
+through `dtc`, because the machine this was written on has neither tool.
+The difference from an hour ago is that the checks now exist and will run
+on the next CI, rather than being described in a README as though they
+already had.
+
+**The shape worth remembering.** Installing a dependency feels like doing
+the work. `host-setup.sh` gained `libdrm-dev`, and that made the compile
+step look present in every subsequent reading of the diff, including mine.
+The thing that caught it was grepping for the claim instead of trusting it.

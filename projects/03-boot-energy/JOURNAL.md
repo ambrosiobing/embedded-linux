@@ -230,3 +230,38 @@ five. The specification asks for five per variant and the first run of
 every variant is discarded by rule, so asking for five leaves four. That is
 the kind of quiet shortfall nobody notices until the standard deviations
 are being compared.
+
+## 9. CI found what this host cannot run, and the fix nearly repeated journal 59
+
+**What happened.** The first push went red. `shellcheck -s sh -e
+SC1090,SC1091` in CI reported SC2154 three times against
+`tests/boot-energy-analyze-test.sh`: `out_d1`, `out_d0` and `out_d2`
+referenced but not assigned.
+
+They were assigned, by `eval "out_$chan=$(...)"` inside a loop, which no
+static checker can follow. The authoring laptop has no shellcheck, so the
+suite had passed here 37 times without anyone being able to say that.
+
+**What was done.** The `eval` is gone. The assertion happens inside the
+loop and the label travels with the case that produced it, so each of the
+three missing-edge cases now reads as one block instead of an assignment
+here and an assertion forty lines later.
+
+Then `scripts/lint.py` refused the comment explaining the fix, because it
+began `# shellcheck cannot follow`, and a comment whose first word after
+the hash is `shellcheck` is parsed as a directive with `cannot` as the
+directive name. **That is journal 59 of Project 8, exactly**, which is why
+that rule exists and why it fired within a minute of the defect being
+introduced.
+
+**Why that and not the alternative.** A `# shellcheck disable=SC2154`
+would have made the run green in one line. It would also have kept a
+construct that hides three variables from every reader, not only from the
+tool, and the rule this repository keeps returning to is that a check
+refusing is information rather than an obstacle.
+
+The narrower lesson is about where a check lives. The CI log named the
+file, the line and the variable, and reading it took one API call with the
+credential git already holds. The prediction that it would fail was made
+before the log was read and was right, but predicting is not knowing, and
+there was no reason to guess when the run had already finished.

@@ -1,0 +1,52 @@
+# Project 9: the same lab with KASAN on.
+#
+#   kas build kas/bench-debug-kasan.yml    or  ./go debug-kasan
+#
+# The second of the two kernels this project builds. It includes
+# bench-debug.yml rather than repeating it, and that inclusion is not a
+# convenience: kasan.cfg is additive to debug.cfg and is not usable
+# alone. A KASAN kernel with no symbols, no console and no pstore would
+# report a use after free to nobody.
+#
+# This is the same mistake BENCH_RT_LAB was invented to fix in Project 8,
+# where one switch gated a whole file and the control arm silently lost
+# eight settings nobody had listed. Two switches, one per file, and the
+# configuration that wants both says so.
+header:
+  version: 14
+  includes:
+    - bench-debug.yml
+
+target: bench-debug-image
+
+local_conf_header:
+  kasan: |
+    # The second switch. bench-debug.yml already set the first.
+    BENCH_KASAN_KERNEL = "1"
+
+    # --- what this costs, in the place where it is paid ------------------
+    #
+    # KASAN shadows memory at one byte per eight. This board has 1 GB, so
+    # about 128 MB is gone before userspace starts, and the instrumented
+    # kernel is roughly twice as slow.
+    #
+    # gpu_mem=16 gives back the largest single block available from
+    # config.txt. The default split hands the VideoCore a good deal more
+    # than a headless debugging board will ever use, and 16 MB is the
+    # documented minimum. The DSI panel that bench-rpi4.yml configures
+    # will not be usable with this, which is the trade: this kernel is
+    # driven over the serial cable and ssh.
+    RPI_EXTRA_CONFIG:append = "\ngpu_mem=16"
+
+    # --- do not measure anything with this kernel ------------------------
+    #
+    # Worth writing in the configuration rather than only in the
+    # documentation, because it is the mistake this repository has
+    # already made once, in Project 8, with a different variable: a
+    # number taken under a condition that no column records.
+    #
+    # Any boot time, latency or memory figure taken on this image is a
+    # figure about KASAN. The cost table in the project README compares
+    # three kernels on purpose (production, debug, debug with KASAN), and
+    # that is the only place a number from this image belongs.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-buggy perf"

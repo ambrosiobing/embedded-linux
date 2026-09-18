@@ -1,0 +1,92 @@
+# Project 9: the kernel debugging lab.
+#
+#   kas build kas/bench-debug.yml        or  ./go debug
+#
+# A Raspberry Pi 3B+, because the project needs a board where a crash
+# costs nothing and where the console cable is the debugger. bench-rpi3.yml
+# already sets the machine.
+#
+# This configuration produces a kernel with the toolbox in it and an image
+# with the faulty module. The KASAN half is a second configuration that
+# includes this one: kas/bench-debug-kasan.yml.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-debug-image
+
+local_conf_header:
+  debug: |
+    # The fragment. See the bbappend for why it is opt in, and debug.cfg
+    # itself for the four symbols that a fragment cannot set and which
+    # are asserted there as consequences instead.
+    BENCH_DEBUG_KERNEL = "1"
+
+    # --- the kernel command line ---------------------------------------
+    #
+    # meta-raspberrypi offers ENABLE_KGDB = "1" as a shortcut, and this
+    # file deliberately does not use it. rpi-cmdline.bb turns that into
+    #
+    #     CMDLINE_KGDB ?= "kgdboc=serial0,115200"
+    #
+    # and serial0 is a device-tree alias, not a tty. "console=serial0"
+    # works because the console code resolves aliases through the
+    # stdout-path mechanism. kgdboc takes a different path: it resolves
+    # its argument with tty_find_polling_driver, which matches a
+    # registered tty driver name and index.
+    #
+    # INFERRED, NOT YET SEEN ON THE BOARD: that this makes
+    # kgdboc=serial0 attach to nothing. It is written here as the reason
+    # for being explicit rather than as a finding, and docs/BRINGUP.md
+    # carries it as a check to run. Being explicit costs nothing if the
+    # alias does work, and if it does not, the failure it avoids is a
+    # debugger that silently attaches to no port at all.
+    CMDLINE_KGDB = "kgdboc=ttyAMA0,115200"
+
+    # nokaslr, so that an address in an oops means the same thing as the
+    # address in vmlinux on the host. Without it the two differ by a
+    # random offset per boot, and a backtrace decoded against vmlinux
+    # names the wrong functions without saying anything is wrong.
+    #
+    # The kernel's own lx-symbols handles this properly and is the right
+    # answer for a long session; nokaslr is the right answer for reading
+    # a single oops out of a log file, which is most of this project.
+    CMDLINE:append = " nokaslr"
+
+    # --- config.txt -----------------------------------------------------
+    #
+    # :append rather than =, because bench-rpi4.yml already sets this
+    # variable for the DSI panel and kas does not promise an order
+    # between local_conf_header blocks. An append is order independent.
+    #
+    # rpi-config_git.bb writes this with printf, not echo, so the \n
+    # separators are interpreted and each line lands on its own.
+    #
+    # disable-bt is the one that decides whether this project works at
+    # all. By default GPIO14 and GPIO15 carry the mini UART (ttyS0) and
+    # the PL011 (ttyAMA0) is wired to the Bluetooth radio. kgdboc=ttyAMA0
+    # on a board without this overlay attaches to a UART that is not on
+    # the header, and debugs nothing, silently.
+    #
+    # ramoops: base-addr 0x0b000000 is the overlay's own default and is
+    # below the 1 GB this board has. total-size 128 kB with a 16 kB
+    # record leaves six dmesg slots after the console region.
+    # console-size is NOT the default: it is 0 upstream, and
+    # CONFIG_PSTORE_CONSOLE without it is a feature with nowhere to
+    # write.
+    #
+    # gpio-led sets the heartbeat up in the kernel rather than from
+    # userspace, which matters here more than it looks: the overlay's own
+    # README notes the LED is brought up early in boot, so it is already
+    # beating before anything that could crash has run.
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=disable-bt\ndtoverlay=ramoops,base-addr=0x0b000000,total-size=0x20000,record-size=0x4000,console-size=0x8000\ndtoverlay=gpio-led,gpio=17,label=heartbeat,trigger=heartbeat"
+
+    # --- what to keep after the build -----------------------------------
+    #
+    # vmlinux and System.map are the whole point of the debug kernel, and
+    # rm_work deletes the directory they live in. perf is here for the
+    # same reason from the other side: it builds against this kernel's
+    # source, so losing the kernel work directory loses the ability to
+    # rebuild it.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-buggy perf"

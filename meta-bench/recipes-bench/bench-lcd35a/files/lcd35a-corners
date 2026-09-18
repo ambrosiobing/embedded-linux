@@ -1,0 +1,133 @@
+#!/bin/sh
+#
+# lcd35a-corners - turn four raw corner readings into a libinput
+# calibration matrix, and say what to do with it.
+#
+# WHY THIS EXISTS RATHER THAN ts_calibrate
+#
+# tslib is the classic answer: ts_calibrate draws five crosses on the
+# framebuffer and writes /etc/pointercal, and ts_test shows the corrected
+# position. It works, and what it produces is read by tslib programs and by
+# nothing else. A Wayland compositor does not read /etc/pointercal, and
+# this project exists to show the modern path.
+#
+# libinput reads a 3x2 calibration matrix from a udev property, and every
+# compositor applies it. That makes calibration DATA rather than a patched
+# application: it survives a reinstall, it is one line in a rule file, and
+# it is the same number whatever draws the picture.
+#
+# So this script does the arithmetic and prints the rule. Reading the raw
+# corners is a human job with evtest, because it needs a finger.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+usage() {
+	cat <<'EOF'
+usage: lcd35a-corners XMIN XMAX YMIN YMAX
+
+The four extreme raw values your finger produces at the corners of the
+panel, read with evtest. Prints a LIBINPUT_CALIBRATION_MATRIX and the udev
+rule that carries it.
+
+How to get the numbers:
+
+  evtest /dev/input/by-path/*spi*event*
+
+  Touch each of the four corners in turn, as close to the edge as the
+  glass allows, and note the extremes of ABS_X and ABS_Y. Nothing else in
+  the output matters for this.
+
+Then, to apply the rule this prints:
+
+  udevadm control --reload
+  udevadm trigger --subsystem-match=input
+  libinput debug-events --device /dev/input/eventN
+
+The kernel already clips to ti,x-min and ti,x-max from the overlay, so a
+well chosen overlay leaves this matrix close to the identity. A matrix far
+from identity is a sign the overlay's limits are wrong, not that the
+calibration is clever.
+EOF
+}
+
+case "${1:-}" in
+-h | --help | "")
+	usage
+	exit 0
+	;;
+esac
+
+if [ $# -ne 4 ]; then
+	usage
+	exit 2
+fi
+
+xmin=$1
+xmax=$2
+ymin=$3
+ymax=$4
+
+for v in "$xmin" "$xmax" "$ymin" "$ymax"; do
+	case $v in
+	'' | *[!0-9]*)
+		echo "not a number: $v" >&2
+		exit 2
+		;;
+	esac
+done
+
+if [ "$xmax" -le "$xmin" ] || [ "$ymax" -le "$ymin" ]; then
+	echo "max must be greater than min: got x $xmin..$xmax, y $ymin..$ymax" >&2
+	exit 2
+fi
+
+# The device range ads7846 reports. This is the 12-bit converter's full
+# scale, and it is what libinput normalises against: the matrix maps the
+# fraction of that range your finger actually reaches onto 0..1.
+FULL=4095
+
+# scale = FULL / (max - min), offset = -min / (max - min)
+#
+# awk rather than shell arithmetic, because these are not integers and
+# this is the one place in the repository where that matters. Six decimal
+# places is far past the resolution of a finger on a resistive panel and
+# costs nothing.
+awk -v xmin="$xmin" -v xmax="$xmax" -v ymin="$ymin" -v ymax="$ymax" \
+	-v full="$FULL" '
+BEGIN {
+	xs = full / (xmax - xmin)
+	ys = full / (ymax - ymin)
+	xo = -xmin / (xmax - xmin)
+	yo = -ymin / (ymax - ymin)
+
+	# A raw minimum of zero makes the offset negative zero, which
+	# printf renders as "-0.000000". That is arithmetically correct
+	# and reads like a mistake in a config file somebody has to trust,
+	# so it is normalised. -0 == 0 is true, which is what makes this
+	# one line enough.
+	if (xo == 0) xo = 0
+	if (yo == 0) yo = 0
+
+	printf "raw x %d..%d, y %d..%d against a device range of 0..%d\n\n",
+		xmin, xmax, ymin, ymax, full
+	printf "LIBINPUT_CALIBRATION_MATRIX=\"%.6f 0 %.6f 0 %.6f %.6f\"\n\n",
+		xs, xo, ys, yo
+
+	print "Put this in /etc/udev/rules.d/99-lcd35a-touch.rules:"
+	print ""
+	printf "ATTRS{name}==\"ADS7846 Touchscreen\", "
+	printf "ENV{LIBINPUT_CALIBRATION_MATRIX}=\"%.6f 0 %.6f 0 %.6f %.6f\"\n",
+		xs, xo, ys, yo
+	print ""
+
+	if (xs > 1.5 || ys > 1.5 || xs < 0.67 || ys < 0.67) {
+		print "WARNING: this matrix is a long way from the identity."
+		print "That usually means ti,x-min/x-max or ti,y-min/y-max in"
+		print "the overlay do not match this panel. Fix the overlay"
+		print "rather than compensating here: the kernel clips before"
+		print "libinput scales, so a wrong clip cannot be undone by a"
+		print "matrix."
+	}
+}'

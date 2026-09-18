@@ -1,0 +1,91 @@
+# gdb setup for the Project 9 debugging lab.
+#
+# THIS RUNS ON THE HOST. Use it from the directory holding vmlinux:
+#
+#     gdb-multiarch -x projects/09-kernel-debug/host/gdbinit vmlinux
+#
+# or, if vmlinux is elsewhere, edit nothing and pass it on the command
+# line; this file never names a path to it on purpose, because the one
+# thing that must not be guessed here is which vmlinux you meant.
+#
+# THE RULE THIS FILE EXISTS TO ENFORCE
+#
+# vmlinux must come from the build that produced the running kernel. Not
+# the same source, not the same version: the same build. A vmlinux from a
+# different build of identical source resolves addresses to the wrong
+# symbols confidently and silently, and the backtrace looks right. That
+# failure has cost more debugging time than any bug it was used on.
+#
+# SPDX-License-Identifier: MIT
+
+# The kernel's own gdb helpers: lx-symbols, lx-dmesg, lx-ps and the rest.
+# They are generated into the kernel build directory by CONFIG_GDB_SCRIPTS
+# as vmlinux-gdb.py next to vmlinux, so this line picks them up only if
+# you started gdb where that file is.
+#
+# If it is not found, gdb prints a warning and carries on without the lx-
+# commands, which is survivable but means no lx-symbols and therefore no
+# module symbols. debug.cfg sets CONFIG_GDB_SCRIPTS for this reason.
+add-auto-load-safe-path .
+source ./vmlinux-gdb.py
+
+# Do not page. A backtrace that stops halfway waiting for a keypress is
+# a backtrace that scrolls off when you press it.
+set pagination off
+set confirm off
+
+# The kernel is not a program gdb started, and several of its defaults
+# are wrong for it.
+set print pretty on
+set print array-indexes on
+
+# kgdb speaks the remote protocol over a serial line that is slow and, in
+# polled mode, occasionally slower. The default 2 s timeout gives up on a
+# board that is merely busy.
+set remotetimeout 30
+
+# A convenience for the one command in this project that is always typed
+# the same way. The port is agent-proxy's gdb port; see host/agent-proxy.sh.
+define kgdb
+  target remote localhost:5551
+end
+document kgdb
+Attach to the board through agent-proxy's gdb port (5551).
+
+The board must already be in the debugger. Put it there from the console
+session with:
+
+    echo g > /proc/sysrq-trigger
+
+or, over the serial terminal, the SysRq break followed by "g". The
+heartbeat LED on GPIO17 freezes when the kernel has stopped, which is how
+you know it worked before gdb says anything.
+end
+
+# The module's symbols are not in vmlinux. lx-symbols loads them, and it
+# needs the directory holding buggy.ko. Run it AFTER attaching, because
+# it reads the module list out of the stopped kernel.
+define lxmod
+  lx-symbols .
+end
+document lxmod
+Load module symbols from the current directory, after attaching.
+
+Run this once connected. Until it has run, a backtrace through the faulty
+module shows raw addresses with no names, which looks like a corrupted
+stack and is not one.
+end
+
+# What the notebook does, in the order it does it. Printed on load so the
+# sequence does not have to be remembered at the moment it is needed.
+echo \n
+echo Project 9 gdb setup loaded.\n
+echo \n
+echo   kgdb             attach through agent-proxy on port 5551\n
+echo   lxmod            load buggy.ko symbols (after attaching)\n
+echo   break fault_null set the breakpoint the notebook uses\n
+echo   bt / info registers / print victim\n
+echo \n
+echo Check first that this vmlinux is from the build now running on the\n
+echo board. Nothing here can verify that, and a mismatch is silent.\n
+echo \n

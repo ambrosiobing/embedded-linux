@@ -132,3 +132,63 @@ regardless, because that is the subsystem's shape rather than this bench's
 wiring. What the board exposes decides which half gets hardware evidence
 and which stays a compile-time claim, and the acceptance table will say
 which is which.
+
+---
+
+## 4. A comment about the linter broke the linter, and the guard against that had a hole
+
+**What happened.** The first push went red on shellcheck. One finding of six
+was this project's: SC2013 on the loop that reads every `BENCH_ADXL345_*`
+name out of the core and checks each is defined exactly once.
+
+The finding was fair and its suggested fix was not. Shellcheck proposes
+piping to a `while read` loop. That body increments two counters, and a
+`while` loop fed by a pipe runs in a subshell, so both counters would come
+back zero and the two assertions after the loop would pass whatever the
+header contained. The suggestion would have turned a working check into one
+that reports success because it counted in a scope nobody reads.
+
+So it became a `disable` with the reasoning written above it. And the
+second push went red on the same file.
+
+**What was done.** The explanation began:
+
+```
+# shellcheck's suggested "while read" loop would be wrong rather than
+```
+
+A comment whose first word after the hash is the tool's name is parsed as a
+directive. `shellcheck's` is not a directive key, so the file failed with
+SC1073 before reaching the `disable` three lines below it. **The comment
+explaining the fix disabled the fix.**
+
+Reworded so the name never opens a line. Then the more useful half: this
+repository already has `check_shellcheck_directives` in `scripts/lint.py`,
+written after the same class of comment reached CI three times. It did not
+catch this one. Its pattern was
+
+```
+^\s*#\s*shellcheck\s+(\S+)
+```
+
+which requires whitespace after the name. An apostrophe is not whitespace,
+so the rule never matched, while the real tool still tried to parse the
+line. The pattern now captures whatever is glued to the name instead of
+requiring a space, because nothing glued to it can be a directive key.
+
+**Why that and not the alternative.** The alternative was to reword the
+comment and move on, which fixes this file and leaves the guard as narrow
+as it was. That guard exists precisely because this keeps happening, and it
+has now happened a fourth time with the guard watching.
+
+Proved by construction rather than by assertion: five comment forms through
+the rule, and the two prose forms are flagged while `disable=SC2013`,
+`shell=sh` and a mid-sentence mention of the tool are accepted. The first
+attempt at that proof was itself wrong, grepping for the probe file's name
+and matching lint's untracked-scripts note instead of the directive
+message, so every form came back FLAGGED including the legitimate ones.
+
+**What this cost.** Two round trips to CI, about twenty minutes each,
+for a defect that no check on the authoring machine can see, because there
+is no shellcheck on it. The widened rule closes exactly that gap: it is the
+part of shellcheck's judgement that can be reproduced without shellcheck.

@@ -1,0 +1,90 @@
+% One serial line, two consumers, and the thing that makes that work.
+%
+% The drawing exists to make one point: the debugger and the console are
+% the same wire, so something on the host has to own the character device
+% and hand out two sockets. Everything else follows from that.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[node distance=5mm]
+
+  %% ---------------- target ----------------
+  \node[user] (trig) {\texttt{echo null > trigger}\\[-1pt]
+                      \scriptsize debugfs, write only};
+  \node[kern, below=7mm of trig] (buggy)
+       {\texttt{buggy.ko}\\[-1pt]
+        \scriptsize null \textbar{} lock \textbar{} uaf \textbar{} leak};
+  \node[kern, below=7mm of buggy] (core)
+       {kernel core\\[-1pt]
+        \scriptsize oops, lockdep, KASAN, kmemleak};
+
+  \node[kern, below left=9mm and -6mm of core] (kgdb)
+       {\texttt{kgdboc}\\[-1pt]\scriptsize gdb remote protocol};
+  \node[hw, below right=9mm and -6mm of core] (ram)
+       {ramoops\\[-1pt]\scriptsize reserved RAM};
+
+  \node[hw, below=7mm of kgdb] (pl011)
+       {PL011 \texttt{ttyAMA0}\\[-1pt]\scriptsize polled mode in the debugger};
+  \node[hw, below=7mm of ram] (pstore)
+       {\texttt{/sys/fs/pstore}\\[-1pt]\scriptsize readable after the reboot};
+
+  % The two instruments that deliberately avoid the cable.
+  \node[tool, above right=2mm and 12mm of trig, align=left] (trace)
+       {ftrace ring buffer\\[-1pt]\scriptsize \texttt{trace.dat}, megabytes};
+  \node[tool, below=4mm of trace, align=left] (perf)
+       {\texttt{perf.data}\\[-1pt]\scriptsize sampled, also megabytes};
+
+  \node[hw, right=9mm of buggy, align=center] (led)
+       {LED, GPIO17\\[-1pt]\scriptsize heartbeat};
+
+  \begin{scope}[on background layer]
+    \node[layer, fill=usercol!20, fit=(trig)(buggy)(core)(kgdb)(ram)(pl011)(pstore)(trace)(perf)(led)] (tgt) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (tgt.north west)
+       {TARGET: Raspberry Pi 3B+};
+
+  %% ---------------- host ----------------
+  \node[host, right=40mm of pl011, align=center] (proxy)
+       {\texttt{agent-proxy 5550\textasciicircum{}5551}\\[-1pt]
+        \scriptsize owns \texttt{/dev/ttyUSB0}, exclusively};
+  \node[host, above right=12mm and -20mm of proxy] (term)
+       {picocom, tcp 5550\\[-1pt]\scriptsize logged to a file, always};
+  \node[tool, above left=12mm and -20mm of proxy] (gdb)
+       {\texttt{gdb-multiarch}, tcp 5551\\[-1pt]\scriptsize \texttt{vmlinux} from this build};
+  \node[host, below=9mm of proxy, align=center] (reports)
+       {\texttt{trace-cmd report}\\[-1pt]\texttt{perf report}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fill=hostcol!25, fit=(proxy)(term)(gdb)(reports)] (hst) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (hst.north west) {HOST};
+
+  %% ---------------- flows ----------------
+  \draw[flow] (trig) -- (buggy);
+  \draw[flow] (buggy) -- (core);
+  \draw[flow] (core) -- (kgdb);
+  \draw[flow] (core) -- node[lbl, pos=0.45] {panic} (ram);
+  \draw[flow] (kgdb) -- (pl011);
+  \draw[flow] (ram) -- node[lbl] {after reboot} (pstore);
+  \draw[flow] (core.east) -- (led.west);
+
+  % The one cable. Drawn thickest on purpose.
+  \draw[wire] (pl011.east) -- node[lbl, align=center]
+       {one UART\\115200 baud\\about 11 kB/s} (proxy.west);
+
+  \draw[bus] (proxy) -- node[lbl] {console} (term);
+  \draw[bus] (proxy) -- node[lbl] {packets} (gdb);
+
+  % And the path that is deliberately not the cable.
+  \draw[flow, dashed] (trace.east) to[out=0, in=170]
+       node[lbl, pos=0.6, align=center] {scp over Ethernet,\\not over the cable} (reports.north west);
+  \draw[flow, dashed] (perf.east) to[out=0, in=175] (reports.west);
+
+  \node[umlnote, below=4mm of pstore, align=left, text width=62mm]
+       {A trace is megabytes and the cable does about 11 kB/s, so ftrace
+        and perf leave over Ethernet. The cable is reserved for the case
+        where the kernel has stopped and Ethernet is therefore gone.};
+
+\end{tikzpicture}
+\end{document}

@@ -219,24 +219,36 @@ contains "and says the run is not a slow boot but a failed one" "$out" \
 
 # ------------------------------------------- each missing edge, named
 
+# The assertion happens INSIDE the loop, and the message travels with the
+# case that produced it. The first version of this built three variables
+# named out_$chan through eval and asserted on them afterwards, which no
+# static checker can follow: SC2154, "out_d1 is referenced but not
+# assigned", three times, and a red CI on the first push. A variable that
+# only a string-evaluating shell knows about is invisible to every reader
+# too, human or otherwise.
 for chan in d1 d0 d2; do
 	d=$WORK/missing-$chan
 	mkdir -p "$d"
 	trace "$d/boot-01.csv" 6000 1000 2000 4000 300000
 	case $chan in
-	d1) trace "$d/boot-02.csv" 6000   -1 2000 4000 300000 ;;
-	d0) trace "$d/boot-02.csv" 6000 1000 2000   -1 300000 ;;
-	d2) trace "$d/boot-02.csv" 6000 1000   -1 4000 300000 ;;
+	d1)
+		trace "$d/boot-02.csv" 6000   -1 2000 4000 300000
+		label="a missing U-Boot marker says U-Boot never started"
+		want="U-Boot never started"
+		;;
+	d0)
+		trace "$d/boot-02.csv" 6000 1000 2000   -1 300000
+		label="a missing complete marker says the job queue never emptied"
+		want="startup job queue never emptied"
+		;;
+	d2)
+		trace "$d/boot-02.csv" 6000 1000   -1 4000 300000
+		label="a silent console says the board printed nothing"
+		want="printed nothing"
+		;;
 	esac
-	eval "out_$chan=\$(\"\$PYTHON\" \"\$SUT\" \"\$d\")"
+	contains "$label" "$("$PYTHON" "$SUT" "$d" --no-summary)" "$want"
 done
-
-contains "a missing U-Boot marker says U-Boot never started" "$out_d1" \
-	"U-Boot never started"
-contains "a missing complete marker says the job queue never emptied" \
-	"$out_d0" "startup job queue never emptied"
-contains "a silent console says the board printed nothing" "$out_d2" \
-	"printed nothing"
 
 # ------------------------------------------------- a file of the wrong shape
 

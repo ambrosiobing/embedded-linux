@@ -529,17 +529,30 @@ def check_shellcheck_directives() -> None:
     """
     keys = ("disable", "enable", "source", "source-path", "shell",
             "external-sources")
-    directive = re.compile(r"^\s*#\s*shellcheck\s+(\S+)")
+
+    # The name need not be followed by whitespace to be taken for a
+    # directive. This rule used to require it, with \s+, and a comment
+    # opening "# shellcheck's suggested loop would be wrong" therefore
+    # passed here and failed in CI with SC1073: the apostrophe is not a
+    # space, so the old pattern never matched, while the real tool still
+    # tried to parse the line and gave up on the whole file.
+    #
+    # That is the fourth time this class of comment has reached CI, and
+    # the first three are why the check exists at all. So the trailing
+    # part is captured rather than required: anything glued to the name
+    # is prose by definition, because no directive key is.
+    directive = re.compile(r"^\s*#\s*shellcheck(\S*)\s*(\S*)")
     for path in shell_files():
         for number, line in enumerate(text(path).splitlines(), start=1):
             match = directive.match(line)
             if not match:
                 continue
-            word = match.group(1)
-            if any(word.startswith(key + "=") for key in keys):
+            glued, word = match.group(1), match.group(2)
+            if not glued and any(word.startswith(key + "=") for key in keys):
                 continue
+            shown = ("shellcheck" + glued) if glued else word
             fail(path, f"line {number}: a comment starting '# shellcheck' is "
-                       f"parsed as a directive, and '{word}' is not one of "
+                       f"parsed as a directive, and '{shown}' is not one of "
                        f"{', '.join(keys)}. Reword so the tool's name is not "
                        f"the first word after the hash.")
 

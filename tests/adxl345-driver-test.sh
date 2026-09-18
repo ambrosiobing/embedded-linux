@@ -153,12 +153,16 @@ duplicated=0
 # admits only [A-Z0-9_], so every match is one whitespace-free token and
 # splitting on whitespace yields exactly one symbol per iteration.
 #
-# shellcheck's suggested "while read" loop would be wrong rather than
-# merely different. The body increments two counters, and a while loop fed
-# by a pipe runs in a subshell, so both would come back zero and the two
+# The suggested "while read" loop would be wrong rather than merely
+# different. The body increments two counters, and a while loop fed by a
+# pipe runs in a subshell, so both would come back zero and the two
 # assertions below would pass no matter what the header contained. That is
 # the worst outcome available: a check that reports success because it
 # counted in a scope nobody reads.
+#
+# The tool's name is deliberately not the first word of any line above.
+# A comment that opens with it is parsed as a directive, which is how this
+# fix broke the very run it was written for.
 # shellcheck disable=SC2013
 for sym in $(grep -o 'BENCH_ADXL345_[A-Z0-9_]*' "$CORE" | sort -u); do
 	defs=$(grep -c "^#define $sym\b" "$HDR" || true)
