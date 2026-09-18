@@ -1,0 +1,12 @@
+# Project 2: the wireless interface, which is the board's only network.
+#
+# The NEO Air has no Ethernet, so this file is the difference between a
+# board reachable over ssh and a board reachable only through the console
+# cable. It is installed by rootfs/mkrootfs.sh rather than written by hand
+# after the first boot, so a reflashed card comes up reachable.
+
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes

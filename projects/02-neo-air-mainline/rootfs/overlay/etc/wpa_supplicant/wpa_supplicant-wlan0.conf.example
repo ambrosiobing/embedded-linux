@@ -1,0 +1,18 @@
+# Project 2: copy this to wpa_supplicant-wlan0.conf and fill it in.
+#
+# THE REAL FILE IS NOT IN THIS REPOSITORY AND MUST NOT BE. .gitignore
+# names wifi.conf and router.conf for the Yocto boards for the same
+# reason: a boot partition copied off a card for safekeeping is a
+# directory of ordinary files, and one of them holds a passphrase.
+#
+# psk may be either a quoted passphrase or 64 hex characters from
+# wpa_passphrase. The quoted form is fine and is what most people have;
+# the hex form keeps the passphrase itself off the card.
+
+ctrl_interface=/run/wpa_supplicant
+update_config=1
+
+network={
+    ssid="bench"
+    psk="change-me"
+}

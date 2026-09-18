@@ -1,0 +1,155 @@
+#!/bin/sh
+#
+# mkrootfs.sh - a Debian armhf root filesystem for the NEO Air.
+#
+# RUNS ON THE HOST, needs root for debootstrap and chroot.
+#
+#   . projects/02-neo-air-mainline/toolchain.env
+#   sudo -E sh projects/02-neo-air-mainline/rootfs/mkrootfs.sh
+#
+# Produces $NEO_OUT/rootfs.tar, which tools/sdcard.sh extracts onto
+# partition 2.
+#
+# THE ORDER OF TWO STEPS IN HERE IS THE WHOLE POINT.
+#
+# The kernel fragment builds brcmfmac as a module. If the root filesystem
+# is assembled before those modules are installed into it, Wi-Fi does not
+# fail on the board. It is absent: no wlan0, no message in dmesg naming a
+# cause, and nothing to search for except the absence itself. The board
+# looks like it has no radio.
+#
+# So the modules are copied in and depmod is run as part of building the
+# filesystem, before it is packed, and this script refuses to run at all if
+# the kernel build has not happened yet. A missing module directory is
+# detectable here and almost undetectable on the board.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+die() {
+	echo "mkrootfs: $1" >&2
+	exit 1
+}
+
+note() {
+	echo "--- $1"
+}
+
+[ "${NEO_ENV:-}" = 1 ] || die "toolchain.env has not been sourced.
+       . projects/02-neo-air-mainline/toolchain.env
+       sudo keeps its own environment, so use sudo -E."
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+OVERLAY=$HERE/overlay
+[ -d "$OVERLAY" ] || die "no overlay at $OVERLAY"
+
+[ "$(id -u)" = 0 ] || die "debootstrap and chroot need root. Use sudo -E."
+
+for tool in debootstrap chroot tar depmod; do
+	command -v "$tool" >/dev/null 2>&1 ||
+		die "$tool is missing.
+       sudo apt install debootstrap qemu-user-static binfmt-support"
+done
+
+# The second stage runs armhf binaries on an x86 host, which only works if
+# binfmt has qemu registered. Without it the failure is a chroot that
+# reports "Exec format error" halfway through, leaving a half-built tree
+# that looks like a disk problem.
+[ -r /proc/sys/fs/binfmt_misc/qemu-arm ] ||
+	die "qemu-arm is not registered with binfmt_misc, so the second stage
+       of debootstrap cannot run armhf binaries on this host.
+       sudo apt install qemu-user-static binfmt-support
+       sudo systemctl restart systemd-binfmt"
+
+# ------------------------------------------- the refusal that matters
+
+MODULES=$NEO_OUT/modules
+VERSION_FILE=$NEO_OUT/kernel-version
+
+[ -r "$VERSION_FILE" ] || die "no $VERSION_FILE.
+       Build the kernel first: kernel/build.sh writes it.
+       Assembling a root filesystem before the modules exist produces a
+       board with no wireless interface and nothing in dmesg to say why."
+
+KVER=$(cat "$VERSION_FILE")
+[ -d "$MODULES/lib/modules/$KVER" ] ||
+	die "no modules at $MODULES/lib/modules/$KVER
+       The kernel build did not install them, or it built a different
+       version. This is the one failure that is invisible on the board:
+       brcmfmac is a module, and without it the radio simply is not there."
+
+note "kernel     $KVER"
+note "modules    $MODULES/lib/modules/$KVER"
+
+# ---------------------------------------------------------- debootstrap
+
+ROOT=${NEO_ROOTFS_DIR:-$NEO_WORK/rootfs}
+rm -rf "$ROOT"
+mkdir -p "$ROOT" "$NEO_OUT"
+
+note "debootstrap $DEBIAN_SUITE $DEBIAN_ARCH from $DEBIAN_MIRROR"
+debootstrap --arch="$DEBIAN_ARCH" --foreign "$DEBIAN_SUITE" "$ROOT" "$DEBIAN_MIRROR"
+cp "$(command -v qemu-arm-static)" "$ROOT/usr/bin/" 2>/dev/null || true
+chroot "$ROOT" /debootstrap/debootstrap --second-stage
+
+note "packages"
+chroot "$ROOT" apt-get update
+chroot "$ROOT" apt-get install -y --no-install-recommends \
+	systemd-sysv udev openssh-server wpasupplicant firmware-brcm80211 \
+	iproute2 iputils-ping e2fsprogs rsync fdisk
+
+# ------------------------------------------------- the modules, then depmod
+
+note "installing modules and running depmod"
+mkdir -p "$ROOT/lib/modules"
+cp -a "$MODULES/lib/modules/$KVER" "$ROOT/lib/modules/"
+chroot "$ROOT" depmod -a "$KVER"
+
+# Assert rather than assume. depmod writing no modules.dep for this
+# version means the copy landed somewhere else, and the board would boot
+# with a radio that never appears.
+[ -s "$ROOT/lib/modules/$KVER/modules.dep" ] ||
+	die "depmod produced no modules.dep for $KVER."
+grep -q 'brcmfmac' "$ROOT/lib/modules/$KVER/modules.dep" ||
+	die "brcmfmac is not in modules.dep after depmod.
+       The kernel fragment asks for it as a module and it is not in the
+       root filesystem. Wi-Fi would be absent with no message."
+note "           brcmfmac is in modules.dep"
+
+# ---------------------------------------------------------- the overlay
+
+note "overlay"
+# -a preserves modes, and the example file stays an example: the real
+# wpa_supplicant configuration holds a passphrase and is written on the
+# card, never in this repository. See .gitignore.
+cp -a "$OVERLAY/." "$ROOT/"
+
+printf 'neo-air\n' >"$ROOT/etc/hostname"
+printf '127.0.1.1\tneo-air\n' >>"$ROOT/etc/hosts"
+
+# fstab with the same placeholder discipline as extlinux.conf: visibly
+# impossible rather than plausibly wrong. flash-emmc.sh rewrites both.
+cat >"$ROOT/etc/fstab" <<'EOF'
+# Rewritten by tools/flash-emmc.sh with the real PARTUUID when the eMMC is
+# provisioned, and by tools/sdcard.sh for the card itself. A device name
+# here would be wrong half the time: names are assigned in probe order.
+PARTUUID=FILLED-BY-FLASH-EMMC / ext4 defaults,noatime 0 1
+EOF
+
+chroot "$ROOT" systemctl enable systemd-networkd
+chroot "$ROOT" systemctl enable wpa_supplicant@wlan0 || true
+
+# Root has no password and no console login is possible without one. This
+# is a bench board on an isolated network, and the console is a cable
+# somebody has to be holding. Stated rather than left implicit.
+note "setting the root password"
+chroot "$ROOT" passwd
+
+# ------------------------------------------------------------- pack
+
+rm -f "$ROOT/usr/bin/qemu-arm-static"
+note "packing"
+tar --numeric-owner -C "$ROOT" -cf "$NEO_OUT/rootfs.tar" .
+size=$(du -h "$NEO_OUT/rootfs.tar" | cut -f1)
+note "wrote      $NEO_OUT/rootfs.tar, $size"
