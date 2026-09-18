@@ -129,11 +129,57 @@ fi
 
 chroot "$ROOT" /debootstrap/debootstrap --second-stage
 
+# debootstrap writes a sources.list carrying main and nothing else, and
+# the firmware this board needs is not in main.
+#
+# Bookworm split non-free-firmware out of non-free so that firmware could
+# be installed without dragging in the rest of non-free. The component is
+# therefore both necessary and narrow. Without it apt says
+#
+#   E: Unable to locate package firmware-brcm80211
+#
+# which reads like a wrong package name and is really a missing component.
+# That is a whole evening if the reader trusts the wording.
+#
+# The component name is bookworm and later. On an older suite it would be
+# plain non-free, so this line is tied to DEBIAN_SUITE rather than being
+# universal, and DEBIAN_SUITE is pinned in toolchain.env.
+note "sources.list: main non-free-firmware"
+printf 'deb %s %s main non-free-firmware\n' \
+	"$DEBIAN_MIRROR" "$DEBIAN_SUITE" >"$ROOT/etc/apt/sources.list"
+
 note "packages"
 chroot "$ROOT" apt-get update
 chroot "$ROOT" apt-get install -y --no-install-recommends \
 	systemd-sysv udev openssh-server wpasupplicant firmware-brcm80211 \
 	iproute2 iputils-ping e2fsprogs rsync fdisk
+
+# What the radio will actually find at boot, listed here rather than
+# discovered on the board with a console and no network.
+#
+# brcmfmac wants two files and Debian packages only one of them. The .bin
+# comes from firmware-brcm80211. The NVRAM .txt beside it is board
+# specific, Debian does not carry the AP6212 one, and without it the
+# driver loads the firmware and then times out bringing the SDIO clock up.
+# That failure reads exactly like broken hardware.
+#
+# This prints rather than refuses. The .txt is the one input this project
+# cannot pin, so a refusal here would block a build over something that is
+# fetched by hand afterwards. docs/BRINGUP.md section 5 says from where.
+note "brcm firmware for this chip:"
+fw=$(find "$ROOT/lib/firmware/brcm" -name 'brcmfmac43430*' \
+	-printf '%f\n' 2>/dev/null | sort)
+if [ -n "$fw" ]; then
+	printf '%s\n' "$fw" | sed 's/^/---            /'
+else
+	note "           none at all, so brcmfmac will find no firmware"
+fi
+case $fw in
+*.txt*) ;;
+*)
+	note "           no NVRAM .txt here. It is the one vendor artefact in"
+	note "           this project: see docs/BRINGUP.md section 5." ;;
+esac
 
 # ------------------------------------------------- the modules, then depmod
 

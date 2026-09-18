@@ -3132,3 +3132,51 @@ prevents it either.
 
 And every guard gets read once more with this question: if it refuses, does
 its message contain enough to diagnose a cause nobody anticipated?
+
+## 104. Refuse what the build can fix; say loudly what it cannot
+
+**Context.** `mkrootfs.sh` refuses four ways and every one of them is a
+state the build itself put there: no pinned environment, no kernel version
+file, no overlay, no `brcmfmac` in `modules.dep`. Running the right command
+in the right order clears all four.
+
+The `brcmfmac` firmware is not like that. The driver needs two files. The
+`.bin` comes from Debian's `firmware-brcm80211`. The NVRAM `.txt` beside it
+is board specific, Debian does not carry the AP6212 one, and it is fetched
+by hand from a vendor image. It is the only input in Project 2 that
+`toolchain.env` cannot pin.
+
+A refusal there would be a build blocked on something no rerun can supply.
+
+**Decision.** A guard refuses when the caller can act on the refusal now. A
+guard **prints** when the missing thing is real, known, and outside the
+build's reach. The printing form gets the same care as a refusal: it names
+the file, says what its absence will look like, and points at the document
+that says where to get it.
+
+    --- brcm firmware for this chip:
+    ---            brcmfmac43430-sdio.bin
+    ---            no NVRAM .txt here. It is the one vendor artefact in
+    ---            this project: see docs/BRINGUP.md section 5.
+
+**Rejected.** Refusing, which turns one predictable evening into a blocked
+build for everyone including the people who already have the file
+elsewhere. And saying nothing, which is what produces the evening: without
+the NVRAM, `brcmfmac` loads the firmware and then times out bringing the
+SDIO clock up, and that failure reads exactly like broken hardware.
+
+**Why.** The question a guard answers is not "is this state wrong". It is
+"what should the person reading this do next". Where the answer is *fix it
+and rerun*, refusing is the shortest path and a warning is noise that gets
+scrolled past. Where the answer is *go and obtain something*, refusing
+does not help them obtain it and costs everyone else the build.
+
+The two forms share the standard that matters, which is decision 103's
+second half: **the message carries enough to diagnose a cause nobody
+anticipated.** A refusal that names only the line, or a warning that says
+only "not found", fails that test identically.
+
+**Consequence.** Warnings of this kind are held to the refusal standard or
+they are not worth printing. Anything softer becomes the line everyone
+learns to ignore, and then the one time it mattered it was on screen and
+nobody read it.

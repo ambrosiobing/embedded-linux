@@ -709,6 +709,117 @@ nobody recognised.
 
 Recorded as decision 103.
 
-*(The sudo implementation has not been named here on purpose. The message
-is the observable fact; which sudo prints it is a version string nobody has
-read yet, and this entry is not the place to guess.)*
+The implementation is **sudo-rs 0.2.13-0ubuntu1.2**, the Rust rewrite that
+Ubuntu now ships in place of the C sudo. It is not a broken sudo; it is a
+different sudo that has not implemented an option, and it is honest about
+that in the only way available to it. The lesson is not about sudo-rs. It
+is that an instruction written against one implementation of a tool is a
+claim about that implementation, and package managers replace
+implementations without asking.
+
+## 12. A missing component reads like a wrong package name
+
+The sudo fix worked. `--- modules /home/bing/bench/neo-air/out/...`, the
+right home directory, on the first attempt and with no `-E`. binfmt took
+the branch it was supposed to:
+
+    --- binfmt qemu-arm is registered with the F flag, so the
+    ---            interpreter is already open and nothing is copied in
+
+`debootstrap` ran both stages and installed the base system. Then:
+
+    E: Unable to locate package firmware-brcm80211
+
+### The sentence apt does not say
+
+Read literally, that is "no such package". It is true and it is the wrong
+thing to conclude. The package exists; it is in **non-free-firmware**, and
+`debootstrap` writes a `sources.list` carrying `main` and nothing else.
+
+Bookworm split `non-free-firmware` out of `non-free` precisely so that a
+machine needing a Wi-Fi blob would not have to enable the whole of
+non-free. The split is a good decision that creates this trap: the
+component is newer than most people's habits, and apt's phrasing points at
+the package name rather than at the index it searched.
+
+The cost of believing apt here is an evening spent checking spellings,
+searching for a renamed package, and eventually concluding that Debian
+dropped the firmware. All while one line was missing from one file.
+
+The fix is that line:
+
+    printf 'deb %s %s main non-free-firmware\n' \
+            "$DEBIAN_MIRROR" "$DEBIAN_SUITE" >"$ROOT/etc/apt/sources.list"
+
+Tied to `DEBIAN_SUITE` rather than hardcoded, because on a suite older than
+bookworm the component is plain `non-free`, and `DEBIAN_SUITE` is pinned.
+
+### The same shape as everything else this week
+
+| Tool | Said | Meant |
+|---|---|---|
+| kconfig | nothing | this symbol does not exist |
+| kconfig | nothing | this menu is closed |
+| sudo-rs | `-E` is ignored, on stderr, then continued | your environment is gone |
+| apt | unable to locate package | your sources list has one component |
+
+Four tools, four true statements, four wrong conclusions available to a
+reader in a hurry. None of them lied. Each answered a narrower question
+than the one being asked, which is decision 101 arriving from four
+directions in three days.
+
+### What was added while the file was open
+
+The firmware install now prints what the radio will actually find:
+
+    --- brcm firmware for this chip:
+    ---            brcmfmac43430-sdio.bin
+    ---            no NVRAM .txt here. It is the one vendor artefact in
+    ---            this project: see docs/BRINGUP.md section 5.
+
+`brcmfmac` wants two files and Debian packages one. The `.bin` is in
+`firmware-brcm80211`. The NVRAM `.txt` beside it is board specific, Debian
+does not carry the AP6212 one, and without it the driver loads the firmware
+and then times out bringing the SDIO clock up. That failure reads exactly
+like broken hardware, and it is the single most predictable evening in this
+whole project.
+
+**It prints rather than refuses,** deliberately. The `.txt` is the one
+input this project cannot pin, and a refusal would block a build over
+something that is fetched by hand afterwards. A refusal is for a state the
+build can fix. This is a state the operator has to fix, later, and the
+right thing to do about it is to say so early and loudly.
+
+Exercised in three states before being believed: both files present, `.bin`
+only, and no `brcm` directory at all. The first state also confirmed it
+ignores `brcmfmac43455-sdio.bin`, which is a different chip and would be a
+misleading thing to list.
+
+### A slip worth recording, because the skill already warned about it
+
+The first attempt at both of these edits was written through a Bash
+heredoc, and the Bash tool consumes backslashes in heredocs. Every `\n`
+became a real newline and every line continuation became a tab.
+
+The result was still valid shell. `sh -n` passed, `lint.py` passed, and the
+`printf` would have worked, because a literal newline inside single quotes
+is a newline either way. It was only wrong to read:
+
+    printf 'deb %s %s main non-free-firmware
+    ' 	"$DEBIAN_MIRROR" "$DEBIAN_SUITE" >...
+
+The bench skill has carried a warning about exactly this for weeks, with a
+tally: four silent drops in one session, three caught by a linter, the
+fourth caught by hardware at forty-five minutes and a reflash. The
+instruction there is to use an editing tool rather than a heredoc for
+anything containing a backslash.
+
+Two notes for the tally. It happened again, which is what a warning that
+has to be remembered is worth. And this time it produced **working code
+that read wrongly**, which is a quieter failure than the documented one:
+nothing downstream would ever have complained, and the next person to edit
+that line would have had to work out why it was written that way.
+
+Fixed by running the edit from a file instead, with the backslashes built
+from `chr(92)` and an `assert` on every anchor, which is what the skill says
+to do when a script must do it at all.
