@@ -49,7 +49,7 @@ OVERLAY=$HERE/overlay
 for tool in debootstrap chroot tar depmod; do
 	command -v "$tool" >/dev/null 2>&1 ||
 		die "$tool is missing.
-       sudo apt install debootstrap qemu-user-static binfmt-support"
+       sudo apt install debootstrap qemu-user-binfmt"
 done
 
 # The second stage runs armhf binaries on an x86 host, which only works if
@@ -59,7 +59,10 @@ done
 [ -r /proc/sys/fs/binfmt_misc/qemu-arm ] ||
 	die "qemu-arm is not registered with binfmt_misc, so the second stage
        of debootstrap cannot run armhf binaries on this host.
-       sudo apt install qemu-user-static binfmt-support
+
+       On Ubuntu 26.04 and later, qemu-user-static is a virtual package
+       and the provider is the one to install:
+       sudo apt install qemu-user-binfmt
        sudo systemctl restart systemd-binfmt"
 
 # ------------------------------------------- the refusal that matters
@@ -90,7 +93,37 @@ mkdir -p "$ROOT" "$NEO_OUT"
 
 note "debootstrap $DEBIAN_SUITE $DEBIAN_ARCH from $DEBIAN_MIRROR"
 debootstrap --arch="$DEBIAN_ARCH" --foreign "$DEBIAN_SUITE" "$ROOT" "$DEBIAN_MIRROR"
-cp "$(command -v qemu-arm-static)" "$ROOT/usr/bin/" 2>/dev/null || true
+
+# The second stage runs armhf binaries through the binfmt handler. How the
+# interpreter reaches the chroot depends on the release, and getting this
+# wrong gives "Exec format error" halfway through a half-built tree.
+#
+# Modern registrations carry the F flag, which opens the interpreter once
+# at registration time and keeps the file descriptor, so it works inside
+# any chroot and nothing has to be copied. Older ones need a statically
+# linked qemu copied in, which is what qemu-user-static existed for.
+#
+# Ubuntu 26.04 dropped qemu-user-static as a real package: it is a virtual
+# one now, provided by qemu-user-binfmt, and there is no qemu-arm-static
+# binary at all, only a dynamically linked /usr/bin/qemu-arm. The first
+# version of this script copied "$(command -v qemu-arm-static)" with a
+# "|| true" after it, so on that release it silently copied nothing and
+# would have worked or not depending on a flag it never looked at.
+QEMU_COPIED=
+if grep -q '^flags:.*F' /proc/sys/fs/binfmt_misc/qemu-arm 2>/dev/null; then
+	note "binfmt qemu-arm is registered with the F flag, so the"
+	note "           interpreter is already open and nothing is copied in"
+else
+	qemu=$(command -v qemu-arm-static || command -v qemu-arm || true)
+	[ -n "$qemu" ] || die "the qemu-arm binfmt handler has no F flag and
+       neither qemu-arm-static nor qemu-arm is on PATH, so the second
+       stage of debootstrap cannot run armhf binaries here.
+       sudo apt install qemu-user-binfmt"
+	note "binfmt has no F flag, copying $qemu into the chroot"
+	cp "$qemu" "$ROOT/usr/bin/"
+	QEMU_COPIED=$ROOT/usr/bin/$(basename "$qemu")
+fi
+
 chroot "$ROOT" /debootstrap/debootstrap --second-stage
 
 note "packages"
@@ -148,7 +181,9 @@ chroot "$ROOT" passwd
 
 # ------------------------------------------------------------- pack
 
-rm -f "$ROOT/usr/bin/qemu-arm-static"
+# Only if one was copied in. Removing a name that was never there is
+# harmless; removing the wrong name leaves an interpreter in the tar.
+[ -z "$QEMU_COPIED" ] || rm -f "$QEMU_COPIED"
 note "packing"
 tar --numeric-owner -C "$ROOT" -cf "$NEO_OUT/rootfs.tar" .
 size=$(du -h "$NEO_OUT/rootfs.tar" | cut -f1)

@@ -14,7 +14,7 @@ that starts halfway through is not a boot log.
 sudo apt install gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf \
     build-essential bison flex libssl-dev swig python3-dev python3-setuptools \
     device-tree-compiler u-boot-tools bc libncurses-dev rsync picocom \
-    debootstrap qemu-user-static binfmt-support sunxi-tools
+    debootstrap qemu-user-binfmt sunxi-tools
 ```
 
 The build scripts name whichever of these is missing rather than failing

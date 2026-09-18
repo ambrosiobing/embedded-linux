@@ -94,21 +94,26 @@ note "fragment   $FRAGMENT"
 
 make -C "$TREE" "$UBOOT_DEFCONFIG"
 
-# merge_config.sh warns on stdout about every option the merge could not
-# honour, and exits 0 either way. Capture it, because an option silently
-# dropped here is an option that is simply absent from the bootloader, and
-# CONFIG_MMC_SUNXI_SLOT_EXTRA being absent means no eMMC.
+# merge_config.sh reports what it did and exits 0 either way. Its output is
+# printed because it is informative, and NOT parsed for failure, which was
+# a mistake here on the first real run.
+#
+# The line it prints most often is
+#
+#     Value of CONFIG_MMC_SUNXI_SLOT_EXTRA is redefined by fragment ...
+#     Previous value: CONFIG_MMC_SUNXI_SLOT_EXTRA=-1
+#     New value: CONFIG_MMC_SUNXI_SLOT_EXTRA=2
+#
+# which is the fragment overriding the defconfig, which is what a fragment
+# is for. The first version of this script treated the word "redefined" as
+# an error and refused a build that had just done exactly the right thing.
+#
+# The question worth asking is not what the merge said about its work, it
+# is whether the option is in the produced .config. That check is below and
+# it is the one that catches a dropped option.
 merged=$( cd "$TREE" && ARCH="$ARCH" scripts/kconfig/merge_config.sh \
 	-m .config "$FRAGMENT" 2>&1 )
 printf '%s\n' "$merged"
-case $merged in
-*"Value of CONFIG_"*"is redefined"* | *"not in final"*)
-	die "merge_config.sh could not honour every line of the fragment.
-       Read the lines above. An option dropped here is an option the
-       bootloader does not have, and the symptom on the board is a
-       shorter 'mmc list' rather than an error."
-	;;
-esac
 
 make -C "$TREE" olddefconfig
 
