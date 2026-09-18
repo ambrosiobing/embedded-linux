@@ -12,6 +12,8 @@
 #   ./go rt           build bench-rt-image, the PREEMPT_RT lab of Project 8
 #   ./go rt-generic   the same image on the same kernel, without PREEMPT_RT
 #   ./go rt-kernel    install that kernel beside the generic one on a card
+#   ./go neo-air SUB  Project 2 on the NanoPi NEO Air, which uses no Yocto:
+#                     uboot | kernel | rootfs | card DEV | fel | all
 #   ./go ble          build bench-ble-image, the BLE gateway of Project 17
 #   ./go hub          build bench-hub-image, the sensor hub of Project 12
 #   ./go iio          build bench-iio-image, the IIO sensor lab of Project 10
@@ -59,6 +61,7 @@ release)    exec sh ./scripts/build.sh bench-release ;;
 rt)         exec sh ./scripts/build.sh bench-rt ;;
 rt-generic) exec sh ./scripts/build.sh bench-rt-generic ;;
 rt-kernel)  shift; exec sh ./scripts/rt-kernel-install.sh "$@" ;;
+neo-air)    shift; exec sh ./projects/02-neo-air-mainline/build.sh "$@" ;;
 ble)        exec sh ./scripts/build.sh bench-ble ;;
 hub)        exec sh ./scripts/build.sh bench-hub ;;
 iio)        exec sh ./scripts/build.sh bench-iio ;;
