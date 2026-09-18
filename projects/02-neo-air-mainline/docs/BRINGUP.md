@@ -173,6 +173,20 @@ So the file is copied to the board-specific name during the root filesystem
 build, and the script prints its `sha256sum` when it does. There is no
 vendor image to download and nothing unpinned left in this project.
 
+What went onto the card, recorded here because this is the one file whose
+provenance is worth writing down rather than inferring:
+
+| | |
+|---|---|
+| package | `firmware-brcm80211` 20230210-5, bookworm `non-free-firmware` |
+| shipped as | `brcmfmac43430-sdio.AP6212.txt` |
+| installed as | `brcmfmac43430-sdio.friendlyarm,nanopi-neo-air.txt` |
+| sha256 | `fdef0603345dd023ad28c0eff2d5167915c617bee2d6944da9a6da1c4ac87ca5` |
+
+A different sha256 on a later build means Debian updated the package, not
+that something is wrong. The value is here so the difference is visible
+rather than silent.
+
 If `dmesg` still shows the SDIO timeout, check the name the driver asked
 for rather than assuming the file is wrong:
 
