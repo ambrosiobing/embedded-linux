@@ -11,8 +11,10 @@ measurement is worth taking, and one of them can end the project:
   because a baseline taken without them has no phases in it and a baseline
   taken with the optimisations already in is not a baseline.
 
-Nothing here has been done. This file is written so that the first session
-with the hardware is spent measuring rather than deciding.
+Step 1 is done: criterion 0 passed on Saturday 19 September 2026, and
+`docs/evidence/logic-selftest.txt` has the numbers. Everything from step 2
+on is still ahead. This file is written so that a session with the
+hardware is spent measuring rather than deciding.
 
 ## Before power
 
@@ -119,16 +121,17 @@ display to see it on. Everything after this is a script writing a CSV.
 **The baseline has to have the markers and none of the optimisations**, or
 there is nothing to compare against.
 
-U-Boot, stage 1 of `uboot/fragments/fast.config` only:
+U-Boot with `uboot/fragments/marker.config`, which holds the marker and
+nothing else. `CONFIG_BOOTDELAY` stays at whatever Project 2 set it to,
+because a baseline that is already faster is not a baseline.
 
-```
-CONFIG_USE_PREBOOT=y
-CONFIG_PREBOOT="gpio set PG11"
-CONFIG_CMD_GPIO=y
-```
-
-Leave `CONFIG_BOOTDELAY` at whatever Project 2 set it to. The trimming
-lines in that file are stage 2 and stay commented out until step 6.
+The trimming is a separate file, `fast.config`, and it is the 10-uboot
+variant at step 6. **Two files rather than one with lines commented in
+and out.** That was the original design and it lasted a day: the
+instruction describing it said the trimming was commented out, the
+trimming was live, and the baseline build attempted both. A fragment's
+active lines have to be visible in the file rather than in a sentence
+about the file.
 
 Linux: add the node from `board/boot-marker-led.dtsi` to the `leds` node
 that `sun8i-h3-nanopi.dtsi` already defines, rebuild the dtb, and generate
@@ -203,7 +206,7 @@ One change, one fragment, one directory, six boots:
 
 | Variant | Change |
 |---|---|
-| `10-uboot` | stage 2 of `fast.config`, and `boot_targets=mmc1` in the environment |
+| `10-uboot` | `uboot/fragments/fast.config`, and `boot_targets=mmc1` in the environment |
 | `20-kernel-trim` | `localmodconfig` against a real `lsmod`, then manual trimming, `quiet loglevel=3` |
 | `21-kernel-lz4` | the three compression fragments, measured against each other |
 | `30-systemd` | the units in `board/units-disabled.txt`, each with its reason |
@@ -228,7 +231,7 @@ P3=$PWD/projects/03-boot-energy
 ```
 
 ```
-NEO_EXTRA_FRAGMENT=$P3/uboot/fragments/fast.config ./go neo-air uboot
+NEO_EXTRA_FRAGMENT=$P3/uboot/fragments/marker.config ./go neo-air uboot
 ```
 
 ```

@@ -337,7 +337,8 @@ because a rule invented after seeing the numbers is not a rule.
 | `board/boot-marker.service` | raises the marker when the job queue empties | NEO Air |
 | `board/0001-dts-boot-marker-led.patch` | the `gpio-leds` child on PA6 | applied in the kernel tree |
 | `board/units-disabled.txt` | every unit masked or disabled, with its reason and what brings it back | |
-| `uboot/fragments/fast.config` | preboot marker, then the U-Boot trimming | |
+| `uboot/fragments/marker.config` | the preboot marker alone, which the baseline carries | |
+| `uboot/fragments/fast.config` | the marker plus the trimming, which is the 10-uboot variant | |
 | `kernel/fragments/*.cfg` | `trim`, and the three compression variants | |
 | `tests/boot-energy-*-test.sh` | everything provable with no hardware | either laptop, and CI |
 | `NEO_EXTRA_FRAGMENT` | Project 2's build scripts take one extra fragment, which is how every variant here reaches a build | wsl laptop |

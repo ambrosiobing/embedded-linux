@@ -66,7 +66,8 @@ happens.
 | `board/boot-marker.service` | raises the marker when the startup job queue empties, without forming an ordering cycle |
 | `board/boot-marker-led.dtsi` | the `gpio-leds` child on PA6, and why it is not yet a patch |
 | `board/units-disabled.txt` | every unit masked or disabled, with its reason and what brings it back |
-| `uboot/fragments/fast.config` | the preboot marker, then the U-Boot trimming, in two stages |
+| `uboot/fragments/marker.config` | the preboot marker alone, which the baseline carries |
+| `uboot/fragments/fast.config` | the marker plus the trimming, which is the 10-uboot variant |
 | `kernel/fragments/` | trimming and the three compression variants |
 | `measure/Makefile` | six boots of a variant with the supply down between them, then the analysis |
 | `docs/before-after.md` | one row per variant, every cell empty |
