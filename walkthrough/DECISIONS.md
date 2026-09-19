@@ -3180,3 +3180,49 @@ only "not found", fails that test identically.
 they are not worth printing. Anything softer becomes the line everyone
 learns to ignore, and then the one time it mattered it was on screen and
 nobody read it.
+
+## 105. A test fixture is a claim about the deployment, and gets checked against it once
+
+**Context.** Project 2's `flash-emmc.sh` was tested thoroughly with
+fixtures: a fake `/sys/block`, a fake `/proc/mounts`, and a pre-populated
+`/boot` equivalent holding `extlinux.conf` and an fstab. Every state and
+every refusal passed. On the real board the script would have failed on its
+first line of work, because the running system does not mount the boot
+partition at `/boot`, and the fixtures had quietly assumed it did.
+
+The whole eMMC provisioning flow, criteria 4 through 6, had never run. The
+tests were green and the flow was impossible, and those two facts did not
+contradict each other because the tests measured the program against a
+world the deployment did not match.
+
+**Decision.** A fixture encodes an assumption about the deployment. At
+least once, that assumption is checked against the real system rather than
+only relied on. Here: the fixtures supply a populated `/boot`, so the
+running image must actually mount one, and `BRINGUP.md` now checks
+`findmnt /boot` before the step that depends on it.
+
+**Rejected.** Trusting a green suite as evidence the flow works. A suite
+proves the program consistent with its fixtures. Whether the fixtures match
+the deployment is a separate question the suite cannot answer, and it is the
+question that was wrong.
+
+Also rejected: making the fixtures "more realistic" open-endedly. The point
+is not infinite fidelity, it is naming the one or two assumptions a fixture
+makes that would be catastrophic if false, and checking those against the
+real system once.
+
+**Why.** This repository keeps finding the same shape from new directions.
+A kernel-config check that passed on an option the build never received. A
+merge guard that read prose. A dependency check that saw executables and
+not headers. A firmware check that asked "any .txt" and meant "the right
+one". Now a test suite that proved a flow correct against a `/boot` the
+board does not mount. Every one was locally true and globally silent, and
+every one was caught by comparing what was asserted against what the next
+layer actually does.
+
+**Consequence.** For each fixture that stands in for real system state,
+name what it assumes and add one check, in the bring-up doc or the code,
+that the assumption holds on the hardware. A fixture that asserts a mount,
+a device type, a file location or a package presence is a place where the
+test and the world can disagree, and the disagreement is invisible until
+someone runs the real thing.

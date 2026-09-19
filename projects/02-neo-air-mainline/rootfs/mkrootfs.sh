@@ -241,7 +241,16 @@ cat >"$ROOT/etc/fstab" <<'EOF'
 # Rewritten by tools/flash-emmc.sh with the real PARTUUID when the eMMC is
 # provisioned, and by tools/sdcard.sh for the card itself. A device name
 # here would be wrong half the time: names are assigned in probe order.
+#
+# The boot partition is mounted at /boot on purpose. U-Boot reads the
+# kernel and extlinux.conf from it directly at boot time, but Linux needs
+# it mounted too, because flash-emmc.sh reads the bootloader image from
+# /boot and copies /boot to the new eMMC boot partition. Without this line
+# /boot is an empty directory on the root filesystem and provisioning the
+# eMMC cannot work. Two distinct placeholders so each line is patched with
+# its own partition's PARTUUID.
 PARTUUID=FILLED-BY-FLASH-EMMC / ext4 defaults,noatime 0 1
+PARTUUID=FILLED-BY-FLASH-BOOT /boot ext4 defaults,noatime 0 2
 EOF
 
 chroot "$ROOT" systemctl enable systemd-networkd

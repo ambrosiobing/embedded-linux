@@ -164,6 +164,11 @@ cp "$EXTLINUX" "$MNT1/extlinux/extlinux.conf"
 # The board is provisioned from this card, so the bootloader image has to
 # travel on it: flash-emmc.sh reads it from /boot.
 cp "$NEO_OUT/u-boot-sunxi-with-spl.bin" "$MNT1/"
+# And flash-emmc.sh itself, so it exists at /boot/flash-emmc.sh on the
+# running board. BRINGUP.md tells the operator to run it from there, and it
+# was not being delivered at all: the card had every piece the eMMC step
+# needs except the script that does the eMMC step.
+cp "$HERE/flash-emmc.sh" "$MNT1/"
 
 tar -xf "$ROOTFS" -C "$MNT2"
 
@@ -184,13 +189,22 @@ grep -q "root=PARTUUID=$id" "$MNT1/extlinux/extlinux.conf" ||
 # it rw from the command line, so nothing broke visibly, which is exactly how
 # a failed unit on every boot goes unnoticed. Decision 99 said both files get
 # the real value; this makes good on it.
+bootuuid=$(blkid -s PARTUUID -o value "$P1")
+[ -n "$bootuuid" ] || die "no PARTUUID on $P1 after formatting it."
 fstab=$MNT2/etc/fstab
 if [ -r "$fstab" ]; then
+	# Anchored on the mount point, so the root line and the boot line are
+	# each patched with their own partition's PARTUUID and neither touches
+	# the other.
 	sed -i "s|^PARTUUID=[^ ]*\( *\)/ |PARTUUID=$id\1/ |" "$fstab"
-	grep -q "PARTUUID=$id" "$fstab" ||
-		die "patched /etc/fstab and the new PARTUUID is not in it."
+	sed -i "s|^PARTUUID=[^ ]*\( *\)/boot |PARTUUID=$bootuuid\1/boot |" "$fstab"
+	grep -q "PARTUUID=$id .*/ " "$fstab" ||
+		die "patched /etc/fstab root line and the new PARTUUID is not in it."
+	grep -q "PARTUUID=$bootuuid .*/boot " "$fstab" ||
+		die "patched /etc/fstab boot line and the new PARTUUID is not in it."
 fi
 note "root       PARTUUID=$id"
+note "boot       PARTUUID=$bootuuid"
 
 sync
 umount "$MNT1"

@@ -237,12 +237,25 @@ Fill in the SSID and passphrase **on the card**, never in the repository.
 
 ## 6. Provision the eMMC
 
-Still booted from the card:
+Still booted from the card. First confirm the boot partition is mounted,
+because the whole step depends on it:
+
+```
+findmnt /boot
+```
+
+It must show the card's first partition on `/boot`. If it does not, the
+fstab `/boot` line did not take and `flash-emmc.sh` will refuse for want of
+a bootloader image; reflash the card with a build that carries the two-line
+fstab. Then:
 
 ```
 sh /boot/flash-emmc.sh -n
 sh /boot/flash-emmc.sh
 ```
+
+`flash-emmc.sh` travels on the card, written to the boot partition by
+`sdcard.sh`, so `/boot/flash-emmc.sh` is present on the running board.
 
 The dry run names the device it discovered. It finds the eMMC by reading
 `type` in sysfs, never by name, because names are assigned in probe order

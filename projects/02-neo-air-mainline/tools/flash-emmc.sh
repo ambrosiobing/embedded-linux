@@ -217,9 +217,17 @@ bootconfig() {
 	grep -q "root=PARTUUID=$id" "$conf" ||
 		die "patched $conf and the new PARTUUID is not in it."
 
+	# Both fstab lines, each to its own eMMC partition. The tree copied from
+	# the SD card carries the card's PARTUUIDs; left unpatched the eMMC would
+	# mount the card's root and boot, which is the class of "boots the wrong
+	# filesystem" that the impossible placeholder exists to prevent.
+	bootid=$(blkid -s PARTUUID -o value "$P1")
+	[ -n "$bootid" ] || die "no PARTUUID on $P1 after formatting it."
+	note "bootconfig boot PARTUUID=$bootid"
 	fstab=$MNT2/etc/fstab
 	if [ -r "$fstab" ]; then
 		sed -i "s|^PARTUUID=[^ ]*\( *\)/ |PARTUUID=$id\1/ |" "$fstab"
+		sed -i "s|^PARTUUID=[^ ]*\( *\)/boot |PARTUUID=$bootid\1/boot |" "$fstab"
 	fi
 }
 

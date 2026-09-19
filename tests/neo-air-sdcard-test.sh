@@ -96,6 +96,8 @@ if [ -n "\$dest" ]; then
 	mkdir -p "\$dest/etc"
 	printf 'PARTUUID=FILLED-BY-FLASH-EMMC / ext4 defaults,noatime 0 1\n' \
 		>"\$dest/etc/fstab"
+	printf 'PARTUUID=FILLED-BY-FLASH-BOOT /boot ext4 defaults,noatime 0 2\n' \
+		>>"\$dest/etc/fstab"
 fi
 exit 0
 EOF
@@ -112,7 +114,10 @@ chmod +x "$WORK/bin/sfdisk"
 cat >"$WORK/bin/blkid" <<EOF
 #!/bin/sh
 echo "blkid \$*" >>"$CALLS"
-echo "11223344-02"
+case \$* in
+*1) echo "11223344-01" ;;
+*)  echo "11223344-02" ;;
+esac
 EOF
 chmod +x "$WORK/bin/blkid"
 
@@ -278,7 +283,16 @@ has_file "fstab is in the extracted rootfs" "$fstab"
 contains "and carries the card's PARTUUID, not the placeholder" \
 	"$(cat "$fstab")" "PARTUUID=11223344-02"
 absent=$(grep -c 'FILLED-BY-FLASH-EMMC' "$fstab" || true)
-check "the fstab placeholder is gone" "$absent" "0"
+check "the fstab root placeholder is gone" "$absent" "0"
+contains "the fstab boot line carries p1's PARTUUID" \
+	"$(cat "$fstab")" "PARTUUID=11223344-01 /boot ext4"
+absentboot=$(grep -c 'FILLED-BY-FLASH-BOOT' "$fstab" || true)
+check "the fstab boot placeholder is gone" "$absentboot" "0"
+
+# flash-emmc.sh is the script the eMMC step runs, and it must travel on the
+# boot partition. It was documented as /boot/flash-emmc.sh and never copied
+# there, so the eMMC step could not begin.
+has_file "flash-emmc.sh is on the boot partition" "$WORK/mnt1/flash-emmc.sh"
 
 echo
 echo "$pass passed, $fail failed"

@@ -120,7 +120,10 @@ chmod +x "$WORK/bin/sfdisk"
 cat >"$WORK/bin/blkid" <<EOF
 #!/bin/sh
 echo "blkid \$*" >>"$CALLS"
-echo "aabbccdd-02"
+case \$* in
+*p1) echo "aabbccdd-01" ;;
+*)   echo "aabbccdd-02" ;;
+esac
 EOF
 chmod +x "$WORK/bin/blkid"
 
@@ -150,6 +153,7 @@ label mainline
     append console=ttyS0,115200 root=PARTUUID=FILLED-BY-FLASH-EMMC rootwait rw
 EOF
 	printf 'PARTUUID=old-value / ext4 defaults 0 1\n' >"$WORK/mnt2/etc/fstab"
+	printf 'PARTUUID=old-boot /boot ext4 defaults 0 2\n' >>"$WORK/mnt2/etc/fstab"
 }
 
 reset() {
@@ -247,8 +251,10 @@ contains "the placeholder is replaced with the real PARTUUID" \
 absent "and the placeholder is gone" "$(cat "$conf")" "FILLED-BY-FLASH-EMMC"
 contains "the rest of the append line is untouched" \
 	"$(cat "$conf")" "console=ttyS0,115200"
-contains "fstab carries the same PARTUUID" \
+contains "fstab root line carries the new root PARTUUID" \
 	"$(cat "$WORK/mnt2/etc/fstab")" "PARTUUID=aabbccdd-02 / ext4"
+contains "fstab boot line carries the new boot PARTUUID" \
+	"$(cat "$WORK/mnt2/etc/fstab")" "PARTUUID=aabbccdd-01 /boot ext4"
 
 # Idempotent: the second run patches a real value rather than the
 # placeholder, which is a different sed match and the reason the pattern is

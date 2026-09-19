@@ -1163,3 +1163,85 @@ pins is the no-solder fix.
 red lines scrolled past on a board that booted fine, and each was a real
 defect that would ship on every card until someone read the part between
 the banner and the login.
+
+## 16. The eMMC step could never have run, and nothing said so
+
+*Saturday 19 September 2026.* With the board booting from the card, the
+next criteria are the eMMC ones: provision it, boot from it, recover it.
+Reading `flash-emmc.sh` against the card that `sdcard.sh` actually writes,
+before running it, found two reasons it would fail on the first line of
+real work. Neither had ever surfaced, because the eMMC step had never run.
+
+### What was wrong
+
+**The script was not on the card.** `BRINGUP.md` section 6 says
+`sh /boot/flash-emmc.sh`. `sdcard.sh` copied the kernel, the dtb,
+`extlinux.conf` and the bootloader image to the boot partition, and not the
+one script the section is about. The card had every piece the eMMC step
+needs except the step itself.
+
+**`/boot` was not mounted, so even a delivered script would refuse.**
+`flash-emmc.sh` reads the bootloader from `/boot/u-boot-sunxi-with-spl.bin`
+and does `rsync /boot/ -> new boot partition`. Both assume `/boot` is the
+card's first partition, mounted. But the fstab `mkrootfs.sh` wrote had a
+root line and nothing else, so on the running board `/boot` is an empty
+directory on the root filesystem. The kernel, dtb and bootloader live on
+p1, which nothing mounts. `flash-emmc.sh` would die at its first state:
+"no bootloader image at /boot/...".
+
+The boot log from entry 15 hides this in plain sight. `findmnt /` showed
+root on `mmcblk0p2`; nobody ran `findmnt /boot`, and it would have shown
+nothing. The board booted perfectly because U-Boot reads p1 directly,
+before Linux, and Linux never needs p1 for an ordinary boot. It needs it
+only to replicate itself, which is the one thing the eMMC step does.
+
+### Why the tests did not catch it
+
+`flash-emmc.sh` is tested with fixtures: a fake `/sys/block`, a fake
+`/proc/mounts`, and a pre-built `mnt1`/`mnt2` with an `extlinux.conf` and an
+fstab already in place. The fixtures supply a populated `/boot`
+equivalent, so the tests proved the state machine correct on the
+assumption that `/boot` has the boot files. Nothing tested that the running
+system actually mounts them there. It is decision 97 once more: the tests
+check the program against a world the deployment does not match, and the
+gap is exactly the assumption the fixtures encode.
+
+### The fix
+
+The boot partition is mounted at `/boot`, which is the standard sunxi
+layout and makes the existing `flash-emmc.sh` correct rather than rewriting
+it. `mkrootfs.sh` writes a two-line fstab now, root and `/boot`, each with
+its own impossible placeholder. `sdcard.sh` patches both lines, with p2's
+PARTUUID for root and p1's for `/boot`, and refuses to finish a card whose
+patch did not take. It also copies `flash-emmc.sh` to the boot partition.
+`flash-emmc.sh`, provisioning the eMMC, rewrites both fstab lines to the
+eMMC's own partitions, so the eMMC mounts its own root and boot rather than
+the card's.
+
+`--one-file-system` in the root copy now does real work: with `/boot` a
+separate mount it is excluded from the root rsync and copied once, by the
+explicit `/boot` rsync, rather than doubled or empty.
+
+### What the tests learned
+
+Both recording `blkid` stubs answered one value for every partition, which
+would let a swap of the root and boot PARTUUIDs pass unseen. They now
+answer per partition, p1 and p2 distinct, and the fixtures carry a `/boot`
+fstab line so the new patching is checked against a line that is present.
+`sdcard.sh` grew an assertion that `flash-emmc.sh` reaches the card.
+Sdcard 35 assertions, flash 33.
+
+### What is still only proven in the harness
+
+This is logic-correct and test-green, and it has not run on hardware. It
+changes the rootfs, so it needs a rebuild, a reflash, and a boot before the
+eMMC step is attempted, and `findmnt /boot` on the running board is the
+first thing to check. `BRINGUP.md` section 6 now opens with that check for
+that reason.
+
+### What to keep
+
+**Read the program against the deployment, not against its fixtures.**
+Both defects were invisible to a passing test suite because the fixtures
+encoded the very assumption that was false. A fixture is a claim about the
+world, and a claim worth testing is worth checking against the world once.
