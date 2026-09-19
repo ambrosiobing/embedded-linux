@@ -7,6 +7,7 @@
 #   ./go neo-air rootfs    Debian armhf, then the modules, then depmod
 #   ./go neo-air card DEV  write the development microSD
 #   ./go neo-air fel       recover a board with no working bootloader
+#   ./go neo-air archive   copy the artefacts to the image store
 #   ./go neo-air all       uboot, kernel, rootfs, in that order
 #
 # WHY THIS EXISTS RATHER THAN FOUR PATHS TO REMEMBER.
@@ -39,7 +40,7 @@ die() {
 }
 
 usage() {
-	sed -n '3,11p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
 	exit 2
 }
 
@@ -152,6 +153,9 @@ card)
 fel)
 	shift
 	exec sh "$HERE/tools/fel-boot.sh" "$@"
+	;;
+archive)
+	exec sh "$HERE/tools/archive.sh"
 	;;
 all)
 	require_space 7 "uboot and kernel together"

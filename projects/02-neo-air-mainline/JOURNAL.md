@@ -1452,3 +1452,57 @@ anywhere else.
 operation against it, including the ones in the prose.** Both errors were
 in the documentation rather than the code, and the code that surrounds them
 has been checking sector 2048 correctly since the first week.
+
+## 19. The one project with a working board had no archived image
+
+*Saturday 19 September 2026.* Asked whether Project 2's artefacts were on
+the Desktop with a project prefix. They were not. The Yocto store on
+aquamarine holds `proj08-bench-rt` and `proj08-bench-rt-generic`, and
+Project 2 had nothing: `./go neo-air` never had an archive target.
+
+So the only project in this repository with a board that boots was the only
+one whose artefacts existed in exactly one place, inside the WSL virtual
+disk. That file has been compacted, filled to read-only and rebuilt on this
+bench before. Losing it would have meant rebuilding U-Boot, a 6.12 kernel
+and a 394 MB root filesystem, with the eMMC as the only surviving copy of
+the thing that works.
+
+`./go neo-air archive` now writes `proj02-neo-air/<date>_<commit>[-dirty]`
+into the same store, with the same naming as the Yocto side, and a
+`PROVENANCE.txt` carrying the pins, the sha256 of every artefact, the flash
+line and the rebuild line. Exercised in three states: a normal run, a
+second run onto the same stamp, which refuses rather than merging, and a
+missing artefact, which refuses and creates nothing.
+
+The `-dirty` detection caught the working tree during its own test, which
+is the right kind of first result.
+
+### The flash line was a claim the code did not support
+
+The provenance file's whole point is that somebody can write a card from an
+archived set years later. The line it generated was:
+
+    NEO_OUT=<dest> sudo -E ./go neo-air card /dev/sdX
+
+Wrong twice. `sudo -E` is ignored on this bench's sudo, which is entry 11's
+whole subject. And `toolchain.env` set `NEO_OUT` unconditionally, so even a
+variable that survived sudo would have been overwritten a line later.
+
+`NEO_OUT` is now `${NEO_OUT:-$NEO_WORK/out}`, and the line reads
+`sudo env NEO_OUT=<dest> ./go neo-air card /dev/sdX`. Verified in three
+states rather than assumed: default, overridden, and overridden under a
+sudo that resets the environment.
+
+That is decision 97 again, a document describing a program, in a file whose
+entire job is to be trustworthy long after everyone has forgotten the
+details. A provenance file with a flash command that does not work is worse
+than one with no flash command, because the reader will not find out until
+they need it.
+
+### What to keep
+
+**An artefact that exists in one place is not archived, whatever the
+directory is called.** The two tiers were named in entry 8 and the project
+with the most to lose was still in the lower one, because the tooling to
+move it up had never been written for the one project that had no Yocto to
+inherit it from.

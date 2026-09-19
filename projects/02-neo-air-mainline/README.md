@@ -103,6 +103,7 @@ Then, on the WSL2 build host:
 ./go neo-air kernel
 sudo ./go neo-air rootfs
 sudo ./go neo-air card /dev/sdX
+./go neo-air archive
 ```
 
 Sudo on the entry point, never on the script: `./go neo-air` sources
