@@ -3226,3 +3226,47 @@ that the assumption holds on the hardware. A fixture that asserts a mount,
 a device type, a file location or a package presence is a place where the
 test and the world can disagree, and the disagreement is invisible until
 someone runs the real thing.
+
+## 106. When two guards both fire, the one with the correct remedy goes first
+
+**Context.** `flash-emmc.sh` refuses four ways. Two of them catch a board
+booted from the eMMC it is being asked to provision: "the target is
+mounted" and "the target carries the running root". The mounted check came
+first, so it always won, because a board booted from the eMMC necessarily
+has that device in `/proc/mounts`.
+
+The board was protected either way. What the operator was told was wrong:
+"Unmount it first". You cannot unmount `/`, and unmounting is not the
+remedy. The remedy is to boot from the microSD card, which is what the
+other guard says and which nobody would ever see.
+
+**Decision.** Where more than one guard can catch the same real situation,
+they are ordered so that the one whose message names the correct action
+runs first. Refusing is not the whole job. A refusal is an instruction, and
+the specific instruction is the part the operator acts on.
+
+**Rejected.** Merging the two into one guard with a combined message. They
+catch genuinely different situations, a mounted target that is not the root
+being one of them, and each message is right for its own case. The problem
+was never the messages, it was which one got to speak.
+
+Also rejected: leaving it, on the grounds that the board is safe either
+way. Safety and guidance are different properties. A safe refusal carrying
+wrong guidance sends a careful person to do something useless and tells
+them, by refusing again for reasons it does not explain, that they are
+still wrong.
+
+**Why.** The ordering was invisible because a test fixture reached the
+shadowed guard by describing a state that cannot exist: root on the eMMC
+while `/proc/mounts` named the card. That is decision 105 in its sharpest
+form, and it carries a diagnostic worth naming on its own.
+
+**A fixture that must describe an impossible state to reach a branch is
+telling you the branch is unreachable.** Not that the fixture is awkward.
+That the code path, in the deployment, has something in front of it. Treat
+the contortion as the finding.
+
+**Consequence.** For each set of guards that can overlap, ask which fires
+on the real overlapping case, and whether that one's message names the
+action that actually resolves it. Order accordingly, and assert on the
+message the operator should not see as well as the one they should.

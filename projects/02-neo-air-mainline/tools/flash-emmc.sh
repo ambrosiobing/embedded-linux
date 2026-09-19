@@ -17,14 +17,14 @@
 #   no eMMC found                   nothing to do, and a guessed device is
 #                                   the whole class of accident this
 #                                   avoids
+#   the target carries /            the specification's version omits this
+#                                   one, and it is checked before the mount
+#                                   check because a board booted from the
+#                                   eMMC trips both, and this is the one
+#                                   whose advice is correct
 #   the target is mounted           writing a partition table under a
 #                                   mounted filesystem corrupts it in a way
 #                                   fsck reports and cannot explain
-#   the target carries /            the specification's version omits this
-#                                   one. On a board already booted from
-#                                   eMMC the first two checks pass and the
-#                                   script overwrites the system it is
-#                                   running from
 #
 # The target is found by reading its type from sysfs, never by name. Block
 # device names are assigned in probe order, so the eMMC is mmcblk1 on some
@@ -100,17 +100,14 @@ identify() {
        what an SD card reports. This board is booted from the card and
        has nothing else to provision."
 
-	if grep -q "^$EMMC" "$MOUNTS"; then
-		die "$EMMC is mounted:
-$(grep "^$EMMC" "$MOUNTS" | sed 's/^/       /')
-       Unmount it first. Writing a partition table under a mounted
-       filesystem corrupts it in a way fsck reports and cannot explain."
-	fi
-
-	# The refusal the specification does not have. If this script is
-	# somehow running on a system whose root is already on the eMMC, the
-	# two checks above both pass, and the next state overwrites the
-	# bootloader of the running system.
+	# The refusal the specification does not have, and it is tested FIRST
+	# on purpose. A board booted from the eMMC necessarily has the eMMC in
+	# /proc/mounts, so the mounted check below would fire first and say
+	# "unmount it first", which is both less informative and actively wrong
+	# advice: the answer is not to unmount anything, it is to boot from the
+	# card. Ordered the other way round this guard was unreachable on real
+	# hardware, and only a test fixture that put root on the eMMC while
+	# /proc/mounts said otherwise, an impossible state, ever reached it.
 	rootdev=${NEO_ROOTDEV:-$(findmnt -n -o SOURCE / 2>/dev/null || echo "")}
 	case $rootdev in
 	"$EMMC"*)
@@ -119,6 +116,13 @@ $(grep "^$EMMC" "$MOUNTS" | sed 's/^/       /')
        copy the eMMC onto itself. Boot from the microSD card first."
 		;;
 	esac
+
+	if grep -q "^$EMMC" "$MOUNTS"; then
+		die "$EMMC is mounted:
+$(grep "^$EMMC" "$MOUNTS" | sed 's/^/       /')
+       Unmount it first. Writing a partition table under a mounted
+       filesystem corrupts it in a way fsck reports and cannot explain."
+	fi
 
 	P1=${EMMC}p1
 	P2=${EMMC}p2

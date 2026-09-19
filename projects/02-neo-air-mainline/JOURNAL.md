@@ -1245,3 +1245,98 @@ that reason.
 Both defects were invisible to a passing test suite because the fixtures
 encoded the very assumption that was false. A fixture is a claim about the
 world, and a claim worth testing is worth checking against the world once.
+
+## 17. Criterion 4, and the refusal that could never fire
+
+*Saturday 19 September 2026.* The eMMC step ran, the board booted from its
+own internal storage, and then the safety refusal we were most proud of
+turned out to be unreachable.
+
+### Criterion 4
+
+`flash-emmc.sh` completed all seven states from the card. Power off, card
+out, power on, and:
+
+    Trying to boot from MMC2
+    append: console=ttyS0,115200 root=PARTUUID=77847699-02 rootwait rw
+    EXT4-fs (mmcblk2p2): mounted filesystem 33470494-...
+    Mounted boot.mount - /boot.
+
+The boot ROM found nothing at byte 8192 of mmc0, moved to mmc2, and mmc2
+carried our bootloader rather than FriendlyElec's. `77847699` is the eMMC's
+own PARTUUID; the card's was `0ea5d3ef`. Root and `/boot` both mounted from
+the filesystems the `format` state had made minutes earlier, by UUID.
+
+That is the `/boot` work from entry 16 proving itself end to end. Had
+`bootconfig` not rewritten the fstab boot line, `/boot` would have hunted
+for the card's `0ea5d3ef-01` on a board with no card in it.
+
+Worth noting what the two boots did to device names. On the card boot the
+SD was `mmcblk1` and the eMMC `mmcblk0`; on the eMMC boot the eMMC was
+`mmcblk2`. Same board, same kernel, three different names across three
+boots, purely from probe order. Every "never by name" decision in this
+project was exercised by the hardware without being asked.
+
+### Then the refusal that could not fire
+
+Still booted from the eMMC, a dry run should have hit the third guard, the
+one entry 2 calls "the refusal the specification does not have". Instead:
+
+    flash-emmc: /dev/mmcblk2 is mounted:
+           /dev/mmcblk2p1 /boot ext4 rw,noatime 0 0
+           Unmount it first.
+    flash-emmc: failed in state identify
+
+The board was safe. The guard that saved it was the wrong one, and the
+advice was wrong too.
+
+**A board booted from the eMMC necessarily has the eMMC in `/proc/mounts`.**
+Root is there by definition, and now `/boot` is as well. The mounted check
+ran first, matched `^/dev/mmcblk2`, and died. The root-carries-target check
+sat below it and could never be reached on real hardware.
+
+And "Unmount it first" is advice that cannot be followed and should not be:
+you cannot unmount `/`, and the correct action is not to unmount anything
+but to boot from the card. An operator who trusted that message would
+unmount `/boot`, retry, be refused again for a reason the message does not
+explain, and learn nothing.
+
+### Why the test said otherwise
+
+The fixture put `NEO_ROOTDEV=/dev/mmcblk1p2`, the eMMC, while leaving
+`/proc/mounts` saying `/dev/mmcblk0p2 /`, the card. **Those two cannot both
+be true.** If root is on the eMMC, `/proc/mounts` says so. The fixture
+described an impossible world, and that impossible world was the only place
+the guard had ever fired. The comment above it stated, as fact, that "both
+checks above pass on a board already booted from eMMC". The board disproved
+that sentence within a minute of being asked.
+
+This is decision 105 arriving again, hours after it was written, and from
+the same file. The fixture encoded an assumption about the deployment; the
+assumption was not merely wrong but impossible; and a green suite reported
+a guard working that reality shadowed.
+
+### The fix
+
+The root-carries-target check now runs **before** the mounted check. Both
+still fire on such a board, and the one with the correct remedy wins.
+
+The fixture now describes a state that can exist: root on the eMMC, and
+`/proc/mounts` carrying both the eMMC root and the eMMC `/boot`. A second
+assertion checks that the output does **not** contain "Unmount it first",
+because the defect was never a missing refusal, it was the wrong one
+speaking.
+
+Proved rather than assumed: with the old ordering restored, both new
+assertions fail. With the fix, 34 pass.
+
+### What to keep
+
+**When two guards can both fire, order them so the one with the correct
+remedy speaks.** Being refused is not enough. A refusal is an instruction,
+and a safe refusal carrying wrong instructions sends a careful operator
+somewhere useless while telling them they were careful.
+
+And the older lesson underneath it: a fixture that has to describe an
+impossible state in order to reach a branch is telling you the branch is
+unreachable. That is a signal, not an inconvenience to be worked around.

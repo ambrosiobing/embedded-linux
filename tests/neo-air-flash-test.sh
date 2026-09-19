@@ -195,16 +195,23 @@ out=$(run -n) || rc=$?
 check "a mounted target is a refusal" "$rc" "1"
 contains "and shows the mount it found" "$out" "/dev/mmcblk1p1 /boot"
 
-# The refusal the specification does not have. Both checks above pass on a
-# board already booted from eMMC, and the next state would then overwrite
-# the bootloader of the running system.
+# The refusal the specification does not have, on a board booted from the
+# eMMC. The fixture describes a state that can actually exist: if root is on
+# the eMMC then /proc/mounts says so too, and /boot is mounted from it as
+# well. The earlier version of this test set NEO_ROOTDEV to the eMMC while
+# leaving /proc/mounts pointing at the card, which is impossible, and it was
+# the only way the guard was ever reached. On real hardware the mount check
+# fired first and told the operator to unmount, which is wrong advice.
 reset
+printf '/dev/mmcblk1p2 / ext4 rw 0 0\n' >"$WORK/mounts"
+printf '/dev/mmcblk1p1 /boot ext4 rw,noatime 0 0\n' >>"$WORK/mounts"
 ROOTDEV=/dev/mmcblk1p2
 rc=0
 out=$(run -n) || rc=$?
 ROOTDEV=
 check "running root on the target is a refusal" "$rc" "1"
 contains "and says to boot from the card first" "$out" "Boot from the microSD card first"
+absent "and does not tell the operator to unmount anything" "$out" "Unmount it first"
 
 reset
 rm -f "$WORK/u-boot.bin"
