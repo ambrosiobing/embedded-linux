@@ -215,19 +215,31 @@ Project 2's build scripts each take one extra fragment through
 `NEO_EXTRA_FRAGMENT`, which exists for this project. Unset, they build the
 baseline exactly as before.
 
-On the **wsl laptop**, with `toolchain.env` sourced:
+On the **wsl laptop**, through `./go`, which is the entry point for
+everything in this repository. Source the pins first or both scripts
+refuse rather than build something unpinned:
+
+```
+. projects/02-neo-air-mainline/toolchain.env
+```
 
 ```
 P3=$PWD/projects/03-boot-energy
 ```
 
 ```
-NEO_EXTRA_FRAGMENT=$P3/uboot/fragments/fast.config projects/02-neo-air-mainline/uboot/build.sh
+NEO_EXTRA_FRAGMENT=$P3/uboot/fragments/fast.config ./go neo-air uboot
 ```
 
 ```
-NEO_EXTRA_FRAGMENT=$P3/kernel/fragments/trim.cfg projects/02-neo-air-mainline/kernel/build.sh
+NEO_EXTRA_FRAGMENT=$P3/kernel/fragments/trim.cfg ./go neo-air kernel
 ```
+
+`./go neo-air` dispatches with a plain `exec sh`, so the variable reaches
+the build script unchanged. `sudo ./go neo-air rootfs` and `card` are a
+different case: `./go` sources `toolchain.env` inside the sudo, and an
+environment variable set in your own shell does not survive that. Neither
+of those steps takes a fragment, so it does not arise here.
 
 **One extra fragment, not a list.** A variant that needs two, such as the
 trimming plus a compression choice, is one file made from both:
