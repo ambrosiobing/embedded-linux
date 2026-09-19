@@ -4,7 +4,7 @@ What actually happened, in order, including the things that were wrong
 first. [DECISIONS.md](../../walkthrough/DECISIONS.md) is the distilled list
 of choices; this is the path that produced them.
 
-All entries are 18 September 2026 unless noted.
+All entries are Friday 18 September 2026 unless noted.
 
 ## 1. The specification first, and the ownership table earned its place
 
@@ -826,8 +826,8 @@ to do when a script must do it at all.
 
 ## 13. The vendor artefact was in the archive all along, and my own check missed it
 
-*19 September 2026. The session ran past midnight; everything before this
-entry is the 18th.*
+*Saturday 19 September 2026. The session ran past midnight; everything
+before this entry is Friday 18 September 2026.*
 
 `rootfs.tar`, 393 MB. All three artefacts now exist. And the listing I
 added one commit earlier, specifically so that the firmware situation would
@@ -953,3 +953,130 @@ correctly. Recorded here so the next reader does not spend time on them.
 
 Nothing has touched hardware. The next command writes a card, and the one
 after that is the first time this project meets the board.
+
+## 14. The first night with the board: no console, and an LED that answered everything
+
+*Saturday 19 September 2026, from about 00:10 to 01:00.*
+
+The card was written and the board was wired and powered, and the console
+said nothing for an hour. This entry is mostly about how the question was
+narrowed without ever getting a single character out of the UART, because
+that turned out to be the transferable part.
+
+### What was tried, in order
+
+| Step | Result |
+|---|---|
+| card written, `picocom -g` running, board powered | `Terminal ready`, two stray bytes, then nothing |
+| checked for an Allwinner FEL device on the host | nothing |
+| `eGON.BT0` read back from byte 8196 of the card | present |
+| boot partition listed | zImage, dtb, u-boot-sunxi-with-spl.bin, extlinux.conf, all correct sizes |
+| loopback: cable TX joined to cable RX, typed `hello` | `hello` echoed |
+| data wires swapped, both arrangements | nothing either way |
+| card removed, board powered | green LED settled into a rhythmic blink |
+
+### The two tests that did the work
+
+**The loopback.** Joining the cable's own transmit and receive leads and
+typing into `picocom` proves the adapter, the `pl2303` kernel module, the
+usbipd bridge into WSL and `picocom` itself, all in one gesture and with
+the board out of the circuit entirely. `hello` came back. That removed
+four candidates at once and cost thirty seconds.
+
+It matters because the adapter was a PL2303HXA, the chip Prolific
+discontinued and whose counterfeits are everywhere, and "the cable is
+probably fake" is a comfortable theory that would have absorbed the rest
+of the night. The loopback made the theory unnecessary rather than
+arguing with it.
+
+**The LED, with the card out.** The board was supposed to be proven by a
+FEL check: with no card and a blank eMMC the boot ROM has nowhere to go
+and must appear on USB in FEL mode. Nothing appeared, which seemed to say
+the board was not running.
+
+It said no such thing. **The eMMC was never blank.** The board shipped with
+a FriendlyElec vendor image on mmc2, so with the card out the boot ROM
+found nothing at byte 8192 of mmc0, moved to mmc2 exactly as designed, and
+booted the vendor system. No FEL, because FEL is the fallback for having
+nothing to boot, and it had something.
+
+The green LED settling into a rhythmic blink is what gave it away. **A
+rhythmic blink is the kernel's heartbeat trigger.** The boot ROM does not
+blink. U-Boot does not blink. Only a running kernel with a heartbeat
+trigger produces that pattern, so an LED nobody had thought of as an
+instrument reported that a full operating system was up.
+
+### What that proved, which is a great deal
+
+A vendor FriendlyElec image prints to UART0 at 115200. It was running, it
+was talking, and `picocom` saw nothing.
+
+So the console fault is independent of everything this project built. Not
+our U-Boot, not our kernel, not the card, not the adapter. Four pins, or
+the contact being made to them. The evening's remaining uncertainty went
+from "any of eight things" to one.
+
+### The assumption that was wrong, and where it was written down
+
+`docs/BRINGUP.md` described removing the card and the boot ROM moving to
+mmc2 **as the proof that our eMMC provisioning worked**. That step cannot
+prove it on this board, because mmc2 already boots something. A board that
+comes up is not evidence that our image came up.
+
+The document now says so, and gives the three commands that ask the
+running system who it is rather than inferring it from the fact that
+something started:
+
+    uname -r
+    cat /etc/os-release
+    findmnt /
+
+This is the same shape as decisions 101 and 102 arriving from the hardware
+side. "The board booted" answers a narrower question than "our image
+booted", and the difference is invisible while everything is working.
+
+### A gap found while planning the way around the console
+
+With the board running Linux and the console unavailable, the obvious
+route in is ssh over wireless. Reading the image to check that route
+found a defect: `mkrootfs.sh` prompts for a root password at build time,
+and Debian ships `PermitRootLogin prohibit-password`, so that password
+works on the console and is refused over the network.
+
+The build asks for a credential and then quietly arranges for it not to
+work. The symptom is `Permission denied, please try again`, which reads as
+a wrong password rather than as a policy, on a board whose only other way
+in is the cable that is not working.
+
+Fixed with a drop-in under `/etc/ssh/sshd_config.d/` rather than an edit
+to `sshd_config`, so a package upgrade rewriting the main file does not
+silently undo it, and with a check in `mkrootfs.sh` that Debian's
+`Include` line is actually present. The tradeoff is written in the drop-in
+itself: a bench board on a private network, a password set by hand and
+absent from the repository, no host keys and no `authorized_keys` in the
+image, and a note that anything leaving this bench should have a normal
+user with sudo instead.
+
+### What to keep
+
+**An LED is an instrument.** Constant means powered. Rhythmic means
+software is running a timer, which on Linux means the kernel got far
+enough to schedule. Nothing else on the board can produce that pattern,
+and it is readable from across a desk with no cable attached.
+
+**A loopback takes the whole host path out of the question in one
+gesture**, and is worth reaching for before any theory about a suspect
+cable.
+
+**When a test fails to produce the expected evidence, check the
+assumption behind the test before believing its result.** "No FEL device
+means the board is not running" rested on "the eMMC is blank", which
+nobody had ever verified and which was false.
+
+### Where this stops tonight
+
+The board works. The card is correct at the byte level. Every artefact is
+built and pushed. What remains is four pins and a silkscreen, which needs
+daylight and possibly a second adapter, since the loopback clears the
+electronics but says nothing about whether all four wires in that
+particular connector are continuous.

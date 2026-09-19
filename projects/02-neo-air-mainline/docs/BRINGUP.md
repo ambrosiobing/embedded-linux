@@ -109,6 +109,32 @@ kernel reports as non-removable.
 
 ## 4. First power-on
 
+**The eMMC is not blank, and nothing in this project put anything there.**
+The board arrived with a FriendlyElec vendor image already on mmc2. That
+was discovered on the first bring-up night, by taking the card out and
+watching the status LED settle into a heartbeat blink: a rhythmic blink is
+the kernel's heartbeat trigger, and neither the boot ROM nor U-Boot
+blinks anything.
+
+Two consequences, and the second is the one that can mislead you for an
+hour:
+
+- A board with no card still boots. The boot ROM finds nothing at byte
+  8192 of mmc0, moves to mmc2 as designed, and starts the vendor system.
+- **A booting board is therefore not evidence that this project's image
+  booted.** Whenever you want to know whose system is running, ask it
+  rather than infer it from the fact that something came up:
+
+```
+uname -r
+cat /etc/os-release
+findmnt /
+```
+
+`6.12.0` and Debian bookworm are ours. Anything else is the vendor image,
+and the answer to "why does my change have no effect" is that you are
+looking at a different operating system.
+
 Card in, antenna on, `picocom` already running, then power.
 
 What to expect, in order:

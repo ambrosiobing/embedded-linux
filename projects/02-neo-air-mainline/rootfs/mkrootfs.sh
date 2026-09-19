@@ -256,6 +256,24 @@ chroot "$ROOT" systemctl enable wpa_supplicant@wlan0 || true
 # Deleted here, regenerated on the board at first boot by a unit in the
 # overlay. ssh-keygen -A writes only what is missing, so it is idempotent
 # and a reflashed board does it once.
+# The overlay drops a file into /etc/ssh/sshd_config.d so that the root
+# password this script asks for is usable over ssh as well as on the
+# console. That only works if Debian's sshd_config still carries its
+# Include line, so it is checked rather than assumed: a silent failure
+# here gives a board that accepts the password on the console and refuses
+# it over the network, which reads as a wrong password rather than as a
+# policy, and this board's console is the thing most likely to be
+# unavailable when it matters.
+SSHD=$ROOT/etc/ssh/sshd_config
+if grep -q '^Include /etc/ssh/sshd_config.d/' "$SSHD"; then
+	note "sshd reads its drop-in directory, the overlay's policy applies"
+else
+	note "sshd_config has no Include line, appending the policy directly"
+	sed -i 's/^#*PermitRootLogin .*/PermitRootLogin yes/' "$SSHD"
+	grep -q '^PermitRootLogin yes' "$SSHD" ||
+		printf '\nPermitRootLogin yes\n' >>"$SSHD"
+fi
+
 note "removing the build host's ssh host keys"
 rm -f "$ROOT"/etc/ssh/ssh_host_*
 chroot "$ROOT" systemctl enable regenerate-ssh-host-keys
