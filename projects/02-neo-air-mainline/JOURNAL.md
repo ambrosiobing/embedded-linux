@@ -1565,3 +1565,69 @@ Open, and neither blocking: the regulatory alternative above, unverified
 until the next build; and the guard-ordering and package fixes from earlier
 today, which are in the repository and will reach a board the next time a
 card is written.
+
+## 21. CI went red on a commit that was already fixed, and said something anyway
+
+*Saturday 19 September 2026, late afternoon.* A failure notice arrived for
+`ci - main (033b674)`, the archive commit.
+
+### What it was
+
+Read through the API with the stored git credential, since there is no `gh`
+on this laptop:
+
+    GET /repos/ambrosiobing/embedded-linux/actions/runs?per_page=5
+
+    661fa04 completed success ci
+    033b674 completed failure ci
+    8c1f894 completed success ci
+
+Already fixed by the next commit. The log named one thing and nothing else:
+
+    projects/02-neo-air-mainline/tools/archive.sh: has a shebang but is
+    committed as 100644, not 100755
+    1 problem(s)
+
+That mattered to confirm rather than assume. **aquamarine has no
+shellcheck**, so `archive.sh`, a 165 line script written today, had never
+been through the real linter. CI runs it. A green-after-fix result does not
+prove shellcheck was happy, because the run that would have told us failed
+before reaching it. Reading the log did prove it: the only finding was the
+mode, and the shellcheck stage had no complaints about the new script.
+
+### What it exposed, which is the part worth keeping
+
+`scripts/lint.py` caught the exec bit **before** CI did. It is in the
+repository, it works, and it found the problem the moment it was run. The
+problem is when it was run: after the commit, because I happened to run it
+as part of the next change.
+
+So the check existed, the check was correct, and the check was not attached
+to the event that needed it. The repository already has a
+`.git/hooks/commit-msg` guard for attribution traces, which exists for
+exactly this reason: prose telling a person to remember something does not
+survive contact with a busy afternoon. There is no `pre-commit` hook
+running `lint.py`, and had there been one, 033b674 would have been refused
+locally and CI would never have gone red.
+
+That is the same shape as the whole of Project 2, one layer up. A correct
+check, in the wrong place, reporting truthfully about something nobody was
+asking it at the moment it mattered.
+
+### Not done, and why
+
+The hook is not added here. It touches `.git/hooks` on two machines, which
+is outside the repository and therefore outside what a commit can carry;
+Project 2 is closed; and a CI failure already fixed by the following push
+is not urgent. It belongs with the next piece of tooling work, alongside
+installing the existing `commit-msg` guard on JPTOUPM678, which is still
+outstanding from 17 September.
+
+### Also checked
+
+The five `walkthrough/` files that mention the NEO Air were read for stale
+claims now that Project 2 is finished. All five mention it descriptively,
+in a hardware table, a piece-by-piece comparison against the Pi, and a
+lifecycle example. None asserts a status, so none went stale. The root
+`README.md` row is the only place that tracked status and it was updated
+with the criteria.
