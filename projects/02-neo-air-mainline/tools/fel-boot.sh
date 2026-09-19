@@ -29,11 +29,21 @@
 # After this script runs, U-Boot appears on the serial console, and the
 # bootloader can be written back from its prompt:
 #
-#   => mmc dev 2
-#   => ext4load mmc 0:1 0x42000000 u-boot-sunxi-with-spl.bin
+#   => mmc dev 1
+#   => ext4load mmc 1:1 0x42000000 u-boot-sunxi-with-spl.bin
 #   => mmc write 0x42000000 0x10 0x800
 #
 # 0x10 is sector 16, which is byte 8192 at 512 bytes per sector.
+#
+# THE DEVICE NUMBER IS 1, NOT 2, AND THE DIFFERENCE MATTERS. The boot ROM
+# calls the eMMC mmc2 and says so in the SPL banner. U-Boot numbers the
+# controllers separately and calls the eMMC mmc 1; its mmc 2 is the SDIO
+# Wi-Fi. Every boot prints the mapping:
+#
+#   MMC:   mmc@1c0f000: 0, mmc@1c10000: 2, mmc@1c11000: 1
+#
+# 1c0f000 is the card slot, 1c10000 the SDIO radio, 1c11000 the eMMC. Read
+# that line, or "mmc list", rather than trusting a number in a comment.
 #
 # SPDX-License-Identifier: MIT
 
@@ -88,7 +98,11 @@ sunxi-fel -v uboot "$BIN"
 
 note "done. U-Boot is now running from SRAM and DRAM, not from any card."
 note "Watch the serial console for the prompt, then write the bootloader"
-note "back to the eMMC:"
-note "  => mmc dev 2"
-note "  => mmc write <addr> 0x10 0x800"
+note "back to the eMMC. Check 'mmc list' first: U-Boot calls the eMMC"
+note "dev 1 on this board and its dev 2 is the SDIO radio, which is not"
+note "the boot ROM's numbering and not what you want to write to."
+note "  => mmc list"
+note "  => mmc dev 1"
+note "  => ext4load mmc 1:1 0x42000000 u-boot-sunxi-with-spl.bin"
+note "  => mmc write 0x42000000 0x10 0x800"
 note "Nothing on either medium has been changed by this script."

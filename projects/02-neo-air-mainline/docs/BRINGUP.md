@@ -277,14 +277,22 @@ Run it a second time to prove idempotence. Criterion 5.
 The last criterion is the one worth doing rather than assuming. A recovery
 path that has never been used is a recovery path whose state nobody knows.
 
-With the card removed, erase the eMMC bootloader:
+Erase the eMMC bootloader while booted **from the card**, so the running
+system is not the one being broken. `mmcblkN` is whichever device sysfs
+reports as type MMC; `flash-emmc.sh -n` names it for you.
 
 ```
 dd if=/dev/zero of=/dev/mmcblkN bs=1024 seek=8 count=1024 conv=fsync
 ```
 
-Power off. Connect the micro USB port to the PC rather than to its supply,
-and power on. `lsusb` on the host should show:
+This erases 1 MiB from byte 8192, which is the bootloader and nothing else.
+**The partitions and their contents survive**, which matters: the eMMC's
+boot partition still holds `u-boot-sunxi-with-spl.bin`, and that is the
+copy written back at the end.
+
+Power off. **Remove the card.** Connect the micro USB port to the PC rather
+than to its supply, and power on. With no bootloader on either medium the
+boot ROM enters FEL, and the host should show:
 
 ```
 1f3a:efe8 Allwinner Technology sunxi SoC OTG connector in FEL/flashing mode
@@ -296,17 +304,34 @@ Then:
 sudo ./go neo-air fel
 ```
 
-U-Boot appears on the console, running from SRAM and DRAM with nothing on
-either card. From its prompt, write the bootloader back:
+U-Boot appears on the console, running from SRAM and DRAM with nothing
+booted from either medium. From its prompt, write the bootloader back.
+
+**Watch the device numbers: U-Boot does not number the controllers the way
+the boot ROM does.** The boot ROM calls the eMMC mmc2, which is what the
+SPL banner says. U-Boot calls it **mmc 1**, and calls the SDIO Wi-Fi mmc 2.
+The board tells you itself, at the top of every boot:
 
 ```
-=> mmc dev 2
-=> mmc write <addr> 0x10 0x800
+MMC:   mmc@1c0f000: 0, mmc@1c10000: 2, mmc@1c11000: 1
 ```
 
-`0x10` is sector 16, which is byte 8192 at 512 bytes per sector, which is
-the same address the boot ROM probes and the same one every script in this
-project writes to.
+`1c0f000` is the card slot, `1c10000` is the SDIO radio, `1c11000` is the
+eMMC. So the eMMC is **dev 1** at the U-Boot prompt, and `mmc dev 2` would
+select the Wi-Fi controller. Read that line on your board rather than
+trusting this paragraph:
+
+```
+=> mmc list
+=> mmc dev 1
+=> ext4load mmc 1:1 0x42000000 u-boot-sunxi-with-spl.bin
+=> mmc write 0x42000000 0x10 0x800
+```
+
+`ext4load` reads the image from the eMMC's own boot partition, which the
+`dd` above deliberately did not touch. `0x10` is sector 16, which is byte
+8192 at 512 bytes per sector, which is the same address the boot ROM probes
+and the same one every script in this project writes to.
 
 That is criterion 6, and it is the interview story: a board with no
 bootloader on either medium, recovered over USB without opening anything.
