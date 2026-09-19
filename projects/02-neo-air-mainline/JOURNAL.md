@@ -1340,3 +1340,115 @@ somewhere useless while telling them they were careful.
 And the older lesson underneath it: a fixture that has to describe an
 impossible state in order to reach a branch is telling you the branch is
 unreachable. That is a signal, not an inconvenience to be worked around.
+
+## 18. Criteria 5 and 6, and the boundary this project is named after
+
+*Saturday 19 September 2026.* Idempotence, then the recovery. The recovery
+worked. Getting there cost two arithmetic errors at the one boundary every
+document in this project warns about.
+
+### Criterion 5
+
+`flash-emmc.sh` run a second time from the card reprovisioned the eMMC
+completely: new partitions, new filesystems, `bootconfig PARTUUID=e48fa0a9-02`
+and `bootconfig boot PARTUUID=e48fa0a9-01`, `fsck reports clean`. New
+PARTUUIDs because it repartitions, which is the point. A failed run is
+recovered by rebooting from the card and running it again, and now that is
+a thing that has been done rather than a thing that is claimed.
+
+### Criterion 6, and what it proved
+
+Erase the eMMC bootloader, remove the card, connect the micro USB to the
+host. `usbipd list` showed `1f3a:efe8`, the board answering over USB with
+nothing bootable on either medium. `sunxi-fel version` returned
+`AWUSBFEX soc=00001680(H3)`. `./go neo-air fel` pushed U-Boot into SRAM and
+the console printed:
+
+    U-Boot SPL 2025.10
+    Trying to boot from FEL
+
+A full U-Boot, running from SRAM and DRAM, on a board that by every normal
+measure was dead. It even tried PXE and gave up politely. `mmc write` put
+the bootloader back and `reset` brought the board up again.
+
+That is the story worth telling: bricked deliberately, recovered over a
+USB cable, nothing opened, no JTAG, no programmer.
+
+### The boundary, twice
+
+The project's first design decision was to write down two numbers: the
+bootloader at byte 8192, the first partition at sector 2048. Every figure
+in `DESIGN.md` exists to make the gap between them visible. Both errors
+today were in that gap.
+
+**The erase.** `bs=1024 seek=8 count=1024` writes 1 MiB from byte 8192 and
+ends at byte 1056768. Sector 2048 is byte 1048576. It overran by 8 KiB and
+zeroed the ext4 superblock 1 KiB into partition 1. The correct count is
+1016, the actual size of the gap.
+
+The consequence arrived exactly where it hurt: `ext4load mmc 1:1` answered
+`Can't set block device` at the moment the recovery needed the image, so
+the image had to come off the SD card instead. The recovery still worked,
+but the cardless path the document promises was not available, because the
+document's own erase had destroyed it.
+
+**The write-back.** `mmc write 0x42000000 0x10 0x800` is sector 16 plus
+2048 sectors, ending at sector 2064. Same boundary, same 8 KiB, same
+partition. Caught by reading it before typing it, only because the first
+error had just been found. The correct count is `0x3EC`, 1004 sectors,
+which is the image rounded up to a whole sector.
+
+Two mistakes, one cause: a round number that looks like a megabyte, used
+where the actual size of the thing was what mattered.
+
+The repair run afterwards confirmed the damage without being asked. Every
+previous `flash-emmc.sh` printed two lines from `sfdisk`:
+
+    Partition #1 contains a ext4 signature.
+    Partition #2 contains a ext4 signature.
+
+This one printed only the second, and `mkfs` likewise reported an existing
+filesystem on p2 alone. The tools could not see a filesystem on p1 because
+its superblock was the 8 KiB that had been overwritten. A destructive
+mistake left a signature in the output of the next ordinary run, which is
+worth knowing: the evidence is often already in a log nobody is reading for
+that purpose.
+
+### A third one that cost twenty minutes
+
+Before either of those, an erase appeared to succeed and had not. The
+command in the document says `of=/dev/mmcblkN`, and `mmcblkN` was typed
+literally. `dd` created a regular file called `/dev/mmcblkN`, wrote 1 MiB
+into it and reported success.
+
+Two things hid it. `/dev` is devtmpfs, so the file vanished at the next
+reboot and could not be found afterwards. And `1048576 bytes copied` looks
+identical either way.
+
+What gave it away was the transfer rate. **125 MB/s is RAM. The eMMC with
+`conv=fsync` does 4.4 MB/s.** The number that looked like success was the
+evidence it had not happened, and the verification that settled it was
+reading byte 8196 back and finding `eGON.BT0` still there.
+
+The placeholder is the defect. `mmcblkN` is honest about the danger and
+useless at the moment of typing, and the device number moved three times in
+one afternoon: the eMMC was `mmcblk0`, `mmcblk1` and `mmcblk2` across
+consecutive boots of the same board. A document cannot hardcode it and a
+human should not have to substitute it under pressure.
+
+### What to keep
+
+**Verify a destructive operation by reading the target back, never by
+reading the tool's own report.** `dd` reported complete success three
+times: once into a file, once into the eMMC, once into the eMMC again. Only
+`od -c` on byte 8196 distinguished them.
+
+**A throughput number is a fingerprint of where the write went.** RAM,
+eMMC and SD each have a signature, and a write that lands somewhere
+unexpected usually announces itself in the rate before it announces itself
+anywhere else.
+
+**When a project's design document names a boundary, check every arithmetic
+operation against it, including the ones in the prose.** Both errors were
+in the documentation rather than the code, and the code that surrounds them
+has been checking sector 2048 correctly since the first week.

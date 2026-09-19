@@ -3270,3 +3270,48 @@ the contortion as the finding.
 on the real overlapping case, and whether that one's message names the
 action that actually resolves it. Order accordingly, and assert on the
 message the operator should not see as well as the one they should.
+
+## 107. Verify a destructive write by reading the target back
+
+**Context.** Project 2's acceptance test erases the eMMC bootloader on
+purpose. On Saturday 19 September 2026 that `dd` ran three times and
+reported complete success every time:
+
+    1048576 bytes (1.0 MB, 1.0 MiB) copied, 0.00838117 s, 125 MB/s
+    1048576 bytes (1.0 MB, 1.0 MiB) copied, 0.240411 s, 4.4 MB/s
+
+The first went into a regular file called `/dev/mmcblkN`, created because
+the document's placeholder was typed literally. `/dev` is devtmpfs, so the
+file vanished at the next reboot and left nothing to find. The second
+erased the eMMC. `dd` cannot tell them apart and neither can its output.
+
+**Decision.** A destructive write is verified by reading the target back,
+with a command that names the target independently. Here:
+
+    dd if=/dev/mmcblk0 bs=1 skip=8196 count=8 status=none | od -c
+
+`eGON.BT0` or eight `\0`. Nothing else settles it.
+
+**Rejected.** Trusting the byte count and exit status, which is what "it
+said it worked" means and which was true of all three runs. Also rejected:
+inferring from the absence of the stray file afterwards, since a file in
+`/dev` does not survive a reboot and its absence is evidence of nothing.
+
+**Why.** The failure mode is not that the write fails. It is that the write
+succeeds against the wrong object, and every indicator a tool offers about
+its own work is equally true in both cases. The only distinguishing
+evidence is outside the tool: the state of the thing that was supposed to
+change.
+
+**A throughput number is a fingerprint of where the write went.** 125 MB/s
+is RAM. 4.4 MB/s is this eMMC with `conv=fsync`. The rate flagged the wrong
+target before anything else did, and on a bench where the media have
+different speeds it is worth reading for that reason alone.
+
+**Consequence.** Every destructive step in this repository gets a read-back
+check beside it in the document, not merely a warning. And a placeholder
+that must be substituted by hand at the moment of maximum consequence, like
+`mmcblkN`, is a defect in the instruction: the device number moved three
+times in one afternoon on this board, so the document cannot hardcode it
+and a human should not have to supply it under pressure. Name the command
+that prints the device, and have the operator read it from there.

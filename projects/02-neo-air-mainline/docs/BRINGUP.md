@@ -282,13 +282,24 @@ system is not the one being broken. `mmcblkN` is whichever device sysfs
 reports as type MMC; `flash-emmc.sh -n` names it for you.
 
 ```
-dd if=/dev/zero of=/dev/mmcblkN bs=1024 seek=8 count=1024 conv=fsync
+dd if=/dev/zero of=/dev/mmcblkN bs=1024 seek=8 count=1016 conv=fsync
 ```
 
-This erases 1 MiB from byte 8192, which is the bootloader and nothing else.
-**The partitions and their contents survive**, which matters: the eMMC's
-boot partition still holds `u-boot-sunxi-with-spl.bin`, and that is the
-copy written back at the end.
+**The count is 1016, not 1024, and the difference is the whole point of
+this project.** The bootloader starts at byte 8192 and partition 1 starts
+at sector 2048, which is byte 1048576. The gap between them is 1040384
+bytes, which is 1016 KiB. A count of 1024 writes 1 MiB, overruns the
+boundary by 8 KiB, and zeroes the ext4 superblock that sits 1 KiB into the
+partition.
+
+That is not hypothetical. It is what happened the first time this was run,
+and the consequence was that `ext4load` from the eMMC boot partition failed
+with `Can't set block device` at exactly the moment the recovery needed it.
+The image had to be fetched from the SD card instead.
+
+With 1016, **the partitions and their contents survive**: the eMMC's boot
+partition still holds `u-boot-sunxi-with-spl.bin`, and that is the copy
+written back at the end, with no card involved.
 
 Power off. **Remove the card.** Connect the micro USB port to the PC rather
 than to its supply, and power on. With no bootloader on either medium the
@@ -325,13 +336,31 @@ trusting this paragraph:
 => mmc list
 => mmc dev 1
 => ext4load mmc 1:1 0x42000000 u-boot-sunxi-with-spl.bin
-=> mmc write 0x42000000 0x10 0x800
+=> mmc write 0x42000000 0x10 0x3EC
 ```
 
 `ext4load` reads the image from the eMMC's own boot partition, which the
 `dd` above deliberately did not touch. `0x10` is sector 16, which is byte
 8192 at 512 bytes per sector, which is the same address the boot ROM probes
 and the same one every script in this project writes to.
+
+**`0x3EC` is 1004 sectors, which is exactly the image**, 513912 bytes
+rounded up to a whole sector. The obvious-looking `0x800` is 2048 sectors:
+it would run from sector 16 to sector 2064 and overwrite the first 8 KiB of
+partition 1, which is the same boundary mistake as the erase above, made
+twice in the same procedure. Write the size of the thing you are writing,
+not a round number that looks like a megabyte.
+
+If the eMMC's boot partition is unreadable because a previous run used the
+wrong count, put the SD card back in and take the image from there instead:
+
+```
+=> mmc dev 0
+=> mmc rescan
+=> ext4load mmc 0:1 0x42000000 u-boot-sunxi-with-spl.bin
+=> mmc dev 1
+=> mmc write 0x42000000 0x10 0x3EC
+```
 
 That is criterion 6, and it is the interview story: a board with no
 bootloader on either medium, recovered over USB without opening anything.

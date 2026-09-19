@@ -31,7 +31,7 @@
 #
 #   => mmc dev 1
 #   => ext4load mmc 1:1 0x42000000 u-boot-sunxi-with-spl.bin
-#   => mmc write 0x42000000 0x10 0x800
+#   => mmc write 0x42000000 0x10 0x3EC
 #
 # 0x10 is sector 16, which is byte 8192 at 512 bytes per sector.
 #
@@ -104,5 +104,5 @@ note "the boot ROM's numbering and not what you want to write to."
 note "  => mmc list"
 note "  => mmc dev 1"
 note "  => ext4load mmc 1:1 0x42000000 u-boot-sunxi-with-spl.bin"
-note "  => mmc write 0x42000000 0x10 0x800"
+note "  => mmc write 0x42000000 0x10 0x3EC"
 note "Nothing on either medium has been changed by this script."
