@@ -4,8 +4,9 @@ The order below is not the order the specification lists its steps in, and
 the difference is deliberate. Two things have to be settled before any
 measurement is worth taking, and one of them can end the project:
 
-- whether the PPK2's logic port can see a 3.3 V marker at all while it
-  sources 5.0 V, which no amount of software can decide;
+- whether the logic port is wired at all, which turns on a pin the
+  specification's table does not list: the port has its own VCC reference,
+  and without it every marker channel reads nothing;
 - whether the markers are in place **before** the baseline is recorded,
   because a baseline taken without them has no phases in it and a baseline
   taken with the optimisations already in is not a baseline.
@@ -48,25 +49,52 @@ and only then move the supply.
 
 This is acceptance criterion 0 and it is not in the specification's list.
 It is promoted because it is a precondition: if it fails, **all three
-channels fail at once** and the measurement method does not work on this
-combination of instrument and rail.
+marker channels fail at once**, and the most likely cause is the pin the
+specification's wiring table leaves out.
 
-Wire only the supply and D3:
+Wire the supply, **the logic port's own reference**, and D3:
 
-| PPK2 | NEO Air |
-|---|---|
-| `VOUT` | header pin 2, `VDD_5V` |
-| `GND` | header pin 6, `GND` |
-| `D3` | header pin 1, `SYS_3.3V` |
+| PPK2 | NEO Air | |
+|---|---|---|
+| `VOUT` | header pin 2, `VDD_5V` | |
+| `GND` | header pin 6, `GND` | |
+| logic `VCC` | header pin 1, `SYS_3.3V` | **the one the specification omits** |
+| logic `GND` | header pin 6, `GND` | same ground as the supply |
+| `D3` | header pin 17, `SYS_3.3V` | pin 1 and pin 17 are one net |
 
-In the Power Profiler desktop app: source meter, 5000 mV, supply on. D3
-should read **high**.
+**The logic port has VCC and GND pins of its own**, and VCC is the level
+shifter's reference, required between 1.65 and 5.5 V. The specification's
+wiring table does not mention it. Leave it unconnected and D0, D1 and D2
+read nothing, all three at once, which is exactly the symptom this
+self-test exists to detect: it would have reported the method broken and
+been believed.
+
+In the Power Profiler desktop app: source meter, 5000 mV, enable power
+output. Then **turn the digital channels on**, with the gear icon at the
+left of the chart toolbar beside "Lock Y-axis". They are off by default
+and the current trace alone shows nothing about D3. Eight rows appear
+under the plot.
+
+D3 should read **high**.
 
 If it does, the 3.3 V markers will be seen and the rest of this file
-proceeds. If it does not, stop and write down what was found, because the
-project then needs a different marker arrangement and that is a design
-change rather than a wiring fix. Neither outcome is a failure of the
-project; only an unrecorded one is.
+proceeds.
+
+If it does not, work down this list before concluding anything about the
+method, because every item is more likely than the instrument being
+unable to do what its documentation says:
+
+- the digital channels are still off in the app, and the current trace
+  looks identical either way;
+- logic `VCC` is not on pin 1, or its jumper has come loose;
+- logic `GND` is not connected, so the reference has no return;
+- D3 is on pin 1 rather than pin 17 and shares a single contact with the
+  reference.
+
+Only when all four are ruled out is this a finding about the instrument,
+and then it gets written into `docs/evidence/logic-selftest.txt` with what
+was seen. Neither outcome is a failure of the project; only an unrecorded
+one is.
 
 ## Step 2: the whole harness, and one boot watched by eye
 
@@ -74,6 +102,7 @@ Add the rest:
 
 | PPK2 | NEO Air | What it is |
 |---|---|---|
+| logic `VCC` | header pin 1, `SYS_3.3V` | stays from step 1, and stays for every run |
 | `D1` | header pin 7, PG11 | U-Boot marker |
 | `D0` | header pin 12, PA6 | boot-complete marker, and the LED |
 | `D2` | debug header pin 3, TXD0 | console TX, in parallel with the cable's white lead |

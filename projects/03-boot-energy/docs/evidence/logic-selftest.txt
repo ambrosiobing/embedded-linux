@@ -1,0 +1,92 @@
+Acceptance criterion 0: the logic port reads a 3.3 V level
+==========================================================
+
+Taken Saturday 19 September 2026, 23:51 local time, 21:51 UTC, on the
+win11 aquamarine authoring laptop. Power Profiler v4.4.1, PPK2 serial
+E617EB4AAAC1.
+
+RESULT: PASS. D3 reads high at 3.3 V while the supply is 5.0 V.
+
+Configuration
+-------------
+
+    Power supply mode      source meter
+    Set supply voltage     5000 mV
+    Enable power output    on
+    Sampling               100,000 samples per second
+    Digital channels       on (they default to OFF, and the current
+                           trace looks identical either way)
+
+Wiring
+------
+
+    PPK2 VOUT        ->  24-pin header pin 2    VDD_5V
+    PPK2 GND         ->  24-pin header pin 6    GND
+    PPK2 logic VCC   ->  24-pin header pin 1    SYS_3.3V
+    PPK2 logic GND   ->  24-pin header pin 6    GND
+    PPK2 D3          ->  24-pin header pin 17   SYS_3.3V
+
+    NanoPi micro USB: unplugged.
+    No USB/TTL console cable attached for this test.
+
+Pin 1 and pin 17 are the same SYS_3.3V net, so D3 sits at its own
+reference and must read high if the channel works at all. Two separate
+pins rather than one wire doubled back: a single contact that has worked
+loose looks exactly like a level that cannot be read.
+
+Observation
+-----------
+
+The eight digital rows are a few pixels tall and a static line cannot be
+read by eye, so the line centre inside each band was measured as a
+percentage of the band height. Higher is a higher logic level.
+
+    Channel   Height in band   Reading   Connected to
+    D0        38 %             low       nothing yet (boot-complete marker)
+    D1        38 %             low       nothing yet (U-Boot marker)
+    D2        38 %             low       nothing yet (console TX)
+    D3        62 %             HIGH      pin 17, SYS_3.3V
+    D4        38 %             low       nothing
+    D5        38 %             low       nothing
+    D6        38 %             low       nothing
+    D7        38 %             low       nothing
+
+D3 sits about 14 pixels above the other seven. The seven that read low
+include D4 to D7, which have nothing attached at all, so the comparison is
+against a known-unconnected input rather than against an assumption about
+where "low" is drawn.
+
+What this settles
+-----------------
+
+The PPK2's logic port has VCC and GND pins of its own, and VCC is the
+level shifter's reference, required between 1.65 and 5.5 V. With it on the
+board's 3.3 V rail, a 3.3 V input reads high while VOUT sources 5.0 V. The
+supply domain and the logic domain are separate, which is what the port is
+built for.
+
+The specification's wiring table for this project does not list that VCC
+pin. Following it exactly would have left the level shifter unreferenced,
+and D0, D1 and D2 would all have read nothing. That is the same symptom
+this self-test was written to detect, so the test would have failed, for a
+missing jumper, and confirmed a prediction the design had already written
+down. See journal entry 12.
+
+Also observed, and not settled
+------------------------------
+
+    Window average    190.66 mA
+    Window maximum    0.96 A
+    Window            10.00 s
+    Charge            1.91 C
+
+The PPK2 sources at most 1 A. A maximum of 0.96 A leaves four percent of
+headroom, against 416.45 mA in a 10 second window taken earlier the same
+evening under the same supply setting.
+
+This is recorded and NOT explained. If demand reaches the ceiling the PPK2
+limits rather than supplies, the board can brown out, and a run taken
+while it is limiting is invalid rather than merely high. What changed
+between the two windows is not known, and it is to be understood before a
+60 second measurement is taken. analyze.py reports the peak current of
+every run so that this is checked by the data rather than assumed once.

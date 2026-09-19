@@ -347,3 +347,92 @@ The U-Boot variant here is almost entirely such lines. Left as it is, and
 written into `docs/BRINGUP.md` as something to confirm on the board
 instead, because widening that loop changes a check Project 2 relies on
 and belongs to whoever owns it.
+
+## 12. The wiring table is missing a pin, and the self-test would have lied about it
+
+**What happened.** The first session with the instrument produced a
+current trace and no answer, because the Power Profiler's digital channels
+are off by default and the current plot looks the same either way. Joseph
+then produced a wiring note saying the PPK2's logic port has a VCC pin
+that goes to the board's 3.3 V rail, with D3 on some other 3.3 V pin.
+
+That contradicted this project's own design document and
+`docs/BRINGUP.md`, both of which said D3 goes to header pin 1
+(`SYS_3.3V`) and said nothing about a logic VCC. Both were following the
+specification's wiring table.
+
+Nordic's documentation settles it. The logic port carries **VCC and GND of
+its own** alongside D0 to D7; VCC is the level shifter's reference and is
+required between 1.65 and 5.5 V.
+
+**What was done.** Corrected in the design document, the bring-up order
+and the acceptance table. Logic `VCC` to pin 1, logic `GND` to pin 6, and
+D3 to pin 17, which is the same `SYS_3.3V` net as pin 1, so the input sits
+at its own reference and must read high. Two pins rather than one wire
+doubled back, because a single contact that has come loose looks exactly
+like a level that cannot be read.
+
+**Why this is the worst kind of error and not merely a wrong one.** The
+design said the open question was whether 3.3 V markers could be read
+while the supply was 5.0 V, and that if they could not, all three channels
+failed at once. The supply domain and the logic domain are separate on
+purpose, so that was never the risk. But **the specification's table omits
+the reference pin**, and following it exactly produces precisely that
+symptom: D0, D1 and D2 all reading nothing.
+
+So the self-test would have failed, for a missing jumper, and confirmed a
+prediction this project had written down in advance. It would have been
+believed, and the method would have been abandoned or redesigned around a
+fault that a single wire fixes. A check that can only confirm the
+hypothesis that motivated it is not a check, and this one was two documents
+deep before anyone looked at the instrument's manual.
+
+**Why the documentation and not the note.** The note was right, but it
+arrived as an image with no source, and this project had already committed
+one mechanism written in the same voice as an observation. The Nordic user
+guide is the authority for what the connector does, it took one search,
+and the answer is now quoted with its numbers rather than paraphrased.
+
+Step 1 of `docs/BRINGUP.md` now lists four wiring faults to rule out
+before anything is concluded about the instrument. Every one of them is
+more likely than a documented part not doing what it documents.
+
+## 13. Criterion 0 is met, and it was settled by measuring the screenshot
+
+**What happened.** With the logic port's VCC on `SYS_3.3V` and D3 on pin
+17, the Power Profiler's eight digital rows are a few pixels tall and a
+static line cannot be read by eye. Two people looking at the same image
+could reasonably disagree about whether D3 was high.
+
+Joseph measured the line centre inside each band as a percentage of the
+band height. D3 sat at 62 percent, the other seven at 38 percent, about 14
+pixels apart.
+
+**What was done.** Recorded as a pass in
+`docs/evidence/logic-selftest.txt`, with the wiring, the app settings and
+the eight percentages. Criterion 0 is the first cell in this project's
+Measured column.
+
+**Why that and not the alternative.** The alternative was to ask for the
+jumper to be moved to ground and back, watching for the row to step. That
+would also have worked and it would have cost a round trip and an
+uncertainty: a line that moves proves the channel switches, but a line
+that does not move proves nothing about which of four wiring faults caused
+it.
+
+The percentages are better evidence than a toggle, because **four of the
+seven low channels have nothing attached at all.** D4 to D7 are the
+control. The comparison is against a known-unconnected input rather than
+against an assumption about where the renderer draws "low", which is
+exactly the question that made the image unreadable in the first place.
+
+A measurement with its own control, from a screenshot nobody could read.
+
+**What is not settled.** The same window shows a maximum of 0.96 A against
+the PPK2's 1 A ceiling, where an earlier window that evening showed
+416.45 mA under the same supply setting. That is four percent of headroom
+and it is written into the evidence file as observed and unexplained. If
+demand reaches the ceiling the instrument limits rather than supplies, the
+board can brown out, and a run taken while it is limiting is invalid
+rather than merely high. It is to be understood before a 60 second
+measurement, not after one.

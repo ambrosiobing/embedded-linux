@@ -102,9 +102,11 @@ signal has in common.
   |            VOUT  o----- 5 V, max 1 A ---------o pin 2   VDD_5V           |
   |            GND   o----- common ground --------o pin 6   GND              |
   |                  |                            |                          |
+  | logic VCC (REF)  o===== 3.3 V reference =======o pin 1   SYS_3.3V         |
+  | logic GND        o----- common ground --------o pin 6   GND              |
   |            D1    o----- U-Boot started -------o pin 7   PG11   (3.3 V)   |
   |            D2    o----- console TX ~~~~~~~~~~~o debug 3 TXD0   (idle hi) |
-  |            D3    o- - - level self-test - - - o pin 1   SYS_3.3V         |
+  |            D3    o- - - level self-test - - - o pin 17  SYS_3.3V         |
   |            D0    o----- boot complete --------o pin 12  PA6    (3.3 V)   |
   +------------------+           |                +--------------------------+
         | USB                    |
@@ -122,6 +124,8 @@ signal has in common.
 |---|---|---|---|
 | 5 V supply | 24-pin header pin 2 (`VDD_5V`) | PPK2 `VOUT` | source-meter mode, 5.0 V |
 | Ground | 24-pin header pin 6 (`GND`) | PPK2 `GND` | common reference |
+| **Logic level reference** | 24-pin header pin 1 (`SYS_3.3V`) | PPK2 logic port `VCC` | **required**, 1.65 to 5.5 V. Without it the level shifter has no reference and D0, D1 and D2 all read nothing |
+| Logic ground | 24-pin header pin 6 (`GND`) | PPK2 logic port `GND` | the same ground as the supply |
 | Boot-complete marker | pin 12 (PA6, `gpiochip0` line 6) | PPK2 `D0` | 3.3 V logic, also drives the LED |
 | U-Boot marker | pin 7 (PG11, line 203) | PPK2 `D1` | set by U-Boot preboot |
 | Console activity | debug header pin 3 (UART0 TXD) | PPK2 `D2`, cable white | idle high, falls on the first start bit |
@@ -134,21 +138,44 @@ than paraphrasing: the `VDD_5V` header pins are on the same net as the
 micro USB 5 V, and that is to be confirmed against the schematic of this
 board revision before the supply is switched on.
 
-### Two questions this design cannot answer without the hardware
+### The logic port has its own reference, and the specification does not mention it
 
-**Does the logic port see a 3.3 V marker while the DUT rail is 5 V?** The
-PPK2's logic inputs are referenced to the voltage domain of the device it
-powers. Every marker in this project is 3.3 V and the supply is 5.0 V, so
-the thresholds may not be met, and if they are not then **all three
-channels are worthless at once** rather than one of them being marginal.
-The specification's own note therefore makes a self-test the first step:
-D3 to header pin 1 (`SYS_3.3V`), supply on, and D3 read in the Power
-Profiler app. If D3 does not read high, the markers need a different
-arrangement and what was found gets written down.
+**This section previously said the PPK2's logic inputs are referenced to
+the voltage domain of the device it powers, and that 3.3 V markers under a
+5.0 V supply might therefore not be readable at all. That was wrong, and
+the correction matters more than the error did.**
 
-There is no software answer to this and no way to design around it in
-advance. It is recorded here as the first thing to do with the hardware,
-and the acceptance table has a row for it.
+The logic port carries **VCC and GND pins of its own**, alongside D0 to
+D7. VCC is the level shifter's reference and Nordic's documentation
+requires it in the range 1.65 to 5.5 V. Tie it to the board's 3.3 V rail
+and 3.3 V markers are read correctly no matter what `VOUT` is set to. The
+supply voltage and the logic domain are simply separate, which is what the
+port is built for.
+
+**The specification's wiring table does not list that pin.** Following it
+exactly leaves the level shifter with no reference, and then D0, D1 and D2
+read nothing, all three at once. That is precisely the symptom its own
+self-test was written to detect, so the self-test would have reported the
+method broken and been believed. A false negative here would have ended
+the project on a missing jumper.
+
+So the self-test stays, and it is now a wiring check rather than a
+question about the instrument:
+
+| PPK2 | NEO Air |
+|---|---|
+| logic `VCC` | pin 1, `SYS_3.3V` |
+| logic `GND` | pin 6, `GND` |
+| `D3` | pin 17, `SYS_3.3V` |
+
+Pin 1 and pin 17 are the same net, so D3 sits at its own reference and must
+read high. Two pins rather than one wire doubled back, because a single
+point of contact that has come loose looks identical to a level that
+cannot be read.
+
+What remains genuinely unknown is smaller and is stated in the acceptance
+table: whether **this** board's rails, wires and connector do what the
+documentation says. That is what the first session answers.
 
 **Source meter, or ampere meter in series?** The appendix says of the PPK2
 that it cannot power a Pi with peripherals and directs it to "ampere-meter

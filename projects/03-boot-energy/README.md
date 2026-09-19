@@ -100,12 +100,13 @@ python measure/analyze.py results/00-baseline --plot results/00-baseline/current
 
 ## Acceptance
 
-**Configured** is what a file says. **Measured** is what a board did. The
-second column is empty in every row because no board has been powered.
+**Configured** is what a file says. **Measured** is what a board did.
+Criterion 0 is measured; the rest are empty because no boot has been
+recorded yet.
 
 | # | Criterion | Configured | Measured |
 |---|---|---|---|
-| 0 | The PPK2 logic port reads a 3.3 V marker while the DUT rail is 5.0 V, checked with D3 against `SYS_3.3V` | nothing can configure this; it is a property of the instrument and the rail | |
+| 0 | With the logic port's `VCC` on `SYS_3.3V`, D3 on pin 17 reads high while the supply is 5.0 V | the wiring table lists the `VCC` pin the specification omits; Nordic requires it between 1.65 and 5.5 V | **met**, Saturday 19 September 2026. D3 at 62 percent of its band against 38 percent for the other seven, including four with nothing attached. [logic-selftest.txt](docs/evidence/logic-selftest.txt) |
 | 1 | D1 rises within 0.5 s of the supply coming on in every run; a later or missing marker discards the run rather than averaging it | `D1_DEADLINE_S = 0.5` in `analyze.py`, with the refusal naming the time it saw and the deadline it used | |
 | 2 | `systemd-analyze time` agrees with the D0 time minus the kernel start within 0.2 s | both use the same definition of complete: the startup job queue emptying, via `is-system-running --wait` | |
 | 3 | The final variant reaches D0 in at most a third of the baseline time, with a standard deviation under 5 percent of the mean over five boots | six variant directories defined, one change each | |
@@ -130,22 +131,32 @@ its first half, and that is done: the interval is named in every summary,
 because an energy figure without its interval is not a measurement of
 anything. The two numbers are both printed and a reader can multiply them.
 
-### The one that could invalidate everything
+### The one that could have ended the project on a missing jumper
 
-Criterion 0 is not in the specification's list. It is promoted here from
-the section's note on the logic port, because it is a precondition rather
-than a result: the PPK2's logic inputs are referenced to the voltage domain
-of the device it powers, every marker in this project is 3.3 V, and the
-supply is 5.0 V. If the thresholds are not met then **all three channels
-fail at once** and there is no measurement to make.
+Criterion 0 is not in the specification's list. It is promoted here
+because it is a precondition rather than a result, and because the
+specification's wiring table is missing a pin.
 
-There is no software answer and no way to design around it in advance. It
-is the first thing to do with the hardware, and what is found gets written
-down either way.
+The PPK2's logic port carries **VCC and GND of its own** alongside D0 to
+D7. VCC is the level shifter's reference and Nordic requires it between
+1.65 and 5.5 V. Tie it to the board's 3.3 V rail and 3.3 V markers are
+read correctly whatever `VOUT` is set to; leave it unconnected, as that
+table would, and D0, D1 and D2 read nothing, all three at once.
+
+**That is the same symptom the self-test was written to detect.** It would
+have reported the method unworkable, for a missing jumper, and been
+believed. An earlier version of this README said the risk was that the
+logic inputs are referenced to the supply domain and 3.3 V might be below
+threshold at 5.0 V. That was wrong; they are separate on purpose.
+
+What is left to confirm is narrower: that this board's rails, wires and
+connector behave as documented. Whatever is found is written down either
+way, because a low reading is a finding about the bench rather than a
+failure of the project.
 
 ## What has not been done
 
-- **Nothing has been built, flashed or powered.** No NanoPi has run this.
+- **No boot has been recorded.** The board has been powered through the PPK2 and the logic port verified, but the markers are not installed and no CSV exists.
 - **No board has been powered through the PPK2.** Project 2's system exists and boots; this project has not yet measured it.
 - `board/0001-dts-boot-marker-led.patch` is a `.dtsi` instead. A patch is a
   diff against specific lines of a specific tree, and inventing hunk
