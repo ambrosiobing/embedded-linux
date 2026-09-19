@@ -1,27 +1,30 @@
 /*
  * Project 3: the boot-complete marker, PA6, header pin 12.
  *
- * WHY THIS IS A .dtsi AND NOT THE 0001-dts-boot-marker-led.patch THE
- * SECTION ASKS FOR.
+ * THIS IS A SNIPPET TO PASTE, NOT A FILE TO INCLUDE, AND NOT AN OVERLAY.
  *
- * A patch is a diff against specific lines of a specific tree. Project 2
- * has not checked out or built a kernel yet, so there is no such tree in
- * this repository, and writing a unified diff would mean inventing hunk
- * headers and context lines that
- * have never been compared against the file they claim to describe. That
- * is a fabrication wearing the format of evidence, and this repository has
- * already paid once for reasoning written in the same voice as an
- * observation.
+ * It goes inside the leds node of
  *
- * So the node is kept in the form that can be checked now, and the patch
- * is generated in Project 2 against the real tree:
+ *     arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts
  *
- *     cp board/boot-marker-led.dtsi <tree>/arch/arm/boot/dts/
- *     # add the &leds block below to sun8i-h3-nanopi-neo-air.dts
- *     git -C <tree> format-patch -1 -o <here>/board/
+ * in the kernel tree, after led-1 and before the closing brace of leds.
+ * Then rebuild the dtb and generate the real patch while the tree is in
+ * front of you:
  *
- * The leds node already exists in sun8i-h3-nanopi.dtsi with the board's
- * power and status LEDs. This adds a child to it; it does not create it.
+ *     git -C $NEO_SRC/linux format-patch -1 -o <repo>/projects/03-boot-energy/board/
+ *
+ * AN EARLIER VERSION OF THIS FILE WAS WRONG IN TWO WAYS, both inherited
+ * from the specification and neither caught until the tree was read on
+ * 20 September 2026.
+ *
+ * It appended with "&leds { ... }", which needs a label. The leds node in
+ * this board's .dts has none: it is written "leds {" and not "leds: leds
+ * {", so the reference resolves against nothing and the build fails.
+ *
+ * It also said the node lives in sun8i-h3-nanopi.dtsi. It does not, for
+ * this board. sun8i-h3-nanopi-neo-air.dts includes only sun8i-h3.dtsi and
+ * sunxi-common-regulators.dtsi, and carries its own leds node with two
+ * children, led-0 on PL10 and led-1 on PA10. Ours is led-2.
  *
  * WHY AN LED AND NOT A RAW GPIO. The marker is written by a systemd unit,
  * and the LED class gives it a file to write with no tool installed:
@@ -38,28 +41,36 @@
  * SPDX-License-Identifier: MIT
  */
 
-&leds {
-	led-boot-marker {
-		label = "boot-marker";
+		led-2 {
+			/*
+			 * NOT "nanopi:green:boot-marker", which is the
+			 * naming the other two follow. The label becomes
+			 * the directory name under /sys/class/leds, and
+			 * boot-marker.service writes
+			 * /sys/class/leds/boot-marker/brightness by that
+			 * exact path. A conventional name here means a
+			 * unit that writes to a path that does not exist,
+			 * and a marker that never rises.
+			 */
+			label = "boot-marker";
 
-		/*
-		 * PA6. Bank 0 is PA, pin 6, which is pin 12 on the 24-pin
-		 * header and the pin the PPK2 reads as D0.
-		 *
-		 * ACTIVE_HIGH because the marker is an event and not a
-		 * state: the PPK2 looks for a rising edge, so the line has
-		 * to start low and go high exactly once. default-state
-		 * below is what guarantees the "starts low" half.
-		 */
-		gpios = <&pio 0 6 GPIO_ACTIVE_HIGH>;
+			/*
+			 * PA6. Bank 0 is PA, pin 6, which is pin 12 on the
+			 * 24-pin header and the pin the PPK2 reads as D0.
+			 *
+			 * ACTIVE_HIGH because the marker is an event and
+			 * not a state: the PPK2 looks for a rising edge, so
+			 * the line has to start low and go high exactly
+			 * once.
+			 */
+			gpios = <&pio 0 6 GPIO_ACTIVE_HIGH>; /* PA6 */
 
-		/*
-		 * NOT "keep", and not omitted. An LED that comes up in an
-		 * undefined state, or that keeps whatever the previous boot
-		 * left, gives analyze.py no rising edge to find and the run
-		 * is discarded as "D0 never rose" when in fact it never
-		 * fell.
-		 */
-		default-state = "off";
-	};
-};
+			/*
+			 * NOT "keep", and not omitted. An LED that comes up
+			 * in an undefined state, or that keeps whatever the
+			 * previous boot left, gives analyze.py no rising
+			 * edge to find, and the run is discarded as "D0
+			 * never rose" when in fact it never fell.
+			 */
+			default-state = "off";
+		};

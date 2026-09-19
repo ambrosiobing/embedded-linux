@@ -133,12 +133,25 @@ trimming was live, and the baseline build attempted both. A fragment's
 active lines have to be visible in the file rather than in a sentence
 about the file.
 
-Linux: add the node from `board/boot-marker-led.dtsi` to the `leds` node
-that `sun8i-h3-nanopi.dtsi` already defines, rebuild the dtb, and generate
-the real patch while the tree is in front of you:
+Linux: paste the `led-2` block from `board/boot-marker-led.dtsi` into the
+`leds` node of the board's own device tree, after `led-1` and before the
+closing brace:
 
 ```
-git -C <tree> format-patch -1 -o projects/03-boot-energy/board/
+$NEO_SRC/linux/arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts
+```
+
+**Not an `&leds` append and not `sun8i-h3-nanopi.dtsi`**, both of which
+the specification implies and neither of which is true here. That `.dts`
+includes only `sun8i-h3.dtsi` and `sunxi-common-regulators.dtsi`, carries
+its own `leds` node with `led-0` on PL10 and `led-1` on PA10, and gives
+that node no label, so `&leds` resolves against nothing.
+
+Then generate the real patch while the tree is in front of you, since a
+patch can only be made against one:
+
+```
+git -C $NEO_SRC/linux format-patch -1 -o ~/src/embedded-linux-bench/projects/03-boot-energy/board/
 ```
 
 Install the unit and enable it:
