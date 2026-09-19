@@ -152,7 +152,7 @@ note "packages"
 chroot "$ROOT" apt-get update
 chroot "$ROOT" apt-get install -y --no-install-recommends \
 	systemd-sysv udev openssh-server wpasupplicant firmware-brcm80211 \
-	iproute2 iputils-ping e2fsprogs rsync fdisk
+	iproute2 iputils-ping e2fsprogs rsync fdisk iw wireless-regdb
 
 # The NVRAM, under the name the driver will actually ask for.
 #
@@ -246,6 +246,15 @@ EOF
 
 chroot "$ROOT" systemctl enable systemd-networkd
 chroot "$ROOT" systemctl enable wpa_supplicant@wlan0 || true
+
+# Mask the generic wpa_supplicant.service. Two units ship: the templated
+# wpa_supplicant@wlan0, which reads our per-interface config and is the one
+# enabled above, and a generic wpa_supplicant.service that wants D-Bus.
+# --no-install-recommends leaves dbus out, so the generic unit fails on
+# every boot with a red line, while the interface unit it has nothing to do
+# with works. Masking it says "this one is not used here" rather than
+# leaving a failure that invites someone to install dbus chasing it.
+chroot "$ROOT" systemctl mask wpa_supplicant.service
 
 # The ssh host keys openssh-server's postinst generated a moment ago are
 # this build machine's keys, made inside the chroot. Left in the tar they

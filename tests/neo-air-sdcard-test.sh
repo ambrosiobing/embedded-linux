@@ -71,7 +71,7 @@ has_file() {
 	fi
 }
 
-for tool in dd mkfs.ext4 partprobe mount umount tar sync; do
+for tool in dd mkfs.ext4 partprobe mount umount sync; do
 	cat >"$WORK/bin/$tool" <<EOF
 #!/bin/sh
 echo "$tool \$*" >>"$CALLS"
@@ -79,6 +79,27 @@ exit 0
 EOF
 	chmod +x "$WORK/bin/$tool"
 done
+
+# tar is not a pure no-op: sdcard.sh patches /etc/fstab inside the extracted
+# tree, and a stub that extracts nothing would let that patch be tested
+# against a file that is not there, which is a check passing on absence
+# rather than on the fix. So the stub lays down the one file the script
+# then edits, with the placeholder the overlay really ships.
+cat >"$WORK/bin/tar" <<EOF
+#!/bin/sh
+echo "tar \$*" >>"$CALLS"
+dest=
+while [ \$# -gt 0 ]; do
+	case \$1 in -C) dest=\$2; shift 2 ;; *) shift ;; esac
+done
+if [ -n "\$dest" ]; then
+	mkdir -p "\$dest/etc"
+	printf 'PARTUUID=FILLED-BY-FLASH-EMMC / ext4 defaults,noatime 0 1\n' \
+		>"\$dest/etc/fstab"
+fi
+exit 0
+EOF
+chmod +x "$WORK/bin/tar"
 
 cat >"$WORK/bin/sfdisk" <<EOF
 #!/bin/sh
@@ -246,6 +267,18 @@ contains "and carries the card's own PARTUUID, not the placeholder" \
 has_file "the bootloader travels on the card for flash-emmc.sh to read" \
 	"$WORK/mnt1/u-boot-sunxi-with-spl.bin"
 has_file "so does the dtb" "$WORK/mnt1/sun8i-h3-nanopi-neo-air.dtb"
+
+# /etc/fstab in the extracted rootfs gets the same PARTUUID as extlinux.conf.
+# This is the fix for a real failure: the placeholder was patched in
+# extlinux.conf and left in fstab, so the first boot reached userspace and
+# then systemd-remount-fs.service failed on a root whose PARTUUID does not
+# exist. The stub laid down the placeholder; the script must have replaced it.
+fstab=$WORK/mnt2/etc/fstab
+has_file "fstab is in the extracted rootfs" "$fstab"
+contains "and carries the card's PARTUUID, not the placeholder" \
+	"$(cat "$fstab")" "PARTUUID=11223344-02"
+absent=$(grep -c 'FILLED-BY-FLASH-EMMC' "$fstab" || true)
+check "the fstab placeholder is gone" "$absent" "0"
 
 echo
 echo "$pass passed, $fail failed"

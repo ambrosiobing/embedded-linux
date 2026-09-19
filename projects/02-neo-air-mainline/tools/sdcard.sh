@@ -175,6 +175,21 @@ id=$(blkid -s PARTUUID -o value "$P2")
 sed -i "s|root=PARTUUID=[^ ]*|root=PARTUUID=$id|" "$MNT1/extlinux/extlinux.conf"
 grep -q "root=PARTUUID=$id" "$MNT1/extlinux/extlinux.conf" ||
 	die "patched extlinux.conf and the new PARTUUID is not in it."
+
+# And /etc/fstab, which carries the same placeholder for the same reason and
+# was forgotten here once. The overlay ships PARTUUID=FILLED-BY-FLASH-EMMC in
+# both files; extlinux.conf above got patched and fstab did not, so the first
+# boot reached userspace and then systemd-remount-fs.service failed trying to
+# remount a root whose PARTUUID does not exist. The kernel had already mounted
+# it rw from the command line, so nothing broke visibly, which is exactly how
+# a failed unit on every boot goes unnoticed. Decision 99 said both files get
+# the real value; this makes good on it.
+fstab=$MNT2/etc/fstab
+if [ -r "$fstab" ]; then
+	sed -i "s|^PARTUUID=[^ ]*\( *\)/ |PARTUUID=$id\1/ |" "$fstab"
+	grep -q "PARTUUID=$id" "$fstab" ||
+		die "patched /etc/fstab and the new PARTUUID is not in it."
+fi
 note "root       PARTUUID=$id"
 
 sync

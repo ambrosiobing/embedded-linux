@@ -1080,3 +1080,86 @@ built and pushed. What remains is four pins and a silkscreen, which needs
 daylight and possibly a second adapter, since the loopback clears the
 electronics but says nothing about whether all four wires in that
 particular connector are continuous.
+
+## 15. The board boots, and the console was a bent pin all along
+
+*Saturday 19 September 2026, daylight.* Entry 14 ended with the console
+silent and the board proven alive by an LED. This is where it talked.
+
+### The console
+
+The debug pins on this board are bare plated holes, no header soldered in,
+and there is no soldering iron on the bench. The connection was loose male
+pins pushed into the holes with female jumpers on the other end. A pin
+resting in a hole touches metal only by luck, and a UART with no contact is
+not garbled, it is silent, which is exactly what entry 14 spent an hour on.
+
+The fix needed no iron: bend each pin a few degrees so it springs against
+the wall of the hole, seat all four, tape the bundle so nothing moves. The
+banner appeared on the next power-up.
+
+That is the whole of what the previous night was missing. Everything built
+was correct; the instrument to see it was not connected.
+
+### What the boot proved
+
+`docs/bootlog-sd.txt` is the capture, SPL banner to login prompt, trimmed
+of the interactive session that followed. Against the project's criteria:
+
+| Criterion | Evidence |
+|---|---|
+| 1, U-Boot sees both media | `MMC: mmc@1c0f000: 0, mmc@1c10000: 2, mmc@1c11000: 1` |
+| 2, login prompt | `Debian GNU/Linux 12 neo-air ttyS0`, kernel 6.12.0 |
+| 3, Wi-Fi | `brcmfmac ... Firmware: BCM43430/1 ... 7.45.98.118`, then a lease |
+
+The AP6212 nvram installed under the driver's name worked: no SDIO clock
+timeout, firmware and nvram both loaded, `wlan0` came up and DHCP gave
+`192.168.92.92`. The eMMC provisioning fix from `CONFIG_MMC_SUNXI_SLOT_EXTRA`
+shows in that three-controller line, which is criterion 1.
+
+### Three defects the boot output confessed, all now fixed
+
+**`systemd-remount-fs.service` failed.** `/etc/fstab` still carried
+`PARTUUID=FILLED-BY-FLASH-EMMC`. `sdcard.sh` patched the placeholder in
+`extlinux.conf` and forgot the identical one in fstab. The kernel had
+mounted root rw from the command line, so nothing broke visibly, which is
+how a unit that fails on every boot goes unwatched. `flash-emmc.sh` already
+patched both; `sdcard.sh` now does too, and the test grows an fstab fixture
+so the fix is checked against a file that is present rather than absent.
+Decision 99 said both files get the real value; this is the second file
+finally getting it.
+
+**`wpa_supplicant.service` failed while `wpa_supplicant@wlan0` succeeded.**
+Two units ship. The templated one reads our per-interface config and is the
+one we enable; the generic one wants D-Bus, which `--no-install-recommends`
+left out. It is now masked, which states "not used here" rather than
+leaving a red line that invites someone to install D-Bus chasing it.
+
+**`cfg80211: failed to load regulatory.db`.** `wireless-regdb` was not
+installed, so the radio ran on the world-restrictive default. Added, along
+with `iw`, whose absence was noticed the moment a diagnosis needed it:
+`iw dev wlan0 link` returned `command not found` on the board.
+
+### The network, and a wall that is not ours
+
+`ssh root@192.168.92.92` timed out. The board and the laptop are on the
+same `/24`, so it was not routing. Pings from the board to its own gateway
+returned `Destination Host Unreachable`: the association to the phone
+hotspot had gone stale by then, and even before that, device-to-device
+traffic was blocked. A phone hotspot with client isolation is not a network
+a headless board can be reached on, and diagnosing an intermittent hotspot
+link is not the project's problem. sshd listens on `0.0.0.0:22`; the image
+is reachable, from a network that permits it. Criterion 3 is the DHCP
+lease, and that was met and captured.
+
+### What to keep
+
+**A loose pin in a plated hole is silence, not noise.** Garbage points at
+baud or ground; nothing at all points at contact or at swapped data lines.
+The loopback separates the two, and once it clears the cable, bending the
+pins is the no-solder fix.
+
+**Read the boot log for its failures even when it reaches a prompt.** Three
+red lines scrolled past on a board that booted fine, and each was a real
+defect that would ship on every card until someone read the part between
+the banner and the login.
