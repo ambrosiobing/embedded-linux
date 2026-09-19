@@ -43,6 +43,21 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 FRAGMENT=$HERE/fragments/bench.config
 [ -r "$FRAGMENT" ] || die "no fragment at $FRAGMENT"
 
+# An optional SECOND fragment, the same mechanism as kernel/build.sh and
+# for the same reason: Project 3 varies this configuration to measure what
+# each change costs in boot time, and its U-Boot variant is one fragment
+# holding a preboot marker, a zero boot delay and the probes it turns off.
+#
+# Unset behaves exactly as before. Set and unreadable is refused by name,
+# because a variant built silently as the baseline would be measured as a
+# change that made no difference.
+EXTRA=${NEO_EXTRA_FRAGMENT:-}
+if [ -n "$EXTRA" ]; then
+	[ -r "$EXTRA" ] || die "NEO_EXTRA_FRAGMENT is set and cannot be read:
+       $EXTRA
+       Unset it to build the baseline, or fix the path."
+fi
+
 # Configuration errors before environment probing, in that order and on
 # purpose. A misconfigured NEO_SRC is wrong on every machine; a missing
 # cross compiler is wrong only on this one. Checking the toolchain first
@@ -145,8 +160,15 @@ make -C "$TREE" "$UBOOT_DEFCONFIG"
 # The question worth asking is not what the merge said about its work, it
 # is whether the option is in the produced .config. That check is below and
 # it is the one that catches a dropped option.
+[ -z "$EXTRA" ] || note "extra      $EXTRA"
+
+# Built as a list rather than interpolated, so the empty case passes no
+# empty argument and neither path is subject to word splitting.
+set -- .config "$FRAGMENT"
+[ -z "$EXTRA" ] || set -- "$@" "$EXTRA"
+
 merged=$( cd "$TREE" && ARCH="$ARCH" scripts/kconfig/merge_config.sh \
-	-m .config "$FRAGMENT" 2>&1 )
+	-m "$@" 2>&1 )
 printf '%s\n' "$merged"
 
 make -C "$TREE" olddefconfig
@@ -154,14 +176,25 @@ make -C "$TREE" olddefconfig
 # And check the fragment actually reached the config, rather than trusting
 # that the merge said so. Same rule as ./go kconfig in the Yocto projects:
 # the question is not what was asked for, it is what arrived.
+#
+# Both fragments, not only this project's own. And note what this cannot
+# see: a "# CONFIG_X is not set" line is skipped as a comment, so the
+# options a fragment turns OFF are merged and never verified. Project 3's
+# U-Boot variant is almost entirely such lines, since its change is to
+# stop probing what this bench does not have.
+check_fragment() {
+	while read -r line; do
+		case $line in
+		'' | '#'*) continue ;;
+		esac
+		key=${line%%=*}
+		grep -q "^$line\$" "$TREE/.config" || missing="$missing $key"
+	done <"$1"
+}
+
 missing=
-while read -r line; do
-	case $line in
-	'' | '#'*) continue ;;
-	esac
-	key=${line%%=*}
-	grep -q "^$line\$" "$TREE/.config" || missing="$missing $key"
-done <"$FRAGMENT"
+check_fragment "$FRAGMENT"
+[ -z "$EXTRA" ] || check_fragment "$EXTRA"
 [ -z "$missing" ] || die "these fragment options are not in the built .config:$missing
        They were requested and are absent, which is the failure this
        check exists to make loud."

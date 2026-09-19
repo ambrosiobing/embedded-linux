@@ -303,3 +303,47 @@ the logic-level self-test, D3 against `SYS_3.3V` with the supply at 5.0 V,
 because if the PPK2's logic inputs cannot see a 3.3 V marker then all three
 channels fail at once and the method needs rethinking before any wiring is
 worth doing.
+
+## 11. The variant plan had no way into a build, and nothing said so
+
+**What happened.** With Project 2 finished, the next thing to check was
+whether this project's fragments could actually be fed to its build
+scripts. They could not. `kernel/build.sh` and `uboot/build.sh` each
+hardcode one path, `fragments/bench.cfg` and `fragments/bench.config`, and
+die when it is missing. No argument, no environment override, no second
+fragment.
+
+So every variant in this project, the U-Boot trimming and all four kernel
+fragments, had nowhere to go. `docs/DESIGN.md` described a workflow that
+could not run.
+
+**What was done.** Both scripts take an optional `NEO_EXTRA_FRAGMENT`.
+Unset behaves exactly as before; set and unreadable is refused by name
+with the path and a sentence saying how to build the baseline instead.
+The merge argument list is built with `set --` so the empty case passes no
+empty argument and neither path is word-split, and the verification loop
+now checks both fragments rather than only the project's own.
+`tests/neo-air-extra-fragment-test.sh`, 14 assertions across both scripts,
+none of which needs a cross compiler; removing the guard from one script
+fails exactly its three.
+
+**Why that and not the alternative.** The alternative was to write the
+dependency into this project's design as a note for whoever picked up
+Project 2 next. That would have left a document describing a workflow that
+does not run, which is the defect decision 97 is about and which this
+project has already committed once.
+
+The change went into another project's files, which a concurrent session
+owns. The tree was quiet and the change is additive, and the refusal is
+the part that matters: a variant whose fragment was silently skipped would
+be **built as the baseline and recorded as a change**, and the two rows
+would differ by nothing with nothing to say why. That is the same failure
+as measuring two images that turned out to be identical, which Project 8
+spent a day on.
+
+**What the check still cannot see.** The verification loop skips comment
+lines, so a `# CONFIG_X is not set` option is merged and never confirmed.
+The U-Boot variant here is almost entirely such lines. Left as it is, and
+written into `docs/BRINGUP.md` as something to confirm on the board
+instead, because widening that loop changes a check Project 2 relies on
+and belongs to whoever owns it.

@@ -39,6 +39,25 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 FRAGMENT=$HERE/fragments/bench.cfg
 [ -r "$FRAGMENT" ] || die "no fragment at $FRAGMENT"
 
+# An optional SECOND fragment, so another project can add its own options
+# without editing this file. Project 3 measures boot time against variants
+# of this configuration, and each of its variants is one such fragment:
+# kernel trimming, and three compression choices measured against each
+# other. Before this existed there was no way in at all, and its whole
+# variant plan had nothing to build.
+#
+# Unset is the normal case and behaves exactly as before. A path that is
+# set and unreadable is refused by name rather than skipped, because a
+# variant whose fragment was silently dropped would be built as the
+# baseline and then measured as though it were not, and the two rows would
+# differ by nothing with no way to see why.
+EXTRA=${NEO_EXTRA_FRAGMENT:-}
+if [ -n "$EXTRA" ]; then
+	[ -r "$EXTRA" ] || die "NEO_EXTRA_FRAGMENT is set and cannot be read:
+       $EXTRA
+       Unset it to build the baseline, or fix the path."
+fi
+
 # Configuration before environment, same order and same reason as the
 # U-Boot script: this guard is true on every machine, the toolchain check
 # only on this one.
@@ -81,8 +100,16 @@ note "defconfig  $KERNEL_DEFCONFIG"
 
 make -C "$TREE" "$KERNEL_DEFCONFIG"
 
+note "fragment   $FRAGMENT"
+[ -z "$EXTRA" ] || note "extra      $EXTRA"
+
+# Built as a list rather than interpolated, so the empty case passes no
+# empty argument and neither path is subject to word splitting.
+set -- .config "$FRAGMENT"
+[ -z "$EXTRA" ] || set -- "$@" "$EXTRA"
+
 merged=$( cd "$TREE" && ARCH="$ARCH" scripts/kconfig/merge_config.sh \
-	-m .config "$FRAGMENT" 2>&1 )
+	-m "$@" 2>&1 )
 printf '%s\n' "$merged"
 
 make -C "$TREE" olddefconfig
@@ -92,14 +119,30 @@ make -C "$TREE" olddefconfig
 # symptom here is the worst kind: CONFIG_BRCMFMAC absent gives a board that
 # boots perfectly and has no wireless interface, with nothing in dmesg
 # naming a cause.
+#
+# Both fragments are checked, not only this project's own. An extra
+# fragment that was merged and then dropped by a dependency is exactly the
+# failure this loop exists for, and it is no less likely for belonging to
+# another project.
+#
+# NOTE what this cannot see: a "# CONFIG_X is not set" line is skipped as
+# a comment, so options a fragment turns OFF are merged and never
+# verified. That is pre-existing and it matters more for an extra
+# fragment than for this one, because trimming a kernel is mostly made of
+# such lines.
+check_fragment() {
+	while read -r line; do
+		case $line in
+		'' | '#'*) continue ;;
+		esac
+		key=${line%%=*}
+		grep -q "^$line\$" "$TREE/.config" || missing="$missing $key"
+	done <"$1"
+}
+
 missing=
-while read -r line; do
-	case $line in
-	'' | '#'*) continue ;;
-	esac
-	key=${line%%=*}
-	grep -q "^$line\$" "$TREE/.config" || missing="$missing $key"
-done <"$FRAGMENT"
+check_fragment "$FRAGMENT"
+[ -z "$EXTRA" ] || check_fragment "$EXTRA"
 [ -z "$missing" ] || die "these fragment options are not in the built .config:$missing
        Requested and absent. Do not build on top of this."
 

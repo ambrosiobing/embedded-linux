@@ -313,6 +313,7 @@ because a rule invented after seeing the numbers is not a rule.
 | `uboot/fragments/fast.config` | preboot marker, then the U-Boot trimming | |
 | `kernel/fragments/*.cfg` | `trim`, and the three compression variants | |
 | `tests/boot-energy-*-test.sh` | everything provable with no hardware | either laptop, and CI |
+| `NEO_EXTRA_FRAGMENT` | Project 2's build scripts take one extra fragment, which is how every variant here reaches a build | wsl laptop |
 | `docs/before-after.md` | one row per variant, assembled from the summaries | |
 
 The measurement scripts are the part that can be tested without the board,

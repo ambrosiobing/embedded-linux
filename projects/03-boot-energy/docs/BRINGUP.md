@@ -180,6 +180,45 @@ One change, one fragment, one directory, six boots:
 | `30-systemd` | the units in `board/units-disabled.txt`, each with its reason |
 | `40-final` | everything, then again with `wpa_supplicant@wlan0` disabled |
 
+### How a variant is built
+
+Project 2's build scripts each take one extra fragment through
+`NEO_EXTRA_FRAGMENT`, which exists for this project. Unset, they build the
+baseline exactly as before.
+
+On the **wsl laptop**, with `toolchain.env` sourced:
+
+```
+P3=$PWD/projects/03-boot-energy
+```
+
+```
+NEO_EXTRA_FRAGMENT=$P3/uboot/fragments/fast.config projects/02-neo-air-mainline/uboot/build.sh
+```
+
+```
+NEO_EXTRA_FRAGMENT=$P3/kernel/fragments/trim.cfg projects/02-neo-air-mainline/kernel/build.sh
+```
+
+**One extra fragment, not a list.** A variant that needs two, such as the
+trimming plus a compression choice, is one file made from both:
+
+```
+cat $P3/kernel/fragments/trim.cfg $P3/kernel/fragments/lz4.cfg >/tmp/21-kernel-lz4.cfg
+```
+
+Concatenating rather than passing two paths keeps the thing that was built
+identifiable from one file, which is what the result directory is named
+after.
+
+**What the build verifies, and what it cannot.** Both scripts check that
+every option in both fragments arrived in the produced `.config`, which is
+the check that catches a silently dropped option. It skips comment lines,
+so a `# CONFIG_X is not set` line is merged and never verified. The U-Boot
+variant here is almost entirely such lines, since its change is to stop
+probing what this bench does not have, so confirm those on the board
+instead: `usb` and `dhcp` should not be commands U-Boot has.
+
 Capture the `lsmod` for step `20-kernel-trim` from a boot **with the Wi-Fi
 up and the console attached**, or `localmodconfig` removes drivers for
 everything that was not loaded and the optimised kernel loses them.
