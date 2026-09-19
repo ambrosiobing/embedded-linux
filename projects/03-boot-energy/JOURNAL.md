@@ -436,3 +436,58 @@ demand reaches the ceiling the instrument limits rather than supplies, the
 board can brown out, and a run taken while it is limiting is invalid
 rather than merely high. It is to be understood before a 60 second
 measurement, not after one.
+
+## 14. A comment that was parsed as a directive, and it worked by accident of line order
+
+**What happened.** The first U-Boot build with `marker.config` succeeded
+and its own check reported every fragment option present. In the middle of
+the output, `merge_config.sh` said this:
+
+    Value of CONFIG_PREBOOT is redefined by fragment marker.config:
+    Previous value: CONFIG_PREBOOT="usb start"
+    New value: # CONFIG_PREBOOT runs before the boot delay and before any
+    storage is CONFIG_PREBOOT="gpio set PG11" # Without this, "gpio" is not
+    a command U-Boot has, CONFIG_PREBOOT names
+
+It had swallowed two paragraphs of prose into the value. The fragment
+opened its explanation with `# CONFIG_PREBOOT runs before the boot
+delay`, and **in a kconfig fragment a line beginning `# CONFIG_` is not a
+comment**: it is how an option is turned off, so the parser read the
+sentence as a directive.
+
+**The produced `.config` was correct**, checked on the board machine:
+`CONFIG_PREBOOT="gpio set PG11"`. The build is usable and was not redone.
+
+**That is luck, and naming it as luck is the point.** The prose line came
+BEFORE the real assignment in the file, and the last value wins. Written
+the way explanations usually are, underneath the setting they explain,
+`CONFIG_PREBOOT` would have become that sentence, U-Boot would have run a
+command that does not exist, D1 would never have risen, and the build
+would still have reported success. The project would have debugged a
+marker on the board.
+
+**What was done.** A lint rule: in `*.cfg` and `*.config`, a line matching
+`^# CONFIG_` must be exactly `# CONFIG_X is not set`. Anything else is
+prose in directive position and is refused by name.
+
+It found **five**, and only two were mine. The other three are in
+`meta-bench` fragments that go into built images: `bench.cfg` line 41
+opening `# CONFIG_PREEMPT_RT belongs to Project 8`, `debug.cfg` line 109,
+and `iio.cfg` line 61. All five reworded so the symbol is not the first
+word after the hash.
+
+The worst was in my own `fast.config`:
+
+    # CONFIG_AUTOBOOT_KEYED is NOT set. Setting it, with a key sequence, makes
+
+which differs from a real directive by a capital letter and a full stop.
+
+**Why a rule and not care.** This is the third shape of its kind in this
+repository, after two rounds of `# shellcheck` comments being parsed as
+shellcheck directives, which `scripts/lint.py` already has a rule for. A
+comment whose first token is a name the tool parses is not a comment. Care
+did not catch the first two and did not catch this one; it was caught by
+reading a diagnostic that scrolled past inside a successful build.
+
+Proved in both directions: reintroducing the prose comment fires the rule,
+and a legitimate `# CONFIG_X is not set` line still passes.

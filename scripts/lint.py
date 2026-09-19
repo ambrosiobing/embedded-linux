@@ -49,6 +49,50 @@ def check_ascii() -> None:
                     fail(path, f"line {number}: non-ASCII {bad!r}")
 
 
+def check_kconfig_comments() -> None:
+    """A prose comment must not sit where a kconfig directive sits.
+
+    In a fragment, "# CONFIG_X is not set" is not a comment. It is how an
+    option is turned OFF, and merge_config.sh parses it as a value.
+
+    So a prose line that happens to begin "# CONFIG_" is read as a
+    directive. On 20 September marker.config opened a paragraph with
+
+        # CONFIG_PREBOOT runs before the boot delay and before any storage is
+
+    and merge_config.sh reported the new value of CONFIG_PREBOOT as that
+    sentence, the intended value, and the next paragraph, concatenated.
+    The build's own check then passed, because the line it greps for was
+    also in .config. A marker that never fires and a green build.
+
+    Worse is the near miss it found in the same file:
+
+        # CONFIG_AUTOBOOT_KEYED is NOT set. Setting it, with a key ...
+
+    which differs from a real directive only in capitalisation and a full
+    stop. Three more were already in meta-bench, in fragments that go into
+    built images.
+
+    This is the third shape of its kind here, after "# shellcheck" twice.
+    A comment whose first token is a name the tool parses is not a comment.
+    """
+    allowed = re.compile(r"^# CONFIG_[A-Za-z0-9_]+ is not set$")
+    suspect = re.compile(r"^# CONFIG_[A-Za-z0-9_]+\b")
+    for pattern in ("*.cfg", "*.config"):
+        for path in ROOT.rglob(pattern):
+            if ".git" in path.parts:
+                continue
+            for number, line in enumerate(text(path).splitlines(), 1):
+                stripped = line.rstrip()
+                if suspect.match(stripped) and not allowed.match(stripped):
+                    fail(path, f"line {number}: a comment starting "
+                               f"'# CONFIG_' is parsed as a directive that "
+                               f"turns that option off. Reword so the "
+                               f"symbol is not the first word after the "
+                               f"hash, or write the exact form "
+                               f"'# CONFIG_X is not set' if that is meant.")
+
+
 def check_dashes() -> None:
     """House rule: no em or en dashes anywhere in the repository."""
     for path in ROOT.rglob("*"):
@@ -764,6 +808,7 @@ def main() -> int:
     for check in (
         check_ascii,
         check_dashes,
+        check_kconfig_comments,
         check_src_uri,
         check_shell_exports,
         check_shell_unused_params,
