@@ -58,6 +58,33 @@ if [ -n "$EXTRA" ]; then
        Unset it to build the baseline, or fix the path."
 fi
 
+# An optional patch against the kernel tree, applied after it is pinned to
+# the tag and before anything is configured.
+#
+# A LOCAL COMMIT IN THAT TREE CANNOT SURVIVE. This script puts the tree at
+# $KERNEL_TAG whenever "git describe --exact-match" does not already say
+# so, and a commit of your own makes that check fail, so the next build
+# re-fetches, checks the tag out and runs "git clean -qxdf" over the top.
+#
+# On 20 September Project 3 added a device-tree node as a commit there,
+# built, and got a dtb with no node in it. The build printed "re-fetching"
+# and then eleven thousand lines of success. Nothing said the edit was
+# gone, and the symptom would have been a marker that never rises, found
+# after a flash and a boot.
+#
+# Absolute, because "git -C" runs from the tree and a relative path would
+# resolve against it rather than against where you typed it.
+EXTRA_PATCH=${NEO_EXTRA_PATCH:-}
+if [ -n "$EXTRA_PATCH" ]; then
+	case $EXTRA_PATCH in
+	/*) ;;
+	*) EXTRA_PATCH=$PWD/$EXTRA_PATCH ;;
+	esac
+	[ -r "$EXTRA_PATCH" ] || die "NEO_EXTRA_PATCH is set and cannot be read:
+       $EXTRA_PATCH
+       Unset it to build an unpatched tree, or fix the path."
+fi
+
 # Configuration before environment, same order and same reason as the
 # U-Boot script: this guard is true on every machine, the toolchain check
 # only on this one.
@@ -92,6 +119,25 @@ else
 	note "cloning linux at $KERNEL_TAG, this is a large clone even shallow"
 	git clone --depth 1 -b "$KERNEL_TAG" \
 		https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git "$TREE"
+fi
+
+if [ -n "$EXTRA_PATCH" ]; then
+	# Tracked files back to the tag FIRST, so a second run does not try to
+	# apply a patch that is already applied and fail. This touches only
+	# the files the previous patch changed, and leaves untracked build
+	# output alone, so the rebuild stays incremental: a device-tree patch
+	# recompiles a dtb rather than a kernel.
+	git -C "$TREE" checkout -q -- .
+
+	git -C "$TREE" apply --check "$EXTRA_PATCH" 2>/dev/null ||
+		die "NEO_EXTRA_PATCH does not apply to this tree:
+       $EXTRA_PATCH
+       The tree is at $KERNEL_TAG. A patch made against a different
+       version, or one already carried by the tag, fails here rather than
+       half applying. 'git -C $TREE apply --check <patch>' says why."
+
+	git -C "$TREE" apply "$EXTRA_PATCH"
+	note "patch      $EXTRA_PATCH"
 fi
 
 note "tree       $TREE"

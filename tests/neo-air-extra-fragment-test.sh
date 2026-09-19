@@ -149,6 +149,31 @@ for name in kernel uboot; do
 		"$out" "NEO_EXTRA_FRAGMENT"
 done
 
+# ----------------------------------- a patch that cannot be read
+
+# Same shape as the fragment, and for a sharper reason. A local commit in
+# the kernel tree CANNOT survive: kernel/build.sh puts that tree at its tag
+# whenever "git describe --exact-match" disagrees, which a commit of your
+# own guarantees, and then runs "git clean -qxdf" over it. On 20 September
+# a device-tree node was added as a commit there, the build printed
+# "re-fetching" and eleven thousand lines of success, and the dtb had no
+# node in it.
+rc=0
+out=$(NEO_EXTRA_PATCH="$WORK/no-such.patch" run "$KERNEL") || rc=$?
+check "kernel: an unreadable extra patch is refused" "$rc" "1"
+contains "kernel: and the refusal names the variable" "$out" "NEO_EXTRA_PATCH"
+contains "kernel: and the path it could not read" "$out" "no-such.patch"
+contains "kernel: and says how to build without it" "$out" "Unset it"
+
+rc=0
+out=$(run "$KERNEL") || rc=$?
+lacks "kernel: an unset extra patch says nothing about itself" 	"$out" "NEO_EXTRA_PATCH"
+
+# u-boot takes no patch, so the variable must not leak into it.
+rc=0
+out=$(NEO_EXTRA_PATCH="$WORK/no-such.patch" run "$UBOOT") || rc=$?
+lacks "uboot: ignores a patch variable it does not implement" 	"$out" "NEO_EXTRA_PATCH"
+
 # ------------------------------------------ what this test cannot reach
 
 # Stated rather than left for someone to discover: no merge happens here,

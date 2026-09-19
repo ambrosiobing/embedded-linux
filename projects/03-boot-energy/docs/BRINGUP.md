@@ -133,13 +133,31 @@ trimming was live, and the baseline build attempted both. A fragment's
 active lines have to be visible in the file rather than in a sentence
 about the file.
 
-Linux: paste the `led-2` block from `board/boot-marker-led.dtsi` into the
-`leds` node of the board's own device tree, after `led-1` and before the
-closing brace:
+Linux: the device-tree change is applied by the build, through
+`NEO_EXTRA_PATCH`, and is **not** committed into the kernel tree.
+
+```
+NEO_EXTRA_PATCH=$PWD/projects/03-boot-energy/board/0001-ARM-dts-sun8i-h3-nanopi-neo-air-a-boot-complete-mark.patch ./go neo-air kernel
+```
+
+**A local commit in that tree cannot survive.** `kernel/build.sh` puts the
+tree at its tag whenever `git describe --exact-match` disagrees, which a
+commit of your own guarantees, and then runs `git clean -qxdf` over it. On
+20 September that is exactly what happened: the node was added as a
+commit, the build printed `re-fetching` and eleven thousand lines of
+success, and the dtb had no node in it. The failure would have surfaced as
+a marker that never rises, after a flash and a boot.
+
+The patch already exists in the repository. To regenerate it, paste the
+`led-2` block from `board/boot-marker-led.dtsi` into the `leds` node of
 
 ```
 $NEO_SRC/linux/arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts
 ```
+
+after `led-1` and before the closing brace, then commit in that tree and
+`git format-patch -1` into `projects/03-boot-energy/board/`. The commit is
+only a means of producing the patch; the build discards it.
 
 **Not an `&leds` append and not `sun8i-h3-nanopi.dtsi`**, both of which
 the specification implies and neither of which is true here. That `.dts`
@@ -147,11 +165,11 @@ includes only `sun8i-h3.dtsi` and `sunxi-common-regulators.dtsi`, carries
 its own `leds` node with `led-0` on PL10 and `led-1` on PA10, and gives
 that node no label, so `&leds` resolves against nothing.
 
-Then generate the real patch while the tree is in front of you, since a
-patch can only be made against one:
+**Verify the dtb rather than the build's exit status**, because the
+failure above produced neither an error nor a warning:
 
 ```
-git -C $NEO_SRC/linux format-patch -1 -o ~/src/embedded-linux-bench/projects/03-boot-energy/board/
+strings $NEO_SRC/linux/arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dtb | grep -c boot-marker
 ```
 
 Install the unit and enable it:

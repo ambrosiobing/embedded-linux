@@ -491,3 +491,53 @@ reading a diagnostic that scrolled past inside a successful build.
 
 Proved in both directions: reintroducing the prose comment fires the rule,
 and a legitimate `# CONFIG_X is not set` line still passes.
+
+## 15. The build discarded the device tree change and reported success
+
+**What happened.** The marker node went into the kernel tree as a commit,
+`git format-patch` saved it into this project, and `./go neo-air kernel`
+was run. It printed
+
+    --- tree is at 'no tag', wanted v6.12, re-fetching
+
+and then about eleven thousand lines ending in `zImage`, the dtb, the
+modules and `brcmfmac present`. Every sign of a good build.
+
+Both of these came back zero:
+
+    grep -c boot-marker .../sun8i-h3-nanopi-neo-air.dts
+    strings .../sun8i-h3-nanopi-neo-air.dtb | grep -c boot-marker
+
+**Why.** `kernel/build.sh` pins the tree with
+`git describe --tags --exact-match`, and when that does not match
+`$KERNEL_TAG` it re-fetches, checks the tag out and runs
+`git clean -qxdf`. A commit of your own is precisely what makes
+`--exact-match` fail, so **the act of saving the change is what guarantees
+it is thrown away.**
+
+**What was done.** `NEO_EXTRA_PATCH` in `kernel/build.sh`, symmetric with
+`NEO_EXTRA_FRAGMENT`: an optional patch, validated at configuration time,
+made absolute because `git -C` runs from the tree, applied after the tag
+is checked out and before anything is configured. `git apply --check`
+first, so a patch made against another version fails loudly instead of
+half applying. Tracked files are restored to the tag before applying, so a
+second run is not an error and the rebuild stays incremental: a
+device-tree patch recompiles a dtb, not a kernel.
+
+Six assertions in `tests/neo-air-extra-fragment-test.sh`, 20 in total now.
+Removing the guard fails three of them.
+
+**Why that and not the alternative.** The alternative was to remember to
+re-apply the edit before every build. That is the same class of thing as
+"comment the trimming lines back in", which this project already got wrong
+within a day, and worse here because there is no diff to inspect: the
+evidence of the edit is destroyed by the process that needs it.
+
+**The part worth keeping.** The build was not wrong. It did what it says
+it does, loudly, in a line that scrolled past two seconds before a
+successful compile. What was missing was a check on the artefact rather
+than on the exit status, and `docs/BRINGUP.md` now ends that step with one:
+count `boot-marker` in the dtb. This is the same lesson as the firmware in
+Project 1 that was installed and unreachable. **Every build artefact
+answers "did it build". None of them answers "did it build what I asked
+for."**
