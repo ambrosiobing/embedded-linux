@@ -124,11 +124,12 @@ kver=$(cat "$NEO_OUT/kernel-version")
 	echo
 	echo "sdcard.sh reads every artefact from \$NEO_OUT, so pointing it at"
 	echo "this directory writes exactly what was archived. The env form is"
-	echo "deliberate: this bench's sudo ignores -E, so a variable set before"
-	echo "sudo does not survive it. Check the device"
-	echo "with lsblk first; the script refuses system disks and anything the"
-	echo "kernel reports as non-removable, and asks you to type the path"
-	echo "back before it writes."
+	echo "deliberate: this bench's sudo ignores -E, so a variable set"
+	echo "before sudo does not survive it."
+	echo
+	echo "Check the device with lsblk first. The script refuses system disks"
+	echo "and anything the kernel reports as non-removable, and asks you to"
+	echo "type the path back before it writes."
 	echo
 	echo "The bootloader goes to byte 8192 and the first partition starts at"
 	echo "sector 2048. Everything dangerous in this project is the gap"

@@ -154,6 +154,34 @@ chroot "$ROOT" apt-get install -y --no-install-recommends \
 	systemd-sysv udev openssh-server wpasupplicant firmware-brcm80211 \
 	iproute2 iputils-ping e2fsprogs rsync fdisk iw wireless-regdb
 
+# The regulatory database, signed with a key this kernel trusts.
+#
+# wireless-regdb ships two copies and update-alternatives picks
+# regulatory.db-debian, which is signed with Debian's key. A mainline kernel
+# trusts only the upstream keys it was built with, so it rejects that one
+# and says so on every boot:
+#
+#   cfg80211: Loading compiled-in X.509 certificates for regulatory database
+#   Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+#   Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+#   cfg80211: loaded regulatory.db is malformed or signature is missing/invalid
+#
+# The radio still works, on the world-restrictive default domain, which
+# costs channels rather than function. regulatory.db-upstream is signed by
+# sforshee, which is one of the two certificates named on the line above.
+#
+# Guarded rather than assumed: if the alternative is not registered under
+# that name the boot is no worse than it is today, and a failure here should
+# not take down a root filesystem build over a channel list.
+note "regulatory database"
+if chroot "$ROOT" update-alternatives --set regulatory.db \
+	/lib/firmware/regulatory.db-upstream >/dev/null 2>&1; then
+	note "           regulatory.db-upstream selected, signed by sforshee"
+else
+	note "           could not select regulatory.db-upstream; the kernel will"
+	note "           reject Debian's copy and fall back to the world domain"
+fi
+
 # The NVRAM, under the name the driver will actually ask for.
 #
 # brcmfmac needs two files. The .bin is unambiguous. The NVRAM is not: the

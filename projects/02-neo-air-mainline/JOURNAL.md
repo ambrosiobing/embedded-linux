@@ -1506,3 +1506,62 @@ directory is called.** The two tiers were named in entry 8 and the project
 with the most to lose was still in the lower one, because the tooling to
 move it up had never been written for the one project that had no Yocto to
 inherit it from.
+
+## 20. Two loose ends, and one of them was on every boot
+
+*Saturday 19 September 2026.* Closing out.
+
+### The regulatory database
+
+Every boot since `wireless-regdb` was installed has printed:
+
+    Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+    Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+    cfg80211: loaded regulatory.db is malformed or signature is missing/invalid
+
+Adding the package made this worse rather than better, in a way easy to
+misread as the package being broken. It is not. `wireless-regdb` ships two
+copies and `update-alternatives` picks `regulatory.db-debian`, signed with
+Debian's key. A mainline kernel trusts only the certificates it was built
+with, and the two it names on the line above are `sforshee` and `wens`.
+`regulatory.db-upstream` is signed by sforshee, which is one of them.
+
+So the kernel is correct, the package is correct, and the default
+alternative is the wrong one for a kernel that is not Debian's. The cost is
+the world-restrictive default domain, which loses channels rather than
+function, and is why this sat unaddressed while the radio associated and
+took a lease perfectly well.
+
+`mkrootfs.sh` now selects `regulatory.db-upstream`, guarded: if the
+alternative is not registered under that name the build says so and carries
+on, because a channel list is not worth failing a root filesystem over.
+
+**This is not verified on hardware.** It needs a rootfs rebuild and a
+reflash, and Project 2's criteria were all met before it. The next card
+written will show whether the line goes away.
+
+### A line wrap in the provenance file
+
+`PROVENANCE.txt` is the one artefact in this project designed to be read
+years from now by someone with no context. An edit left a sentence broken
+across an awkward line: "Check the device / with lsblk first". Fixed.
+
+Small, and worth doing precisely because of what that file is for. A
+document whose whole purpose is to be legible later is the wrong place to
+leave a paragraph that reads as though it was assembled rather than
+written.
+
+### Where Project 2 ends
+
+| | |
+|---|---|
+| Criteria | all six, on hardware |
+| Evidence | boot logs for both media, committed |
+| Artefacts | archived with provenance, outside the VHDX |
+| Tests | 69 assertions across the two destructive tools |
+| Record | 20 journal entries, decisions 98 to 107 |
+
+Open, and neither blocking: the regulatory alternative above, unverified
+until the next build; and the guard-ordering and package fixes from earlier
+today, which are in the repository and will reach a board the next time a
+card is written.
