@@ -265,3 +265,41 @@ file, the line and the variable, and reading it took one API call with the
 credential git already holds. The prediction that it would fail was made
 before the log was read and was right, but predicting is not knowing, and
 there was no reason to guess when the run had already finished.
+
+## 10. The blocker cleared, and the sentence about it went stale a second time
+
+**What happened.** Project 2 reached Complete on hardware on Saturday
+19 September 2026. Its board boots U-Boot 2025.10 and a 6.12 kernel from
+its own eMMC to a login prompt on `ttyS0`, with a 522 line console capture
+in `projects/02-neo-air-mainline/docs/bootlog-emmc.txt`.
+
+This project's README, design document and journal entry 1 all said that
+Project 2 was in flight and had produced no image, with `out/` and
+`docs/evidence/` empty. Every word of that was true on Friday 18 September
+2026 and false on Saturday 19 September 2026.
+
+**What was done.** Corrected in all three places, in place, saying what the
+earlier version claimed rather than replacing it silently. The empty
+Measured column stayed empty, but its reason changed from "there is nothing
+to boot" to "no board has been powered through the PPK2", which is a much
+smaller and much more actionable statement.
+
+**Why that and not the alternative.** Leaving it would have been defensible
+on the grounds that the conclusion did not move. That is precisely the
+reasoning decision 97 is about, and this is the second time in this
+project's short life that the same sentence has gone stale: entry 7 records
+the first, when another session created Project 2's tree twenty minutes
+after this one had established it did not exist.
+
+Twice in two days, on one sentence, is a pattern rather than an accident.
+The sentence was load-bearing in a particular way: it was the justification
+a reader was given for an empty column, so a reader who checked it would
+have found a completed project and concluded the table was neglected rather
+than blocked. A claim that explains an absence has to be re-read whenever
+the absence is what changed.
+
+**What this unblocks.** Everything in `docs/BRINGUP.md`. The first step is
+the logic-level self-test, D3 against `SYS_3.3V` with the supply at 5.0 V,
+because if the PPK2's logic inputs cannot see a 3.3 V marker then all three
+channels fail at once and the method needs rethinking before any wiring is
+worth doing.

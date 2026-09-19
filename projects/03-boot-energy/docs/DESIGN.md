@@ -13,25 +13,24 @@ sets the other when the startup job queue empties, and a Nordic PPK2
 records those markers on the same clock as the current samples. Nothing in
 the timing comes from the board.
 
-## What this project cannot do yet
+## What this project has not done yet
 
-**There is no system to boot.** The specification's key facts line says
-"NanoPi NEO Air with the mainline system from Project 2", and Project 2 is
-in flight rather than finished: a design, a U-Boot build script, a kernel
-build script and fragment, an eMMC flashing tool and its tests, with an
-empty `out/`, an empty `docs/evidence/` and no board flashed. Nothing
-boots, so there is nothing to optimise.
+**There is now a system to boot.** Project 2 reached Complete on hardware
+on Saturday 19 September 2026, and the NanoPi NEO Air boots its own eMMC to
+a login prompt on `ttyS0`. An earlier version of this section said that
+project was in flight and had produced no image, which was true on
+Friday 18 September 2026 and is not true now.
 
-So this document, the host tooling and the board-side artefacts are written
-now, and every number in this project stays blank until Project 2 produces
-a system. A blank is honest. A placeholder is a claim, and the
-specification's own before/after table says so in its caption: the example
-figures there are illustrative and every cell is to be replaced by the mean
-of five boots.
+What has not happened is the measurement. No board has been powered through
+the PPK2, so every number in this project is still blank, and a blank is
+honest where a placeholder is a claim. The specification's own before/after
+table says the same thing in its caption: the example figures there are
+illustrative and every cell is to be replaced by the mean of five boots.
 
-What that means in practice is written into the acceptance table in
-[../README.md](../README.md): each criterion carries its evidence file or
-the reason it cannot yet be met.
+The order of the first session with the instrument is in
+[BRINGUP.md](BRINGUP.md). It does not follow the specification's step
+order, and the reason is in that file: one test can end the method and
+belongs first.
 
 ## Architecture
 

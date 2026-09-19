@@ -16,26 +16,30 @@ channel, which ties every burst in the current trace to a line of output.
 
 The design is in [docs/DESIGN.md](docs/DESIGN.md).
 
-## This project is blocked on a system to boot, and nothing here pretends otherwise
+## The system to boot now exists
 
 The specification's key facts line reads "NanoPi NEO Air with the mainline
-system from Project 2".
+system from Project 2", and until Saturday 19 September 2026 there was no
+such system, so every measured cell in this project was blank for want of
+anything to measure.
 
-**Project 2 is in flight and has not produced one yet.** As of 18 September
-2026 its working tree holds a design document, a U-Boot build script, a
-kernel build script with a fragment, an eMMC flashing tool and a 32
-assertion test suite, all uncommitted. What it does not hold is an image:
-`out/` is empty, `docs/evidence/` is empty, there is no README, and no
-NanoPi has been flashed. There is nothing to boot, so there is nothing to
-optimise and nothing to measure.
+**That blocker is gone.** Project 2 reached Complete on hardware on
+Saturday 19 September 2026: U-Boot 2025.10 and a 6.12 kernel on a Debian
+bookworm armhf root filesystem, booting the board's own eMMC with no card
+in the slot, with `docs/bootlog-emmc.txt` in that project a 522 line
+capture from power-on to a login prompt on `ttyS0`.
 
-What is written here is everything that does not depend on that system: the
-design, the host measurement and analysis programs with their tests, the
-board-side marker artefacts, and the configuration fragments. **Every
-measured number in this project is blank**, and the blanks are the honest
-state rather than an oversight. The specification's own before/after table
-says the same thing in its caption: the figures printed there are
-illustrative placeholders, to be replaced by the mean of five boots.
+**This section previously said Project 2 was in flight and had produced no
+image.** That was true when it was written on Friday 18 September 2026 and
+is false now. It is corrected here rather than quietly replaced, because
+the sentence was load-bearing: it was the justification a reader was given
+for a table with an empty column.
+
+The measured column is still empty, and now for a different and smaller
+reason: **no board has been powered through the PPK2 yet.** The first
+session with the instrument is written out step by step in
+[docs/BRINGUP.md](docs/BRINGUP.md), and it starts with the one test that
+could still end the method, the logic-level self-test.
 
 **This is Software complete on the repository's ladder**, and the
 distinction from Project 6 is worth stating because the two look alike from
@@ -47,7 +51,8 @@ which is exactly what that rung means.
 
 What is missing is not software. `trim.cfg`, the device-tree patch and
 `units-disabled.txt` are data that can only come from a board, and the next
-rung up, Built and running on the board, is plainly not met.
+rung up, Built and running on the board, is not met until the bench session
+happens.
 
 ## What this project adds to the repository
 
@@ -141,7 +146,7 @@ down either way.
 ## What has not been done
 
 - **Nothing has been built, flashed or powered.** No NanoPi has run this.
-- **Project 2 has produced no image yet**, so there is no baseline system to optimise against.
+- **No board has been powered through the PPK2.** Project 2's system exists and boots; this project has not yet measured it.
 - `board/0001-dts-boot-marker-led.patch` is a `.dtsi` instead. A patch is a
   diff against specific lines of a specific tree, and inventing hunk
   headers for a tree that has never been checked out would be a
