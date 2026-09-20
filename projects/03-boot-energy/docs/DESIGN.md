@@ -77,13 +77,22 @@ exists to run a preboot hook. Both descriptions above are the corrected
 ones. The three numbers are still three well defined edges and none of
 them moved; what was wrong was the story told about them.
 
-One consequence is not yet resolved and is flagged rather than patched:
-`uboot/fragments/fast.config` describes its optimisations as shortening
-"the phase between the D1 marker and the first console byte", and that
-phase runs backwards. What those options actually delay is U-Boot's own
-output and its storage scan, both of which happen after the SPL banner
-that D2 is currently measuring. That gets settled when the 10-uboot
-variant is measured, not before.
+One consequence is now settled. `uboot/fragments/fast.config` described
+its optimisations as shortening "the phase between the D1 marker and the
+first console byte", and that phase runs backwards. What those options
+shorten is the interval from the D1 marker to the kernel being handed
+control, which is inside `t_done` and is not instrumented separately.
+The saving is therefore read from `t_done`, and from `t_done` minus
+`t_uboot`, against a baseline whose `t_done` has a spread of 0.281 s
+across five runs. Removing a 2 second boot delay is seven standard
+deviations of that, so no fourth marker is needed to see it.
+
+A fourth marker at the kernel handoff is deliberately not added. There is
+no hook there that costs nothing, and `systemd-analyze` cannot supply the
+number because the ownership table above forbids any reported figure
+coming from the board's own clock. The consequence, that U-Boot's scan
+and the kernel's own time cannot be separated by this harness, is
+recorded rather than worked around.
 
 D2 is the console TX line, which idles high and falls on the start bit of
 the first character. That is why the console edge is a falling one and the
