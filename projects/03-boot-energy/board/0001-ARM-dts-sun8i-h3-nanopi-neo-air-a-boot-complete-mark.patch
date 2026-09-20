@@ -1,0 +1,30 @@
+From 475d1f441c83c9a4bb368db7c9915d23ea9437b1 Mon Sep 17 00:00:00 2001
+From: ambrosio <ambrosiobing@gmail.com>
+Date: Sun, 20 Sep 2026 01:22:45 +0200
+Subject: [PATCH] ARM: dts: sun8i-h3-nanopi-neo-air: a boot-complete marker LED
+ on PA6
+
+---
+ arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts
+index 6d85370e0..7a6f746f4 100644
+--- a/arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts
++++ b/arch/arm/boot/dts/allwinner/sun8i-h3-nanopi-neo-air.dts
+@@ -71,6 +71,12 @@ led-1 {
+ 			label = "nanopi:blue:status";
+ 			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
+ 		};
++
++		led-2 {
++			label = "boot-marker";
++			gpios = <&pio 0 6 GPIO_ACTIVE_HIGH>; /* PA6 */
++			default-state = "off";
++		};
+ 	};
+ 
+ 	wifi_pwrseq: pwrseq {
+-- 
+2.53.0
+
