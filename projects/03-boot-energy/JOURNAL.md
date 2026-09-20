@@ -603,3 +603,280 @@ instrument can source, it limits rather than supplies, the board may
 brown out, and that run's energy figure is wrong rather than merely high.
 `analyze.py` reports `peak_ma` on every run for this reason and it is to
 be read on the first real capture, not at the end of the matrix.
+
+## 17. The instrument was under-supplied all along, and the discard rule proved itself
+
+Sunday 20 September 2026, the session that got the board onto its eMMC and
+the PPK2 onto a COM port.
+
+**The discard rule stopped being an argument and became a measurement.**
+Three boots of the same image, same kernel, same marker:
+
+| Boot | Kernel | Userspace | Total |
+|---|---|---|---|
+| Card, first, after an unclean shutdown | 2.405 s | 18.217 s | 20.623 s |
+| Card, second, clean | 2.593 s | 10.564 s | 13.157 s |
+| eMMC, first | 1.871 s | 9.357 s | 11.229 s |
+
+The first two differ by **57 percent**, and the difference is one thing:
+`EXT4-fs (mmcblk0p2): recovery complete` and
+`system.journal corrupted or uncleanly shut down, renaming and
+replacing`. The rule that discards the first run of every variant was
+written into `analyze.py` and `docs/DESIGN.md` before any data existed,
+on the argument that a filesystem change is a property of the previous
+run rather than of the variant being measured. It would have swallowed
+7.5 seconds into the baseline.
+
+It also means I was wrong to call the 20.623 s figure "the baseline" when
+it appeared. It was the number the rule exists to throw away.
+
+**And that opens a problem with the method itself.** `ppk2_boot.py` ends
+every capture by cutting VOUT, because a boot measurement has to start
+from a board that is genuinely off. So **every measured run leaves the
+filesystem unclean and every following boot pays recovery**. The variants
+are at least consistently affected, but the baseline is systematically
+inflated and the variance is worse, which criterion 3 cares about: it
+wants a standard deviation under 5 percent.
+
+`Storage=volatile` for journald is already listed in
+`board/units-disabled.txt` as part of the `30-systemd` variant. Part of
+the saving it shows will therefore be an artefact of how this project
+measures rather than a property of the system. That has to be said in the
+write-up rather than claimed as an optimisation.
+
+## 18. The PPK2 has two USB connectors and only one was ever plugged in
+
+**What happened.** Asked to be specific about which USB port to use, I
+went and read the documentation instead of recalling it. The PPK2 has
+two micro-USB connectors:
+
+    DATA/POWER       communication and the instrument's own power
+    USB POWER ONLY   supplies the DUT, required in source-meter mode
+                     above 400 mA
+
+Only DATA/POWER has ever been connected, in this session and every
+earlier one. This board idles with a 424 mA peak and showed 0.96 A in a
+window containing a boot. **Both are over the threshold**, so the
+instrument has been sourcing an over-400 mA load from a single USB port
+throughout.
+
+**What that costs.** Every current figure taken so far is suspect. The
+0.96 A that looked like the board approaching the PPK2's 1 A ceiling is
+more likely the USB port running out. Those numbers were observations
+rather than results, but they were already in
+`docs/evidence/logic-selftest.txt`, which is corrected in place.
+
+**What survives.** Criterion 0 and the marker verification. D3 high, and
+D0, D1, D2, D3 all high, are logic levels read through the level shifter
+against its own 3.3 V reference, which does not depend on supply
+headroom. The board booted to a login repeatedly, so it was not badly
+starved.
+
+**Why this was found by a question rather than by a check.** Nothing in
+the project could have caught it. `analyze.py` reports `peak_ma` on every
+run precisely so that a limiting instrument becomes visible in the data,
+and it would have shown the symptom without ever naming the cause. It took
+Joseph asking which connector, and the answer being in a document neither
+of us had read.
+
+The same shape as the logic port's own VCC pin two days earlier: a
+connector on the instrument that the specification's wiring table does
+not mention, whose absence produces a plausible wrong reading rather than
+an error. **Twice now, the fault was a pin nobody had been told about.**
+
+## 19. Two smaller corrections from the same session
+
+**Power down before unplugging.** Joseph stopped me mid-instruction to
+ask whether the board should be powered off rather than pulled, and he
+was right. We had just measured what a hard cut costs on this board:
+7.5 seconds of recovery on the next boot. The H3 has no power-off path,
+so `poweroff` ends at `reboot: Power off not available: System halted
+instead`, which is fine: the filesystems are unmounted and synced by
+then, and that is the part that matters.
+
+**The PPK2's serial port is not called what I said.** It enumerates as
+`nRF Connect USB CDC ACM`, not `JLink CDC UART Port`, which is the name
+on Nordic's development kits. `docs/BRINGUP.md` says the right one now.
+
+## 20. The peak was inrush, and my explanation for it was wrong
+
+Sunday 20 September 2026. The first capture that ever completed,
+1,597,440 samples over 15.974 seconds, written from the board with both
+PPK2 USB connectors attached for the first time.
+
+The number this project was waiting on was the peak current, because
+everything else depends on the instrument not having been limiting while
+it measured. Entry 18 predicted the peak would fall once the DUT had its
+own supply connector, on the reasoning that 0.96 A was the single USB
+port running out.
+
+It did not fall. It came back at **1015.2 mA**, slightly higher.
+
+The prediction was wrong and the reason it was wrong is visible in the
+same file. The peak lasts **two samples, twenty microseconds**, at
+1.41 ms after the supply comes on. That is the board's bulk capacitance
+charging, not the board drawing. Past the first ten milliseconds nothing
+in the entire boot goes above 804 mA:
+
+    first 10 ms, inrush                peak 1015.2 mA   mean  90.3 mA
+    10 ms to first console byte        peak  206.9 mA   mean  84.8 mA
+    first console byte to complete     peak  804.2 mA   mean 183.6 mA
+    the 0.5 s tail, idle               peak  564.2 mA   mean 144.9 mA
+
+So the 0.96 A seen in the Power Profiler two nights ago was this same
+transient, seen in a ten second window that happened to contain a power
+on. The under-supply was real and connecting USB POWER ONLY was still
+the right call, but it was never what that number meant.
+
+What the measurement does settle is better than what I was looking for.
+During the boot itself the instrument had about twenty percent of
+headroom, so it was not limiting while it worked. That is the claim the
+project actually needs, and it is now made from data rather than from an
+argument about connectors.
+
+**THAT LAST PARAGRAPH IS WRONG AND IS CORRECTED IN ENTRY 22.** It was
+written from one run. Five more arrived within the hour and three of them
+reach 942 to 994 mA inside the boot with no inrush involved, so the
+headroom claimed here does not exist.
+
+**The lesson is one this repository keeps relearning.** A number at the
+edge of an instrument's range invites an explanation about the
+instrument. The explanation was available, plausible, and wrong, and it
+survived two days because nobody had looked at where in time the peak
+sat. Twenty microseconds and fifteen seconds are different phenomena and
+a single maximum cannot tell them apart. `analyze.py` reports `peak_ma`
+per run, which was right, but a peak with no time attached to it is
+still an invitation to guess.
+
+## 21. D1 is stuck high, and the deadline rule cannot tell the difference
+
+The same file, read one channel further.
+
+    d0   starts 0, ends 1, one rising edge at 15.45212 s, no falls
+    d2   starts 1, first falling edge at 1.06975 s, 78,998 edges after
+    d1   starts 1, ends 1, ZERO rising edges, ZERO falling edges
+
+D1 is the U-Boot marker on PG11, and it is high in all 1,597,440 samples.
+It is high at sample zero, ten microseconds after the supply comes on,
+when the SoC is still in the boot ROM and U-Boot is several seconds away
+from existing.
+
+`phases()` discards the run for it, with the reason **"D1 never rose, so
+U-Boot never started"**. That is the correct behaviour drawn from a
+channel that is not telling the truth, and it is the worst kind of
+correct: the sentence names a cause, the cause is wrong, and the run is
+gone. A reader of the output would go looking at the bootloader.
+
+Everything else in the capture is sound and agrees with the board:
+
+    first console byte, D2 falling         1.070 s
+    boot complete, D0 rising              15.452 s
+    tail after the marker                  0.522 s   (0.5 s by design)
+    energy over [0, t_done]               13.660 J   at 5.0 V
+
+15.452 less the 11.229 s that `systemd-analyze` reports leaves 4.2 s of
+U-Boot, which is the right size for `bootdelay=2` plus loading. The
+`rising_edge()` rewrite from entry 16 is doing on real data exactly what
+it was written for: D0 rose once, at the marker, and never fell.
+
+`docs/BRINGUP.md` anticipated the opposite failure and says to check with
+`gpio set PG11` typed by hand when **"the board boots normally and D1
+stays low"**. It stays high, so the check written there does not reach
+this. Pin 7 is PG11 on the NEO Air header, so the wiring table is not
+wrong; what is unsettled is whether the wire is seated on pin 7 and what
+the pin does coming out of reset.
+
+**If PG11 idles high, a rising-edge marker cannot work on it at all**,
+and the preboot has to drive it low instead, or the marker has to move
+to a pin that is genuinely low out of reset. That is a design change and
+it gets written down before it is made, not after.
+
+One thing not to do, and it is tempting: D2's first falling edge is a
+perfectly good "the bootloader is alive" signal sitting right there at
+1.070 s. Substituting it for D1 would make the discard stop and the
+table fill in. It would also silently redefine `t_uboot` from "BROM plus
+SPL, before any storage is scanned" into "first console byte", which is
+a later and different event. The rule in `docs/DESIGN.md` is that
+discard rules are not negotiable after seeing the data. A definition is
+not negotiable after seeing the data either.
+
+## 22. Six runs, and the one-run conclusion in entry 20 does not hold
+
+Sunday 20 September 2026. Five more captures, taken in a loop with ten
+seconds of rails-down between them, joined the first. `analyze.py` over
+the directory:
+
+    6 run(s) found, 0 kept.
+
+    - boot-00.csv: first run of the variant, discarded by rule
+    - boot-01.csv: D1 never rose, so U-Boot never started
+    - boot-02.csv: D1 never rose, so U-Boot never started
+    - boot-03.csv: D1 never rose, so U-Boot never started
+    - boot-04.csv: D1 never rose, so U-Boot never started
+    - boot-05.csv: D1 never rose, so U-Boot never started
+
+Five identical reasons and no sixth kind of failure. The capture path is
+now proven on five independent boots and D1 is the only thing between
+these six files and a filled-in table. The first-run rule and the D1 rule
+also fired separately and said which was which, which is the whole reason
+the first discard is applied before any file is read.
+
+**The correction.** Entry 20 said that past the first ten milliseconds
+nothing in the boot goes above 804 mA, and concluded that the instrument
+had about twenty percent of headroom while it measured. That was written
+from `boot-00` alone. Splitting inrush from the rest, per run:
+
+    run          inrush    after 10 ms   at        above 900 mA
+    boot-00     1015.2 mA     804.2 mA   15.325 s     0.020 ms
+    boot-01      910.6 mA     800.8 mA   11.315 s     0.010 ms
+    boot-02      942.7 mA     840.9 mA   14.854 s     0.040 ms
+    boot-03      886.5 mA     994.1 mA   14.658 s     0.190 ms
+    boot-04      958.3 mA     959.2 mA   15.161 s     0.300 ms
+    boot-05      912.4 mA     861.5 mA   15.229 s     0.010 ms
+
+Three of the six reach 942 to 994 mA **inside the boot**, in the last
+second before the marker, with no capacitor charging involved. `boot-03`
+comes within six milliamps of the source limit. There is no twenty
+percent of headroom. There is, at those instants, no headroom worth
+naming.
+
+The energy figure survives this and the peak figure does not. The whole
+time spent above 900 mA is at most 0.30 ms inside a 15.5 second
+recording, so if the meter were hard-clipping through every one of those
+samples the error in a 14 J integral is under a hundredth of a percent.
+`peak_ma` is a different matter: at those moments the number may be a
+property of the PPK2 rather than of the board, and the write-up has to
+say so rather than quoting it as the board's maximum demand.
+
+**This is the second time in one evening that one run produced a
+confident wrong sentence**, and the first time was three hours earlier in
+the same journal. Project 8 did this too, at row 3 of eighteen. The
+pattern is not carelessness about arithmetic, it is that a single run
+reads like a measurement and behaves like an anecdote, and the discard
+rules exist because the project knew that before the hardware did.
+
+**What the six runs do establish.** With D1 set aside, the other two
+channels give real numbers over six boots:
+
+    t_console   1.07440 s   sd 0.00410 s
+    t_done     15.48606 s   sd 0.19162 s
+    energy      14.087 J    sd 0.288 J
+
+Four milliseconds of spread on the first console byte. That is the
+measurement quality the project was built for, and it is a strong
+argument for the marker method over reading timestamps off the board:
+`systemd-analyze` cannot see anything before the kernel, and the interval
+from power on to the bootloader printing is where this variant's savings
+are supposed to come from.
+
+**And entry 16's rewrite paid for itself.** In five of the six runs `d0`
+starts HIGH, falls once, then rises once: the pin is undriven through
+BROM, SPL and U-Boot, the kernel's `gpio-leds` applies
+`default-state = "off"`, and the marker unit raises it. `boot-00` starts
+low because the board had been off long enough to discharge, while each
+of the other five began ten seconds after a power cut. The original
+detector asked whether D0 was high anywhere in a batch and would have
+ended five of these six captures in the first batch, half a second after
+power on, with a CSV full of BROM. It was rewritten before any of this
+data existed, on the strength of watching one power cycle, and five runs
+have now exercised the case it was rewritten for.

@@ -84,9 +84,25 @@ The PPK2 sources at most 1 A. A maximum of 0.96 A leaves four percent of
 headroom, against 416.45 mA in a 10 second window taken earlier the same
 evening under the same supply setting.
 
-This is recorded and NOT explained. If demand reaches the ceiling the PPK2
-limits rather than supplies, the board can brown out, and a run taken
-while it is limiting is invalid rather than merely high. What changed
-between the two windows is not known, and it is to be understood before a
-60 second measurement is taken. analyze.py reports the peak current of
-every run so that this is checked by the data rather than assumed once.
+EXPLAINED ON SUNDAY 20 SEPTEMBER 2026, AND THESE CURRENT FIGURES ARE NOT
+TO BE USED.
+
+The PPK2 has two micro-USB connectors. DATA/POWER carries communication
+and the instrument's own power. USB POWER ONLY supplies the DUT and is
+required in source-meter mode above 400 mA.
+
+Only DATA/POWER was ever connected, in this session and every earlier one.
+This board draws 424 mA at idle peak and showed 0.96 A in a window
+containing a boot, so it was over that threshold the whole time. The
+0.96 A is therefore most likely the single USB port running out rather
+than the board's demand, and every current number above was taken from an
+under-supplied instrument.
+
+The logic readings in this file are unaffected. They are levels through
+the level shifter against its own 3.3 V reference and do not depend on
+supply headroom, and the board booted to a login repeatedly, so it was not
+badly starved. Criterion 0 stands.
+
+The first capture with both connectors attached will say whether the peak
+changes. analyze.py reports peak_ma on every run so that this is checked
+by the data rather than assumed once.

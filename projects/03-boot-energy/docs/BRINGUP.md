@@ -197,7 +197,25 @@ On the Windows host:
 python measure/ppk2_boot.py COM5 ../results/00-baseline/boot-00.csv
 ```
 
-`COM5` is an example. The port is whatever the PPK2 enumerated as.
+`COM5` is an example. Find the real one on the Windows side:
+
+```
+Get-PnpDevice -Class Ports -PresentOnly | Select-Object Status, FriendlyName
+```
+
+The PPK2 enumerates as **`nRF Connect USB CDC ACM`**, not as a JLink port,
+which is the name Nordic's development kits use.
+
+**Both of the PPK2's micro-USB connectors have to be plugged in.**
+DATA/POWER carries communication and the instrument's own power, and is
+the one that produces the COM port. USB POWER ONLY supplies the DUT and is
+required in source-meter mode above 400 mA. This board idles with a 424 mA
+peak and draws close to an amp during boot, so it is over that threshold
+throughout.
+
+Connecting only DATA/POWER does not fail. It produces plausible current
+figures from an under-supplied instrument, which is how every reading
+before 20 September 2026 was taken. See journal 18.
 
 Then look at the file rather than trusting it:
 
