@@ -541,3 +541,65 @@ count `boot-marker` in the dtb. This is the same lesson as the firmware in
 Project 1 that was installed and unreachable. **Every build artefact
 answers "did it build". None of them answers "did it build what I asked
 for."**
+
+## 16. The markers work, and watching them work found a defect in the capture
+
+**What happened.** Saturday 19 September into Sunday 20 September 2026,
+the first time all four logic channels were wired and the board was
+powered from the PPK2 alone.
+
+With the board booted and idle, D0, D1, D2 and D3 all read high: the
+boot-complete marker on PA6, U-Boot's preboot marker on PG11, the console
+TX idling, and the reference. Every link in the chain from
+`marker.config` through the device-tree patch to `boot-marker.service`,
+visible at the instrument at once.
+
+Then a power cycle was watched live, and **D0 goes high, low, then high**.
+
+The fall is early, before the console has said much. The reading, and it
+is inference rather than observation: nothing owns PA6 through BROM, SPL
+and U-Boot, so it reads high; the kernel's `gpio-leds` driver probes and
+applies `default-state = "off"` from the device tree, driving it low; the
+marker unit raises it at the end. Only the third of those is the event
+this project measures.
+
+**What that broke.** `ppk2_boot.py` asked whether D0 was high **anywhere**
+in a batch of samples. That is true in the very first batch. The capture
+would have stopped about half a second after power on, written a CSV
+holding the beginning of a boot, and reported success. `analyze.py` would
+then have found its rising edge in that fragment and reported a boot that
+completed before the kernel started.
+
+**What was done.** `rising_edge()` replaces it, carrying the previous
+level across batches because an edge is a property of two samples and
+those two are not always delivered together. The level starts as `None`
+rather than `0`: an unknown starting level is not a low one, and assuming
+low would turn "D0 was already high when we started looking" into a
+transition that never happened.
+
+A third stub mode in `tests/boot-energy-capture-test.sh` reproduces what
+the board does: high, falling, rising. Reverting to the level check fails
+**one** of the two new assertions, and it is worth saying which. `MARKER
+yes` still passes, because the broken detector does report a marker,
+instantly and wrongly. What catches it is the row count: 3 instead of 9,
+the capture ending in the first batch.
+
+**Why this is the entry worth keeping.** Nothing in the test suite could
+have found this. The stubs were written from the design, and the design
+said the marker rises once. The board says otherwise, and it only says so
+across a power cycle: a running board shows levels, and levels looked
+perfect.
+
+`default-state = "off"` is why the pin falls at all, and the comment in
+`boot-marker-led.dtsi` already argued for it on the grounds that an LED
+in an undefined state gives the analysis no rising edge to find. That
+reasoning was right and incomplete. It produces a **falling** edge as
+well, in a place nobody predicted, and the capture had to learn about it.
+
+**Still to check on the next capture.** The peak current. Idle is 112 mA
+with a 424 mA maximum, but a window containing a boot showed 0.96 A
+against the PPK2's 1 A ceiling. If a boot ever demands more than the
+instrument can source, it limits rather than supplies, the board may
+brown out, and that run's energy figure is wrong rather than merely high.
+`analyze.py` reports `peak_ma` on every run for this reason and it is to
+be read on the first real capture, not at the end of the matrix.

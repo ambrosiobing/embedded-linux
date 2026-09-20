@@ -40,16 +40,40 @@ SETTLE_S = 2.0            # let the board discharge before recording
 DIGITAL = ("d0", "d1", "d2")
 
 
-def boot_complete(batch):
-    """True if D0 went high anywhere in this batch of samples.
+def rising_edge(batch, previous):
+    """Find a LOW to HIGH transition on D0. Returns (found, last_level).
 
-    ANYWHERE, not "at the end of it". Checking only the last sample of a
-    batch, which is the obvious way to write this, drops the marker
-    whenever the batch boundary happens to fall after the edge has been
-    read into a later position, and the run then times out with a complete
-    recording that the script never noticed was complete.
+    A LEVEL IS NOT AN EVENT, and on this board the difference decides
+    whether a capture is a boot or a fraction of one.
+
+    D0 is PA6. Watched through a whole power cycle on 20 September, it
+    goes HIGH, then LOW, then HIGH:
+
+        high   nothing owns the pin yet, through BROM, SPL and U-Boot
+        low    the kernel's gpio-leds driver probes and applies
+               default-state = "off" from the device tree
+        high   boot-marker.service writes brightness, which is the event
+               this project measures
+
+    The first version of this asked whether D0 was high anywhere in a
+    batch. That is true in the very first batch, so the capture would have
+    stopped about half a second after power on with a CSV holding the
+    beginning of a boot, and analyze.py would have reported a boot that
+    completed before the kernel started.
+
+    Carrying `previous` across batches is what makes the edge detectable
+    at a batch boundary; an edge is a property of two samples and those
+    two are not always delivered together. previous is None until the
+    first sample is seen, so a capture that opens with D0 already high
+    waits for it to fall before any rise can count.
     """
-    return any(int(sample[0]) == 1 for sample in batch)
+    found = False
+    for sample in batch:
+        level = int(sample[0])
+        if previous == 0 and level == 1:
+            found = True
+        previous = level
+    return found, previous
 
 
 def record_boot(ppk, timeout_s=60.0, tail_s=0.5, clock=time.monotonic,
@@ -74,6 +98,11 @@ def record_boot(ppk, timeout_s=60.0, tail_s=0.5, clock=time.monotonic,
     marker_seen = False
     tail_until = None
 
+    # None, not 0. An unknown starting level is not a low one, and
+    # assuming low would turn "D0 was already high when we started
+    # looking" into a rising edge that never happened.
+    d0_level = None
+
     while clock() - started < timeout_s:
         buf = ppk.get_data()
         if buf:
@@ -81,7 +110,8 @@ def record_boot(ppk, timeout_s=60.0, tail_s=0.5, clock=time.monotonic,
             currents.extend(samples)
             batch = list(zip(*ppk.digital_channels(raw)))
             digital.extend(batch)
-            if not marker_seen and boot_complete(batch):
+            found, d0_level = rising_edge(batch, d0_level)
+            if not marker_seen and found:
                 marker_seen = True
                 tail_until = clock() + tail_s
         if tail_until is not None and clock() >= tail_until:

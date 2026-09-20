@@ -134,7 +134,21 @@ def batch(i, d0, d1, d2):
     return {"i": i, "d0": d0, "d1": d1, "d2": d2}
 
 
-if mode == "marker":
+if mode == "highfirst":
+    # WHAT THE BOARD ACTUALLY DOES. D0 is high through BROM, SPL and
+    # U-Boot because nothing owns PA6 yet, then the kernel's gpio-leds
+    # driver applies default-state = "off" and drives it low, and only
+    # then does the marker unit raise it. Observed on 20 September 2026
+    # across a power cycle.
+    #
+    # A detector that asks "is D0 high" stops the capture in the first
+    # batch, about half a second after power on.
+    batches = [
+        batch([100.0, 100.0, 100.0], [1, 1, 1], [0, 0, 0], [1, 1, 1]),
+        batch([150.0, 150.0, 150.0], [1, 0, 0], [1, 1, 1], [0, 0, 0]),
+        batch([200.0, 200.0, 200.0], [0, 1, 1], [1, 1, 1], [1, 1, 1]),
+    ]
+elif mode == "marker":
     batches = [
         batch([100.0, 100.0, 100.0], [0, 0, 0], [0, 1, 1], [1, 1, 1]),
         # The edge is in the MIDDLE. A check that reads only the last
@@ -181,6 +195,16 @@ before "the meter is in source mode before it is asked to switch the DUT" \
 contains "and it is set to 5.0 V" "$out" "set_source_voltage 5000"
 before "the supply is switched off again at the end" \
 	"$out" "power ON" "stop_measuring"
+
+# ------------------------- a level is not an event, and D0 starts high
+
+# The capture must not end because D0 happened to be high when it began.
+# Three batches: high throughout the first, falling in the second when
+# the kernel claims the pin, rising in the third when the marker unit
+# writes it. Only that last transition is the boot completing.
+high=$("$PYTHON" "$WORK/drive.py" "$SUT" highfirst "$WORK/high.csv")
+contains "a capture that opens with D0 high still finds the real edge" 	"$high" "MARKER yes"
+contains "and records every sample rather than stopping in batch one" 	"$high" "ROWS 9"
 
 # ------------------------------- the marker is looked for in the whole batch
 

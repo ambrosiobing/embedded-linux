@@ -44,6 +44,25 @@ note() {
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 OVERLAY=$HERE/overlay
+
+# A SECOND OVERLAY, so another project can put files on the image without
+# editing this one.
+#
+# Project 3 needs a systemd unit on the image and CANNOT install it on the
+# board: tools/flash-emmc.sh runs mkfs.ext4 over both partitions, so
+# anything placed there by hand is destroyed by the next provisioning run,
+# and that project re-provisions once per measured variant.
+#
+# Same shape as NEO_EXTRA_FRAGMENT and NEO_EXTRA_PATCH. Unset is the
+# normal case. Set and not a directory is refused by name rather than
+# skipped: a unit that silently failed to arrive is a marker that never
+# rises, found after a flash and a boot rather than here.
+EXTRA_OVERLAY=${NEO_EXTRA_OVERLAY:-}
+if [ -n "$EXTRA_OVERLAY" ]; then
+	[ -d "$EXTRA_OVERLAY" ] || die "NEO_EXTRA_OVERLAY is set and is not a
+       readable directory: $EXTRA_OVERLAY
+       Unset it to build without one, or fix the path."
+fi
 [ -d "$OVERLAY" ] || die "no overlay at $OVERLAY"
 
 [ "$(id -u)" = 0 ] || die "debootstrap and chroot need root.
@@ -259,6 +278,27 @@ note "overlay"
 # wpa_supplicant configuration holds a passphrase and is written on the
 # card, never in this repository. See .gitignore.
 cp -a "$OVERLAY/." "$ROOT/"
+
+if [ -n "$EXTRA_OVERLAY" ]; then
+	note "extra overlay $EXTRA_OVERLAY"
+	cp -a "$EXTRA_OVERLAY/." "$ROOT/"
+
+	# Any unit the extra overlay drops into /etc/systemd/system is
+	# ENABLED here, because shipping the .wants symlink in the
+	# repository instead does not survive a Windows checkout, where
+	# git's core.symlinks defaults to false and the link arrives as a
+	# text file containing a path. This repository is edited on Windows.
+	#
+	# Enabling by name and not by glob-and-hope: the loop prints each
+	# one, so a unit that was copied and not enabled is visible here
+	# rather than on the board.
+	for _unit in "$EXTRA_OVERLAY"/etc/systemd/system/*.service; do
+		[ -f "$_unit" ] || continue
+		_name=$(basename "$_unit")
+		chroot "$ROOT" systemctl enable "$_name"
+		note "enabled    $_name"
+	done
+fi
 
 printf 'neo-air\n' >"$ROOT/etc/hostname"
 printf '127.0.1.1\tneo-air\n' >>"$ROOT/etc/hosts"

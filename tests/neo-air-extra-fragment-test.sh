@@ -26,6 +26,7 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 KERNEL=$ROOT/projects/02-neo-air-mainline/kernel/build.sh
 UBOOT=$ROOT/projects/02-neo-air-mainline/uboot/build.sh
+ROOTFS=$ROOT/projects/02-neo-air-mainline/rootfs/mkrootfs.sh
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -173,6 +174,55 @@ lacks "kernel: an unset extra patch says nothing about itself" 	"$out" "NEO_EXTR
 rc=0
 out=$(NEO_EXTRA_PATCH="$WORK/no-such.patch" run "$UBOOT") || rc=$?
 lacks "uboot: ignores a patch variable it does not implement" 	"$out" "NEO_EXTRA_PATCH"
+
+# mkrootfs.sh checks NEO_ENV before anything else, so without it every run
+# below dies on the toolchain guard and an assertion on the exit status
+# passes for the wrong reason. That happened while writing this: two
+# overlay cases went green against a message about toolchain.env.
+run_rootfs() {
+	NEO_ENV=1 NEO_SRC=$WORK/src NEO_EXTRA_OVERLAY="$1" sh "$ROOTFS" 2>&1
+}
+
+# --------------------------------- an overlay that is not a directory
+
+# The third of the three, and the one with the sharpest reason.
+# tools/flash-emmc.sh runs mkfs.ext4 over both eMMC partitions, so a file
+# installed on the board by hand is destroyed by the next provisioning
+# run, and Project 3 re-provisions once per measured variant. A systemd
+# unit therefore has to arrive with the image.
+#
+# The guard runs before mkrootfs.sh checks for root, deliberately: a
+# configuration mistake should be reachable without sudo.
+rc=0
+out=$(run_rootfs "$WORK/no-such-overlay") || rc=$?
+check "rootfs: an overlay that is not a directory is refused" "$rc" "1"
+contains "rootfs: and the refusal names the variable" "$out" "NEO_EXTRA_OVERLAY"
+contains "rootfs: and the path it was given" "$out" "no-such-overlay"
+contains "rootfs: and says how to build without one" "$out" "Unset it"
+
+# A FILE is not a directory, and cp -a of a file over a tree is a
+# different kind of wrong than an absent path.
+: >"$WORK/overlay-is-a-file"
+rc=0
+out=$(run_rootfs "$WORK/overlay-is-a-file") || rc=$?
+check "rootfs: a file where a directory belongs is refused too" "$rc" "1"
+contains "rootfs: and names it" "$out" "NEO_EXTRA_OVERLAY"
+
+# Unset must reach the next guard, which is the root check, rather than
+# complaining about an overlay nobody asked for.
+rc=0
+out=$(run_rootfs "") || rc=$?
+lacks "rootfs: an unset overlay says nothing about itself" \
+	"$out" "NEO_EXTRA_OVERLAY"
+
+# Project 3's overlay must actually contain the unit it promises, because
+# an empty overlay copies cleanly and enables nothing.
+if [ -f "$ROOT/projects/03-boot-energy/rootfs-overlay/etc/systemd/system/boot-marker.service" ]; then
+	_shipped=yes
+else
+	_shipped=no
+fi
+check "project 3 ships the marker unit in its overlay" "$_shipped" "yes"
 
 # ------------------------------------------ what this test cannot reach
 
