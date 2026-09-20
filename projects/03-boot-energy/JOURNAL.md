@@ -880,3 +880,231 @@ ended five of these six captures in the first batch, half a second after
 power on, with a CSV full of BROM. It was rewritten before any of this
 data existed, on the strength of watching one power cycle, and five runs
 have now exercised the case it was rewritten for.
+
+## 23. Where the bench stands, and a wrong cause named twice
+
+Sunday 20 September 2026, late. Stopping here, with the state written
+down rather than carried in anyone's head.
+
+**Settled today.** The capture path works: six boots, `t_console` at
+1.07440 s with 4.1 ms of spread, `t_done` at 15.48606 s, energy 14.087 J.
+`rising_edge()` handled a D0 that starts high in five of the six. The
+peak is inrush and the headroom claim made from one run was withdrawn.
+
+**Open, and the only thing between here and a filled-in table.** D1 is
+flat high in every sample of every run. Two hypotheses remain and both
+are cheap to test:
+
+  1. PG11 idles high, so `gpio set` produces no edge. Fixed by one line,
+     `CONFIG_PREBOOT="gpio clear PG11; gpio set PG11"`, plus a U-Boot
+     rebuild and reflash.
+  2. D1 and D3 are swapped. D3 sits on pin 17, `SYS_3.3V`, a rail that is
+     high whenever the board is powered and never moves, which is
+     precisely D1's signature. Fixed by exchanging two jumpers.
+
+Neither has been tested, because the bench stopped working first.
+
+**What went wrong this evening, in order.**
+
+The console cannot take input. Output arrives, typing does nothing, which
+points at the green lead on debug pin 4, `RXD0`. Everything done on this
+board for two days was read-only, so a green lead that was never seated
+would not have shown up until the first time anyone tried to type.
+
+That blocked the `gpio clear PG11` test, so a console-free probe was
+substituted: move D1 from pin 7 onto pin 12 beside D0, take one capture,
+and see whether D1 follows a channel known to work. Before that could
+run, COM5 was held by Power Profiler, and **I told Joseph to kill the
+nRF processes without first turning the output off.** The capture then
+ran the full 60 seconds and timed out with D0 never rising.
+
+I read that timeout as the forced kill having wedged the instrument.
+**That was wrong, and it was the second confident wrong cause in one
+evening.** The 60 second file settles it: current is zero across all six
+million samples, and all three logic channels are flat. Power Profiler
+then showed the same thing live with the output enabled, sampling
+running and `DUT ON` in its log: **window average 1.85 nA**, and all
+eight digital rows flat including row 3, which is wired to pin 17 and
+must go high the instant the board has 3.3 V.
+
+The supply path to the board is open. It is physical, it is one of the
+two wires on the PPK2's 4-pin power header, and it is not the kill and
+not the software.
+
+**The probable mechanism, and the lesson.** Two header pins each carry
+two sockets: pin 6 holds both grounds, and pin 12 now holds both D0 and
+D1 because the probe put them there. Stacking a second socket onto an
+occupied pin is what preceded the failure. The instruction to do it did
+not say that a second socket usually means neither is seated, and it
+should have, because the same sentence had already been written about
+pin 6 earlier in the same evening.
+
+**Tomorrow, in order.**
+
+  1. Restore the supply. Wire from PPK2 `VOUT` to 24-pin pin 2, wire from
+     PPK2 `GND` to 24-pin pin 6, both ends. Confirm by current in the
+     hundreds of milliamps and digital row 3 going high.
+  2. Seat the green lead on debug pin 4 so the console takes input.
+  3. Put D1 back on pin 7.
+  4. At the `=>` prompt: `gpio status PG11`, `gpio clear PG11`,
+     `gpio set PG11`, screenshotting the digital rows. Whichever row
+     moves, D1 or D3, names the fix.
+  5. Retake the six baseline runs under whichever fix that was.
+
+**Row 3 is now a start-of-session check.** It costs nothing, it is
+already wired, and it would have caught tonight's fault in the first
+five seconds rather than after a 60 second capture and a screenshot.
+Criterion 0 was written as a one-time acceptance test. It is better as a
+habit.
+
+## 24. One open contact, and three confident explanations for it
+
+Sunday 20 September 2026, morning. The bench came back with a board that
+would not power, and I explained it wrongly three times before looking.
+
+**First: the console cannot take input, so the green lead on debug pin 4
+must be loose.** It was not. The board was unpowered, so there was
+nothing to echo anything back. When power returned, typing worked
+immediately and `root@neo-air` logged in on the first try.
+
+**Second: the 60 second capture timed out, so the forced kill of the nRF
+processes wedged the instrument.** It did not. That file holds six
+million samples at zero current. The board was never powered during it.
+The kill was still my mistake, because I told Joseph to stop those
+processes without first turning the output off, but it was not this.
+
+**Third: D1 and D3 are swapped.** Also no.
+
+Power Profiler settled it in one screen: output enabled, sampling
+running, `DUT ON` in the log, and a window average of **1.85 nA**. All
+eight digital rows flat, including row 3, which is wired to pin 17 and
+must go high the moment the board has 3.3 V.
+
+The fault was one contact in the supply pair. Reseating it onto 24-pin
+pin 4, which is `VDD_5V` on this header just as pin 2 is, brought back
+193 mA and a booting board.
+
+**What actually found it was a demand for precision, not a deduction.**
+My instructions had been saying things like "the red lead", on a bench
+with three red wires, one of which must stay unconnected. Joseph asked
+which red, and rewriting the whole harness as a list of connectors and
+pin numbers is what exposed that the supply had been described by colour
+and never once by endpoint.
+
+## 25. PG11 has no pull resistor, and that was the whole thing
+
+At the U-Boot prompt, with the wire proven:
+
+    gpio set PG11     then  gpio input PG11  ->  value is 1
+    gpio clear PG11   then  gpio input PG11  ->  value is 0
+
+The pin holds whatever it was last driven to. Driven low and released it
+stays low; driven high and released it stays high. No pull either way.
+
+Nothing in the Linux device tree claims PG11, so at the end of every
+capture it is still high from that run's preboot. The script cuts power
+and restores it two seconds later and the line is still high. A preboot
+of `gpio set PG11` then drove high a line that was already high, and
+**no edge existed for anything to find**. Six runs, 1.6 million samples
+each, zero transitions in either direction.
+
+`analyze.py` was right every single time. Its sentence, "D1 never rose,
+so U-Boot never started", was a true observation attached to a false
+cause, which is the most expensive kind of correct.
+
+The fix is to clear the pin before setting it. I worried the low pulse
+might be shorter than the 10 microsecond sample period and be missed
+non-deterministically. It is **3.19 ms, 319 samples**, in every run.
+Worth worrying about, and worth measuring rather than arguing about.
+
+**The wire was proven separately and visually.** Toggling PG11 six times
+from the prompt draws six wide square pulses on row 1, unmistakable
+beside row 2's narrow echo spikes. That mattered because a static logic
+level a few pixels tall cannot be read off a screenshot, which is what
+defeated us on Saturday 19 September 2026 as well. A level is hard to
+see. A change is easy. When a reading is too small to trust, make it
+move.
+
+The first run of that test proved nothing, because D1 was still on pin 12
+where Saturday night's probe left it and I never gave the step to move it
+back. Fourteen toggles against an empty pin.
+
+## 26. The baseline, and the two things it falsified within a minute
+
+Six runs, five kept. The first table this project has ever produced:
+
+    time to U-Boot marker (s)         1.492    sd 0.00046
+    time to first console byte (s)    1.083    sd 0.0003
+    time to boot complete (s)        15.431    sd 0.281
+    energy per boot (J)              14.42     sd 0.19
+    mean current (mA)               187        sd 1
+    peak current (mA)              1233        sd 49
+
+**It falsified the deadline immediately.** The D1 deadline was 0.5 s,
+taken from the specification's first acceptance criterion and never
+measured. The marker fires at 1.492 s, so all five healthy runs were
+discarded with the words "the bootloader did not start" about a board
+that had booted five times in a row. A threshold that rejects every good
+run is not a discard rule, it is a defect in one. It is now 3.0 s, twice
+the slowest observed rise, and the old value and the reason it was wrong
+are written into both `analyze.py` and `docs/DESIGN.md`. Changing a
+discard rule after seeing data is what that document warns against, so
+it gets changed in the open or not at all.
+
+**It falsified the phase order too.** The design said D1 opens the
+measured interval, covering BROM plus SPL, before any storage is scanned.
+The console byte arrives at 1.083 s and the marker at 1.492 s, **410 ms
+later**, because the SPL prints its banner before U-Boot proper exists to
+run a preboot hook. Neither number moved and neither edge is wrong; the
+story told about them was. Both descriptions are corrected.
+
+One consequence is flagged and not patched: `fast.config` says its
+optimisations shorten the phase between the D1 marker and the first
+console byte, and that phase now runs backwards. That gets settled when
+the 10-uboot variant is measured.
+
+**And the table lied about its own precision.** The spreads on the two
+bootloader edges are 0.46 ms and 0.3 ms, and a three decimal format
+printed both as 0.000, which reads as perfect repeatability. The program
+already refuses to print a bare zero for a single kept run for exactly
+that reason, and then did it here anyway. A spread that is not zero is
+now never shown as one.
+
+**The peaks went up, not down.** 1145 to 1261 mA today against 886 to
+1015 on Saturday, all of it inrush inside the first 1.4 ms. The
+difference is the supply contact: Saturday's was already failing, and
+contact resistance was limiting the inrush we were measuring. Today's
+figures are the honest ones and they sit **above the PPK2's 1 A rating**,
+so the peak cannot be quoted as a property of the board at all. Entry 20
+blamed the instrument, entry 22 corrected that to the board, and the
+answer is that at that instant the two cannot be separated.
+
+## 27. The same chip was mmcblk0, mmcblk1 and mmcblk2 in three boots
+
+Writing the new U-Boot to the eMMC nearly went somewhere else.
+
+    boot A    eMMC on mmc0        root on mmcblk0p2
+    boot B    SDIO wifi on mmc0   root on mmcblk1p2
+    boot C    SDIO wifi on mmc1   root on mmcblk2p2
+
+Three consecutive boots of one board with nothing changed, decided by
+which card registers first. `flash-emmc.sh` already carries a comment
+about this and derives its target from sysfs for precisely this reason,
+and I wrote the instruction with a device name in it anyway.
+
+The gate was there. It said run `findmnt -no SOURCE /` and only proceed
+if it printed `mmcblk0p2`. It printed `mmcblk1p2`, and both commands went
+into the terminal together, so the gate could not do its job. **A check
+and the thing it guards, pasted as one block, is not a check.**
+
+What saved it was an accident. `/dev/mmcblk0` did not exist, `dd` creates
+its output file when it is missing, and `/dev` is RAM backed, so the
+write landed in a 522128 byte file: exactly the 8192 byte seek plus the
+513936 byte payload. `ls -l` showed a leading dash rather than a `b`.
+Nothing on any disk was touched, and the 40.6 MB/s in the `dd` output was
+the tell. The real write to the eMMC ran at 14.9 MB/s.
+
+Two things follow. A destination that must be a block device should be
+checked for being one. And the project's own rule, **never name the
+device, always derive it**, applies to instructions in a chat window
+exactly as much as it applies to a script.

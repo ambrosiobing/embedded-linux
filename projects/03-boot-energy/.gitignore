@@ -1,0 +1,15 @@
+# Raw captures never enter the repository.
+#
+# One boot at 100 kS/s for sixteen seconds is 1.6 million rows and about
+# 37 MB. Six runs per variant and five variants is over a gigabyte, and
+# docs/DESIGN.md's data flow puts all of it under results/<variant>/,
+# which is one "git add ." away from being committed forever.
+#
+# What is kept is what was derived from them: summary.md, which carries
+# the means, the spreads and every discarded run with its reason, and the
+# plots. Those are a few kilobytes and they are the evidence the
+# write-up cites.
+#
+# Where the captures actually live is written in docs/BRINGUP.md, beside
+# the command that produces them.
+results/*/*.csv

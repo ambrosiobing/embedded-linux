@@ -63,10 +63,27 @@ recording:
 
 | Number | From | What it covers |
 |---|---|---|
-| `t_uboot` | first **rising** edge of D1 | BROM plus SPL, before any storage is scanned |
-| `t_console` | first **falling** edge of D2 | U-Boot, the kernel load and the decompression, up to the first console byte |
+| `t_uboot` | first **rising** edge of D1 | boot ROM, SPL, DRAM init, relocation and U-Boot init, up to the preboot hook. **1.4920 s on this board**, measured |
+| `t_console` | first **falling** edge of D2 | boot ROM and SPL, up to the SPL's first printed character. **1.0826 s**, and therefore **earlier** than `t_uboot`, not later |
 | `t_done` | first **rising** edge of D0 | everything, to the end of the systemd startup job queue |
 | `E` | `5.0 V * sum(I) * dt` over `[0, t_done]` | energy for one whole boot, in joules |
+
+**THE FIRST TWO ROWS ARE NOT IN THE ORDER THIS DOCUMENT ORIGINALLY GAVE
+THEM.** It assumed the preboot marker fires before anything is printed,
+so that D1 opened the measured interval. Measured on Sunday 20 September
+2026, the console byte arrives at 1.0826 s and the marker at 1.4920 s,
+410 ms later, because the SPL prints its banner before U-Boot proper
+exists to run a preboot hook. Both descriptions above are the corrected
+ones. The three numbers are still three well defined edges and none of
+them moved; what was wrong was the story told about them.
+
+One consequence is not yet resolved and is flagged rather than patched:
+`uboot/fragments/fast.config` describes its optimisations as shortening
+"the phase between the D1 marker and the first console byte", and that
+phase runs backwards. What those options actually delay is U-Boot's own
+output and its storage scan, both of which happen after the SPL banner
+that D2 is currently measuring. That gets settled when the 10-uboot
+variant is measured, not before.
 
 D2 is the console TX line, which idles high and falls on the start bit of
 the first character. That is why the console edge is a falling one and the
@@ -317,9 +334,20 @@ Variants, one directory each, one change each:
 These are written here rather than in the analysis script's comments
 because a rule invented after seeing the numbers is not a rule.
 
-- **A run where D1 does not rise within 0.5 s of the supply coming on is
+- **A run where D1 does not rise within 3.0 s of the supply coming on is
   discarded, not averaged.** The bootloader did not start. Averaging it in
   would report a slow boot for a board that did not boot.
+
+  **This said 0.5 s until Sunday 20 September 2026, and that number was
+  never measured.** It assumed preboot runs early in the bootloader; it
+  runs in U-Boot proper, at 1.4920 s on this board. The rule as written
+  discarded all five healthy runs of the first working baseline and told
+  us the bootloader had not started. 3.0 s is twice the slowest observed
+  rise. A board that genuinely does not start raises no edge at all and
+  is caught without any threshold, so this is a bound on lateness rather
+  than the detector it was described as. Recorded here because a rule
+  changed after seeing data has to be changed in the open or it is not a
+  rule at all.
 - **The first run of every variant is discarded.** A filesystem change can
   trigger a long `fsck` on the next mount, and that is a property of the
   previous run rather than of the variant being measured.

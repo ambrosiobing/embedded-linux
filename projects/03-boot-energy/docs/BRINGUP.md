@@ -109,9 +109,32 @@ Add the rest:
 | `D0` | header pin 12, PA6 | boot-complete marker, and the LED |
 | `D2` | debug header pin 3, TXD0 | console TX, in parallel with the cable's white lead |
 
-Supply on, in the app, and watch the current trace. The familiar shape is a
-plateau during U-Boot, a ramp through the kernel, and bursts as services
-start. None of the markers move yet, because neither has been installed.
+In the app: **Source meter**, **5000 mV**, **Digital channels on**. Then
+**Enable power output**, and only then **Start**. Two separate controls,
+and both are needed: the output powers the board and brings the serial
+console to life, and Start is the only reason anything appears on the
+graph. With Start unpressed you can watch a perfectly healthy board boot
+into a blank window, which looks exactly like the failure this step is
+here to catch.
+
+**Then read row 3 before reading anything else.** It is wired to pin 17,
+`SYS_3.3V`, so it goes high the instant the board has its 3.3 V rail and
+stays there. It going high means the supply is connected, the logic port
+is referenced and the levels can be trusted, which is criterion 0 asked
+again in one glance. On Sunday 20 September 2026 a single unseated supply
+contact cost most of a morning, and row 3 would have named it in five
+seconds. Criterion 0 was written as a one-time acceptance test. It is
+better as the first thing you look at in every session.
+
+Watch the current trace. The familiar shape is a plateau during U-Boot,
+a ramp through the kernel, and bursts as services start. None of the
+markers move yet, because neither has been installed.
+
+**To shut down, in this order:** Stop, then Enable power output off. The
+acquisition is stopped before the supply it is measuring, and never the
+other way round. Close the app from its own window: killing the nRF
+processes with the output still enabled leaves the instrument in a state
+that takes a power cycle of the PPK2 to clear.
 
 This step exists to catch a wiring mistake while there is still a live
 display to see it on. Everything after this is a script writing a CSV.
@@ -196,6 +219,16 @@ On the Windows host:
 ```
 python measure/ppk2_boot.py COM5 ../results/00-baseline/boot-00.csv
 ```
+
+**Captures may be staged on a local disk instead.** One run is about
+37 MB and six of them written across the WSL share from Windows is slow
+enough to be worth avoiding; a folder on the Windows desktop and a copy
+afterwards is fine, and is how the first working baseline was taken on
+Sunday 20 September 2026. `analyze.py` takes a directory wherever it
+sits. What must not change is that the derived `summary.md` ends up under
+`results/<variant>/`, because that is what the write-up cites and what
+`.gitignore` is arranged around: the CSVs are excluded from the
+repository by rule, the summaries are kept.
 
 `COM5` is an example. Find the real one on the Windows side:
 

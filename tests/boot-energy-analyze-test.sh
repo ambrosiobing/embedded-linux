@@ -202,18 +202,62 @@ check "two identical kept runs do have a spread, and it is zero" \
 
 # ------------------------------------------------ a bootloader that did not start
 
-# D1 at 55000 is 0.550 s, past the 0.5 s deadline in the first acceptance
-# criterion. Discarded rather than averaged: the board did not boot, and
-# folding it in reports a slow boot instead of a failed one.
+# A run whose D1 rises one second past the deadline. Discarded rather
+# than averaged: the board did not boot, and folding it in reports a slow
+# boot instead of a failed one.
+#
+# THE FIXTURE IS DERIVED FROM THE CONSTANT, NOT FROM A LITERAL. This
+# deadline was 0.5 s until Sunday 20 September 2026, when the first
+# baseline that produced a real marker rose at 1.492 s and the rule
+# discarded all five healthy runs. The literals here said 55000 and
+# "0.5 s deadline", so this test passed while the rule rejected every
+# good boot, and then failed three assertions the moment the rule was
+# corrected. A test that hardcodes the threshold it is testing cannot
+# tell a fix from a regression.
+cat >"$WORK/make_late.py" <<'PYEOF'
+"""Sample indices for a run that misses the deadline, read from the SUT.
+
+    make_late.py ANALYZE_PY
+
+Six lines: total samples, the D1 index, the D2 index, the D0 index, the
+time D1 rises as the program will print it, and the deadline as the
+program will print it. Read from the module so that moving the constant
+moves the fixture with it.
+"""
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("analyze", sys.argv[1])
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+rise = int(round((mod.D1_DEADLINE_S + 1.0) / mod.SAMPLE_DT))
+print(rise + 50000)
+print(rise)
+print(rise + 10000)
+print(rise + 30000)
+print("%.3f" % (rise * mod.SAMPLE_DT))
+print("%.1f" % mod.D1_DEADLINE_S)
+PYEOF
+
 late=$WORK/late
 mkdir -p "$late"
-trace "$late/boot-01.csv" 60000 1000 2000 4000 300000
-trace "$late/boot-02.csv" 60000 55000 56000 58000 300000
+"$PYTHON" "$WORK/make_late.py" "$SUT" >"$WORK/late.txt"
+late_n=$(sed -n '1p' "$WORK/late.txt")
+late_d1=$(sed -n '2p' "$WORK/late.txt")
+late_d2=$(sed -n '3p' "$WORK/late.txt")
+late_d0=$(sed -n '4p' "$WORK/late.txt")
+late_t=$(sed -n '5p' "$WORK/late.txt")
+late_deadline=$(sed -n '6p' "$WORK/late.txt")
+
+trace "$late/boot-01.csv" 6000 1000 2000 4000 300000
+trace "$late/boot-02.csv" "$late_n" "$late_d1" "$late_d2" "$late_d0" 300000
 out=$("$PYTHON" "$SUT" "$late")
 check "a late D1 leaves nothing to average" \
 	"$("$PYTHON" "$SUT" "$late" --json | field runs_kept)" "0"
-contains "and the refusal gives the time it saw" "$out" "0.550"
-contains "and the deadline it was measured against" "$out" "0.5 s deadline"
+contains "and the refusal gives the time it saw" "$out" "$late_t"
+contains "and the deadline it was measured against" "$out" \
+	"$late_deadline s deadline"
 contains "and says the run is not a slow boot but a failed one" "$out" \
 	"bootloader did not start"
 

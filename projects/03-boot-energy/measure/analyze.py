@@ -57,9 +57,28 @@ SAMPLE_DT = 1e-5
 # measurement of it, and docs/DESIGN.md says so beside the energy figure.
 SUPPLY_V = 5.0
 
-# A bootloader that has not raised its marker within half a second has not
-# started. From the specification's first acceptance criterion.
-D1_DEADLINE_S = 0.5
+# A bootloader that has not raised its marker by now has not started.
+#
+# THIS WAS 0.5 s AND THAT NUMBER WAS NEVER MEASURED. It came from the
+# specification's first acceptance criterion, which assumed the preboot
+# hook runs early in the bootloader. It does not: preboot runs in U-Boot
+# proper, after the boot ROM, after the SPL, after DRAM init and after
+# relocation. On this board that is 1.4920 to 1.4927 s, measured across
+# six boots on Sunday 20 September 2026 with a spread of 1.2 ms.
+#
+# At 0.5 s the rule discarded every healthy run, all five of five, with
+# the reason "the bootloader did not start" for a board that had booted
+# perfectly. A threshold that rejects every good run is not a discard
+# rule, it is a defect in one.
+#
+# 3.0 s is twice the slowest observed rise, rounded. It is a bound on
+# lateness and nothing more: a board that never starts raises no edge at
+# all and is caught by the branch above this one, which does not depend
+# on any threshold. Changing this after seeing data is exactly what
+# docs/DESIGN.md warns against, so the old value, why it was wrong, and
+# the measurement it is now derived from are all written down here and
+# there rather than the number being quietly moved.
+D1_DEADLINE_S = 3.0
 
 COLUMNS = ("t_s", "i_ua", "d0", "d1", "d2")
 
@@ -219,6 +238,26 @@ def plot_run(path, out):
     return out
 
 
+def format_sd(sd, fmt):
+    """A spread, never rounded down to a bare zero while it is not zero.
+
+    The mean's format is the wrong one for its own standard deviation.
+    Boot times are printed to a millisecond, and the first baseline that
+    worked had spreads of 0.3 ms and 0.6 ms on the two bootloader edges:
+    real, repeatable, and the tightest numbers this project has produced.
+    "%.3f" turns both into 0.000, which reads as perfect repeatability
+    and is the same false claim this program already refuses to make for
+    a single kept run.
+
+    So a spread that is not zero is never shown as one. It falls back to
+    two significant figures, which for 0.00031 prints 0.00031.
+    """
+    text = fmt % sd
+    if sd != 0 and float(text) == 0:
+        return "%.2g" % sd
+    return text
+
+
 def as_markdown(report):
     out = []
     out.append("# %s" % report["directory"])
@@ -243,7 +282,7 @@ def as_markdown(report):
         out.append("| %s | %s | %s | %d |"
                    % (label,
                       "not measured" if mean is None else fmt % mean,
-                      "not measured" if sd is None else fmt % sd,
+                      "not measured" if sd is None else format_sd(sd, fmt),
                       report["runs_kept"]))
     out.append("")
     if report["discarded"]:
