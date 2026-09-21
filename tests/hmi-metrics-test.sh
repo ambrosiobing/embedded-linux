@@ -110,10 +110,12 @@ make_tree() {
 	# cache is doing its job. Used = (Total - Available) / Total,
 	# which is 25 percent here. An implementation reading MemFree
 	# would report about 95 percent.
-	printf 'MemTotal:        4000000 kB\n' >"$tree/proc/meminfo"
-	printf 'MemFree:          200000 kB\n' >>"$tree/proc/meminfo"
-	printf 'MemAvailable:    3000000 kB\n' >>"$tree/proc/meminfo"
-	printf 'Buffers:          100000 kB\n' >>"$tree/proc/meminfo"
+	{
+		printf 'MemTotal:        4000000 kB\n'
+		printf 'MemFree:          200000 kB\n'
+		printf 'MemAvailable:    3000000 kB\n'
+		printf 'Buffers:          100000 kB\n'
+	} >"$tree/proc/meminfo"
 
 	if [ -n "$state_word" ]; then
 		printf '%s\n' "$state_word" >"$tree/run/bench/state"

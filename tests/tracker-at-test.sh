@@ -14,7 +14,7 @@
 # SPDX-License-Identifier: MIT
 set -eu
 
-here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 # python3 on the Windows authoring laptop is the Microsoft Store stub,
 # which exits without running anything and takes the suite's pass with it.

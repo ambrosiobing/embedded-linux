@@ -22,7 +22,7 @@
 # SPDX-License-Identifier: MIT
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 tracker="$root/meta-bench/recipes-bench/bench-tracker/files/tracker"
 fake="$root/tests/fake-modem.py"
 
@@ -170,7 +170,13 @@ run_scenario() {
 	_status=$?
 	set -e
 	wait "$_fake_pid" 2>/dev/null || true
-	eval "status_$(echo "$_scenario" | tr - _)=$_status"
+
+	# One plain variable, read by the check_status that follows each
+	# scenario. This was an eval building a name per scenario, which
+	# neither a reader nor shellcheck could follow: CI reported the three
+	# variables as never assigned, and it was right about what it could
+	# see. Project 3's suite had the same construct and the same fix.
+	last_status=$_status
 	return 0
 }
 
@@ -185,7 +191,7 @@ check "happy: reaches REGISTERED" "state CONFIGURED -> REGISTERED" "$work/happy.
 check "happy: sends" "state REGISTERED -> SENDING" "$work/happy.log"
 check "happy: acknowledged" "SENDING -> REGISTERED: acknowledged" "$work/happy.log"
 check "happy: ends ASLEEP" "state REGISTERED -> ASLEEP" "$work/happy.log"
-check_status "happy: exit" 0 "$status_happy"
+check_status "happy: exit" 0 "$last_status"
 
 # The granted values, decoded. 00101000 is eight hours, 28800 seconds, and
 # the configuration above asked for seventeen. An implementation that
@@ -209,7 +215,7 @@ run_scenario denied
 check "denied: reaches FAILED" "-> FAILED: network refused the attach" \
 	"$work/denied.log"
 refute "denied: never claims a report" "SENDING" "$work/denied.log"
-check_status "denied: exit" 1 "$status_denied"
+check_status "denied: exit" 1 "$last_status"
 
 echo "== no-psm: attached, PSM refused =="
 run_scenario no-psm
@@ -232,7 +238,7 @@ run_scenario slow-attach
 check "slow-attach: gets there" "-> REGISTERED" "$work/slow-attach.log"
 check "slow-attach: really did poll more than once" \
 	"AT+CEREG?" "$work/slow-attach.seen"
-check_status "slow-attach: exit" 0 "$status_slow_attach"
+check_status "slow-attach: exit" 0 "$last_status"
 
 echo "== no-ack: the server never answers =="
 run_scenario no-ack
