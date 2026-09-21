@@ -1,0 +1,83 @@
+% Where ten seconds goes, and which instrument can see each part.
+%
+% The drawing exists because systemd-analyze is blind to the first two
+% thirds of the timeline, and a boot-time project that trusts it alone
+% will trim the part that was already fast.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, x=13mm, y=-10mm]
+
+  %% ---------------- the bar ----------------
+  \node[hw, minimum width=39mm, minimum height=11mm, anchor=west] at (0,0)
+       (fw) {firmware};
+  \node[kern, minimum width=39mm, minimum height=11mm, anchor=west] at (3,0)
+       (kn) {kernel};
+  \node[comp, minimum width=65mm, minimum height=11mm, anchor=west] at (6,0)
+       (us) {user space};
+
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(fw.south)+(0,-1mm)$)
+       {bootcode, EEPROM,\\\texttt{start4.elf}, device tree,\\overlays};
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(kn.south)+(0,-1mm)$)
+       {decompress, probe,\\mount root};
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(us.south)+(0,-1mm)$)
+       {systemd, \texttt{seatd}, weston,\\PAM session, \texttt{bench-hmi},\\
+        \textbf{first frame}};
+
+  %% ---------------- which instrument sees what ----------------
+  \draw[bus, draw=badcol, thick] ($(fw.north west)+(0,3mm)$) --
+       node[lbl, above, text=badcol, align=center]
+       {SERIAL CONSOLE ONLY\\terminal timestamps}
+       ($(kn.north east)+(0,3mm)$);
+
+  \draw[bus, draw=okcol, thick] ($(us.north west)+(0,3mm)$) --
+       node[lbl, above, text=okcol, align=center]
+       {\texttt{systemd-analyze}\\\texttt{critical-chain}, \texttt{blame}, \texttt{plot}}
+       ($(us.north east)+(0,3mm)$);
+
+  \node[bad, anchor=north west, text width=150mm, align=left,
+        font=\sffamily\scriptsize] at (0,2.3)
+       {\textbf{\texttt{systemd-analyze} cannot see the first two blocks.}
+        It reports the firmware and loader times that the firmware hands
+        it, and on this platform those are not the whole story. A project
+        that measures with it alone will trim user space, which on a
+        Yocto image is already the small half, and conclude that boot
+        time is hard to improve.};
+
+  %% ---------------- trims ----------------
+  \node[head, minimum width=58mm, anchor=north west] at (0,4.0) {trim};
+  \node[head, minimum width=92mm, anchor=north west] at (4.5,4.0) {worth};
+
+  \foreach \i/\t/\w in {%
+    1/{mask \texttt{NetworkManager-wait-online},}/{the largest single win on a stock image},
+    2/{\ \ \ \ \texttt{ModemManager}, \texttt{bluetooth}}/{},
+    3/{\texttt{disable\_splash=1}, \texttt{boot\_delay=0}}/{firmware noise, before the kernel runs},
+    4/{\texttt{quiet} on the kernel line}/{console output at 115200 is not free},
+    5/{keep \texttt{ssh}}/{\textbf{deliberately not trimmed}: the board stays reachable}%
+  }{
+    \node[cell, minimum width=58mm, anchor=north west] at (0,4.0+\i) {\t};
+    \node[cell, minimum width=92mm, anchor=north west] at (4.5,4.0+\i) {\w};
+  }
+
+  \node[umlnote, anchor=north west, text width=150mm, align=left] at (0,9.3)
+       {\textbf{Not done: \texttt{DefaultDependencies=no} on the kiosk
+        unit.} It buys a few hundred milliseconds, and the unit then
+        needs its own ordering written by hand against \texttt{seatd},
+        the tty and the filesystems. That is a large increase in the
+        number of ways to get a silent ordering bug, for a gain smaller
+        than the spread between three measurements.};
+
+  \node[umlnote, anchor=north west, text width=150mm, align=left] at (0,11.2)
+       {\textbf{This image does not start where the specification
+        starts.} The trim list above is written for Raspberry Pi OS Lite,
+        which has NetworkManager, ModemManager and apt timers. A Yocto
+        image has none of them. The budget should therefore be easier to
+        meet and most of the list inapplicable, which is a finding to
+        record rather than a reason to skip the measurement.};
+
+\end{tikzpicture}
+\end{document}

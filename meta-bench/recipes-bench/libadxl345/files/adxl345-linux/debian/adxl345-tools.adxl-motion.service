@@ -1,0 +1,40 @@
+[Unit]
+Description=ADXL345 motion detector
+Documentation=https://github.com/ambrosiobing/embedded-linux
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/adxl-motion
+User=adxl345
+# The two groups that replace root. Membership is what grants the bus and
+# the GPIO line; nothing here is setuid and nothing runs as root.
+SupplementaryGroups=i2c gpio
+Restart=on-failure
+RestartSec=5
+
+# Hardening. Each line here removes something this service demonstrably
+# does not need, which is the only defensible way to write them: a
+# hardening block copied from somewhere else either breaks the service or
+# protects nothing.
+#
+# ProtectSystem=strict makes the whole filesystem read-only. The service
+# writes nothing: it prints to stdout and the journal collects it. If it
+# ever needs a file, StateDirectory= gives it one writable directory
+# without loosening any of this.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+PrivateDevices=no
+# PrivateDevices would hide /dev/i2c-1, which is the one device this
+# service exists to open. Said explicitly rather than omitted, so that
+# nobody adds it later as an obvious improvement.
+DeviceAllow=char-i2c rw
+RestrictAddressFamilies=AF_UNIX
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,104 @@
+# Project 13: the Wayland kiosk HMI.
+#
+#   kas build kas/bench-kiosk.yml        or  ./go kiosk
+#
+# A Raspberry Pi 4, because the project needs the VideoCore VI and the
+# DSI panel, and because bench-rpi4.yml already drives that panel: it
+# sets dtoverlay=vc4-kms-dsi-7inch and appends console=tty1, so every
+# bench image already shows a login prompt on this screen. This
+# configuration takes the screen for a dashboard and leaves the login
+# prompt on tty1, which is why nothing here conflicts with a getty.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+target: bench-kiosk-image
+
+local_conf_header:
+  kiosk: |
+    # --- the distro feature weston refuses to build without -------------
+    #
+    # oe-core's weston carries required-distro-features.inc:
+    #
+    #   REQUIRED_DISTRO_FEATURES = "wayland opengl \
+    #       ${@oe.utils.conditional('VIRTUAL-RUNTIME_init_manager',
+    #                               'systemd', 'pam', '', d)}"
+    #
+    # and this bench sets INIT_MANAGER = "systemd", so pam is required.
+    # Poky supplies wayland and opengl and NOT pam:
+    #
+    #   DISTRO_FEATURES_DEFAULT   acl alsa bluetooth debuginfod ext2 ipv4
+    #                             ipv6 pcmcia usbgadget usbhost wifi
+    #                             xattr nfs zeroconf pci 3g nfc x11 vfat
+    #                             seccomp
+    #   POKY_DEFAULT_...          opengl ptest multiarch wayland vulkan
+    #
+    # Without this line the build stops at parse time inside
+    # features_check, naming weston. That reads like a broken recipe
+    # rather than a missing distro feature, and it is the first thing
+    # this project would have lost an evening to.
+    #
+    # It is here rather than in bench-rpi4.yml because it is a
+    # DISTRO-WIDE change: it rebuilds a great deal and it alters every
+    # other image in this repository. Project 3 measures boot time and
+    # kernel size, and a silently different distro underneath those
+    # numbers is exactly the comparison failure Project 8 already made
+    # once.
+    DISTRO_FEATURES:append = " pam"
+
+    # --- the GPU provider, which is not set here and must not be --------
+    #
+    # Nothing in this file selects Mesa, and that is correct: it is
+    # already the default. meta-raspberrypi's rpi-base.inc puts
+    # vc4graphics into MACHINE_FEATURES unless DISABLE_VC4GRAPHICS is 1,
+    # and rpi-default-providers.inc then reads it:
+    #
+    #   PREFERRED_PROVIDER_virtual/egl     ?= vc4graphics ? mesa : userland
+    #   PREFERRED_PROVIDER_virtual/libgles2 ?= vc4graphics ? mesa : userland
+    #   PREFERRED_PROVIDER_virtual/libgbm  ?= vc4graphics ? mesa : mesa-gl
+    #
+    # weston's kms and egl PACKAGECONFIG entries depend on virtual/egl
+    # and virtual/libgbm, so the whole compositor rests on that feature
+    # being present. Written down because the failure mode is remote: a
+    # board where somebody set DISABLE_VC4GRAPHICS = "1" builds weston
+    # against the closed VideoCore userland stack, and the KMS backend
+    # does not work for a reason four files away from the symptom.
+    #
+    # If this project ever reports "no outputs" on a board whose
+    # connector is connected, check MACHINE_FEATURES before anything.
+
+    # --- the panel orientation, set ONCE, at the lowest layer -----------
+    #
+    # The panel's natural orientation puts the ribbon at the top, which
+    # is upside down on a normal stand. The DRM command line is the only
+    # place this is set: wlroots and weston both read the panel
+    # orientation property and rotate the output, and libinput maps the
+    # touch coordinates to the ROTATED output, so every layer above
+    # inherits one answer.
+    #
+    # Setting it a second time (transform= in weston.ini, or a libinput
+    # calibration matrix in udev, or the firmware's legacy lcd_rotate)
+    # rotates the picture twice while the touch follows only the first.
+    # That presents as touch working correctly upside down, which is the
+    # hardest version of this bug to read, and it is why
+    # 99-bench-touch.rules ships disabled.
+    #
+    # bench-rpi4.yml already appends console=tty1, and CMDLINE:append
+    # accumulates, so both survive.
+    CMDLINE:append = " video=DSI-1:800x480@60,panel_orientation=upside_down"
+
+    # --- boot budget: the firmware half ---------------------------------
+    #
+    # Acceptance is power-on to first dashboard frame in under 10 s, and
+    # systemd-analyze cannot see this part of it. These two are the
+    # firmware's own contribution and they are free.
+    RPI_EXTRA_CONFIG:append = "\ndisable_splash=1\nboot_delay=0"
+
+    # --- what to keep after the build -----------------------------------
+    #
+    # weston and the dashboard are what gets debugged here. LVGL is
+    # vendored inside bench-hmi's work directory, so keeping bench-hmi
+    # keeps the toolkit source too, which is where the Wayland backend
+    # lives and where a protocol problem is read.
+    RM_WORK_EXCLUDE += "weston bench-hmi mesa linux-raspberrypi"

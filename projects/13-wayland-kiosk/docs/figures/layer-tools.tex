@@ -1,0 +1,53 @@
+% The deliverable of this project, as one drawing.
+%
+% Every graphics integration failure is a question of which layer is
+% misconfigured. Each layer has exactly one tool that answers for it, and
+% knowing the mapping is the skill the dashboard exists to teach.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[y=-10mm]
+
+  \def\lw{40mm}
+  \def\tw{56mm}
+  \def\pw{62mm}
+
+  \node[head, minimum width=\lw] at (0,0) {layer};
+  \node[head, minimum width=\tw] at (1,0) {the tool that shows it};
+  \node[head, minimum width=\pw] at (2,0) {a healthy answer};
+
+  \foreach \i/\layer/\tool/\proof in {%
+    1/{firmware found the panel}/{\texttt{dmesg | grep -iE 'vc4|rpi\_touchscreen'}}/{the overlay loaded, the panel MCU answered},
+    2/{KMS sees a connected output}/{\texttt{drm\_info}}/{\texttt{DSI-1} connected, 800x480, \textbf{and which card}},
+    3/{the pipeline is composited}/{\texttt{cat /sys/kernel/debug/dri/N/state}}/{one active plane, holding the client buffer},
+    4/{raw touch reaches the kernel}/{\texttt{evtest /dev/input/eventN}}/{\texttt{ABS\_MT\_POSITION\_X/Y}, \texttt{BTN\_TOUCH}, \texttt{SYN}},
+    5/{touch is mapped to the output}/{\texttt{libinput debug-events -{}-verbose}}/{\texttt{TOUCH\_DOWN} at the corner you touched},
+    6/{the compositor started}/{\texttt{journalctl -u bench-kiosk -b}}/{backend chosen, seat acquired, output named},
+    7/{it offers what a client needs}/{\texttt{wayland-info}}/{\texttt{xdg\_wm\_base}, \texttt{wl\_seat} \textbf{with touch}},
+    8/{the client speaks the protocol}/{\texttt{WAYLAND\_DEBUG=1} on the \textbf{client}}/{\texttt{wl\_touch.down}, \texttt{frame}, \texttt{commit}},
+    9/{the widget layer reacted}/{LVGL log at \texttt{LV\_LOG\_LEVEL\_WARN}}/{the button callback ran}%
+  }{
+    \node[cell, minimum width=\lw, fill=kerncol!25] at (0,\i) {\layer};
+    \node[cell, minimum width=\tw, fill=compcol!25] at (1,\i) {\tool};
+    \node[cell, minimum width=\pw] at (2,\i) {\proof};
+  }
+
+  %% the one rule people get wrong
+  \node[bad, anchor=north west, text width=150mm, align=left,
+        font=\sffamily\scriptsize] at (-0.52,9.7)
+       {\textbf{WAYLAND\_DEBUG=1 goes on the CLIENT, never on the
+        compositor.} On the compositor it prints every frame of every
+        client. On a dashboard that redraws twice a second that buries
+        the journal, and the thing being debugged with it.};
+
+  \node[umlnote, anchor=north west, text width=150mm, align=left]
+       at (-0.52,11.0)
+       {\textbf{How to use the table:} a failure lives at exactly one
+        layer, so bisect rather than reading top to bottom. Start at row
+        2 (\texttt{drm\_info}); if the output is connected the problem is
+        above it, and if not it is below. Four commands settle almost
+        everything.};
+
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,1027 @@
+#!/usr/bin/env python3
+"""tracker - attach, report one position, sleep, in as little charge as possible.
+
+Project 15's router keeps a modem on a network and is judged by uptime.
+This program is judged by charge per report, so almost every decision here
+is the opposite of that one's. It does not keep a bearer. It does not poll.
+It does not run a daemon that always knows the modem's state, because
+knowing costs a wake-up and the modem is meant to be asleep.
+
+The shape, which is the deliverable:
+
+    OFF ---PWRKEY---> BOOTING ---AT ok---> CONFIGURED
+                                                |
+                                          attach|
+                      +------------------ REGISTERED <--------+
+                      |                         |             |
+               report |                         | PSM granted |
+                      v                         v             |
+                   SENDING ---ack--->        ASLEEP ----------+
+                      |                     (TAU timer)
+                      | no ack, after the whole CoAP
+                      | retransmission schedule
+                      v
+                   BACKOFF ---> (the timer starts the next run)
+
+Every transition is driven by an AT response or by a timer, and both are
+things a test can supply.
+
+There are two seams, and they are at different layers.
+
+The modem is reached only by writing a line and reading lines back, so a
+fake modem is a port with a table of canned responses. `--port` takes any
+readable and writable path, and the test hands it the slave side of a
+pseudo-terminal: see tests/fake-modem.py and tests/tracker-state-test.sh.
+
+A pty rather than the FIFO that seems simpler, for two reasons. A FIFO is
+one-directional, and one process cannot open it read and write without
+reading back its own traffic, so a bidirectional dialogue needs two of them
+and a convention about which is which. And a pty slave is a character
+device, so the termios setup below actually runs during the test, which a
+FIFO would skip. The part most likely to be wrong is then the part the test
+exercises rather than the part it steps around.
+
+Everything else outside this process is invoked by name through PATH, which
+is Project 15's `lte-watchdog` pattern and is here for the same reason: the
+whole state machine then runs on a laptop with no modem and no GPIO. That
+covers `tracker-gpio`, which owns PWRKEY and the report marker.
+
+Why Python rather than the shell script Project 15 predicted. Two reasons,
+both of them things the shell cannot do without adding a binary to the
+image. CoAP is a binary protocol over UDP, and building its header is
+sixteen lines of struct packing here against a helper program there. And
+reading an AT response needs a read that times out, which POSIX shell has
+no portable way to do. Nothing outside the standard library is imported, so
+this costs python3-core in the image and no pyserial.
+
+Why the CoAP packet is built here and handed to the modem as data, rather
+than sent through a socket. There is no network interface. ModemManager is
+absent by design, so there is no QMI and no PPP, and nothing has given the
+kernel an `wwan0` to route through. The modem's own IP stack carries the
+packet instead, reached over the same AT port. That is a consequence worth
+stating plainly because it also shrinks the kernel question: this image
+needs a USB serial driver and nothing else. No PPP, no CDC Ethernet.
+
+SPDX-License-Identifier: MIT
+"""
+
+from __future__ import annotations
+
+import argparse
+import errno
+import os
+import random
+import re
+import select
+import struct
+import subprocess
+import sys
+import time
+
+CONF = "/etc/bench/tracker.conf"
+
+DEFAULTS = {
+    # Where the modem's AT interface appears. A udev rule gives it this
+    # name, because a ttyUSB index is a property of enumeration order and
+    # this modem presents several ports.
+    "port": "/dev/tracker-at",
+    "baud": "115200",
+    # The network. Both are card identity rather than repository content,
+    # which is why this file is written after flashing and never committed.
+    "apn": "",
+    "coap_host": "",
+    "coap_port": "5683",
+    "coap_path": "bench/16/position",
+    # The requested PSM values. Requested is the operative word: the
+    # network answers with what it will give, which may be less, and the
+    # granted values are what gets recorded. See docs/DESIGN.md.
+    # 8 hours, as a GPRS Timer 3 octet: unit 001 is hours, count 01000 is
+    # eight. This default was written as 00111000 first, which is count
+    # 11000, which is 24 hours, and the comment beside it still said eight.
+    # decode_tau() found it in the first minute it ran. That is the whole
+    # argument for decoding these octets in the program rather than
+    # trusting the value in the configuration file, and it is why the two
+    # decode functions below have their unit tables written out.
+    "psm_tau": "00101000",
+    "psm_active": "00000001",  # 1 x 2 s, as a GPRS Timer 2 octet
+    "edrx_cycle": "",  # empty means do not request eDRX at all
+    # How often to wake and report, when PSM was refused and the host has
+    # to keep its own time instead.
+    "report_interval_s": "3600",
+    "backoff_base_s": "60",
+    # CoAP's confirmable retransmission, which is the only retry there is.
+    # RFC 7252's defaults, named here so a bench can shorten them.
+    "ack_timeout_s": "2",
+    "max_retransmit": "4",
+    # The radio. 38 is LTE only, and the value matters to the instrument as
+    # much as to the network: see the comment on CMD_RADIO_LTE_ONLY.
+    "at_timeout_s": "10",
+    "attach_timeout_s": "180",
+    # How long to wait between attach polls. A setting rather than a
+    # constant because it is a real trade and not a detail: each poll is an
+    # AT round trip on a modem that is already drawing its search current,
+    # so polling fast costs almost nothing extra here and polling slowly
+    # risks the deadline passing between two answers. Two seconds is the
+    # board default; the test sets it near zero, which is what makes a
+    # four-poll cold attach provable in a suite rather than in six seconds
+    # of real waiting.
+    "attach_poll_s": "2",
+    "marker_gpio": "",  # empty means take no marker; see mark()
+}
+
+# Every modem-specific string in the program is here, in one table, for two
+# reasons. The bench has two modems and the second one is the control, so
+# the differences between them belong somewhere a reader can diff rather
+# than scattered through the state machine. And none of these has yet been
+# confirmed against the part on the bench: they are read out of the
+# SIM7070G AT command manual, which is a claim about the modem and not an
+# observation of it. Project 8 shipped a parser written from a remembered
+# format and every row it produced was blank. So the table is provisional
+# until a transcript lands in projects/16-nbiot-tracker/docs/evidence/, and
+# the journal says so.
+
+# Lock the radio to LTE. This is a network preference on its face and an
+# instrument requirement underneath: the SIM7070G also does GPRS, a GPRS
+# transmit burst on this class of part is in the region of 2 A, and the
+# PPK2 stops at 1 A. A trace that clipped would be withdrawn rather than
+# published, as Project 3's 1233 mA peak was. Locking out 2G is cheaper
+# than discovering that after a night of capture.
+CMD_RADIO_LTE_ONLY = "AT+CNMP=38"
+# Within LTE, 1 is Cat-M, 2 is NB-IoT, 3 is both and lets the modem choose.
+CMD_MODE_PREF = "AT+CMNB={mode}"
+
+MODEMS = {
+    "sim7070g": {
+        "radio": [CMD_RADIO_LTE_ONLY, CMD_MODE_PREF],
+        "apn": 'AT+CGDCONT=1,"IP","{apn}"',
+        "attach_query": "AT+CEREG?",
+        "signal": "AT+CSQ",
+        "psm": 'AT+CPSMS=1,,,"{tau}","{active}"',
+        "psm_query": "AT+CPSMS?",
+        "edrx": 'AT+CEDRXS=1,4,"{cycle}"',
+        "gnss_power": "AT+CGNSPWR={on}",
+        "gnss_query": "AT+CGNSINF",
+        "net_open": "AT+CNACT=0,1",
+        "net_query": "AT+CNACT?",
+        "udp_open": 'AT+CAOPEN=0,0,"UDP","{host}",{port}',
+        "udp_send": "AT+CASEND=0,{length}",
+        "udp_recv": "AT+CARECV=0,{length}",
+        "udp_close": "AT+CACLOSE=0",
+        "net_close": "AT+CNACT=0,0",
+    },
+    # The control. NB-IoT only, so there is no CMNB and no 2G to lock out,
+    # and its socket commands are the older CSOC family rather than CAOPEN.
+    # Left deliberately incomplete: filling it in from the manual would
+    # produce a second set of unverified strings, and one is enough to have
+    # to check. It gets written when the first modem's table has been
+    # confirmed and there is something to compare against.
+    "sim7020e": {},
+}
+
+STATES = ("OFF", "BOOTING", "CONFIGURED", "REGISTERED", "SENDING", "ASLEEP",
+          "BACKOFF", "FAILED")
+
+
+class AtError(Exception):
+    """The modem said ERROR, or said nothing for long enough."""
+
+
+class AtTimeout(AtError):
+    """Distinguished from ERROR on purpose: a timeout on a modem that has
+    just been asked to attach is normal and a timeout on AT is not."""
+
+
+# ---------------------------------------------------------------- transport
+
+FINAL_OK = re.compile(r"^(OK|CONNECT(\s.*)?)$")
+FINAL_ERR = re.compile(r"^(ERROR|NO CARRIER|\+CM[ES] ERROR:.*)$")
+
+
+class AtPort:
+    """A line-oriented AT transport with a read timeout.
+
+    Deliberately not pyserial. The only thing needed from a terminal here
+    is raw mode and a baud rate, termios in the standard library does both,
+    and an image that has to carry pyserial for a tracker has lost an
+    argument about size it did not need to have.
+    """
+
+    def __init__(self, path, baud=115200, log=None):
+        self.path = path
+        self.baud = baud
+        self.log = log
+        self.fd = None
+        self._buf = b""
+
+    def open(self):
+        # O_NOCTTY because this must not become the controlling terminal;
+        # a modem that drops DCD would otherwise send SIGHUP here.
+        # O_NONBLOCK because opening a serial port with no carrier blocks.
+        self.fd = os.open(self.path, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+        if os.fstat(self.fd).st_mode & 0o170000 == 0o020000:
+            self._configure_termios()
+        return self
+
+    def _configure_termios(self):
+        """Raw mode at the configured baud.
+
+        Guarded by the character-device test above rather than called
+        unconditionally, and that guard is what lets a test point --port at
+        a FIFO. It is also correct on its own terms: termios on a pipe
+        fails with ENOTTY, and a program that cannot be tested without
+        hardware is a program that is tested on hardware, one flash at a
+        time.
+        """
+        import termios
+
+        speed = getattr(termios, "B%d" % self.baud, None)
+        if speed is None:
+            raise AtError("no termios constant for baud %d" % self.baud)
+        attrs = termios.tcgetattr(self.fd)
+        iflag, oflag, cflag, lflag, ispeed, ospeed, cc = attrs
+        iflag &= ~(termios.IXON | termios.IXOFF | termios.ICRNL
+                   | termios.INLCR | termios.IGNCR)
+        oflag &= ~termios.OPOST
+        lflag &= ~(termios.ICANON | termios.ECHO | termios.ECHOE
+                   | termios.ISIG)
+        cflag |= termios.CLOCAL | termios.CREAD
+        # No hardware flow control. The modem's USB ports do not carry RTS
+        # and CTS, and leaving CRTSCTS set on a port with no CTS gives a
+        # write that blocks for ever rather than an error.
+        if hasattr(termios, "CRTSCTS"):
+            cflag &= ~termios.CRTSCTS
+        cc[termios.VMIN] = 0
+        cc[termios.VTIME] = 0
+        termios.tcsetattr(self.fd, termios.TCSANOW,
+                          [iflag, oflag, cflag, lflag, speed, speed, cc])
+
+    def close(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+    def _write(self, data):
+        self._trace(">", data)
+        while data:
+            try:
+                n = os.write(self.fd, data)
+            except OSError as exc:
+                if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
+                    select.select([], [self.fd], [], 1.0)
+                    continue
+                raise
+            data = data[n:]
+
+    def read_line(self, deadline):
+        """One line, or None once the deadline has passed.
+
+        Empty lines are dropped rather than returned. The modem frames
+        every response with them and a caller that had to skip them would
+        do it in five places and forget one.
+        """
+        while True:
+            if b"\n" in self._buf:
+                line, self._buf = self._buf.split(b"\n", 1)
+                text = line.decode("ascii", "replace").strip("\r \t")
+                if text:
+                    self._trace("<", text)
+                    return text
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            ready, _, _ = select.select([self.fd], [], [], remaining)
+            if not ready:
+                return None
+            chunk = os.read(self.fd, 512)
+            if not chunk:
+                # A FIFO whose writer has closed reads EOF for ever. Waiting
+                # for the deadline rather than spinning keeps the test's
+                # failure a timeout, which is legible, instead of a busy
+                # loop, which is not.
+                time.sleep(min(0.05, max(0.0, remaining)))
+                continue
+            self._buf += chunk
+
+    def command(self, text, timeout=10.0, collect=None):
+        """Send one command, gather its response, return (lines, final).
+
+        `collect` names a prefix whose unsolicited lines should be kept
+        even when they arrive before the command's own response, which is
+        how +CEREG behaves during an attach.
+        """
+        self._write(text.encode("ascii") + b"\r\n")
+        deadline = time.monotonic() + timeout
+        lines = []
+        while True:
+            line = self.read_line(deadline)
+            if line is None:
+                raise AtTimeout("no final result for %r in %.0fs"
+                                % (text, timeout))
+            if line == text:
+                continue  # the echo, if the modem still has ATE1 on
+            if FINAL_OK.match(line):
+                return lines, line
+            if FINAL_ERR.match(line):
+                raise AtError("%s -> %s" % (text, line))
+            lines.append(line)
+            if collect and line.startswith(collect):
+                return lines, ""
+
+    def send_raw(self, payload, timeout=10.0):
+        """Write bytes after the modem's `>` prompt and wait for its result.
+
+        Used for the CoAP datagram. The prompt is not a line, so it cannot
+        go through read_line.
+        """
+        deadline = time.monotonic() + timeout
+        while b">" not in self._buf:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AtTimeout("no send prompt")
+            ready, _, _ = select.select([self.fd], [], [], remaining)
+            if not ready:
+                raise AtTimeout("no send prompt")
+            self._buf += os.read(self.fd, 512)
+        self._buf = self._buf.split(b">", 1)[1]
+        self._write(payload)
+        while True:
+            line = self.read_line(deadline)
+            if line is None:
+                raise AtTimeout("no result after send")
+            if FINAL_OK.match(line):
+                return line
+            if FINAL_ERR.match(line):
+                raise AtError("send -> %s" % line)
+
+    def _trace(self, direction, data):
+        if self.log is None:
+            return
+        if isinstance(data, bytes):
+            data = data.decode("ascii", "replace").strip()
+        for part in str(data).splitlines():
+            if part.strip():
+                self.log("%s %s" % (direction, part.strip()))
+
+
+# ------------------------------------------------------------------ parsers
+#
+# Each of these returns a dict, and each reports what it could not read
+# rather than returning a blank that looks like a reading. A field that is
+# absent is absent; a field that was present and unparsable is an error the
+# caller can log, which is the difference between a gap and a lie.
+
+CEREG_RE = re.compile(r"\+CEREG:\s*(\d+),\s*(\d+)(.*)")
+CSQ_RE = re.compile(r"\+CSQ:\s*(\d+),\s*(\d+)")
+CPSMS_RE = re.compile(r'\+CPSMS:\s*(\d+)(?:,\s*([^,]*))?(?:,\s*([^,]*))?'
+                      r'(?:,\s*"([01]{8})")?(?:,\s*"([01]{8})")?')
+
+
+def parse_cereg(line):
+    """+CEREG: <n>,<stat>[,<tac>,<ci>,<AcT>[,,,<Active-Time>,<TAU>]]
+
+    stat 1 is registered on the home network, 5 is registered roaming.
+    Anything else is not attached, and 3 is a refusal worth surfacing.
+    """
+    match = CEREG_RE.match(line)
+    if not match:
+        return None
+    out = {"n": int(match.group(1)), "stat": int(match.group(2))}
+    out["registered"] = out["stat"] in (1, 5)
+    out["denied"] = out["stat"] == 3
+    # The granted PSM timers ride on the URC when <n> is 4. They are the
+    # numbers this project exists to read, so they are pulled out here
+    # rather than assumed from what was requested.
+    octets = re.findall(r'"([01]{8})"', match.group(3) or "")
+    if len(octets) >= 2:
+        out["granted_active"] = octets[-2]
+        out["granted_tau"] = octets[-1]
+    return out
+
+
+def parse_csq(line):
+    """+CSQ: <rssi>,<ber>, where rssi 99 means not known or not detectable."""
+    match = CSQ_RE.match(line)
+    if not match:
+        return None
+    raw = int(match.group(1))
+    out = {"raw": raw, "ber": int(match.group(2))}
+    out["dbm"] = None if raw == 99 else -113 + 2 * raw
+    return out
+
+
+def parse_cpsms(line):
+    """+CPSMS: <mode>,,,"<TAU>","<Active-Time>" as read back from the modem.
+
+    Read back, not requested. A network that refuses PSM leaves mode 0 here
+    while the configuration file still says it was asked for, which is
+    exactly the case acceptance criterion 4 exists to catch.
+    """
+    match = CPSMS_RE.match(line)
+    if not match:
+        return None
+    return {
+        "mode": int(match.group(1)),
+        "tau": match.group(4),
+        "active": match.group(5),
+    }
+
+
+CARECV_RE = re.compile(r"\+CARECV:\s*(\d+),(.*)", re.DOTALL)
+HEX_RE = re.compile(r"^[0-9A-Fa-f]+$")
+
+
+def parse_carecv(line):
+    """The bytes out of a +CARECV: <length>,<data> line, or None.
+
+    This exists because the first version of await_ack() handed the whole
+    line to coap_parse(), prefix included, so the parser read the letters
+    of "+CARECV:" as a CoAP version, type and code. It would have returned
+    a confident answer about a header that was never in the packet. The
+    test that would have caught it did not exist yet; designing the fake
+    modem is what surfaced it.
+
+    Two framings are accepted because it is not yet settled which one this
+    part will be asked for. The manual documents the data arriving as
+    itself, which is fine until a datagram contains a carriage return and
+    the line-oriented reader above cuts it in half. Hex avoids that
+    entirely at the cost of doubling the bytes on a link where bytes are
+    charge. Whichever is chosen, the length field is the check: a payload
+    whose decoded length disagrees with it is discarded rather than
+    guessed at.
+    """
+    match = CARECV_RE.match(line)
+    if not match:
+        return None
+    declared, body = int(match.group(1)), match.group(2)
+    if HEX_RE.match(body) and len(body) == declared * 2:
+        return bytes.fromhex(body)
+    raw = body.encode("latin-1", "replace")
+    if len(raw) != declared:
+        return None
+    return raw
+
+
+def decode_tau(octet):
+    """A GPRS Timer 3 octet as seconds.
+
+    Three bits of unit and five bits of count, and the unit table is not in
+    an order anyone would guess: 2 is decihours, 6 is 320 hours, and 7
+    means the timer is deactivated. Getting this wrong turns an eight hour
+    sleep into a ten minute one and the mistake is invisible in the
+    configuration.
+    """
+    if not octet or len(octet) != 8 or set(octet) - set("01"):
+        return None
+    unit, count = int(octet[:3], 2), int(octet[3:], 2)
+    table = {0: 600, 1: 3600, 2: 36000, 3: 2, 4: 30, 5: 60, 6: 1152000}
+    if unit == 7:
+        return 0  # deactivated
+    return count * table[unit]
+
+
+def decode_active(octet):
+    """A GPRS Timer 2 octet as seconds. A different table from Timer 3."""
+    if not octet or len(octet) != 8 or set(octet) - set("01"):
+        return None
+    unit, count = int(octet[:3], 2), int(octet[3:], 2)
+    table = {0: 2, 1: 60, 2: 360}
+    if unit == 7:
+        return 0
+    if unit not in table:
+        return None
+    return count * table[unit]
+
+
+# --------------------------------------------------------------------- CoAP
+#
+# RFC 7252, the confirmable subset, which is all a tracker needs: one POST,
+# one ACK, and a retransmission schedule for when the ACK does not come.
+
+COAP_VERSION = 1
+TYPE_CON, TYPE_ACK = 0, 2
+CODE_POST = 0x02
+OPTION_URI_PATH = 11
+ACK_TIMEOUT = 2.0
+ACK_RANDOM_FACTOR = 1.5
+MAX_RETRANSMIT = 4
+
+
+def coap_build_post(path, payload, message_id, token):
+    """One confirmable POST, as bytes."""
+    header = struct.pack("!BBH",
+                         (COAP_VERSION << 6) | (TYPE_CON << 4) | len(token),
+                         CODE_POST, message_id)
+    out = header + token
+    last = 0
+    for segment in [s for s in path.split("/") if s]:
+        out += coap_option(OPTION_URI_PATH - last, segment.encode("utf-8"))
+        last = OPTION_URI_PATH
+    if payload:
+        out += b"\xff" + payload
+    return out
+
+
+def coap_option(delta, value):
+    """One option, with the nibble extension encoding RFC 7252 defines.
+
+    The extension is the part that is easy to leave out and hard to notice:
+    it only fires for a delta or a length of 13 or more, and a Uri-Path of
+    twelve characters or fewer never reaches it. A server would reject the
+    first long path and nothing before it.
+    """
+    def nibble(value):
+        if value < 13:
+            return value, b""
+        if value < 269:
+            return 13, struct.pack("!B", value - 13)
+        return 14, struct.pack("!H", value - 269)
+
+    dn, dext = nibble(delta)
+    ln, lext = nibble(len(value))
+    return struct.pack("!B", (dn << 4) | ln) + dext + lext + value
+
+
+def coap_parse(data):
+    """Enough of a response to tell an acknowledgement from anything else."""
+    if len(data) < 4:
+        return None
+    first, code, message_id = struct.unpack("!BBH", data[:4])
+    return {
+        "version": first >> 6,
+        "type": (first >> 4) & 0x03,
+        "token_length": first & 0x0F,
+        "code": code,
+        "class": code >> 5,
+        "detail": code & 0x1F,
+        "message_id": message_id,
+        "ack": ((first >> 4) & 0x03) == TYPE_ACK,
+        "success": (code >> 5) == 2,
+    }
+
+
+def coap_retransmit_schedule(base=ACK_TIMEOUT, count=MAX_RETRANSMIT):
+    """The delays RFC 7252 asks for, as a list rather than as a loop.
+
+    A list because it is then a thing a test can assert about, and because
+    the randomisation is the part people drop: every device in a fleet
+    waking on the same hour and retransmitting on the same fixed schedule
+    is a small denial of service against the server they all report to.
+
+    `base` and `count` are settings rather than constants for one reason
+    that is not about the protocol: the defaults add up to thirty seconds
+    of waiting, and a test suite that takes thirty seconds to prove one
+    refusal is a suite people stop running.
+    """
+    delay = base * (1.0 + random.random() * (ACK_RANDOM_FACTOR - 1.0))
+    delays = []
+    for _ in range(count):
+        delays.append(delay)
+        delay *= 2
+    return delays
+
+
+# ------------------------------------------------------------- the machine
+
+
+class Tracker:
+    """The state machine.
+
+    Transitions are methods rather than a table, because each one has to do
+    something as well as decide something, and a table plus an action map
+    is two things to keep in step. The state name is recorded on every
+    change so the log reads as a trace of the diagram in the docstring.
+    """
+
+    def __init__(self, conf, port, gpio=None, log=None):
+        self.conf = conf
+        self.port = port
+        self.gpio = gpio or GpioTool(conf.get("marker_gpio", ""), log=log)
+        self.log = log or (lambda msg: None)
+        self.state = "OFF"
+        self.modem = MODEMS["sim7070g"]
+        self.attempts = 0
+        self.granted = {}
+        self.at_timeout = float(conf.get("at_timeout_s", 10))
+
+    def to(self, state, why=""):
+        if state not in STATES:
+            raise ValueError("no such state: %s" % state)
+        self.log("state %s -> %s%s" % (self.state, state,
+                                       (": " + why) if why else ""))
+        self.state = state
+        return state
+
+    # OFF -> BOOTING. The modem is powered by pulsing PWRKEY, which is a
+    # GPIO and therefore not this program's to drive: tracker-gpio owns it,
+    # for the same reason Project 15's lte-gpio owns that board's.
+    def power_on(self):
+        self.gpio.pwrkey_pulse()
+        return self.to("BOOTING", "PWRKEY pulsed")
+
+    # BOOTING -> CONFIGURED. Bare AT until it answers. A modem that has
+    # just been powered says nothing for several seconds and then says
+    # several things at once, so this is a poll and not a single command.
+    def wait_ready(self, timeout=20.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                self.port.command("AT", timeout=1.0)
+            except AtError:
+                continue
+            self.port.command("ATE0", timeout=self.at_timeout)
+            return self.to("CONFIGURED", "modem answers AT")
+        return self.to("FAILED", "no answer to AT in %.0fs" % timeout)
+
+    def configure(self, mode="3"):
+        """Radio, APN and the PSM request, in that order.
+
+        The order is not arbitrary. The radio has to be locked before an
+        attach can happen, or the modem may attach on GPRS while the
+        instrument is still rated for 1 A, and PSM has to be requested
+        before the attach because the request rides on it.
+        """
+        for template in self.modem["radio"]:
+            self.port.command(template.format(mode=mode),
+                              timeout=self.at_timeout)
+        apn = self.conf.get("apn", "")
+        if apn:
+            self.port.command(self.modem["apn"].format(apn=apn),
+                              timeout=self.at_timeout)
+        self.port.command("AT+CEREG=4", timeout=self.at_timeout)
+        self.request_psm()
+        return self.state
+
+    def request_psm(self):
+        tau = self.conf.get("psm_tau", "")
+        active = self.conf.get("psm_active", "")
+        if not tau or not active:
+            self.log("psm not requested: no timers configured")
+            return
+        self.port.command(self.modem["psm"].format(tau=tau, active=active),
+                          timeout=self.at_timeout)
+        cycle = self.conf.get("edrx_cycle", "")
+        if cycle:
+            self.port.command(self.modem["edrx"].format(cycle=cycle),
+                              timeout=self.at_timeout)
+
+    # CONFIGURED -> REGISTERED, or FAILED. This is the slowest step by a
+    # wide margin: an NB-IoT attach on a cold cell can take minutes, which
+    # is why attach_timeout_s is its own setting and not at_timeout_s.
+    def attach(self):
+        deadline = time.monotonic() + float(
+            self.conf.get("attach_timeout_s", 180))
+        while time.monotonic() < deadline:
+            lines, _ = self.port.command(self.modem["attach_query"],
+                                         timeout=self.at_timeout)
+            for line in lines:
+                status = parse_cereg(line)
+                if status is None:
+                    continue
+                if status.get("denied"):
+                    return self.to("FAILED", "network refused the attach")
+                if status.get("registered"):
+                    self.note_granted(status)
+                    return self.to("REGISTERED", "stat %d" % status["stat"])
+            time.sleep(float(self.conf.get("attach_poll_s", 2)))
+        return self.to("FAILED", "no attach before the deadline")
+
+    def note_granted(self, status):
+        """Record what the network gave, which is rarely what was asked.
+
+        This is acceptance criterion 4 and it is the reason the project has
+        an instrument at all. Reading it back is cheap; assuming it is how
+        a battery estimate becomes fiction.
+        """
+        for key in ("granted_tau", "granted_active"):
+            if key in status:
+                self.granted[key] = status[key]
+        if self.granted:
+            self.granted["tau_s"] = decode_tau(self.granted.get("granted_tau"))
+            self.granted["active_s"] = decode_active(
+                self.granted.get("granted_active"))
+            self.log("psm granted: TAU %s (%s s), Active %s (%s s)" % (
+                self.granted.get("granted_tau"), self.granted.get("tau_s"),
+                self.granted.get("granted_active"),
+                self.granted.get("active_s")))
+        else:
+            self.log("psm granted: nothing reported on +CEREG")
+
+    def read_psm(self):
+        """AT+CPSMS? as the second witness to the same fact.
+
+        Two sources for one number looks like belt and braces and is not:
+        the URC carries what the network sent at attach, this carries what
+        the modem currently believes, and Project 8's lesson is that a
+        claim written when it was true stays written after the thing
+        changes. A TAU ACCEPT later in the session moves one and not the
+        other.
+        """
+        lines, _ = self.port.command(self.modem["psm_query"],
+                                     timeout=self.at_timeout)
+        for line in lines:
+            parsed = parse_cpsms(line)
+            if parsed:
+                self.granted["cpsms"] = parsed
+                return parsed
+        return None
+
+    # REGISTERED -> SENDING -> REGISTERED or BACKOFF.
+    def report(self, payload):
+        """One position, once, with the marker around exactly the send.
+
+        The marker is what makes the current trace readable: the PPK2 sees
+        a logic channel go high here and low at the end, and the charge
+        integrated between those edges is the number in acceptance
+        criterion 6. It is deliberately around the send rather than around
+        the whole wake, so the figure measures the report and not the
+        program's own startup.
+        """
+        self.to("SENDING")
+        self.gpio.mark(True)
+        try:
+            acked = self.send_coap(payload)
+        finally:
+            self.gpio.mark(False)
+        if acked:
+            self.attempts = 0
+            return self.to("REGISTERED", "acknowledged")
+        # Every retry lives inside send_coap, as CoAP's own retransmission
+        # of a confirmable message, so by the time control arrives here the
+        # report has genuinely failed. The first version counted attempts
+        # out here instead and went back to REGISTERED to try again later,
+        # which was wrong twice over: this program sends one report and
+        # exits, so "later" was a counter that reset on every run and a
+        # retry that never happened; and retrying on a later wake means
+        # attaching again, when the cheap moment to try again is while the
+        # radio is still up.
+        self.attempts += 1
+        return self.to("BACKOFF", "no acknowledgement after %d transmissions"
+                       % self.retransmit_count())
+
+    def send_coap(self, payload):
+        """Open the modem's own UDP socket, POST, wait for the ACK.
+
+        Everything here goes over the AT port because there is no network
+        interface: see the module docstring.
+        """
+        host = self.conf.get("coap_host", "")
+        if not host:
+            raise AtError("no coap_host configured")
+        port = int(self.conf.get("coap_port", 5683))
+        message_id = random.randint(0, 0xFFFF)
+        token = struct.pack("!H", random.randint(0, 0xFFFF))
+        datagram = coap_build_post(self.conf.get("coap_path", ""), payload,
+                                   message_id, token)
+        self.port.command(self.modem["net_open"], timeout=60.0)
+        try:
+            self.port.command(
+                self.modem["udp_open"].format(host=host, port=port),
+                timeout=30.0)
+            # CoAP's confirmable retransmission, which is the only retry
+            # this program has. The same datagram goes out each time,
+            # message id and token unchanged, because that is what lets a
+            # server recognise the duplicate and answer it once rather
+            # than recording the same position four times.
+            for attempt, delay in enumerate(self.retransmit_schedule(), 1):
+                self.port.command(
+                    self.modem["udp_send"].format(length=len(datagram)),
+                    timeout=self.at_timeout, collect="+CASEND")
+                self.port.send_raw(datagram, timeout=30.0)
+                if self.await_ack(message_id, delay):
+                    if attempt > 1:
+                        self.log("acknowledged on transmission %d" % attempt)
+                    return True
+                self.log("no acknowledgement in %.1fs, retransmitting"
+                         % delay)
+            return False
+        finally:
+            # Closed in a finally because a socket left open is a modem
+            # kept awake, and a modem kept awake is the whole failure this
+            # project is about.
+            try:
+                self.port.command(self.modem["udp_close"],
+                                  timeout=self.at_timeout)
+                self.port.command(self.modem["net_close"], timeout=30.0)
+            except AtError as exc:
+                self.log("close failed, continuing: %s" % exc)
+
+    def retransmit_schedule(self):
+        return coap_retransmit_schedule(
+            base=float(self.conf.get("ack_timeout_s", ACK_TIMEOUT)),
+            count=int(self.conf.get("max_retransmit", MAX_RETRANSMIT)))
+
+    def retransmit_count(self):
+        return len(self.retransmit_schedule())
+
+    def await_ack(self, message_id, timeout):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            line = self.port.read_line(min(deadline,
+                                           time.monotonic() + 2.0))
+            if line is None:
+                continue
+            if not line.startswith("+CADATAIND"):
+                continue
+            lines, _ = self.port.command(
+                self.modem["udp_recv"].format(length=128),
+                timeout=self.at_timeout)
+            for candidate in lines:
+                data = parse_carecv(candidate)
+                if data is None:
+                    continue
+                reply = coap_parse(data)
+                if reply and reply["ack"] and \
+                        reply["message_id"] == message_id:
+                    return reply["success"]
+        return False
+
+    # REGISTERED -> ASLEEP. The one state with nothing in it, which is the
+    # point: the program exits and the modem is left alone. Anything that
+    # runs here costs current.
+    def sleep_until_next(self):
+        tau = self.granted.get("tau_s")
+        if tau:
+            self.log("sleeping on the network's TAU of %d s" % tau)
+        else:
+            self.log("no PSM granted; the host keeps its own interval")
+        return self.to("ASLEEP", "nothing further until the next report")
+
+    def backoff_delay(self):
+        """Exponential, from the configured base, capped at the interval.
+
+        Capped because a backoff longer than the report interval turns a
+        temporary server outage into a tracker that has stopped, and the
+        difference between those two is invisible from the server side.
+        """
+        base = float(self.conf.get("backoff_base_s", 60))
+        interval = float(self.conf.get("report_interval_s", 3600))
+        return min(base * (2 ** max(0, self.attempts - 1)), interval)
+
+
+class GpioTool:
+    """PWRKEY and the report marker, reached by running tracker-gpio.
+
+    By name through PATH, which is Project 15's seam and is here so the
+    state machine runs on a laptop. The marker is optional: with no GPIO
+    configured, mark() does nothing and says so once, because a bench
+    without the instrument attached should still be able to send a report.
+    """
+
+    def __init__(self, marker="", log=None):
+        self.marker = marker
+        self.log = log or (lambda msg: None)
+        self._warned = False
+        self._held = None
+
+    def run(self, *args):
+        return subprocess.run(["tracker-gpio", *args], check=True,
+                              capture_output=True, text=True)
+
+    def pwrkey_pulse(self):
+        self.log("pwrkey: pulsing")
+        self.run("pwrkey")
+
+    def mark(self, high):
+        """Start or stop the held marker.
+
+        Not a pair of set-the-line calls, which is what this was first. A
+        process that requests a GPIO, drives it and exits hands the line
+        back to the kernel, which makes it an input again, so "set high"
+        followed some seconds later by "set low" produces two brief spikes
+        and no interval between them. Integrating between those edges
+        measures nothing. So the line is held for as long as a process
+        lives and the interval ends when the process does.
+        """
+        if not self.marker:
+            if not self._warned:
+                self.log("no marker_gpio configured; the trace will have "
+                         "no report markers and criterion 6 cannot be met")
+                self._warned = True
+            return
+        if high:
+            if self._held is not None:
+                return
+            self._held = subprocess.Popen(
+                ["tracker-gpio", "marker-hold"],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            # Wait for the line to actually be high before returning, so
+            # the caller's next action is genuinely inside the marked
+            # interval. tracker-gpio announces and flushes for this.
+            if self._held.stdout is not None:
+                self._held.stdout.readline()
+            return
+        if self._held is None:
+            return
+        self._held.terminate()
+        try:
+            self._held.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            # A marker left high is a trace whose interval never ends,
+            # which is worse than no marker at all: it looks like a
+            # measurement.
+            self.log("marker did not release; killing it")
+            self._held.kill()
+            self._held.wait()
+        self._held = None
+
+
+# ------------------------------------------------------------------ plumbing
+
+
+def read_conf(path):
+    """Key=value, with the three Windows traps Project 1 lost a board to.
+
+    A byte order mark on the first key, CRLF endings, and a final line with
+    no newline. The third is the one that bites: a plain read loop ends
+    before the body runs and silently drops the last key, which is usually
+    the one most recently added.
+    """
+    conf = dict(DEFAULTS)
+    try:
+        with open(path, "r", encoding="utf-8-sig") as handle:
+            text = handle.read()
+    except FileNotFoundError:
+        return conf
+    for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        conf[key.strip()] = value.strip().strip('"')
+    return conf
+
+
+def make_payload(conf):
+    """What one report carries.
+
+    Short on purpose. Every byte is radio time and radio time is charge,
+    and a tracker that reports JSON with field names spends more of its
+    battery on the word "latitude" than on the number.
+    """
+    return ("%d,%s" % (int(time.time()), conf.get("coap_path", ""))).encode()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description="attach, report one position, sleep")
+    parser.add_argument("-c", "--conf", default=CONF)
+    parser.add_argument("-p", "--port",
+                        help="override the AT port; a FIFO works, which is "
+                             "how the test drives this with no modem")
+    parser.add_argument("--mode", default="3",
+                        choices=["1", "2", "3"],
+                        help="1 Cat-M, 2 NB-IoT, 3 let the modem choose")
+    parser.add_argument("--once", action="store_true",
+                        help="one report, then exit; the normal mode, "
+                             "because a timer starts the next one")
+    parser.add_argument("--no-power", action="store_true",
+                        help="skip PWRKEY: the modem is already on")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    args = parser.parse_args(argv)
+
+    def log(message):
+        sys.stderr.write("tracker: %s\n" % message)
+        sys.stderr.flush()
+
+    quiet = log if args.verbose else (lambda msg: None)
+    conf = read_conf(args.conf)
+    port = AtPort(args.port or conf["port"], int(conf["baud"]), log=quiet)
+    try:
+        port.open()
+    except OSError as exc:
+        log("cannot open %s: %s" % (args.port or conf["port"], exc))
+        return 2
+
+    tracker = Tracker(conf, port, log=log)
+    try:
+        if not args.no_power:
+            tracker.power_on()
+        else:
+            tracker.to("BOOTING", "--no-power")
+        if tracker.wait_ready() == "FAILED":
+            return 1
+        tracker.configure(mode=args.mode)
+        if tracker.attach() == "FAILED":
+            return 1
+        tracker.read_psm()
+        # Guarded rather than unconditional. Written without the guard, a
+        # report that reached BACKOFF was immediately moved to ASLEEP by
+        # the next line, so the program exited reporting the one state that
+        # means everything went well. A failure that overwrites itself with
+        # a success is worse than a crash.
+        if tracker.report(make_payload(conf)) == "REGISTERED":
+            tracker.sleep_until_next()
+        else:
+            log("backing off for %.0f s before the next report"
+                % tracker.backoff_delay())
+    except AtError as exc:
+        log("modem: %s" % exc)
+        return 1
+    finally:
+        port.close()
+    return 0 if tracker.state == "ASLEEP" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

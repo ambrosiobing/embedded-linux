@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+# One line of build system, because CMakeLists.txt is the single build
+# definition and debhelper knows how to drive it. Everything specific to
+# this package is in the .install files and the symbols file.
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=RelWithDebInfo

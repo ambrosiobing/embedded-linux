@@ -22,10 +22,21 @@ root filesystem are built directly, which is why this lives under
 `meta-bench/`. Project 4 already keeps scripts here, so the layout is not
 new.
 
-Two later projects depend on the result. Project 3 measures and shortens
+One later project depends on the result. Project 3 measures and shortens
 the boot this one produces, so the boot has to be measurable, which means
 `CONFIG_PRINTK_TIME=y` and a console that is attached from the SPL banner
-onward. Project 16 reuses the same small system for the cellular tracker.
+onward.
+
+**This paragraph used to say that Project 16 reuses the same small system
+for the cellular tracker. It does not, and cannot.** The root README
+assigns that project a Raspberry Pi 3, and the reason is physical rather
+than a preference: its modem is a SIM7070G on a standard Raspberry Pi
+40-pin GPIO extension header, and this board has a 24-pin header and a
+separate 4-pin debug UART. The HAT does not stack on it. The sentence is
+corrected here rather than deleted because it was the only place the two
+projects were connected, and a reader who remembers it should find out why
+it was wrong. See `projects/16-nbiot-tracker/docs/DESIGN.md`, which
+resolves the conflict in full.
 
 ## Figure 1: the boot chain, and where each stage lives
 

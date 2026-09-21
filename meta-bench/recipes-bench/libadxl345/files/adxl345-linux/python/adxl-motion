@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""adxl-motion - say when the sensor moved, and log it.
+
+The policy half of this project. adxl-map prints numbers; this decides
+what they mean and is the thing a service runs.
+
+WHY A RUNNING BASELINE AND NOT A FIXED THRESHOLD
+
+The sensor always reads about 1 g, because gravity does not switch off.
+A fixed threshold on the magnitude therefore has to be calibrated to the
+angle the board happens to be lying at, and it goes wrong the moment
+somebody props it against something. The baseline is the median of a
+window instead, so the detector measures CHANGE and needs no calibration
+and no level surface.
+
+Median rather than mean, because a single sharp knock would drag a mean
+baseline up behind it and mask the next event. A median ignores it.
+
+WHY N CONSECUTIVE BURSTS
+
+One burst over the threshold is a footstep on the bench, a cable being
+moved, or the fridge. Requiring several in a row costs latency measured
+in tenths of a second and removes nearly all of that.
+
+WHAT A RUNNING BASELINE COSTS, WHICH IS NOT OBVIOUS
+
+It is a high-pass filter, so SUSTAINED movement is absorbed. Keep the
+sensor moving and the moved readings become the median, the difference
+falls to zero, and the detector goes quiet with the sensor still moving.
+
+That is correct for "tell me when something changed" and wrong for "tell
+me while something is moving", and the two are easy to confuse while
+reading this file. The window sets how long sustained movement stays
+interesting: 32 bursts by default.
+
+Anything needing the second behaviour wants a fixed reference instead,
+and then it needs calibrating for the angle the board is lying at, which
+is the trade this file took the other side of. The property is asserted
+in tests/adxl345-motion-test.sh rather than merely described here; it was
+found by a test that expected the opposite.
+
+SPDX-License-Identifier: MIT
+"""
+
+import argparse
+import os
+import signal
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import adxl345  # noqa: E402
+
+
+def magnitude(sample):
+    """Length of one (x, y, z), in counts. Integer arithmetic on purpose:
+    the comparison below is against another integer and a float here buys
+    nothing but a rounding question."""
+    x, y, z = sample
+    return int((x * x + y * y + z * z) ** 0.5)
+
+
+def median(values):
+    ordered = sorted(values)
+    n = len(ordered)
+    if n == 0:
+        return 0
+    if n % 2:
+        return ordered[n // 2]
+    return (ordered[n // 2 - 1] + ordered[n // 2]) // 2
+
+
+class Detector:
+    """The decision, separated from the sensor so it can be tested.
+
+    Nothing in this class touches hardware, which is what lets the test
+    suite drive it with a list of numbers and assert on the transitions.
+    """
+
+    def __init__(self, window=32, threshold=64, consecutive=3):
+        self.window = window
+        self.threshold = threshold
+        self.consecutive = consecutive
+        self.history = []
+        self.run = 0
+        self.moving = False
+
+    def feed(self, samples):
+        """One burst. Returns 'start', 'stop' or None."""
+        if not samples:
+            return None
+
+        burst = median([magnitude(s) for s in samples])
+        self.history.append(burst)
+        if len(self.history) > self.window:
+            self.history.pop(0)
+
+        # Until the window has filled there is no baseline worth
+        # comparing against, so the detector stays quiet rather than
+        # firing on its own start-up transient.
+        if len(self.history) < self.window:
+            return None
+
+        baseline = median(self.history)
+        if abs(burst - baseline) > self.threshold:
+            self.run += 1
+        else:
+            self.run = 0
+
+        if not self.moving and self.run >= self.consecutive:
+            self.moving = True
+            return "start"
+        if self.moving and self.run == 0:
+            self.moving = False
+            return "stop"
+        return None
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("-d", "--device", default="/dev/i2c-1")
+    p.add_argument("-a", "--address", default="0x53")
+    p.add_argument("-i", "--int-gpio", type=int, default=-1,
+                   help="BCM offset of INT1, or omit to poll")
+    p.add_argument("-t", "--threshold", type=int, default=64,
+                   help="counts of change, about 250 mg at the default")
+    p.add_argument("-n", "--consecutive", type=int, default=3)
+    p.add_argument("--window", type=int, default=32)
+    args = p.parse_args()
+
+    stopping = {"now": False}
+
+    def on_signal(_sig, _frm):
+        stopping["now"] = True
+
+    signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGTERM, on_signal)
+
+    try:
+        sensor = adxl345.Sensor(args.device.encode(),
+                                int(args.address, 0), args.int_gpio)
+    except OSError as exc:
+        # The journal is the only place this is read from under systemd,
+        # so the message has to carry the cause rather than a code.
+        print("adxl-motion: %s" % exc, file=sys.stderr)
+        return 1
+
+    detector = Detector(args.window, args.threshold, args.consecutive)
+
+    with sensor:
+        sensor.start()
+        # Unbuffered enough for journalctl -f to be useful. Without this
+        # the output arrives in 4 kB lumps and a service that logs one
+        # line a minute appears to be dead.
+        while not stopping["now"]:
+            try:
+                burst = sensor.read()
+            except OSError as exc:
+                print("adxl-motion: read failed: %s" % exc, file=sys.stderr)
+                return 1
+            event = detector.feed(burst)
+            if event:
+                print("%s %s" % (time.strftime("%Y-%m-%dT%H:%M:%S"), event),
+                      flush=True)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

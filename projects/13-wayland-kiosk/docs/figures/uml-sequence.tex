@@ -1,0 +1,72 @@
+% One touch, from the glass to the widget callback.
+%
+% Six boundaries, and each one has a different tool. That is the project:
+% a touch that does nothing has failed at exactly one of these arrows,
+% and the tools bisect it in about four commands.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\scriptsize]
+
+  \def\ybot{-11.4}
+
+  \foreach \x/\txt in {
+      0/{FT5406},
+      2.7/{\texttt{edt\_ft5x06}},
+      5.4/{evdev},
+      8.1/{libinput\\(inside weston)},
+      10.8/{weston\\kiosk shell},
+      13.8/{\texttt{bench-hmi}\\(LVGL)}} {
+    \node[actor, text width=21mm] at (\x,0) {\txt};
+    \draw[lifeline] (\x,-0.62) -- (\x,\ybot);
+  }
+
+  %% ---------------- touch down ----------------
+  \draw[irq] (0,-1.1) -- node[lbl, above] {INT low} (2.7,-1.1);
+  \node[activation, minimum height=16mm] at (2.7,-1.9) {};
+  \draw[msg] (2.7,-1.7) -- node[lbl, below] {I2C read: one point, x, y} (0,-1.7);
+  \draw[msg] (2.7,-2.7) -- node[lbl, above]
+       {\texttt{ABS\_MT\_POSITION\_X/Y}, \texttt{BTN\_TOUCH}, \texttt{SYN}} (5.4,-2.7);
+  \node[umlnote, anchor=west, text width=26mm] at (5.6,-2.2)
+       {\texttt{evtest} sees it here};
+
+  \draw[msg] (5.4,-3.6) -- node[lbl, above] {\texttt{read()}: \texttt{input\_event[]}} (8.1,-3.6);
+  \node[activation, minimum height=16mm] at (8.1,-4.4) {};
+  \node[umlnote, anchor=west, text width=32mm] at (8.3,-4.3)
+       {calibration matrix, then\\mapped to the \textbf{rotated}
+        output.\\\texttt{libinput debug-events}\\sees it here};
+
+  \draw[msg] (8.1,-5.6) -- node[lbl, above] {\texttt{TOUCH\_DOWN}, \texttt{TOUCH\_FRAME}} (10.8,-5.6);
+  \node[activation, minimum height=7mm] at (10.8,-5.9) {};
+  \draw[msg] (10.8,-6.4) -- node[lbl, above]
+       {\texttt{wl\_touch.down(serial, id, x, y)}, \texttt{frame}} (13.8,-6.4);
+
+  \node[activation, minimum height=24mm] at (13.8,-7.6) {};
+  \node[umlnote, anchor=east, text width=34mm] at (13.6,-7.4)
+       {\texttt{WAYLAND\_DEBUG=1} on the\\\textbf{client} sees it here.\\
+        \texttt{lv\_indev} reads PRESSED,\\the button callback runs,\\
+        \texttt{lv\_timer\_handler} redraws};
+
+  %% ---------------- redraw ----------------
+  \draw[msg] (13.8,-9.0) -- node[lbl, above]
+       {\texttt{wl\_surface.attach}, \texttt{damage}, \texttt{commit}} (10.8,-9.0);
+  \node[activation, minimum height=9mm] at (10.8,-9.5) {};
+  \draw[msg] (10.8,-10.0) -- node[lbl, above, pos=0.42]
+       {\texttt{drmModeAtomicCommit} on \texttt{vc4}, page flip at vblank} (2.7,-10.0);
+  \draw[reply] (10.8,-10.7) -- node[lbl, below]
+       {\texttt{wl\_callback.done} (next frame)} (13.8,-10.7);
+
+  %% ---------------- the reading of it ----------------
+  \node[umlnote, anchor=north west, text width=140mm, align=left]
+       at (-1.0,-11.9)
+       {\textbf{Six boundaries, six tools.} A touch that does nothing has
+        failed at exactly one of these arrows. Walk them from the bottom
+        of the stack up: \texttt{evtest}, then
+        \texttt{libinput debug-events}, then \texttt{wayland-info} for
+        the seat capability, then \texttt{WAYLAND\_DEBUG} on the client.
+        Each one either shows the event or does not, and the first that
+        does not is the layer to fix.};
+
+\end{tikzpicture}
+\end{document}

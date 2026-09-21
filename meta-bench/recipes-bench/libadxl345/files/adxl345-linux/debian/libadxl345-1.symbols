@@ -1,0 +1,14 @@
+# The exported ABI, pinned. dpkg-gensymbols compares the built library
+# against this list and fails the build when they disagree, which is what
+# turns "exactly six symbols" from a wish into a build-time guarantee.
+#
+# An accidental export shows up here as a new symbol and fails. A removed
+# one fails too. Either way the fix is a deliberate decision about the
+# soname rather than a surprise for whoever linked against 1.0.
+libadxl345.so.1 libadxl345-1 #MINVER#
+ adxl_close@Base 1.0.0
+ adxl_open@Base 1.0.0
+ adxl_read@Base 1.0.0
+ adxl_start@Base 1.0.0
+ adxl_stop@Base 1.0.0
+ adxl_version@Base 1.0.0

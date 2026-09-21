@@ -8,6 +8,7 @@
 #   ./go dev          build the debugging variant
 #   ./go rpi3         build the same layer for a Raspberry Pi 3
 #   ./go router       build bench-router-image, the LTE router of Project 15
+#   ./go tracker      build bench-tracker-image, Project 16's NB-IoT tracker
 #   ./go release      build with SBOM, CVE check and source archive
 #   ./go rt           build bench-rt-image, the PREEMPT_RT lab of Project 8
 #   ./go rt-generic   the same image on the same kernel, without PREEMPT_RT
@@ -20,12 +21,14 @@
 #   ./go adxl345      build bench-adxl345-image, the ADXL345 driver of Project 5
 #   ./go explorer     build bench-explorer-image, the Explorer 700 of Project 6
 #   ./go lcd35a       build bench-lcd35a-image, the DRM panel of Project 7
+#   ./go userdrv      build bench-userdrv-image, the ADXL345 library of Project 11
 #   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
 #   ./go ab           build bench-ab-image, the A/B update card of Project 19
 #   ./go ab-bundle    build a signed RAUC bundle from that same configuration
 #   ./go ab-broken    the bundle that must roll back: criterion 5
 #   ./go ab-wrong     the bundle that must be refused: criterion 7
 #   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
+#   ./go kiosk        build bench-kiosk-image, the Wayland HMI of Project 13
 #   ./go debug        build bench-debug-image, the debugging lab of Project 9
 #   ./go debug-kasan  the same lab with KASAN on, which is a second kernel
 #   ./go proxy        split the console cable into a gdb port and a terminal
@@ -61,6 +64,7 @@ build)      exec sh ./scripts/build.sh bench-rpi4 ;;
 dev)        exec sh ./scripts/build.sh bench-dev ;;
 rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
 router)     exec sh ./scripts/build.sh bench-router ;;
+tracker)    exec sh ./scripts/build.sh bench-tracker ;;
 release)    exec sh ./scripts/build.sh bench-release ;;
 rt)         exec sh ./scripts/build.sh bench-rt ;;
 rt-generic) exec sh ./scripts/build.sh bench-rt-generic ;;
@@ -72,12 +76,14 @@ iio)        exec sh ./scripts/build.sh bench-iio ;;
 adxl345)    exec sh ./scripts/build.sh bench-adxl345 ;;
 explorer)   exec sh ./scripts/build.sh bench-explorer ;;
 lcd35a)     exec sh ./scripts/build.sh bench-lcd35a ;;
+userdrv)    exec sh ./scripts/build.sh bench-userdrv ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
 ab)         exec sh ./scripts/build.sh bench-rpi3-ab ;;
 ab-bundle)  exec sh ./scripts/build.sh bench-ab-bundle ;;
 ab-broken)  exec sh ./scripts/build.sh bench-ab-bundle-broken ;;
 ab-wrong)   exec sh ./scripts/build.sh bench-ab-bundle-wrong ;;
 tee)        exec sh ./scripts/build.sh bench-tee ;;
+kiosk)      exec sh ./scripts/build.sh bench-kiosk ;;
 debug)      exec sh ./scripts/build.sh bench-debug ;;
 debug-kasan) exec sh ./scripts/build.sh bench-debug-kasan ;;
 proxy)      shift; exec sh ./projects/09-kernel-debug/host/agent-proxy.sh "$@" ;;

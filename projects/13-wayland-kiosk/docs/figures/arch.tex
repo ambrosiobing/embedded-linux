@@ -1,0 +1,108 @@
+% The graphics stack from panel to widget.
+%
+% The drawing makes two points that the prose takes a paragraph each for:
+% there are TWO DRM cards and only one of them has connectors, and only
+% the compositor opens DRM and evdev. The client owns nothing.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[node distance=4mm and 8mm]
+
+  %% ---------------- hardware ----------------
+  \node[hw] (panel) {7 inch DSI panel\\[-1pt]
+                     {\scriptsize 800x480, backlight MCU on I2C}};
+  \node[hw, right=of panel] (touch) {FT5406 touch\\[-1pt]
+                     {\scriptsize I2C inside the DSI ribbon}};
+  \node[hw, right=of touch] (kbd) {Pi keyboard\\[-1pt]
+                     {\scriptsize USB HID}};
+  \node[hw, right=of kbd] (gpu) {VideoCore VI\\[-1pt]
+                     {\scriptsize HVS, DSI encoder, V3D core}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fit=(panel)(touch)(kbd)(gpu), inner ysep=7pt] (hwl) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (hwl.north west) {HARDWARE};
+
+  %% ---------------- kernel ----------------
+  \node[kern, above=12mm of panel] (vc4)
+       {\texttt{vc4} DRM/KMS\\[-1pt]
+        {\scriptsize DSI-1, CRTC, planes}\\[-1pt]
+        {\scriptsize \texttt{panel-raspberrypi-touchscreen}}};
+  \node[kern, above=12mm of touch] (ft)
+       {\texttt{edt\_ft5x06} + evdev\\[-1pt]
+        {\scriptsize \texttt{/dev/input/eventN}}};
+  \node[kern, above=12mm of kbd] (hid)
+       {\texttt{usbhid} + evdev\\[-1pt]
+        {\scriptsize \texttt{/dev/input/eventM}}};
+  \node[kern, above=12mm of gpu] (v3d)
+       {\texttt{v3d} render node\\[-1pt]
+        {\scriptsize \texttt{/dev/dri/renderD128}}\\[-1pt]
+        {\scriptsize \textbf{no connectors}}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fit=(vc4)(ft)(hid)(v3d), inner ysep=7pt] (kl) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (kl.north west) {KERNEL};
+
+  \draw[bus] (panel) -- node[lbl, right] {DSI} (vc4);
+  \draw[irq] (touch) -- node[lbl, right] {IRQ, I2C} (ft);
+  \draw[irq] (kbd) -- node[lbl, right] {USB} (hid);
+  \draw[bus] (gpu) -- (v3d);
+
+  %% ---------------- user space ----------------
+  \node[seat, above=12mm of vc4] (seatd)
+       {\texttt{seatd}\\[-1pt]{\scriptsize seat0, hands out fds}};
+  \node[comp, above=12mm of ft, xshift=20mm, minimum width=52mm] (weston)
+       {\texttt{weston}, kiosk shell\\[-1pt]
+        {\scriptsize \textbf{DRM MASTER}, libinput, xkbcommon, EGL/GBM}};
+  \node[client, above=12mm of v3d] (mesa)
+       {Mesa \texttt{v3d}\\[-1pt]{\scriptsize GLES for the compositor}};
+
+  \node[client, above=10mm of weston, minimum width=46mm] (hmi)
+       {\texttt{bench-hmi} (LVGL 9.3)\\[-1pt]
+        {\scriptsize \texttt{xdg\_toplevel}, \texttt{wl\_touch}, \texttt{wl\_keyboard}}};
+  \node[seat, above=10mm of seatd] (sysd)
+       {\texttt{systemd}\\[-1pt]{\scriptsize unit on tty1, PAM session}};
+  \node[file, above=10mm of mesa] (files)
+       {\texttt{/proc}, \texttt{/sys}, \texttt{/run/bench}\\[-1pt]
+        {\scriptsize metrics and the Project 1 state}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fit=(seatd)(weston)(mesa)(hmi)(sysd)(files), inner ysep=7pt]
+         (ul) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (ul.north west) {USER SPACE};
+
+  %% ---------------- the crossings ----------------
+  \draw[bus] (vc4) -- node[lbl, right, align=left]
+       {the card WITH\\connectors} (seatd);
+  \draw[bus] (ft.north) -- node[lbl, right] {evdev} (ft.north |- weston.south);
+  \draw[bus] (hid.north) -- node[lbl, right] {evdev} (hid.north |- weston.south);
+  \draw[bus] (v3d) -- (mesa);
+
+  \draw[flow] (seatd.east) -- node[lbl, above] {fds} (weston.west);
+  \draw[bus] (weston) -- node[lbl, right] {Wayland socket} (hmi);
+  \draw[flow] (mesa.west) -- (weston.east);
+  \draw[flow] (sysd.east) to[out=0, in=180] node[lbl, above, pos=0.3] {starts} (hmi.west);
+  \draw[flow] (files.west) -- node[lbl, above] {500 ms} (hmi.east);
+
+  %% ---------------- the two notes ----------------
+  \node[umlnote, anchor=north west, text width=76mm]
+       at ($(hwl.south west)+(0,-5mm)$)
+       {\textbf{Two DRM cards, and only one has connectors.} A compositor
+        that opens the \texttt{v3d} node reports ``no outputs'' and
+        nothing else. \texttt{drm\_info} resolves it in seconds. The card
+        NUMBERING is not stable across kernel versions, so nothing here
+        hardcodes a number without checking it first.};
+
+  \node[umlnote, anchor=north east, text width=76mm]
+       at ($(hwl.south east)+(0,-5mm)$)
+       {\textbf{Only the compositor opens DRM and evdev.} The client has
+        neither the permission nor a reason: it receives
+        \texttt{wl\_touch} and \texttt{wl\_keyboard} over a socket. An
+        application reading \texttt{/dev/input} directly is a design that
+        has gone wrong.};
+
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,6 @@
+adxl345 (1.0.0) unstable; urgency=medium
+
+  * Initial packaging: the runtime library, the development files and
+    the reader with its udev rule.
+
+ -- Joseph Ambrose Pagaran <jagp.coin@proton.me>  Mon, 21 Sep 2026 12:00:00 +0200

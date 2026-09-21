@@ -145,6 +145,33 @@ else
 		fail=1
 	fi
 
+	step "compile tracker-gpio against host libgpiod"
+	# Project 16's power key and instrument marker. Same treatment as
+	# lte-gpio, which it deliberately does not share a package with: that
+	# one lives in bench-lte, whose package drags ModemManager and
+	# NetworkManager into any image that installs it, and this project's
+	# whole argument is that a tracker installs neither.
+	#
+	# "info" is the subcommand to run here because it is the only one that
+	# touches no line. "pwrkey" and "marker-hold" both refuse without an
+	# offset in the configuration, which is correct on a board and would be
+	# a confusing non-zero exit in a check.
+	out=$(mktemp -d)/tracker-gpio
+	tracker_src=meta-bench/recipes-bench/bench-tracker/files/tracker-gpio.c
+	# Word splitting on the pkg-config output is intended here too.
+	# shellcheck disable=SC2046
+	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \
+		"$tracker_src" -o "$out" $(pkg-config --libs libgpiod); then
+		echo "compiled clean with -Werror"
+		if timeout 5 "$out" info; then
+			echo "reports its configuration and refuses what is unset"
+		else
+			fail=1
+		fi
+	else
+		fail=1
+	fi
+
 	step "compile the real-time toggler against host libgpiod"
 	# Project 8's instrument. It is the one program here that is
 	# measured rather than merely run, so a warning about a conversion

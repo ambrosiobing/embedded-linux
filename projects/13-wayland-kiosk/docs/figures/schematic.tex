@@ -1,0 +1,102 @@
+% One ribbon, two wires, and a power budget.
+%
+% The wiring is almost nothing. The drawing exists for the two facts that
+% are not obvious from it and that both cost a bring-up: where the panel
+% takes its power from, and that the touch I2C is already in the ribbon
+% on a Raspberry Pi 4.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small]
+
+  %% ---------------- the board ----------------
+  \node[hw, minimum width=52mm, minimum height=58mm, align=center] (pi) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(pi.north)+(0,-3mm)$) {Raspberry Pi 4};
+
+  \coordinate (disp) at ($(pi.north east)+(0,-14mm)$);
+  \coordinate (p2)   at ($(pi.east)+(0,6mm)$);
+  \coordinate (p6)   at ($(pi.east)+(0,1mm)$);
+  \coordinate (p8)   at ($(pi.east)+(0,-8mm)$);
+  \coordinate (p10)  at ($(pi.east)+(0,-13mm)$);
+  \coordinate (p9)   at ($(pi.east)+(0,-18mm)$);
+  \coordinate (usb)  at ($(pi.west)+(0,-6mm)$);
+  \coordinate (pwr)  at ($(pi.south)+(-10mm,0)$);
+
+  \node[font=\sffamily\scriptsize, anchor=east, inner sep=1pt]
+       at ($(disp)+(-1mm,0)$) {DISPLAY connector};
+  \fill[linecol] (disp) circle (0.8mm);
+
+  \foreach \p/\name in {p2/{pin 2\ \ 5V}, p6/{pin 6\ \ GND},
+                        p8/{pin 8\ \ GPIO14}, p10/{pin 10\ GPIO15},
+                        p9/{pin 9\ \ GND}} {
+    \fill[linecol] (\p) circle (0.6mm);
+    \node[font=\sffamily\scriptsize, anchor=east, inner sep=1pt]
+         at ($(\p)+(-1mm,0)$) {\name};
+  }
+
+  %% ---------------- the panel ----------------
+  \node[hw, right=44mm of pi, minimum width=44mm, minimum height=40mm,
+        align=center, yshift=8mm] (panel)
+       {7 inch DSI panel\\[-1pt]
+        {\scriptsize 800x480}\\[6mm]
+        {\scriptsize adapter board on the back}};
+
+  % the ribbon: video AND touch i2c together
+  \draw[bus, very thick] (disp) -- node[lbl, align=center, pos=0.5]
+       {15-way FPC ribbon\\DSI video \textbf{and} touch I2C}
+       (panel.west |- disp);
+
+  % power from the header
+  \draw[thick, red!60!black] (p2) -- ++(20mm,0) |- ($(panel.west)+(0,-12mm)$);
+  \node[lbl, anchor=south] at ($(p2)+(12mm,0.5mm)$) {5V, about 450 mA};
+  \draw[thick] (p6) -- ++(16mm,0) |- ($(panel.west)+(0,-16mm)$);
+  \node[lbl, anchor=south] at ($(p6)+(10mm,0.5mm)$) {GND};
+
+  %% ---------------- console, for boot timing only ----------------
+  \node[seat, below right=2mm and 30mm of p10, align=left,
+        font=\sffamily\scriptsize, minimum height=14mm] (ttl)
+       {USB/TTL cable\\[-1pt]
+        white = RX, green = TX, black = GND\\[-1pt]
+        \textcolor{badcol}{red = 5V, LEFT OPEN}};
+  \draw[thick] (p8) -- ++(8mm,0) |- (ttl.west);
+  \draw[thick] (p10) -- ++(6mm,0) |- ($(ttl.west)+(0,-2mm)$);
+  \draw[thick] (p9) -- ++(4mm,0) |- ($(ttl.west)+(0,-4mm)$);
+  \node[lbl, anchor=west] at ($(ttl.south)+(-18mm,-3mm)$)
+       {only for the boot-time measurements};
+
+  %% ---------------- keyboard and supply ----------------
+  \node[hw, left=12mm of usb, align=center, font=\sffamily\scriptsize] (kbd)
+       {official Pi keyboard\\[-1pt]USB HID, and a 3 port hub};
+  \draw[bus] (kbd.east) -- node[lbl] {USB-A} (usb);
+
+  \node[seat, below=10mm of pwr, align=center, font=\sffamily\scriptsize]
+       (sup) {3 A USB-C supply};
+  \draw[thick] (pwr) -- (sup);
+
+  %% ---------------- the two notes that cost a bring-up ----------------
+  \node[umlnote, anchor=north west, text width=92mm, align=left]
+       at ($(pi.south west)+(0,-26mm)$)
+       {\textbf{Power the panel from header pins 2 and 6, not from a USB
+        port.} The panel itself works either way. The touch controller's
+        power sequencing does not, on some revisions, and the symptom is
+        a picture with no touch, which sends you looking at evdev.};
+
+  \node[umlnote, anchor=north west, text width=92mm, align=left]
+       at ($(pi.south west)+(0,-44mm)$)
+       {\textbf{On the Pi 4 the touch I2C is inside the DSI ribbon.} The
+        SDA and SCL jumper wires in older wiring guides are for earlier
+        boards. Adding them here is not harmless: it puts a second driver
+        on the same bus.};
+
+  \node[umlnote, anchor=north west, text width=92mm, align=left]
+       at ($(pi.south west)+(0,-62mm)$)
+       {\textbf{Budget:} panel and backlight about 450 mA, keyboard hub
+        up to 200 mA more with a mouse, and the Pi 4 peaks above 1 A
+        under load. Watch \texttt{dmesg} for ``Undervoltage detected'': a
+        brown-out during boot shows as a black panel with the backlight
+        ON, which reads exactly like a KMS problem and is not one.};
+
+\end{tikzpicture}
+\end{document}

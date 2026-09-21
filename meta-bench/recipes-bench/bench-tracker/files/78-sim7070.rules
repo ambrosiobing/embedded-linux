@@ -1,0 +1,48 @@
+# A stable name for the modem's AT port, and a way to find out which one it is.
+#
+# THIS FILE IS DELIBERATELY INCOMPLETE ON MONDAY 21 SEPTEMBER 2026, and it
+# is incomplete in a way that still does useful work rather than in a way
+# that waits.
+#
+# What is known. 1e0e is SIMCom's USB vendor id. That is not a guess: this
+# repository already matches on it for the SIM7600E-H, in
+# meta-bench/recipes-bench/bench-router/files/77-sim7600.rules, against a
+# part that has been on a board and enumerated.
+#
+# What is not known. The SIM7070G's product id, and which of its several
+# tty interfaces carries AT. Both have to be read off the board with lsusb
+# and dmesg, and neither is written here from memory. Project 1 lost two
+# rounds to a wlan0 that was assumed, and Project 8 lost a flash to a
+# spidev that was.
+#
+# So the first rule below names every SIMCom tty by its interface number
+# instead of naming one of them AT. Plug the HAT in, boot, and:
+#
+#     ls -l /dev/tracker-tty-*
+#     lsusb -d 1e0e:
+#     for p in /dev/tracker-tty-*; do
+#         printf 'AT\r\n' > "$p"; head -n 2 < "$p"
+#     done
+#
+# The interface that answers OK is the AT port. Record the product id and
+# that interface number in projects/16-nbiot-tracker/docs/evidence/, then
+# fill in and uncomment the second rule, and the tracker's default port of
+# /dev/tracker-at starts working.
+#
+# Matching on the vendor alone is broader than this repository's habit, and
+# it is safe here for a reason worth stating rather than assuming: the
+# bench has two SIMCom modems and they are not both plugged in at once,
+# because they are both 40-pin HATs and there is one header. If that ever
+# stops being true, this rule becomes ambiguous and the product id has to
+# be added to it as well.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1e0e", \
+	SYMLINK+="tracker-tty-$env{ID_USB_INTERFACE_NUM}"
+
+# The real rule, once the board has been read. Two values to fill in.
+#SUBSYSTEM=="tty", ATTRS{idVendor}=="1e0e", ATTRS{idProduct}=="XXXX", \
+#	ENV{ID_USB_INTERFACE_NUM}=="XX", SYMLINK+="tracker-at"
+
+# Nothing on this image manages modems, so there is no ModemManager filter
+# policy to argue with and no ID_MM_PORT_IGNORE lines are needed here. That
+# is the difference between this image and Project 15's, stated where
+# someone comparing the two rule files will look for it.

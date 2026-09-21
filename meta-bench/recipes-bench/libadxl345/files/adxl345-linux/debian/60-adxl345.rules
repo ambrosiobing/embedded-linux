@@ -1,0 +1,12 @@
+# Reading the sensor needs no root, and this is the whole mechanism.
+#
+# Raspberry Pi OS already ships a rule like this; a plain Debian does
+# not, which is why the package carries its own. Membership of the group
+# is what a user gets, rather than sudo on a program that talks to a bus.
+KERNEL=="i2c-[0-9]*", GROUP="i2c", MODE="0660"
+
+# The service asks for the gpio group too, because INT1 is reached
+# through the GPIO character device. Without this rule that group
+# grants nothing and the interrupt path silently falls back to
+# polling, which works and hides the misconfiguration.
+SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"

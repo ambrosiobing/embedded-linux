@@ -1,0 +1,32 @@
+[Unit]
+Description=Report a position on an interval
+Documentation=https://github.com/ambrosiobing/embedded-linux
+
+[Timer]
+# The first report waits for the system to settle rather than racing the
+# USB enumeration that creates the modem's tty. The service's
+# ConditionPathExists covers a missing configuration; nothing covers a port
+# that has not appeared yet except waiting for it.
+OnBootSec=60
+# One hour, matching report_interval_s in tracker.conf. The two values are
+# written in two places and nothing keeps them in step, which is a real
+# defect rather than a tidy one: the program uses its own value to size the
+# backoff cap, and this one decides when it actually runs. If a bench
+# changes the interval, both have to move. Worth collapsing into a
+# generated unit once there is a second interval to support.
+OnUnitActiveSec=1h
+# Spread the fleet. Every device reporting on the hour is a server that
+# sees its whole load in one second, and on a shared cell it is also every
+# radio transmitting at once.
+RandomizedDelaySec=300
+# Survive a reboot without losing the schedule, so a board that restarts
+# does not report immediately and then again an hour later.
+Persistent=true
+# Do not wake the system to send. If the processor has reached a deeper
+# idle state, the report can wait for it to come out on its own: the whole
+# project is about charge, and waking a Pi to talk to a modem that is
+# itself asleep spends on both ends.
+WakeSystem=false
+
+[Install]
+WantedBy=timers.target

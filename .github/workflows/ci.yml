@@ -62,7 +62,12 @@ jobs:
           # skips where dtc is absent, so without this package the
           # assertion would be written and never run, which is worse
           # than not having it.
-          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev device-tree-compiler
+          # cmake: Project 11 is a CMake library, and
+          # tests/adxl345-build-test.sh configures, builds and runs it
+          # against its fake bus. Without cmake that suite skips its
+          # compile section and says so, which would make its own skip
+          # message ("CI installs cmake and does compile it") false.
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev device-tree-compiler cmake
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
@@ -120,6 +125,45 @@ jobs:
         # three-hour image build.
         run: |
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-lte/files/lte-gpio.c -o /tmp/lte-gpio $(pkg-config --libs libgpiod)
+
+      - name: Compile the tracker control tool
+        # Project 16's power key and instrument marker. A separate binary
+        # from Project 15's above on purpose: that one ships in bench-lte,
+        # whose package drags ModemManager and NetworkManager into any
+        # image installing it, and a tracker installs neither.
+        run: |
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-tracker/files/tracker-gpio.c -o /tmp/tracker-gpio $(pkg-config --libs libgpiod)
+
+      - name: tracker-gpio reports its state and refuses an unset pin
+        # Both directions, because a guard that has never refused is
+        # indistinguishable from a guard that is not there. "info" touches
+        # no line and must succeed; "pwrkey" must refuse with exit 2,
+        # because a runner has no /etc/bench/tracker.conf and therefore no
+        # offset. There is no default offset on purpose: a GPIO offset is a
+        # property of a HAT on a board revision, and a wrong one drives
+        # whatever else is on the pin.
+        run: |
+          /tmp/tracker-gpio info
+          # The status is captured rather than tested in an if condition.
+          # This step runs under bash -e, so the expected non-zero would
+          # end the step before it could be checked, and reading $? out of
+          # an elif after a failed condition is a trick that works and that
+          # nobody should have to verify while reading a CI log.
+          set +e
+          /tmp/tracker-gpio pwrkey
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "tracker-gpio drove a pin with no offset configured."
+            exit 1
+          fi
+          if [ "$status" -ne 2 ]; then
+            echo "tracker-gpio refused with exit $status, not the"
+            echo "documented exit 2, so something other than the missing"
+            echo "offset stopped it."
+            exit 1
+          fi
+          echo "refused an unset pwrkey_gpio with exit 2, as it must"
 
       - name: Compile the real-time toggler
         # Project 8's instrument. A number that reaches a results table

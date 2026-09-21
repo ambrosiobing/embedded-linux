@@ -1,0 +1,64 @@
+# Touch calibration for the bench kiosk, SHIPPED DISABLED ON PURPOSE.
+#
+# Read this before uncommenting anything.
+#
+# WHY IT IS DISABLED
+#
+# The rotation for this panel is set once, at the lowest layer, on the
+# kernel command line:
+#
+#     video=DSI-1:800x480@60,panel_orientation=upside_down
+#
+# wlroots and weston both read the DRM panel orientation property and
+# rotate the output, and libinput maps touch coordinates to the rotated
+# output. So on a correctly configured board THIS FILE SHOULD NOT BE
+# NEEDED, and a calibration matrix applied on top of a rotation that
+# already worked rotates the touch surface a second time. The symptom is
+# touch that works perfectly, upside down, which is the hardest version
+# of this bug to reason about because every individual layer looks right.
+#
+# Measure before correcting:
+#
+#     libinput debug-events --verbose
+#
+# Touch the TOP LEFT of the picture. If the coordinates are near 0,0 the
+# mapping is already correct and nothing here should be enabled.
+#
+# WHY THE DEVICE NAME IS NOT FILLED IN
+#
+# It differs between kernel versions and driver bindings. The project
+# specification says it may read FT5406 or raspberrypi-ts, and the only
+# way to know is to look at the board:
+#
+#     libinput list-devices | grep -A2 -i 'touch\|ft5\|raspberrypi'
+#     bench-gfx input
+#
+# A rule with the wrong ATTRS{name} matches nothing and changes nothing,
+# silently, which reads as "calibration did not help" and sends you
+# looking at the compositor.
+#
+# HOW TO ENABLE IT
+#
+# Copy this file to /etc/udev/rules.d/, put the real device name in, and
+# uncomment exactly one matrix line. Then:
+#
+#     udevadm control --reload
+#     udevadm trigger --subsystem-match=input
+#     systemctl restart weston
+#
+# The matrix is libinput's, in the order
+#     xx xy x0  yx yy y0
+# applied to normalised coordinates.
+
+# 180 degree flip. The usual correction when the picture was rotated and
+# the touch was not.
+#ACTION=="add|change", KERNEL=="event[0-9]*", ATTRS{name}=="*FT5406*", \
+#    ENV{LIBINPUT_CALIBRATION_MATRIX}="-1 0 1 0 -1 1"
+
+# The same, for the other name the driver may present.
+#ACTION=="add|change", KERNEL=="event[0-9]*", ATTRS{name}=="*raspberrypi-ts*", \
+#    ENV{LIBINPUT_CALIBRATION_MATRIX}="-1 0 1 0 -1 1"
+
+# Identity, for putting things back without deleting the file.
+#ACTION=="add|change", KERNEL=="event[0-9]*", ATTRS{name}=="*FT5406*", \
+#    ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0"

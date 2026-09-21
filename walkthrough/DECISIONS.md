@@ -3315,3 +3315,124 @@ that must be substituted by hand at the moment of maximum consequence, like
 times in one afternoon on this board, so the document cannot hardcode it
 and a human should not have to supply it under pressure. Name the command
 that prints the device, and have the operator read it from there.
+
+---
+
+## 108. A project is re-targeted to hardware on the bench, not deferred to hardware that is not
+
+**Context.** Three of the twenty projects are specified around parts that
+are not on this bench: Project 10 wants an X-NUCLEO-IKS4A1, Project 11 a
+VL53L8CX on an X-NUCLEO-53L8A1, and Project 17 a STWIN.box. The
+specification was written from a catalogue rather than from the drawer.
+
+**Decision.** Project 11 was re-targeted to the ADXL345 that is on the
+bench, keeping every one of its teaching points: i2c-dev and I2C_RDWR, a
+soname and hidden visibility, pkg-config, ctypes bindings, fake-bus
+tests, udev groups instead of root, a hardened unit, and packaging.
+
+**Rejected.** Writing it for the VL53L8CX and marking the hardware rows
+deferred with a stated reason, which is what this repository does
+elsewhere and which Projects 10 and 17 still do.
+
+**Why.** Deferring works when the software can still be exercised. Here
+it could not. The VL53L8CX has no public register map, so it is driven
+through a licence-gated vendor library, and the specified CMake links
+that library into the TEST binary as well as the real one. An absent
+download would therefore have blocked `ctest`, which is the part meant to
+run in CI with no sensor anywhere. The project would have sat in the
+table looking finished and been unexercisable by its own author.
+
+The ADXL345's register map is public, so nothing is gated and every line
+compiles from the first commit.
+
+**Consequence, and it is the better half.** Project 5 writes an in-kernel
+IIO driver for the same chip. The two now answer Project 11's own opening
+question, which is why a sensor needs a kernel driver at all, on one part
+rather than by analogy. That pairing did not exist before and is only
+possible because the parts collapsed onto one.
+
+It also creates the only conflict on this bench that produces readings
+that are wrong rather than absent: two drivers, one chip, one address.
+The two projects never share an image, `bench-userdrv-image` says so, and
+`tests/adxl345-build-test.sh` asserts it.
+
+**What it costs, recorded rather than glossed.** The 90 kB firmware
+upload goes, and with it chunked large writes and the 8192-byte i2c-dev
+message limit, which were the most interesting part of the original
+platform layer. The 8x8 multizone frame goes too.
+
+**When to defer instead.** When the software half can be built and tested
+without the part. Projects 10 and 17 are in that position and are
+correctly deferred: their code compiles, their suites run, and only the
+measurements wait.
+
+## 109. A GPIO held by a short-lived process is not held
+
+**Context.** Project 16 marks the interval a current trace is integrated
+over by driving a GPIO that the PPK2 reads as a logic channel. The obvious
+shape is two calls: raise the line before the report, lower it after.
+
+**Decision.** The marker is one call that blocks. `tracker-gpio
+marker-hold` requests the line, drives it, and waits for a signal; the
+caller ends the interval by ending the process.
+
+**Rejected.** `tracker-gpio marker 1` followed later by `marker 0`, which
+is what the first design said and what reads more naturally at the call
+site.
+
+**Why.** A process that requests a line, drives it and exits gives the line
+back to the kernel, which returns it to an input. The two-call version
+produces two spikes a few milliseconds long with nothing between them. The
+charge integrated between those edges is the charge of nothing at all, and
+it would still have been printed as a number with units.
+
+Project 15 met the same fact from the other direction and its `lte-gpio`
+says so: releasing the `FLIGHT` line let the HAT's pull-up put the radio
+into flight mode, so that line is held too. Two projects, opposite
+intentions, one mechanism.
+
+**Consequence, because it lands inside a published number.** The
+integration interval is bounded by that process starting and stopping, so
+process startup is inside the interval rather than outside it. Any charge
+per report measured this way reads slightly high. That is the safe
+direction for a budget, and the size of it is to be measured once rather
+than assumed negligible.
+
+**Where else this applies.** Anywhere a line has to stay asserted longer
+than the program that asserts it: a reset held during a bring-up, an enable
+held across a measurement, a chip select driven by hand. The general form
+is that a GPIO request is a lease, not a write.
+
+## 110. A suite that skips on the authoring host is split, not accepted
+
+**Context.** Project 16's state machine is exercised against a fake modem.
+The fake is a pseudo-terminal, because a FIFO is one-directional and
+because a pty slave is a character device, so the program's real terminal
+setup runs during the test rather than being stepped around. The Windows
+authoring laptop has no pty, so that suite skips there.
+
+**Decision.** The work was split along the line where the host stops
+mattering. `tests/tracker-at-test.py` substitutes the port in process and
+runs anywhere: the parsers, both 3GPP timer tables, CoAP construction, the
+configuration reader and every state transition. `tests/tracker-state-test.sh`
+keeps the transport and skips where there is no pty. The two share one set
+of scenario tables.
+
+**Rejected.** One suite that skips on the machine the work is done on, with
+a note saying to run it in CI.
+
+**Why.** A test that is only ever run by someone else is a test whose
+failures are found by someone else, and this repository already has three
+checks that never fired and were indistinguishable from checks that passed.
+The split is what let the state machine's defects be found while it was
+being written: an unacknowledged report that reported success, a CoAP
+parser reading an AT prefix as a packet header, and a PSM default whose
+comment disagreed with its own value by a factor of three.
+
+**Why the tables are shared rather than duplicated.** Two fakes are two
+opinions about what the part says, and they drift. One table read through
+two doors cannot.
+
+**When one suite is still right.** When it runs everywhere. The split costs
+a second file and is only worth it where a genuine host capability, a pty,
+a GPIO chip, a kernel tree, divides the suite in two.

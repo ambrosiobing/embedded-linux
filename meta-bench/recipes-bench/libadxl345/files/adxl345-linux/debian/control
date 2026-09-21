@@ -1,0 +1,33 @@
+Source: adxl345
+Section: libs
+Priority: optional
+Maintainer: Joseph Ambrose Pagaran <jagp.coin@proton.me>
+Build-Depends: debhelper-compat (= 13), cmake, pkg-config, libgpiod-dev (>= 2.0)
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: libadxl345-1
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: ADXL345 accelerometer library (runtime)
+ A userspace driver for the ADXL345 over i2c-dev, with an opaque
+ six-function C API, hidden visibility and a soname. It needs no kernel
+ module: the part is driven entirely from user space.
+
+Package: libadxl345-dev
+Architecture: any
+Section: libdevel
+Multi-Arch: same
+Depends: libadxl345-1 (= ${binary:Version}), ${misc:Depends}
+Description: ADXL345 accelerometer library (development files)
+ The header and the pkg-config file, so a third party links the library
+ the way any library is linked.
+
+Package: adxl345-tools
+Architecture: any
+Depends: libadxl345-1 (>= ${source:Version}), ${misc:Depends}
+Description: ADXL345 reader and its udev rule
+ adxl-map prints live acceleration. The package also ships the udev rule
+ that puts /dev/i2c-* in group i2c, so that reading the sensor needs no
+ root.

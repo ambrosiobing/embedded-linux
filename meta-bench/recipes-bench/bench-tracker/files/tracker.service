@@ -1,0 +1,32 @@
+[Unit]
+Description=Send one position report over Cat-M or NB-IoT
+Documentation=https://github.com/ambrosiobing/embedded-linux
+# No After=ModemManager.service, and no Wants either. This image does not
+# install it: see projects/16-nbiot-tracker/README.md for what that costs.
+ConditionPathExists=/etc/bench/tracker.conf
+
+[Service]
+# Type=oneshot and not a daemon, which is the whole shape of the project.
+# A service that stays resident is a service that is scheduled, and a
+# process that is scheduled keeps a processor out of its deeper idle
+# states. The program attaches, sends one report and exits; tracker.timer
+# decides when the next one happens.
+Type=oneshot
+ExecStart=/usr/bin/tracker --once
+# Root, because tracker-gpio needs the GPIO character device and the AT
+# port is not group-readable. The right answer for a product is a udev
+# group for the gpiochip and another for the tty; that is two more moving
+# parts than this bench earns, and Project 15's unit says the same in the
+# same words for the same reason.
+# A failed report must not be retried immediately. The expensive part of a
+# report is the attach, and a network that refused one attach will refuse
+# the next one a second later while the radio draws its search current the
+# whole time. The timer is the retry.
+Restart=no
+# Bounded, so a modem that never answers cannot hold the radio on for ever.
+# Long enough for a cold NB-IoT attach, which can genuinely take minutes,
+# plus the CoAP retransmission schedule.
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

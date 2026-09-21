@@ -25,9 +25,9 @@ something wrong to a card.
 
 **If you are interested in the software, you need no hardware and no
 build.** `./go check` runs everything provable without a board in about two
-minutes: both C programs compiled with `-Werror` against libgpiod v2, both
-Python programs byte-compiled, the static layer checks and every suite in
-`tests/`. CI runs the same set on every push. The applications, the
+minutes: six C programs compiled with `-Werror`, four of them against
+libgpiod v2, every Python program byte-compiled, the static layer checks
+and every suite in `tests/`. CI runs the same set on every push. The applications, the
 recipes, the kernel fragments, the systemd units, the test suites and the
 whole `walkthrough/` read on any machine.
 
@@ -176,12 +176,12 @@ the claim can be checked rather than taken.
 | 08 | [PREEMPT_RT latency lab with the MCC 118 as instrument](projects/08-preempt-rt) | Raspberry Pi 4, and a 3B v1.2 as second board | Real-time kernel, cyclictest, IRQ affinity, jitter | **Measured**: 18 matched rows on the board, generic against PREEMPT_RT, with an MCC 118 as the external instrument. PREEMPT_RT changed nothing at the pin until the core was isolated, then improved p99.9 by a third to a half. Two force_turbo rows not taken, and why, in [results](projects/08-preempt-rt/results) |
 | 09 | [Kernel debugging lab: kgdb, ftrace, perf, pstore](projects/09-kernel-debug) | Raspberry Pi 3B+ | Debugging and tracing over the serial console | **Written, not yet built**: a deliberately faulty module, the debug and KASAN fragments behind two switches, two images, the host proxy and decode tools with 37 assertions, and a six-part notebook. No image built, no fault triggered |
 | 10 | [IIO in depth with the X-NUCLEO-IKS4A1](projects/10-iio-iks4a1) | Raspberry Pi 3B+ | IIO buffers and triggers, libiio, iiod, AHRS | **In progress**: design, kernel fragment, overlay, the inventory and rate tools, a scan decoder and a libiio client; no board work yet |
-| 11 | VL53L8CX: porting and packaging a vendor userspace driver | Raspberry Pi 4 | i2c-dev and spidev, shared libraries, packaging | Planned |
+| 11 | [A userspace driver packaged as a library](projects/11-adxl345-userspace) | Raspberry Pi 4 | Userspace drivers over i2c-dev, shared library hygiene, two packaging systems | **Written, not yet built**: the library with six exported symbols and a soname, its ctypes bindings, a reader and a motion detector, a Yocto recipe and a Debian source package, and 113 assertions. Nothing has been compiled on any machine |
 | 12 | [A sensor-hub D-Bus service over UART](projects/12-sensor-hub) | Raspberry Pi 4 | CBOR wire protocols, sd-bus, polkit, socket activation | **Linux side complete**: wire protocol, daemon, policy, activation, client and three test suites; firmware specified, no board work yet |
-| 13 | A Wayland kiosk HMI on the 7 inch touchscreen | Raspberry Pi 4 | DRM/KMS, Wayland, libinput, LVGL or Qt | Planned |
+| 13 | [A Wayland kiosk HMI on the 7 inch touchscreen](projects/13-wayland-kiosk) | Raspberry Pi 4 | DRM/KMS with vc4 and v3d, weston kiosk shell, libinput, LVGL | **Written, not yet built**: the compositor configuration, an LVGL dashboard as a Wayland client with LVGL vendored at 9.3, a layer-by-layer graphics diagnostic, and 20 assertions that run on a laptop plus 21 more that need a compiler. Nothing has been compiled on any machine |
 | 14 | The Pi as a USB gadget: Ethernet, serial and HID | Raspberry Pi 4 | USB gadget configfs, libcomposite, evdev to HID | Planned |
 | 15 | [An LTE router with failover and GNSS](projects/15-lte-router) | Raspberry Pi 4 | ModemManager, NetworkManager, QMI, nftables, gpsd | **Built and running on the board**: live LTE bearer at metric 700, NAT and DHCP for the bench LAN, a firewall that drops by default, metrics with real signal, and both uplink radios up. Failover timings are the measurement outstanding; GNSS is deferred, because the bench is an indoor desk and the antenna needs sky |
-| 16 | A low-power Cat-M and NB-IoT tracker | Raspberry Pi 3 | AT state machines, CoAP/LwM2M, PSM/eDRX, current budget | Planned |
+| 16 | [A low-power Cat-M and NB-IoT tracker](projects/16-nbiot-tracker) | Raspberry Pi 3 | AT state machines, CoAP/LwM2M, PSM/eDRX, current budget | **Written, not yet built**: the AT state machine, the power key and instrument marker tool, the recipe, the image and the build configuration, with 75 assertions that need no modem. No ModemManager and no network interface at all, so the CoAP datagram is built on the host and handed to the modem's own IP stack. The kernel fragment and the udev rule are deliberately unfinished until `lsusb` has been read on the board, and the whole AT command table is provisional until a real transcript replaces it |
 | 17 | [A BLE gateway for the STWIN.box with BlueZ](projects/17-ble-gateway) | Raspberry Pi 3B+ | BLE central on Linux, BlueZ D-Bus GATT, pipelines | **Software complete**: kernel fragment, BlueZ configuration, the gateway and three test suites; no board work yet |
 | 18 | Edge Wi-Fi access point with MQTT over TLS and a private PKI | Raspberry Pi 3 | hostapd, dnsmasq, Mosquitto, X.509 | Planned |
 | 19 | [A/B updates with RAUC](projects/19-rauc-ab) | Raspberry Pi 3 | OTA with RAUC, U-Boot bootcount, read-only rootfs, overlayfs-etc, SoC watchdog | **Software complete**: a four partition card, the A/B boot script, the RAUC configuration and bundle recipe, a health check gated on `boot-complete.target`, a failsafe timer, the SoC watchdog, slot LEDs, and the two bundles that are meant to fail. 119 assertions that need no hardware, thirty of them proved by injecting the fault they catch. Nothing has been built and no board has seen any of it; dm-verity stays a stretch goal |
@@ -307,7 +307,7 @@ usually break can be:
 | BlueST protocol | `sh tests/stwin-bluest-test.sh` | Project 17's decoder: masks read from UUIDs, both frame shapes, and an unknown mask bit stopping the walk rather than shifting every field after it |
 | BLE connection ladder | `sh tests/stwin-supervisor-test.sh` | Scan, connect, resolve, stream and back off, with a fake link that can fail at any step |
 | Gateway sinks | `sh tests/stwin-sinks-test.sh` | CSV columns fixed by the feature mask, daily rollover, the MQTT topic and payload, one LED per state |
-| Host compile | `./go check` | Four C programs built with `-Werror`: three against the host libgpiod v2, and the sensor hub daemon against libsystemd and libcbor, which is the only check anywhere that reads a D-Bus vtable. Every Python program byte-compiled |
+| Host compile | `./go check` | Six C programs built with `-Werror`: four against the host libgpiod v2, the sensor hub daemon against libsystemd and libcbor, which is the only check anywhere that reads a D-Bus vtable, and `drmfill` against libdrm. The SDK example is cross-compiled separately. Every Python program byte-compiled, found by shebang as well as by extension, so the ones with no `.py` are not missed |
 
 CI runs all of these on every push, on a pinned `ubuntu-24.04` runner
 with libgpiod v2 built from a named tag, because no Ubuntu LTS image

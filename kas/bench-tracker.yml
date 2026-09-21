@@ -1,0 +1,55 @@
+# Project 16: the Cat-M and NB-IoT tracker.
+#
+#   kas build kas/bench-tracker.yml       or  ./go tracker
+#
+# A separate configuration rather than a change to bench-rpi3.yml, for the
+# reason stated in the repository README: a project that needs a different
+# kernel or a different image adds its own kas file next to the others. The
+# shared one stays the thing every project can still build.
+#
+# The Raspberry Pi 3 and not the Pi 4, which most of this bench uses. The
+# reason is physical rather than a preference: the SIM7070G HAT presents a
+# standard 40-pin extension header, so it needs a board that has one, and
+# the repository's own README already assigns this project the Pi 3.
+# Project 2's design document says instead that Project 16 reuses the
+# NanoPi NEO Air; that sentence is wrong and
+# projects/16-nbiot-tracker/docs/DESIGN.md records why. The NEO Air has a
+# 24-pin header and a separate 4-pin debug UART, so the HAT does not stack
+# on it at all.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-tracker-image
+
+local_conf_header:
+  tracker: |
+    # NO KERNEL FRAGMENT IS TURNED ON HERE, AND THAT IS NOT AN OMISSION.
+    #
+    # There would ordinarily be a BENCH_TRACKER_KERNEL = "1" on this line,
+    # matching the switch pattern every other project in this repository
+    # uses in
+    # meta-bench/recipes-kernel/linux/linux-raspberrypi_%.bbappend.
+    # There is not, because the fragment it would turn on has not been
+    # written, and it has not been written because nothing here records how
+    # a SIM7070G enumerates on USB.
+    #
+    # The nearest thing this repository has is Project 15's router.cfg,
+    # which provides option and qmi_wwan for a SIM7600E-H. It cannot be
+    # borrowed for two reasons. It is a different part in a different USB
+    # composition, and it is gated as one unit that also builds in the
+    # whole netfilter and conntrack stack, which a tracker has no use for
+    # and would pay for in kernel size and build time.
+    #
+    # The way forward is one boot, not one guess: build this image, attach
+    # the HAT, and read lsusb and dmesg. The image installs usbutils for
+    # exactly that. See meta-bench/recipes-core/images/bench-tracker-image.bb
+    # and the three open facts in
+    # projects/16-nbiot-tracker/docs/evidence/README.md.
+
+    # The AT transcript is where this project is debugged, far more than
+    # the kernel log, and the state machine is the thing being designed.
+    # Keeping the sources means a change can be tried against a built tree
+    # rather than from the start.
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-tracker"

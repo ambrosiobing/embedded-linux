@@ -1,0 +1,4 @@
+usr/bin/adxl-map
+usr/bin/adxl-motion
+usr/lib/python3/dist-packages/adxl345
+debian/60-adxl345.rules lib/udev/rules.d

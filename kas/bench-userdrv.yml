@@ -1,0 +1,46 @@
+# Project 11: a userspace driver for the ADXL345, packaged as a library.
+#
+#   kas build kas/bench-userdrv.yml    or  ./go userdrv
+#
+# Its own configuration for one reason, and it is the reason in the
+# project's ownership table: Project 5 binds an in-kernel IIO driver to
+# this same chip at this same address, and two drivers on one device give
+# readings that are wrong rather than absent. The two never share an
+# image, so they have separate kas files and separate targets.
+#
+# It includes bench-rpi4.yml because the specification puts this project
+# on a Raspberry Pi 4, and the library needs nothing the base image does
+# not already have beyond the I2C bus.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+target: bench-userdrv-image
+
+local_conf_header:
+  userdrv: |
+    # The bus the sensor is on. ENABLE_I2C writes "dtparam=i2c1=on" and
+    # "dtparam=i2c_arm=on" into config.txt; without it there is no
+    # /dev/i2c-1 and the library's open fails with ENOENT, which reads
+    # like a missing sensor rather than a missing bus.
+    ENABLE_I2C = "1"
+
+    # NO KERNEL SWITCH, and that is worth saying out loud.
+    #
+    # Every other project here that touches hardware adds a fragment to
+    # linux-raspberrypi_%.bbappend. This one adds nothing: i2c-dev is
+    # already in the Raspberry Pi defconfig, and the whole project runs
+    # in user space. A kernel fragment would be the first sign that
+    # somebody had started writing Project 5 twice.
+
+    # The 400 kHz the design assumes. The default is 100 kHz, which works
+    # and makes a 32-entry FIFO burst take four times as long as it
+    # needs to. 1 MHz is possible on short wires and is not set here
+    # because nothing has measured this board's wiring yet.
+    RPI_EXTRA_CONFIG = "dtparam=i2c_arm_baudrate=400000"
+
+    # The library's work directory survives, because when a register
+    # write does not land the first useful thing is to read the built
+    # source rather than guess at what the recipe compiled.
+    RM_WORK_EXCLUDE += "libadxl345"

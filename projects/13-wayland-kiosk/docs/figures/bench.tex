@@ -1,0 +1,80 @@
+% What is on the desk.
+%
+% The point of the drawing is the instrument split: systemd-analyze
+% cannot see the firmware and kernel part of the boot budget, so a
+% project with a screen still needs a serial cable.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, node distance=6mm]
+
+  %% ---------------- the panel on its stand ----------------
+  \node[hw, minimum width=62mm, minimum height=38mm, align=center] (panel) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(panel.north)+(0,-3mm)$) {7 inch panel, 800x480};
+  \node[client, anchor=north, minimum width=48mm, minimum height=16mm,
+        align=center, font=\sffamily\scriptsize]
+       at ($(panel.north)+(0,-9mm)$) (dash)
+       {the dashboard\\[-1pt]load, SoC temp, memory bar, state LED};
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(panel.south)+(0,4mm)$)
+       {ribbon at the TOP in its natural orientation};
+
+  \node[umlnote, anchor=west, text width=44mm]
+       at ($(panel.east)+(4mm,0)$)
+       {Natural orientation puts the ribbon at the top, which is upside
+        down on a normal stand. Hence
+        \texttt{panel\_orientation=upside\_down} on the kernel command
+        line, set \textbf{once, at the lowest layer}, so that every
+        consumer above it agrees.};
+
+  %% ---------------- the board ----------------
+  \node[hw, below=22mm of panel, minimum width=62mm, minimum height=26mm,
+        align=center] (pi) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(pi.north)+(0,-3mm)$) {Raspberry Pi 4};
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(pi.north)+(0,-9mm)$) {BCM2711, VideoCore VI};
+
+  \draw[bus, very thick] ($(panel.south)+(-8mm,0)$) --
+       node[lbl, align=center] {ribbon} ($(pi.north)+(-8mm,0)$);
+  \draw[thick] ($(panel.south)+(10mm,0)$) --
+       node[lbl, align=center] {2 jumpers\\pins 2 and 6} ($(pi.north)+(10mm,0)$);
+
+  %% ---------------- the two hosts paths ----------------
+  \node[seat, below left=16mm and -6mm of pi, align=center,
+        font=\sffamily\scriptsize, minimum width=52mm] (host)
+       {Host: \texttt{picocom} with timestamps ON\\[-1pt]
+        the firmware and kernel part of the budget};
+  \draw[bus] ($(pi.south)+(-16mm,0)$) -- node[lbl, align=center]
+       {USB/TTL} (host.north);
+
+  \node[hw, below right=16mm and -6mm of pi, align=center,
+        font=\sffamily\scriptsize, minimum width=46mm] (net)
+       {Ethernet: ssh, and \texttt{scp} of the plots};
+  \draw[bus] ($(pi.south)+(14mm,0)$) -- (net.north);
+
+  \node[hw, right=8mm of pi, align=center, font=\sffamily\scriptsize] (kbd)
+       {Pi keyboard\\[-1pt]USB-A};
+  \draw[bus] (pi.east) -- (kbd.west);
+
+  %% ---------------- the instrument split ----------------
+  \node[umlnote, anchor=north west, text width=128mm, align=left]
+       at ($(host.south west)+(-4mm,-6mm)$)
+       {\textbf{Two instruments, because one of them is blind to half the
+        budget.} \texttt{systemd-analyze} reports userspace, and takes
+        the firmware and loader figures from what the firmware hands it.
+        The serial console with terminal timestamps is the only
+        instrument for the part before userspace. That is why a project
+        with a screen on it still has a serial cable in the parts list.};
+
+  \node[umlnote, anchor=north west, text width=128mm, align=left]
+       at ($(host.south west)+(-4mm,-24mm)$)
+       {\textbf{The keyboard is an instrument too.} Acceptance asks that
+        Tab and Enter work the buttons \emph{with the touch driver
+        unloaded}, which is what proves the two input paths are
+        independent rather than one path wearing two names.};
+
+\end{tikzpicture}
+\end{document}

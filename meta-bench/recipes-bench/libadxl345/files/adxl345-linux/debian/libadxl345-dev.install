@@ -1,0 +1,3 @@
+usr/include/adxl345/adxl.h
+usr/lib/*/libadxl345.so
+usr/lib/*/pkgconfig/adxl345.pc

@@ -1,0 +1,97 @@
+% Given a symptom, which layer to suspect.
+%
+% The companion to layer-tools.tex: that one lists the tools in stack
+% order, this one starts from what you can actually see, which is a black
+% screen or a touch that does nothing.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, node distance=9mm]
+
+  %% ================ branch A: nothing on the panel ================
+  \node[qst] (light) {is the backlight on?};
+  \node[font=\sffamily\small\bfseries, above=4mm of light]
+       {nothing on the panel};
+
+  \node[fix, below left=12mm and 16mm of light] (power)
+       {\textbf{power}, not graphics\\
+        \scriptsize 450 mA at 5 V from header pins 2 and 6\\
+        \scriptsize \texttt{dmesg | grep -i undervoltage}};
+  \draw[trans] (light) -| node[ans, above, pos=0.25] {no} (power);
+
+  \node[qst, below right=12mm and 6mm of light] (drm)
+       {\texttt{drm\_info}: is DSI-1\\connected?};
+  \draw[trans] (light) -| node[ans, above, pos=0.25] {yes, black} (drm);
+
+  \node[fix, below left=12mm and 2mm of drm] (overlay)
+       {the overlay did not load\\
+        \scriptsize firmware and \texttt{config.txt} layer};
+  \draw[trans] (drm) -| node[ans, above, pos=0.25] {no} (overlay);
+
+  \node[qst, below right=12mm and 2mm of drm] (jrnl)
+       {what does the unit's\\journal say?};
+  \draw[trans] (drm) -| node[ans, above, pos=0.25] {yes} (jrnl);
+
+  \node[fix, below left=12mm and 4mm of jrnl] (nooutputs)
+       {``no outputs''\\
+        \scriptsize the compositor opened the \texttt{v3d} card.\\
+        \scriptsize Wrong DRM node, not a broken panel.};
+  \draw[trans] (jrnl) -| (nooutputs);
+
+  \node[fix, below right=12mm and 0mm of jrnl] (seat)
+       {``could not connect to seat''\\
+        \scriptsize \texttt{seatd}. \textbf{NOT} a permission problem\\
+        \scriptsize on \texttt{/dev/dri}, which is where people look.};
+  \draw[trans] (jrnl) -| (seat);
+
+  %% ================ branch B: picture, no touch ================
+  \node[qst, right=70mm of light] (evtest)
+       {\texttt{evtest}: any events\\at all?};
+  \node[font=\sffamily\small\bfseries, above=4mm of evtest]
+       {picture is there, touch does nothing};
+
+  \node[fix, below left=12mm and 8mm of evtest] (kernel)
+       {kernel layer\\
+        \scriptsize is \texttt{edt\_ft5x06} bound? is the IRQ arriving?\\
+        \scriptsize \texttt{dmesg}, and the I2C in the ribbon};
+  \draw[trans] (evtest) -| node[ans, above, pos=0.25] {no} (kernel);
+
+  \node[qst, below right=12mm and 2mm of evtest] (li)
+       {\texttt{libinput debug-events}:\\right corner?};
+  \draw[trans] (evtest) -| node[ans, above, pos=0.25] {yes} (li);
+
+  \node[fix, below left=12mm and 2mm of li] (calib)
+       {calibration matrix in \textbf{udev}\\
+        \scriptsize never in the application, and never\\
+        \scriptsize a second rotation in the toolkit};
+  \draw[trans] (li) -| node[ans, above, pos=0.25] {wrong} (calib);
+
+  \node[qst, below right=12mm and 0mm of li] (wl)
+       {\texttt{WAYLAND\_DEBUG=1}\\on the \textbf{client}};
+  \draw[trans] (li) -| node[ans, above, pos=0.25] {right} (wl);
+
+  \node[fix, below left=12mm and 2mm of wl] (seatcap)
+       {no \texttt{wl\_touch.down}\\
+        \scriptsize \texttt{wl\_seat} has no touch capability.\\
+        \scriptsize \texttt{wayland-info} lists what is offered.};
+  \draw[trans] (wl) -| (seatcap);
+
+  \node[fix, below right=12mm and 0mm of wl] (toolkit)
+       {events arrive\\
+        \scriptsize it is the toolkit. LVGL log, and whether\\
+        \scriptsize the widget is where the finger is.};
+  \draw[trans] (wl) -| (toolkit);
+
+  %% ---------------- the reading of it ----------------
+  \node[umlnote, anchor=north, text width=170mm, align=left]
+       at ($(nooutputs.south)+(48mm,-10mm)$)
+       {\textbf{Bisect, do not read top to bottom.} A failure lives at
+        exactly one layer. Start in the middle with \texttt{drm\_info} or
+        \texttt{libinput debug-events}: each answer removes half the
+        stack, and four commands settle almost everything. Reading the
+        layers in order from the firmware up is how an evening goes into
+        a problem that was three commands deep.};
+
+\end{tikzpicture}
+\end{document}
