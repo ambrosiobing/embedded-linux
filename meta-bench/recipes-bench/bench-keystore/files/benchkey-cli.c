@@ -24,8 +24,19 @@
 
 /* 1 MiB. A signed record is a few hundred bytes; this is a limit chosen
  * so that "benchkey sign /dev/zero" ends rather than filling memory.
+ *
+ * NOT "MAX_INPUT". The kernel's <linux/limits.h> defines that name as
+ * 255, the size of the tty type-ahead buffer, and tee_client_api.h pulls
+ * <limits.h> in ahead of this line. The first build on Monday 21
+ * September 2026 compiled with "MAX_INPUT redefined", which meant this
+ * file's value won only because it came second. Reorder the includes,
+ * or let a header add <linux/limits.h> later, and the sign command would
+ * silently truncate every input at 255 bytes with no warning at all,
+ * because at that point the two definitions would agree on which one
+ * was first. A name nothing else in the include tree uses cannot lose
+ * that race.
  */
-#define MAX_INPUT (1024 * 1024)
+#define BENCHKEY_MAX_INPUT (1024 * 1024)
 
 static void print_hex(const uint8_t *buf, size_t len)
 {
@@ -99,14 +110,14 @@ static int read_all(const char *path, uint8_t **out, size_t *out_len)
 		return -1;
 	}
 
-	buf = malloc(MAX_INPUT);
+	buf = malloc(BENCHKEY_MAX_INPUT);
 	if (!buf) {
 		if (fh != stdin)
 			fclose(fh);
 		return -1;
 	}
 
-	len = fread(buf, 1, MAX_INPUT, fh);
+	len = fread(buf, 1, BENCHKEY_MAX_INPUT, fh);
 	if (fh != stdin)
 		fclose(fh);
 

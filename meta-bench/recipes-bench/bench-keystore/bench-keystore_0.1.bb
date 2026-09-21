@@ -130,6 +130,18 @@ do_compile() {
     ${CC} -shared -Wl,-soname,libbenchkey.so.1 ${LDFLAGS} \
         ${S}/benchkey.o -lteec -o ${S}/libbenchkey.so.1
 
+    # The unversioned name, for the link below. "-lbenchkey" makes the
+    # linker look for libbenchkey.so and nothing else; the versioned file
+    # is what the loader finds at run time through the soname, and the
+    # two are different names for a reason. do_install has made this
+    # symlink for the package since the recipe was written, and the
+    # first build found that do_compile never made it for itself:
+    #
+    #     ld: cannot find -lbenchkey: No such file or directory
+    #
+    # after the TA had linked and signed. Monday 21 September 2026.
+    ln -sf libbenchkey.so.1 ${S}/libbenchkey.so
+
     ${CC} ${CFLAGS} ${CPPFLAGS} -I${S} ${S}/benchkey-cli.c \
         -o ${S}/benchkey ${LDFLAGS} -L${S} -lbenchkey -lteec
 }
