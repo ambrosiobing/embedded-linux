@@ -103,6 +103,12 @@ check "no unsubstituted tokens remain" \
 
 # The two hardware actions become observable no-ops. The names are printed
 # so that a reader of this output knows exactly what was not executed.
+#
+# The ${rauc_part} and ${rauc_slot} below are U-Boot variables and must
+# reach the boot script as those eight characters, for U-Boot to expand
+# at boot. Single quotes are what keeps the shell from expanding them
+# here, which is the opposite of what shellcheck's SC2016 assumes.
+# shellcheck disable=SC2016
 sed -e 's/^\( *\)if ext4load .*/\1if echo "STUB-LOAD mmc 0:${rauc_part} \/boot\/Image"; then/' \
 	-e 's/^\( *\)booti .*/\1echo "STUB-BOOT slot ${rauc_slot} part ${rauc_part}"/' \
 	"$WORK/boot.cmd" >"$WORK/boot.sandbox.cmd"

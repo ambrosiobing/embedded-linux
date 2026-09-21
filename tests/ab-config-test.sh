@@ -105,6 +105,11 @@ check "the two compatible strings are identical" "$bun_compat" "$sys_compat"
 # And the indirection is actually wired up. Without this, the default above
 # could be correct while the class read something else entirely, and the
 # check above would pass on a variable nothing consumes.
+#
+# The expected text is the literal string ${BENCH_AB_COMPATIBLE} as it
+# sits in the recipe, so it is single-quoted on purpose; SC2016 assumes
+# the opposite.
+# shellcheck disable=SC2016
 contains "the bundle takes its compatible from that variable" \
 	"$(cat "$BUNDLE")" 'RAUC_BUNDLE_COMPATIBLE = "${BENCH_AB_COMPATIBLE}"'
 
@@ -166,6 +171,10 @@ check "the save comes before the kernel load" \
 # The kernel comes out of the slot, not off the shared FAT partition. If
 # this line ever becomes a fatload from 0:1, every slot boots the same
 # kernel and an update can no longer change it, silently.
+#
+# Literal ${rauc_part}, a U-Boot variable in the boot script, matched as
+# text. Single quotes on purpose.
+# shellcheck disable=SC2016
 contains "the kernel is loaded from the chosen slot" \
 	"$(cat "$BOOTCMD")" 'ext4load @@BOOT_MEDIA@@ 0:${rauc_part}'
 contains "and from /boot inside that slot" \
@@ -397,6 +406,9 @@ check "the card image does not carry the broken application" \
 # mean the two builds differed by a sed rather than by a file.
 check "both application units are fetched" \
 	"$(grep -c "file://bench-app.*\.service" "$RECIPE")" "2"
+# Literal ${S}, BitBake's variable in the recipe, matched as text.
+# Single quotes on purpose.
+# shellcheck disable=SC2016
 contains "the broken one is installed under the real name" \
 	"$(cat "$RECIPE")" 'install -Dm0644 ${S}/bench-app-broken.service'
 contains "and it runs /bin/false" \
