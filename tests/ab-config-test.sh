@@ -32,8 +32,8 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 
-SYSCONF=$ROOT/meta-bench/recipes-core/rauc/files/system.conf
-BUNDLE=$ROOT/meta-bench/recipes-core/bundles/bench-bundle.bb
+SYSCONF=$ROOT/meta-bench/dynamic-layers/meta-rauc/recipes-core/rauc/files/system.conf
+BUNDLE=$ROOT/meta-bench/dynamic-layers/meta-rauc/recipes-core/bundles/bench-bundle.bb
 BOOTCMD=$ROOT/meta-bench/recipes-bsp/rpi-u-boot-scr/files/boot.cmd.in
 WKS=$ROOT/meta-bench/wic/bench-ab.wks
 IMAGE=$ROOT/meta-bench/recipes-core/images/bench-ab-image.bb

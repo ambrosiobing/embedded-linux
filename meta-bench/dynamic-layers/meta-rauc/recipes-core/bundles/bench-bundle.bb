@@ -12,10 +12,10 @@ md5=0835ade698e0bcf8506ecda2f7b4f302"
 inherit bundle
 
 # THIS STRING IS COMPARED, NOT DISPLAYED, and it must be identical to the
-# one in meta-bench/recipes-core/rauc/files/system.conf. RAUC refuses a
-# bundle whose compatible differs from the running system's, before it
-# writes anything, which is the check that stops a Pi 4 image reaching this
-# card.
+# one in the system.conf beside this file, at
+# ../rauc/files/system.conf. RAUC refuses a bundle whose compatible
+# differs from the running system's, before it writes anything, which is
+# the check that stops a Pi 4 image reaching this card.
 #
 # Nothing in the build compares these two strings. They are in different
 # files, read by different programs, at different times, and the only

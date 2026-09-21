@@ -15,8 +15,8 @@ The success path is three lines long. The project is the failure paths.
 | [kas/bench-ab-bundle.yml](../../kas/bench-ab-bundle.yml) | `./go ab-bundle`, a signed update |
 | [meta-bench/wic/bench-ab.wks](../../meta-bench/wic/bench-ab.wks) | the four partition card, and the first `.wks` in this repository |
 | [boot.cmd.in](../../meta-bench/recipes-bsp/rpi-u-boot-scr/files/boot.cmd.in) | the boot script: the most dangerous file here |
-| [system.conf](../../meta-bench/recipes-core/rauc/files/system.conf) | what the board believes about its own slots |
-| [bench-bundle.bb](../../meta-bench/recipes-core/bundles/bench-bundle.bb) | one signed bundle, one root filesystem |
+| [system.conf](../../meta-bench/dynamic-layers/meta-rauc/recipes-core/rauc/files/system.conf) | what the board believes about its own slots |
+| [bench-bundle.bb](../../meta-bench/dynamic-layers/meta-rauc/recipes-core/bundles/bench-bundle.bb) | one signed bundle, one root filesystem |
 | [bench-ab](../../meta-bench/recipes-bench/bench-ab/) | the application, the health check, the failsafe, the watchdog, the LEDs |
 | [tests/ab-config-test.sh](../../tests/ab-config-test.sh) | 101 assertions about agreements no build can check |
 | [tests/ab-bootscript-test.sh](../../tests/ab-bootscript-test.sh) | runs the real boot script in a U-Boot sandbox |
