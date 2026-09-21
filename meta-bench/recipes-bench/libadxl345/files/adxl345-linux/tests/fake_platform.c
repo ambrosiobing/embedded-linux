@@ -76,6 +76,14 @@ const struct fake_log *fake_get_log(void)
 	return &log_state;
 }
 
+void fake_log_clear(void)
+{
+	/* Only the count. Entries past it are never read, and the other
+	 * fields of log_state are counters a test may still be about to
+	 * assert on. */
+	log_state.count = 0;
+}
+
 static void log_event(int kind, uint8_t reg, uint8_t value)
 {
 	if (log_state.count >= FAKE_LOG_MAX)

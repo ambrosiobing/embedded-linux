@@ -51,4 +51,16 @@ uint8_t fake_reg(uint8_t r);
 /* The ordered transfer log, for assertions about sequence. */
 const struct fake_log *fake_get_log(void);
 
+/* Forget the transfers so far and keep everything else: the register
+ * file, the FIFO, the open and close counts. For an assertion about the
+ * ORDER of one operation's writes, called immediately before it, so the
+ * log holds that operation and nothing earlier.
+ *
+ * Without this, "the first write to POWER_CTL" is the standby write
+ * adxl_open makes, which precedes every configuration write, and an
+ * ordering claim about start or stop is judged against a write that
+ * belongs to neither. Two such claims failed in CI on Monday 21
+ * September 2026 with the library's order correct on both paths. */
+void fake_log_clear(void);
+
 #endif /* FAKE_PLATFORM_H */

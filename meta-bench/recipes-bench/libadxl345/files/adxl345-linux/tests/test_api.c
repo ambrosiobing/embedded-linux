@@ -115,6 +115,11 @@ static void test_start(void)
 
 	fake_reset();
 	adxl_open(&d, "/dev/i2c-1", 0x53, -1);
+
+	/* Open has already written POWER_CTL once, to standby. The ordering
+	 * claim below is about start's writes only, so the log begins
+	 * here. */
+	fake_log_clear();
 	eq("start at 2 g and 100 Hz", adxl_start(d, 2, 100), ADXL_OK);
 
 	/* FULL_RES set, range bits 00. The whole point of FULL_RES is that
@@ -207,6 +212,10 @@ static void test_stop(void)
 	fake_reset();
 	adxl_open(&d, "/dev/i2c-1", 0x53, -1);
 	adxl_start(d, 2, 100);
+
+	/* Open and start have both written POWER_CTL and INT_ENABLE by now.
+	 * The ordering claim below is about stop's writes only. */
+	fake_log_clear();
 	eq("stop returns OK", adxl_stop(d), ADXL_OK);
 	eq("measurement is off", fake_reg(0x2d), 0);
 	eq("the interrupt is disabled", fake_reg(0x2e), 0);
