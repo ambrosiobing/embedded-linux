@@ -246,9 +246,33 @@ check_fragment() {
 		fi
 
 		promptless=$((promptless + 1))
-		who=$(grep -E "(select|imply)[[:space:]]+${sym}[[:space:]]*(\$|if )" \
-			"$selectors" 2>/dev/null | head -3 |
-			sed "s|^$src/||" | cut -d: -f1 | sort -u | tr '\n' ' ')
+
+		# DEDUPLICATE BEFORE TRUNCATING, AND SAY WHAT WAS HIDDEN.
+		#
+		# This was one pipeline with "head -3" sitting immediately
+		# after the grep, so it cut raw matching LINES in whatever
+		# order the file list happened to be in, and only afterwards
+		# reduced them to filenames. Three matches inside one file
+		# therefore printed as three names, every other selector was
+		# discarded unseen, and the list read as complete.
+		#
+		# On Monday 21 September 2026 that hid drivers/tee/Kconfig,
+		# whose menuconfig TEE selects both DMA_SHARED_BUFFER and
+		# GENERIC_ALLOCATOR, behind three files that had nothing to do
+		# with the fragment being checked. The reader concluded the
+		# two symbols were incidental when they were guaranteed, which
+		# is the opposite conclusion and the wrong fix.
+		#
+		# A truncated list that does not admit it is worse than a long
+		# one, because it is evidence you cannot argue with.
+		all=$(grep -E "(select|imply)[[:space:]]+${sym}[[:space:]]*(\$|if )" \
+			"$selectors" 2>/dev/null |
+			sed "s|^$src/||" | cut -d: -f1 | sort -u)
+		total=$(printf '%s\n' "$all" | awk 'NF' | wc -l | tr -d ' ')
+		who=$(printf '%s\n' "$all" | awk 'NF' | head -3 | tr '\n' ' ')
+		if [ "$total" -gt 3 ]; then
+			who="${who}and $((total - 3)) more"
+		fi
 
 		if [ "$marker" = yes ]; then
 			echo "consequence CONFIG_$sym  promptless, selected by:" \

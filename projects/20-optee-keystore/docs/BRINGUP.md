@@ -27,7 +27,7 @@ Two builds, and the version they share is the thing to get right.
 
 # the secure world, in its own checkout, on the Linux filesystem
 mkdir -p ~/optee-rpi3 && cd ~/optee-rpi3
-repo init -u https://github.com/OP-TEE/manifest.git -m rpi3.xml
+repo init -u https://github.com/OP-TEE/manifest.git -m rpi3.xml -b 4.1.0
 repo sync -j4
 cd build && make -j8 toolchains && make -j8
 ls ../out/boot        # armstub8.bin, u-boot files, uboot.env, config.txt
@@ -42,6 +42,14 @@ put its output in `docs/evidence/rpi3-manifest.txt`. OP-TEE moves fast and
 the same tag. If they differ, the TA is compiled against one dev kit and
 dispatched by another OP-TEE, and nothing in either build will mention it.
 The check that settles it is on the board, in step 4.
+
+**The `-b 4.1.0` above is what makes that true, and it was missing.** This
+page asked for the tag in the paragraph you are reading and then gave a
+`repo init` without it, which takes the manifest's default branch: OP-TEE
+tip on whatever day the command is run. The two halves would then differ
+by however far tip has moved, and the failure mode is the one described
+above, which no build reports. Corrected on Monday 21 September 2026,
+before either half was built.
 
 Before paying for the long build, check the fragment:
 
