@@ -1,0 +1,39 @@
+[Unit]
+Description=Shared FAT boot partition (p1)
+Documentation=https://github.com/ambrosiobing/embedded-linux
+ConditionKernelCommandLine=rauc.slot
+Before=local-fs.target
+DefaultDependencies=no
+
+[Mount]
+What=/dev/mmcblk0p1
+Where=/boot
+Type=vfat
+
+# rw,sync RATHER THAN ro PLUS A REMOUNT, and the difference is worth
+# stating because docs/DESIGN.md's ownership table asks for the other one.
+#
+# The hazard that table names is real: uboot.env has two writers, U-Boot's
+# saveenv and Linux's fw_setenv, and the danger is this partition holding
+# dirty pages when the board reboots. The table's remedy was to mount ro
+# and let fw_setenv remount rw and back.
+#
+# That remedy cannot be implemented where it has to be. RAUC calls
+# fw_setenv itself, from PATH, with no hook to wrap it, so the remount
+# would have to live in a shadow binary shipped over u-boot-fw-utils'
+# own. Two files with one name, and the winner decided by package install
+# order.
+#
+# sync attacks the same hazard from the other end and needs no wrapper:
+# every write reaches the card before the call returns, so there is no
+# window in which dirty pages exist to be lost. The cost is that writes to
+# p1 are slow, and the only thing that writes to p1 at runtime is a 16 KiB
+# environment file, twice per update.
+#
+# umask keeps the environment file out of reach of anything but root. FAT
+# carries no permissions of its own, so without this every file on the
+# boot partition is world writable.
+Options=rw,sync,noatime,umask=0077
+
+[Install]
+WantedBy=local-fs.target

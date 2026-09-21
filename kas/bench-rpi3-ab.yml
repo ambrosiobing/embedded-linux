@@ -1,0 +1,107 @@
+# Project 19: A/B root filesystem updates with RAUC, on a Raspberry Pi 3.
+#
+#   kas build kas/bench-rpi3-ab.yml
+#
+# WHY THIS IS NOT kas/bench-rpi3.yml.
+#
+# That file exists so Projects 5 and 6 can run the ordinary bench rootfs on
+# a Pi 3, and only the machine changes there. Project 19 changes a good deal
+# more than the machine: U-Boot in place of the firmware's direct kernel
+# load, four partitions in place of the stock two, a read-only root and a
+# writable /etc overlay. Folding any of that into bench-rpi3.yml would
+# silently change what the other two projects build.
+#
+# THE TUNE IS ALREADY WARM, PROBABLY. raspberrypi3-64 is cortexa53 and this
+# bench has built it: Project 8 ran a full cortexa53 build on Wednesday
+# 16 September 2026 and kept sstate-cache afterwards. That is a reason to
+# expect a warm build, not a promise of one. Read the Sstate summary on the
+# first screen of output rather than believing either answer in advance.
+# projects/19-rauc-ab/JOURNAL.md entry 5 has the evidence and the arithmetic.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+machine: raspberrypi3-64
+target: bench-ab-image
+
+repos:
+  meta-rauc:
+    url: https://github.com/rauc/meta-rauc
+    branch: scarthgap
+
+local_conf_header:
+  ab: |
+    # U-Boot, because the A/B decision needs something that can read and
+    # write a persistent environment across a reboot. The Raspberry Pi
+    # firmware loads a kernel directly and has no way to express "this slot
+    # has two attempts left, try the other one next time".
+    RPI_USE_U_BOOT = "1"
+    PREFERRED_PROVIDER_virtual/bootloader = "u-boot"
+
+    # Figure 2 of docs/DESIGN.md: 64 MiB boot, two fixed 1024 MiB roots, a
+    # 512 MiB shared data partition. The stock rpi-sdimg layout has one root
+    # and cannot express a second slot, so the layout is this project's own.
+    WKS_FILE = "bench-ab.wks"
+
+    # The two switches this project owns, both default off in the layer.
+    #
+    # BENCH_AB_BOOTSCRIPT replaces boot.scr for every Raspberry Pi image
+    # built in this configuration. That is safe here and would not be
+    # anywhere else, which is why it is a switch rather than an
+    # unconditional bbappend: the A/B script decrements counters that only
+    # this project's uboot.env has, and loads a kernel from a path only
+    # this project's rootfs has. See the bbappend's own header.
+    #
+    # BENCH_AB_KERNEL adds the watchdog fragment. Setting it without the
+    # image's RuntimeWatchdogSec would give a watchdog device that nothing
+    # feeds, so the two belong together and the image recipe says so.
+    BENCH_AB_BOOTSCRIPT = "1"
+    BENCH_AB_KERNEL = "1"
+
+    # THE THREE PATHS THAT ARE NOT IN THIS REPOSITORY AND MUST NOT BE.
+    #
+    # The private key signs bundles and never leaves the build laptop. The
+    # certificate is its public half, and goes into the image so the board
+    # can verify what it is offered. The CA is what the image trusts; with
+    # a self-signed development pair it is the same file as the
+    # certificate, which is why two of these point at one path.
+    #
+    # Left empty on purpose. Every recipe that needs one refuses to build
+    # and says which variable was empty and what to set it to, rather than
+    # falling back to meta-rauc's example certificate, whose private half
+    # is published on the internet. Fill them in on the build laptop only.
+    #
+    # docs/BRINGUP.md carries the openssl commands that make the pair.
+    #
+    # BENCH_RAUC_CA   = "/home/<user>/bench/keys/dev.cert.pem"
+    # BENCH_RAUC_CERT = "/home/<user>/bench/keys/dev.cert.pem"
+    # BENCH_RAUC_KEY  = "/home/<user>/bench/keys/dev.key.pem"
+
+    # The DSI panel overlay inherited from bench-rpi4.yml is replaced here,
+    # not extended. INFERRED, not observed: Figure 4 wires a serial console
+    # and three LEDs and mentions no DSI panel. If the 7 inch panel is in
+    # fact on the Pi 3, add its dtoverlay line back alongside these three
+    # rather than deleting this comment, because a panel with no overlay
+    # lights its backlight and draws nothing, which looks exactly like a
+    # board that did not boot.
+    #
+    # THE THREE LEDS OF FIGURE 3, as kernel LED class devices. Declared
+    # here rather than in bench-ab-image.bb because rpi-config_git.bb is
+    # what writes config.txt, and a variable set in an image recipe is
+    # scoped to that recipe and would be read by nobody. The failure that
+    # produces is a card with no LED devices and no error anywhere.
+    #
+    # rpi-config writes this with printf, so the escapes below really do
+    # become three separate config.txt lines. On one line the second and
+    # third would be parsed as arguments to the first, silently.
+    #
+    # The offsets are the same ones recorded in bench-status/files/leds.conf,
+    # which is where this bench's wiring lives. tests/ab-config-test.sh
+    # asserts the two still agree, because nothing else connects them.
+    RPI_EXTRA_CONFIG = "dtoverlay=gpio-led,gpio=17,label=slot-a\ndtoverlay=gpio-led,gpio=27,label=slot-b\ndtoverlay=gpio-led,gpio=22,label=ab-busy"
+
+    # rm_work is inherited and would delete the two source trees this
+    # project actually gets debugged in. The boot script is the artefact
+    # that can take out both slots at once, so its sources stay.
+    RM_WORK_EXCLUDE += "u-boot rauc"

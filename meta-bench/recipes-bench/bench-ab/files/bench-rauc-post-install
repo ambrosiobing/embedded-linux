@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# RAUC post-install handler: the red LED goes out again.
+#
+# This runs only after a SUCCESSFUL installation, which is what makes the
+# signalling work without any error handling here. If the install fails,
+# this never runs, the red LED stays steady, and the board is visibly
+# saying that something was left half done. That is the correct reading: a
+# failed install has not damaged the running slot, but the inactive one is
+# no longer a known quantity.
+#
+# The slot that was just written is not marked good by this. It has not run
+# yet. Confirmation happens on the next boot, from inside the new slot,
+# when its own health check passes.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+/usr/bin/bench-slot-leds good || true

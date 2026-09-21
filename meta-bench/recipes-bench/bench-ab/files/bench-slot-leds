@@ -1,0 +1,131 @@
+#!/bin/sh
+#
+# bench-slot-leds - the three LEDs of figure 3, driven from slot state.
+#
+#   bench-slot-leds boot          green or yellow for the slot, red blinking
+#   bench-slot-leds good          red off: this slot is confirmed
+#   bench-slot-leds busy          red steady: a write is in progress
+#   bench-slot-leds unconfirmed   red blinking: running but not yet good
+#
+# WHY THIS IS NOT bench-status, WHICH ALREADY DRIVES THESE THREE LINES.
+#
+# Project 12's bench-status daemon owns GPIO 17, 27 and 22 on every other
+# image in this repository, and turns one word from /run/bench/state into a
+# colour meaning healthy, starting or failed. Those are the same three
+# lines and the same three LEDs that figure 3 of this project's design
+# gives entirely different meanings: which slot booted, and whether it has
+# been confirmed.
+#
+# Two owners, one resource. It is resolved by removing one of them:
+# bench-ab-image.bb takes bench-status out of the image. That is not a
+# preference, it is forced. The gpio-led overlays claim these lines in the
+# device tree, so libgpiod cannot open them at all and bench-status would
+# fail at start on a board where nothing is actually wrong.
+#
+# The alternative considered and rejected was to teach bench-state two more
+# words. It would have put two unrelated meanings on one indicator, so a
+# yellow LED would mean either "a watched unit is starting" or "you are on
+# slot B", decided by which image was flashed. An indicator that needs the
+# image name to interpret is not an indicator.
+#
+# WHY THE KERNEL DRIVES THEM RATHER THAN A DAEMON. The LEDs come from
+# dtoverlay=gpio-led lines in config.txt, so each is an ordinary LED class
+# device and blinking is the kernel's timer trigger rather than a loop in
+# userspace. That matters for the one state where it counts: red blinking
+# means the slot is running and not yet confirmed, which is exactly the
+# window in which userspace may be wedged. A blink driven by a shell loop
+# would stop blinking when the thing it is warning about happened.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+LEDS=${BENCH_LEDS_DIR:-/sys/class/leds}
+
+GREEN=$LEDS/slot-a
+YELLOW=$LEDS/slot-b
+RED=$LEDS/ab-busy
+
+# The LEDs are optional. A bench without them is a bench, and refusing to
+# run would turn a missing jumper wire into a failed health check and then
+# into a rolled-back slot. So every write is best effort, and the absence
+# is reported once, naming the exact paths that were looked for, because a
+# guard that says only "no" trains people to ignore it.
+warned=0
+missing() {
+	[ "$warned" = 0 ] || return 0
+	warned=1
+	echo "bench-slot-leds: no LED class devices at $LEDS" >&2
+	echo "                 expected $GREEN, $YELLOW and $RED" >&2
+	echo "                 These come from the dtoverlay=gpio-led lines in" >&2
+	echo "                 config.txt. Without them the board runs normally" >&2
+	echo "                 and reports its slot only on the console." >&2
+}
+
+write() {
+	# $1 directory, $2 attribute, $3 value
+	if [ ! -w "$1/$2" ]; then
+		missing
+		return 0
+	fi
+	printf '%s\n' "$3" >"$1/$2" 2>/dev/null || missing
+}
+
+off() {
+	write "$1" trigger none
+	write "$1" brightness 0
+}
+
+steady() {
+	write "$1" trigger none
+	write "$1" brightness 1
+}
+
+# The kernel's timer trigger. Equal on and off times at 500 ms, which is
+# slow enough to read across a desk and fast enough not to be mistaken for
+# a steady light in a photograph.
+blink() {
+	write "$1" trigger timer
+	write "$1" delay_on 500
+	write "$1" delay_off 500
+}
+
+slot=$(sed -n 's/.*rauc\.slot=\([A-Za-z0-9]*\).*/\1/p' /proc/cmdline)
+
+case ${1:-} in
+boot)
+	case $slot in
+	A)
+		steady "$GREEN"
+		off "$YELLOW"
+		;;
+	B)
+		off "$GREEN"
+		steady "$YELLOW"
+		;;
+	*)
+		# Neither slot. This is a board booted without the A/B boot
+		# script, so both slot lights stay dark rather than guessing.
+		# The red one still blinks, because an unconfirmed state is
+		# exactly what this is.
+		off "$GREEN"
+		off "$YELLOW"
+		echo "bench-slot-leds: no rauc.slot on the kernel command line" >&2
+		;;
+	esac
+	blink "$RED"
+	;;
+good)
+	off "$RED"
+	;;
+busy)
+	steady "$RED"
+	;;
+unconfirmed)
+	blink "$RED"
+	;;
+*)
+	echo "usage: bench-slot-leds [boot | good | busy | unconfirmed]" >&2
+	exit 2
+	;;
+esac

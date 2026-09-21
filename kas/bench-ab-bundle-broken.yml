@@ -1,0 +1,39 @@
+# Acceptance criterion 5: the bundle that is supposed to fail.
+#
+#   kas build kas/bench-ab-bundle-broken.yml      or  ./go ab-broken
+#
+# A bundle identical to the good one in every respect except that its
+# bench-app.service runs /bin/false. It is correctly signed and carries the
+# right compatible string, so RAUC installs it without complaint. That is
+# the point: the failure must happen after a successful install, on the
+# next boot, from inside the new slot.
+#
+# What must then happen, and what the console log has to show:
+#
+#   boot 1 of slot B   health check fails, slot never marked good
+#   boot 2 of slot B   the same, one attempt left
+#   boot 3 of slot B   the same, no attempts left
+#   boot 4             U-Boot skips B entirely and boots slot A
+#
+# No manual action anywhere in that sequence. If any step needs a keypress,
+# the mechanism has not been demonstrated.
+#
+# THE ONLY DIFFERENCE FROM THE GOOD BUNDLE IS THE SWITCH BELOW. Everything
+# else is inherited, so a rollback that happens here is attributable to the
+# broken application and not to two builds that differed in some other way.
+# That is the same discipline Project 8 needed for its two kernels: a
+# comparison differs in one variable or it is not a comparison.
+header:
+  version: 14
+  includes:
+    - bench-ab-bundle.yml
+
+local_conf_header:
+  broken: |
+    BENCH_AB_BREAK_APP = "1"
+
+    # So the file on the card says what it is. Three bundles land in one
+    # deploy directory and two of them are meant to fail; distinguishing
+    # them by timestamp alone is how the wrong one gets installed during a
+    # demonstration.
+    BENCH_AB_BUNDLE_NAME = "bench-ab-broken"

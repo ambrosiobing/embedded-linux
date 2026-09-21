@@ -21,6 +21,10 @@
 #   ./go explorer     build bench-explorer-image, the Explorer 700 of Project 6
 #   ./go lcd35a       build bench-lcd35a-image, the DRM panel of Project 7
 #   ./go netboot      build bench-netboot-image, the DUT of Project 4's lab
+#   ./go ab           build bench-ab-image, the A/B update card of Project 19
+#   ./go ab-bundle    build a signed RAUC bundle from that same configuration
+#   ./go ab-broken    the bundle that must roll back: criterion 5
+#   ./go ab-wrong     the bundle that must be refused: criterion 7
 #   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
 #   ./go debug        build bench-debug-image, the debugging lab of Project 9
 #   ./go debug-kasan  the same lab with KASAN on, which is a second kernel
@@ -69,6 +73,10 @@ adxl345)    exec sh ./scripts/build.sh bench-adxl345 ;;
 explorer)   exec sh ./scripts/build.sh bench-explorer ;;
 lcd35a)     exec sh ./scripts/build.sh bench-lcd35a ;;
 netboot)    exec sh ./scripts/build.sh bench-netboot ;;
+ab)         exec sh ./scripts/build.sh bench-rpi3-ab ;;
+ab-bundle)  exec sh ./scripts/build.sh bench-ab-bundle ;;
+ab-broken)  exec sh ./scripts/build.sh bench-ab-bundle-broken ;;
+ab-wrong)   exec sh ./scripts/build.sh bench-ab-bundle-wrong ;;
 tee)        exec sh ./scripts/build.sh bench-tee ;;
 debug)      exec sh ./scripts/build.sh bench-debug ;;
 debug-kasan) exec sh ./scripts/build.sh bench-debug-kasan ;;

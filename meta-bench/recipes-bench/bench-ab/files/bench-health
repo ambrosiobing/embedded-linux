@@ -1,0 +1,107 @@
+#!/bin/sh
+#
+# bench-health - decide whether the slot now running deserves to be kept.
+#
+# This script is the whole rollback policy. Everything else in the project
+# is machinery for carrying out the decision it makes.
+#
+# HOW THE DECISION REACHES RAUC, because it is not by calling it. This
+# script never runs "rauc status mark-good". It exits zero or non-zero,
+# and systemd does the rest: bench-health.service is RequiredBy
+# boot-complete.target, and meta-rauc's own rauc-mark-good.service is
+# ordered After and Requires boot-complete.target. A failure here means
+# that target is never reached, so mark-good never runs, so the boot
+# counter stays decremented and U-Boot moves on after three attempts.
+#
+# That was worth discovering rather than assuming. The obvious design is a
+# script that checks some things and then calls mark-good itself, and it
+# would have raced meta-rauc's service, which is installed by default and
+# would have marked the slot good on its own schedule regardless of what
+# this file concluded. Two owners of one decision, with the stock one
+# winning quietly. Reading the unit was cheaper than finding that on a
+# board.
+#
+# WHAT HEALTH MEANS HERE: the application answered. Not that systemd
+# reached multi-user.target, which it does with every service dead, and not
+# that the filesystem mounted, which it does in both slots whatever is in
+# them.
+#
+# WHAT IT DELIBERATELY DOES NOT MEAN: reachable over the network. A device
+# on a bench with no cable, or behind a hotspot with client isolation,
+# which is a thing that has actually happened on this bench, is not a
+# broken device. A health check that tests connectivity rolls a perfectly
+# good slot back because somebody unplugged a switch, and then rolls the
+# other one back too, and the board ends up on its oldest software for a
+# reason nobody can see from the console.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+RUNDIR=/run/bench-ab
+HEARTBEAT=$RUNDIR/heartbeat
+GOOD=/run/slot-good
+
+# The heartbeat is written every 5 s. 15 s allows two missed writes before
+# the slot is judged, which keeps a loaded board from failing on a hiccup
+# while still deciding well inside the 120 s failsafe.
+MAX_AGE=${BENCH_HEALTH_MAX_AGE:-15}
+
+slot=$(sed -n 's/.*rauc\.slot=\([A-Za-z0-9]*\).*/\1/p' /proc/cmdline)
+[ -n "$slot" ] || slot="unknown"
+
+fail() {
+	echo "bench-health: slot $slot FAILED: $1" >&2
+	echo "bench-health: not marking good. U-Boot has already spent one" >&2
+	echo "              attempt on this slot; after three it boots the other." >&2
+	exit 1
+}
+
+# Each check says what it looked at, not just that it failed. A refusal
+# without evidence cannot be argued with, and on a bench the thing people
+# do with a guard they cannot argue with is switch it off.
+[ -e "$HEARTBEAT" ] ||
+	fail "no heartbeat at $HEARTBEAT, so bench-app never started or never wrote"
+
+then_ts=$(cat "$HEARTBEAT" 2>/dev/null || echo "")
+case $then_ts in
+'' | *[!0-9]*)
+	fail "heartbeat at $HEARTBEAT is not a timestamp: '$then_ts'"
+	;;
+esac
+
+now_ts=$(date +%s)
+age=$((now_ts - then_ts))
+
+# A negative age means the clock moved backwards between the write and this
+# read, which on a board with no RTC is what happens when NTP arrives
+# mid-boot. It is not an application fault and must not roll a slot back.
+if [ "$age" -lt 0 ]; then
+	echo "bench-health: heartbeat is ${age}s in the future, clock stepped." >&2
+	echo "              Treating as fresh: this board has no RTC and NTP" >&2
+	echo "              corrects the clock during boot." >&2
+	age=0
+fi
+
+[ "$age" -le "$MAX_AGE" ] ||
+	fail "heartbeat is ${age}s old, limit is ${MAX_AGE}s, so bench-app has stopped writing"
+
+# The marker the failsafe timer looks for. It is written last, after every
+# check has passed, so its presence means exactly one thing and the timer
+# can test for it without knowing anything about what was checked.
+: >"$GOOD"
+
+# The red LED stops blinking: this slot is confirmed.
+#
+# THE "|| true" IS LOAD BEARING AND MUST STAY. This script runs under
+# set -e and its exit status is the rollback decision. Without the guard, a
+# board whose LEDs are not wired, or whose overlay lines were left out of
+# config.txt, would fail its health check, never reach
+# boot-complete.target, never be marked good, and roll back to the other
+# slot after three boots. An unplugged indicator would become a software
+# fault, and the console would blame the application.
+/usr/bin/bench-slot-leds good || true
+
+echo "bench-health: slot $slot is healthy, heartbeat ${age}s old."
+echo "bench-health: boot-complete.target may now be reached, which is what"
+echo "              lets rauc-mark-good.service reset the boot counter."

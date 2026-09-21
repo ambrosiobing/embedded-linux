@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# bench-failsafe - reboot a slot that never decided anything.
+#
+# WHY A TIMER AS WELL AS A WATCHDOG, since both end in a reboot and it
+# looks like belt and braces. They catch different failures and neither
+# catches the other's.
+#
+# The hardware watchdog catches a kernel that has stopped scheduling.
+# systemd stops petting /dev/watchdog0 and the SoC resets the board. It is
+# blind to a kernel that is perfectly healthy, because a healthy kernel
+# keeps petting the watchdog forever.
+#
+# This timer catches exactly that case: a board that is alive, scheduling,
+# answering the console, and has simply never reached a verdict. A service
+# stuck in start, a dependency that never resolves, a health check waiting
+# on something that will not arrive. Without it, such a slot boots, hangs
+# in a healthy-looking limbo, never marks itself good and never fails
+# either, and because U-Boot only decrements on a fresh boot the board sits
+# there indefinitely. An unattended board that has stopped deciding looks
+# identical to one that is working.
+#
+# So: at 120 s after boot, either a verdict was reached or this reboots to
+# spend another attempt. Three of those and U-Boot moves to the other slot.
+#
+# IT TESTS THE MARKER, NOT THE CHECKS. /run/slot-good is written by
+# bench-health as its last action, after everything has passed. Testing for
+# the file rather than re-running the checks keeps one definition of
+# healthy in one place; a second implementation here would be a second
+# opinion, and the two would drift.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+GOOD=/run/slot-good
+
+slot=$(sed -n 's/.*rauc\.slot=\([A-Za-z0-9]*\).*/\1/p' /proc/cmdline)
+[ -n "$slot" ] || slot="unknown"
+
+if [ -e "$GOOD" ]; then
+	exit 0
+fi
+
+echo "bench-failsafe: slot $slot has not been marked good 120s after boot." >&2
+echo "bench-failsafe: no verdict was reached, which is neither a pass nor a" >&2
+echo "                failure, so this reboot spends one of the slot's three" >&2
+echo "                attempts to force one." >&2
+echo "bench-failsafe: if this repeats on both slots the fault is in something" >&2
+echo "                shared, which A/B does not protect: boot.scr, the device" >&2
+echo "                tree, or the firmware on p1. Recover with the second card." >&2
+
+# Flushed before the reboot, otherwise the reason for the reboot is in a
+# journal buffer that the reboot discards, and the console shows a board
+# that restarted for no stated reason. That is the single most annoying
+# thing to debug on an unattended board.
+sync
+journalctl --flush 2>/dev/null || true
+
+systemctl --no-block reboot

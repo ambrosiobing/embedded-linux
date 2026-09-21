@@ -1,0 +1,7 @@
+[Unit]
+Description=Bench A/B failsafe, reboot a slot that reached no verdict
+ConditionKernelCommandLine=rauc.slot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bench-failsafe

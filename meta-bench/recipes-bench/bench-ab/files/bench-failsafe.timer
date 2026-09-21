@@ -1,0 +1,19 @@
+[Unit]
+Description=Bench A/B failsafe timer, 120s after boot
+ConditionKernelCommandLine=rauc.slot
+
+[Timer]
+# 120 s, against a health check that decides within about 15 s of the
+# application starting. The gap is deliberate: this timer exists to catch a
+# boot that never decides, not to race one that is still deciding.
+OnBootSec=120
+
+# One second, rather than systemd's default of one minute. A timer meant to
+# fire at 120 s that may fire anywhere up to 180 s makes every measurement
+# in the acceptance table an approximation.
+AccuracySec=1s
+
+Unit=bench-failsafe.service
+
+[Install]
+WantedBy=timers.target

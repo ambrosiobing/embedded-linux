@@ -174,3 +174,21 @@ SRC_URI += '${@"file://adxl345.cfg" if d.getVar("BENCH_ADXL345_KERNEL") == "1" e
 # noise later, which is why it is explained in two places.
 BENCH_LCD35A_KERNEL ?= "0"
 SRC_URI += '${@"file://lcd35a.cfg" if d.getVar("BENCH_LCD35A_KERNEL") == "1" else ""}'
+
+# And Project 19's watchdog, same switch pattern. A/B rollback has two
+# halves and this is the half that does not need userspace: the counter in
+# uboot.env catches a slot that boots and fails, the watchdog catches a
+# slot that hangs before anything can fail.
+#
+# Opt in, for the ordinary reason and one that is specific to this bench.
+# The ordinary one is Project 3, which measures kernel size and boot time
+# and should not be measuring a driver no other image opens.
+#
+# The specific one is that a watchdog device nothing pets is worse than no
+# watchdog at all. systemd only feeds /dev/watchdog0 when RuntimeWatchdogSec
+# is set, and that setting lives in this project's image rather than in the
+# kernel. Turned on by default, every other image in this repository would
+# gain a watchdog device with no feeder, which is harmless only for as long
+# as nobody enables the setting for an unrelated reason.
+BENCH_AB_KERNEL ?= "0"
+SRC_URI += '${@"file://watchdog.cfg" if d.getVar("BENCH_AB_KERNEL") == "1" else ""}'

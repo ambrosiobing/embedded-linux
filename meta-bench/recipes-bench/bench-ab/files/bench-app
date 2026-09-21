@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# bench-app - the application whose health decides whether a slot is kept.
+#
+# Project 19 is about the update mechanism rather than about any particular
+# payload, so this stands in for the real thing. What matters is that it is
+# a genuine long-running service with a genuine liveness signal, because
+# the whole rollback decision is built on the answer to one question: did
+# the application answer?
+#
+# It does two things, and the second is the one that matters.
+#
+#   1. It writes a heartbeat that bench-health reads. That is the evidence
+#      a slot is working.
+#   2. It pets its own systemd watchdog. That is a second, faster loop:
+#      systemd restarts this service long before the hardware watchdog
+#      would reset the board, so an application that wedges costs a
+#      restart rather than a reboot.
+#
+# The failure injection the acceptance table calls for is to ship a bundle
+# whose bench-app.service runs /bin/false. Nothing here needs to cooperate
+# with that: the service fails to start, no heartbeat is ever written,
+# bench-health fails, boot-complete.target is never reached, the slot is
+# never marked good, and U-Boot returns to the other slot on the third try.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+RUNDIR=/run/bench-ab
+HEARTBEAT=$RUNDIR/heartbeat
+INTERVAL=${BENCH_APP_INTERVAL:-5}
+
+mkdir -p "$RUNDIR"
+
+beat() {
+	# Written to a temporary name and renamed into place. rename is
+	# atomic within a filesystem, so a reader either sees the previous
+	# timestamp or the new one and never a half-written file. A health
+	# check that can read an empty file is a health check that fails at
+	# random, roughly once per however many boots, which is the hardest
+	# kind of fault to attribute on a bench.
+	date +%s >"$HEARTBEAT.new"
+	mv "$HEARTBEAT.new" "$HEARTBEAT"
+}
+
+# THE FIRST BEAT COMES BEFORE THE READY NOTIFICATION, and the order is the
+# point. Type=notify means nothing ordered after this service starts until
+# the ready message is sent, so bench-health cannot run early and find no
+# heartbeat. Sending ready first and beating afterwards would leave exactly
+# that gap: a few milliseconds wide, harmless on most boots, and a slot
+# rolled back for no reason on the fast ones.
+beat
+systemd-notify --ready --status="writing heartbeat every ${INTERVAL}s"
+
+while true; do
+	beat
+
+	# The systemd-level watchdog, petted from the shell. This is a
+	# child process rather than the main PID, which is why the unit
+	# sets NotifyAccess=all; with the default systemd ignores this
+	# message, the watchdog expires and the service is killed every
+	# WatchdogSec exactly as if it had hung.
+	systemd-notify WATCHDOG=1
+
+	sleep "$INTERVAL"
+done

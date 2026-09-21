@@ -71,6 +71,42 @@ do_configure() {
     install -m 0644 ${S}/ta-sub.mk ${TA_BUILD}/sub.mk
 }
 
+# --sysroot IN CFLAGS, WHICH LOOKS REDUNDANT AND IS NOT.
+#
+# ${CC} already carries --sysroot, and every normal-world compile below
+# uses ${CC}, so this line changes nothing for them: the value is the same
+# path twice. It exists for the trusted application, which never sees
+# ${CC} at all.
+#
+# The TA dev kit's mk/gcc.mk builds its own compiler variable from
+# CROSS_COMPILE and then destroys the inherited one on purpose:
+#
+#     CC$(sm)     := $(CROSS_COMPILE_$(sm))gcc
+#     CC          := false    # "to discover accidental use"
+#     libgcc$(sm) := $(shell $(CC$(sm)) $(CFLAGS$(arch-bits-$(sm))) \
+#                            -print-libgcc-file-name)
+#
+# so libgcc is located by a bare aarch64-poky-linux-gcc plus CFLAGS64,
+# and mk/ta_dev_kit.mk line 37 defines CFLAGS64 ?= $(CFLAGS), which
+# oe_runmake takes from this recipe's environment. Without --sysroot
+# there, the compiler answers the question with the two words "libgcc.a"
+# and the link fails with:
+#
+#     aarch64-poky-linux-ld.bfd: cannot find libgcc.a
+#
+# Measured on Monday 21 September 2026 rather than reasoned about. With
+# --sysroot the same compiler answers with an absolute path; the tune
+# flags make no difference either way, which is worth recording because
+# meta-arm passes LIBGCC_LOCATE_CFLAGS='${HOST_CC_ARCH}${TOOLCHAIN_OPTIONS}'
+# and that variable is read only by mk/clang.mk. Passing it here would
+# have looked like the fix and done nothing, since optee.inc pins
+# TOOLCHAIN = "gcc".
+#
+# This is the same single line meta-arm's optee.inc uses for the same
+# reason. That file is not required here because the rest of it is about
+# building optee-os, not a TA against its dev kit.
+CFLAGS += "--sysroot=${STAGING_DIR_HOST}"
+
 # TA_DEV_KIT_DIR comes from meta-arm's optee.inc as
 # ${STAGING_INCDIR}/optee/export-user_ta, which is where
 # optee-os-tadevkit installs it. It is set there but deliberately not

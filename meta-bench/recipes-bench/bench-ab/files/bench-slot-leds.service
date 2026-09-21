@@ -1,0 +1,23 @@
+[Unit]
+Description=Slot indicator LEDs
+ConditionKernelCommandLine=rauc.slot
+
+# The LED class devices come from dtoverlay lines, so they exist as soon as
+# the kernel has probed. sysfs is not a mounted filesystem this unit has to
+# wait for, but the ordering below matters for a different reason: the red
+# LED must be blinking before the health check can turn it off, or a very
+# fast boot leaves it dark and indistinguishable from a confirmed slot.
+Before=bench-health.service
+
+[Service]
+Type=oneshot
+
+# The lights are state, not a process. Without this the unit goes inactive
+# the moment the script exits, and anything ordered After it starts
+# immediately rather than after the LEDs are set.
+RemainAfterExit=yes
+
+ExecStart=/usr/bin/bench-slot-leds boot
+
+[Install]
+WantedBy=multi-user.target

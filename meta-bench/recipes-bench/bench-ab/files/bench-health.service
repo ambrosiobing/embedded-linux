@@ -1,0 +1,32 @@
+[Unit]
+Description=Bench A/B slot health check
+ConditionKernelCommandLine=rauc.slot
+
+# The application has to have answered before its health can be judged.
+# Requires rather than Wants: if bench-app cannot start at all, which is
+# the failure the acceptance table injects, this check must fail rather
+# than be skipped.
+Requires=bench-app.service
+After=bench-app.service
+
+# The gate. boot-complete.target is not reached until this unit has
+# succeeded, and meta-rauc's rauc-mark-good.service Requires that target,
+# so a failure here means the slot is never marked good and the boot
+# counter stays spent.
+Before=boot-complete.target
+
+[Service]
+Type=oneshot
+
+# The verdict has to outlive the process. Without this the unit goes
+# inactive on exit, boot-complete.target loses its requirement, and a
+# perfectly healthy slot can be un-decided by a later daemon-reload.
+RemainAfterExit=yes
+
+ExecStart=/usr/bin/bench-health
+
+[Install]
+# RequiredBy, not WantedBy. WantedBy would let boot-complete.target be
+# reached with this check failed, which is precisely the outcome the whole
+# project exists to prevent.
+RequiredBy=boot-complete.target

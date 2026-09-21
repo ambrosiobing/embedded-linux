@@ -1,0 +1,40 @@
+[Unit]
+Description=Bench A/B demonstration application
+Documentation=https://github.com/ambrosiobing/embedded-linux
+
+# Only on an A/B boot. The same package can sit in an image booted without
+# the A/B boot script, and a heartbeat nobody reads is a process that costs
+# power and explains nothing.
+ConditionKernelCommandLine=rauc.slot
+
+[Service]
+# Type=notify, so that nothing ordered after this unit runs until the
+# application has written its first heartbeat. bench-health depends on
+# exactly that ordering; see the comment above the first beat in bench-app.
+Type=notify
+
+# The heartbeat and the watchdog message both come from the shell loop
+# rather than from the main PID, and with the default systemd ignores
+# notifications from anything but the main process. With NotifyAccess left
+# alone the ready message never arrives, the service times out in start,
+# and the slot is rolled back for a reason that has nothing to do with the
+# application.
+NotifyAccess=all
+
+ExecStart=/usr/bin/bench-app
+
+# The fast loop. A wedged application costs a restart here, long before the
+# 14 s hardware watchdog or the 120 s failsafe would notice anything. The
+# beat interval is 5 s, so this allows five missed beats.
+WatchdogSec=30
+Restart=on-failure
+RestartSec=2
+
+# /run/bench-ab, created for this service and removed with it. That the
+# directory disappears when the application dies is useful rather than
+# incidental: bench-health then reports a missing heartbeat instead of
+# reading a stale one left behind by the previous generation.
+RuntimeDirectory=bench-ab
+
+[Install]
+WantedBy=multi-user.target

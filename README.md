@@ -79,8 +79,9 @@ to this one.
 
 The twenty projects are not independent. Project 5 writes a kernel driver
 that Project 10 then exercises; Projects 11 and 12 cross-compile with the
-SDK that Project 1 produces; Projects 5, 6 and 19 want the identical rootfs
-on a different board. Twenty repositories would mean twenty copies of the
+SDK that Project 1 produces; Projects 5 and 6 want the identical rootfs
+on a different board, and Project 19 shares that board while needing a
+different one. Twenty repositories would mean twenty copies of the
 same layer pins, and a reader would have to reconstruct the order.
 
 So the layer is shared and the projects are directories inside it:
@@ -183,7 +184,7 @@ the claim can be checked rather than taken.
 | 16 | A low-power Cat-M and NB-IoT tracker | Raspberry Pi 3 | AT state machines, CoAP/LwM2M, PSM/eDRX, current budget | Planned |
 | 17 | [A BLE gateway for the STWIN.box with BlueZ](projects/17-ble-gateway) | Raspberry Pi 3B+ | BLE central on Linux, BlueZ D-Bus GATT, pipelines | **Software complete**: kernel fragment, BlueZ configuration, the gateway and three test suites; no board work yet |
 | 18 | Edge Wi-Fi access point with MQTT over TLS and a private PKI | Raspberry Pi 3 | hostapd, dnsmasq, Mosquitto, X.509 | Planned |
-| 19 | A/B updates with RAUC, a watchdog and a read-only rootfs | Raspberry Pi 3 | OTA, U-Boot bootcount, overlayfs, dm-verity | Planned |
+| 19 | [A/B updates with RAUC](projects/19-rauc-ab) | Raspberry Pi 3 | OTA with RAUC, U-Boot bootcount, read-only rootfs, overlayfs-etc, SoC watchdog | **Software complete**: a four partition card, the A/B boot script, the RAUC configuration and bundle recipe, a health check gated on `boot-complete.target`, a failsafe timer, the SoC watchdog, slot LEDs, and the two bundles that are meant to fail. 119 assertions that need no hardware, thirty of them proved by injecting the fault they catch. Nothing has been built and no board has seen any of it; dm-verity stays a stretch goal |
 | 20 | [OP-TEE on the Pi 3: a trusted application for key storage](projects/20-optee-keystore) | Raspberry Pi 3 | TrustZone, OP-TEE OS, TEE Client API, secure storage | **Software complete**: threat model, kernel fragment, trusted application, client, verifier and three test suites; the secure world is built out of tree and no board work yet |
 
 ## Building

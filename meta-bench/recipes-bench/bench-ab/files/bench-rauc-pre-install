@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# RAUC pre-install handler: the red LED goes steady.
+#
+# Steady red means a write is in progress and the card must not lose power.
+# It is the one state in this project where pulling the plug does real
+# damage, because a half written slot is not a slot that rolls back, it is
+# a slot that contains part of two filesystems.
+#
+# RAUC handlers take no arguments, which is why this is a wrapper around
+# one word rather than a parameter in system.conf.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+# Never fail the install because of an indicator. An unplugged LED must not
+# stop a working update, and bench-slot-leds already exits 0 when the class
+# devices are absent; this is the second belt for the case where it cannot.
+/usr/bin/bench-slot-leds busy || true

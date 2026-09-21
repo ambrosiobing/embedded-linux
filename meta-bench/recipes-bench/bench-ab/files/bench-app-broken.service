@@ -1,0 +1,37 @@
+[Unit]
+Description=Bench A/B demonstration application (DELIBERATELY BROKEN)
+ConditionKernelCommandLine=rauc.slot
+
+# THIS UNIT EXISTS TO FAIL. It is installed in place of bench-app.service
+# when BENCH_AB_BREAK_APP is "1", which only kas/bench-ab-bundle-broken.yml
+# sets, and it is how acceptance criterion 5 is provoked.
+#
+# The specification asks for "a bundle whose bench-app.service runs
+# /bin/false". Writing that by hand on the board would prove nothing about
+# the update path, because the interesting part is that a BUNDLE carrying a
+# broken application is installed successfully, boots, fails its health
+# check three times and is abandoned. The fault has to travel the whole
+# mechanism to be a test of the mechanism.
+#
+# Nothing else in the project cooperates with this. bench-health simply
+# finds no heartbeat, exits non-zero, boot-complete.target is never
+# reached, meta-rauc's mark-good never runs, and U-Boot moves on after the
+# third attempt. That is the point: the failure path is the ordinary path
+# with one thing missing.
+
+[Service]
+# Type=notify, as the real unit is, so the failure is a failure to start
+# rather than a process that exits cleanly. /bin/false never sends a ready
+# notification, so systemd reports this as failed rather than as finished.
+Type=notify
+NotifyAccess=all
+ExecStart=/bin/false
+
+# No Restart=. The real unit restarts on failure, which is correct for a
+# transient fault and wrong here: restarting would keep the slot busy
+# looking alive while never becoming healthy, and the failsafe timer rather
+# than the health check would be what ends the boot. Criterion 5 asks for
+# three boot attempts, so this fails once per boot, cleanly.
+
+[Install]
+WantedBy=multi-user.target

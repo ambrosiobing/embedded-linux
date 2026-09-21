@@ -1,5 +1,11 @@
-# Same layer, other board. Projects 5, 6 and 19 use the identical rootfs
-# on a Raspberry Pi 3, so only the machine changes.
+# Same layer, other board. Projects 5 and 6 run the identical rootfs on a
+# Raspberry Pi 3, so only the machine changes.
+#
+# Project 19 also targets a Pi 3 and is NOT built from this file. It needs
+# U-Boot, four partitions, a read-only root and meta-rauc, which is more
+# than a machine change, so it carries kas/bench-rpi3-ab.yml of its own.
+# This comment named Project 19 until Monday 21 September 2026, when that
+# turned out to be a prediction about work that had not been done yet.
 #
 #   kas build kas/bench-rpi3.yml
 header:

@@ -1,0 +1,32 @@
+# Acceptance criterion 7, second half: the bundle that must be refused
+# before anything is written.
+#
+#   kas build kas/bench-ab-bundle-wrong.yml      or  ./go ab-wrong
+#
+# Identical to the good bundle and correctly signed, but claiming to be for
+# a different system. RAUC compares the compatible string in the bundle
+# against the one in the target's system.conf and refuses on a mismatch,
+# and it does so BEFORE writing to the inactive slot. The distinction
+# matters: a refusal after a partial write would leave the other slot in an
+# unknown state, and the point of this check is that it cannot.
+#
+# The first half of criterion 7, a bundle signed with a key the board does
+# not trust, needs no kas file. It is the ordinary bundle built with
+# BENCH_RAUC_KEY and BENCH_RAUC_CERT pointed at the second key pair, which
+# docs/BRINGUP.md step 1 explains how to make. Two different mechanisms are
+# being shown, and they fail at different moments: the signature is checked
+# when the bundle is opened, the compatible when the system is examined.
+header:
+  version: 14
+  includes:
+    - bench-ab-bundle.yml
+
+local_conf_header:
+  wrong: |
+    # A plausible neighbour rather than nonsense. "bench-rpi4" is what a
+    # bundle for the Pi 4 board on this same bench would carry, which is
+    # the mistake somebody would actually make. A string like "xxx" would
+    # demonstrate that RAUC compares strings and nothing about the risk the
+    # comparison exists to remove.
+    BENCH_AB_COMPATIBLE = "bench-rpi4"
+    BENCH_AB_BUNDLE_NAME = "bench-ab-wrong-compatible"

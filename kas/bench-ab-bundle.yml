@@ -1,0 +1,23 @@
+# The same configuration as kas/bench-rpi3-ab.yml, built to a different
+# target: the signed update bundle rather than the card image.
+#
+#   kas build kas/bench-ab-bundle.yml
+#
+# WHY A SECOND FILE RATHER THAN A SECOND TARGET. A kas file names one
+# target, and these two are wanted at different times. The card image is
+# built once and written to a reader; the bundle is built for every change
+# after that and never touches a card. Keeping them apart means the
+# ordinary development loop does not rebuild a wic image nobody is going to
+# flash.
+#
+# Everything else is inherited, so the bundle is always built from exactly
+# the configuration the card image was built from. That matters more here
+# than it looks: a bundle built against a different machine, a different
+# kernel fragment or a different compatible string is a file that installs
+# and then does not boot.
+header:
+  version: 14
+  includes:
+    - bench-rpi3-ab.yml
+
+target: bench-bundle

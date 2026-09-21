@@ -1,0 +1,117 @@
+# Project 19: the A/B boot script.
+#
+# THIS IS THE MOST DANGEROUS FILE IN THE PROJECT. It is on the shared FAT
+# partition, it is in no bundle, and it is the thing that would perform a
+# rollback. A broken copy takes out both slots at once and no amount of
+# rollback logic helps, because the rollback logic is what broke. The
+# recovery path is the second microSD card, not the other slot.
+#
+# It replaces the stock meta-raspberrypi script, which loads a kernel from
+# the FAT partition and takes its command line from the device tree. Both
+# of those are exactly what A/B has to change: the kernel must come from
+# the slot so that an update can replace it, and root= must name the slot
+# that was chosen.
+#
+# THE ORDER OF OPERATIONS IS THE WHOLE DESIGN. The counter is decremented
+# and written to disk BEFORE the kernel is loaded, never after. A board
+# that loses power between the decrement and the boot has spent an attempt
+# it did not use, which costs one retry. A board that decremented after a
+# successful load would never decrement at all on the failure that matters
+# most, the one where the kernel loads and then hangs, and the slot would
+# be retried forever.
+#
+# The counters only ever go down here. Putting them back up is RAUC's job
+# in Linux, after a health check has passed. Neither side can do the
+# other's work, and that is what makes the mechanism safe rather than
+# merely redundant.
+
+# A fresh card has no uboot.env, so the first boot has to invent one. These
+# three defaults are the only place the initial state is written; RAUC sets
+# them afterwards and never reads them.
+if test "x${BOOT_ORDER}" = "x"; then
+    setenv BOOT_ORDER "A B"
+fi
+if test "x${BOOT_A_LEFT}" = "x"; then
+    setenv BOOT_A_LEFT 3
+fi
+if test "x${BOOT_B_LEFT}" = "x"; then
+    setenv BOOT_B_LEFT 3
+fi
+
+# Cleared rather than assumed empty. These are ordinary environment
+# variables and a previous boot may have left them set, in which case the
+# loop below would take the first branch and boot last time's slot.
+setenv rauc_slot
+setenv rauc_part
+
+for BOOT_SLOT in "${BOOT_ORDER}"; do
+    if test "x${rauc_slot}" != "x"; then
+        echo "Slot ${rauc_slot} already chosen, ignoring ${BOOT_SLOT}"
+    elif test "x${BOOT_SLOT}" = "xA"; then
+        if test ${BOOT_A_LEFT} -gt 0; then
+            setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1
+            echo "Slot A chosen, ${BOOT_A_LEFT} attempts left after this one"
+            setenv rauc_slot A
+            setenv rauc_part 2
+        else
+            echo "Slot A has no attempts left"
+        fi
+    elif test "x${BOOT_SLOT}" = "xB"; then
+        if test ${BOOT_B_LEFT} -gt 0; then
+            setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1
+            echo "Slot B chosen, ${BOOT_B_LEFT} attempts left after this one"
+            setenv rauc_slot B
+            setenv rauc_part 3
+        else
+            echo "Slot B has no attempts left"
+        fi
+    else
+        echo "BOOT_ORDER names ${BOOT_SLOT}, which is not a slot on this card"
+    fi
+done
+
+# Both slots exhausted. The board is not bricked and it is not fixed
+# either: something has failed three times on each side, and the honest
+# thing is to say so on the console and start again rather than sit at a
+# U-Boot prompt that nobody is watching. Whoever reads this line is being
+# told to reach for the second card.
+if test "x${rauc_slot}" = "x"; then
+    echo "No slot has attempts left. Both counters reset to 3, rebooting."
+    echo "If this repeats, the fault is shared: the boot script, the device"
+    echo "tree or the firmware on p1. Recover with the second microSD card."
+    setenv BOOT_A_LEFT 3
+    setenv BOOT_B_LEFT 3
+    saveenv
+    reset
+fi
+
+# The decrement reaches the card here, before anything is loaded. Every
+# path below this line has already spent its attempt.
+saveenv
+
+# The firmware's own command line, from the device tree /chosen node, is
+# taken as the base so that the console settings config.txt produced are
+# kept rather than reinvented. This project's arguments are appended, which
+# means they win: Linux takes the last occurrence of root=, so whatever
+# cmdline.txt said about the root filesystem is overridden by the slot that
+# was actually chosen above.
+fdt addr ${fdt_addr} && fdt get value bootargs_fw /chosen bootargs
+setenv bootargs "${bootargs_fw} root=/dev/mmcblk0p${rauc_part} rootwait ro rauc.slot=${rauc_slot}"
+
+# The kernel comes out of the slot, not off the FAT partition. This single
+# line is why each slot can carry its own kernel and why an update is
+# allowed to change one. It is also why bench-ab-image.bb has to install
+# kernel-image-image: on a Raspberry Pi the kernel would otherwise exist
+# only on p1 and this load would find nothing.
+#
+# A slot that has never been installed is an empty filesystem, so this load
+# fails, and that is a normal event on a freshly flashed card the first
+# time BOOT_ORDER reaches slot B. The attempt has already been spent, so
+# resetting here returns to the other slot rather than looping.
+if ext4load @@BOOT_MEDIA@@ 0:${rauc_part} ${kernel_addr_r} /boot/@@KERNEL_IMAGETYPE@@; then
+    echo "Booting slot ${rauc_slot} from /dev/mmcblk0p${rauc_part}"
+    @@KERNEL_BOOTCMD@@ ${kernel_addr_r} - ${fdt_addr}
+fi
+
+echo "Slot ${rauc_slot} did not load a kernel. Rebooting to try the other."
+reset
