@@ -197,6 +197,10 @@ check_fragment() {
 		case $line in
 		"# consequence:"*)
 			marker=yes
+			# The TEXT, not just the fact of it. The claim is the
+			# thing to be checked, and it cannot be checked if it is
+			# thrown away here.
+			marker_text=${line#\# consequence:}
 			continue
 			;;
 		CONFIG_*)
@@ -209,6 +213,7 @@ check_fragment() {
 			[ -n "$sym" ] || { marker=no; continue; }
 			;;
 		*)
+			marker_text=
 			# Any other line, comment or blank, ends the marker's
 			# reach. It has to sit directly above what it excuses.
 			marker=no
@@ -277,6 +282,47 @@ check_fragment() {
 		if [ "$marker" = yes ]; then
 			echo "consequence CONFIG_$sym  promptless, selected by:" \
 				"${who:-nothing found}"
+
+			# CHECK THE CLAIM, DO NOT MERELY PRINT BESIDE IT.
+			#
+			# The header of this script has always promised that the
+			# selectors are printed "so the claim in the comment can be
+			# checked rather than believed". With 36 selectors and three
+			# shown, that was not possible: on Monday 21 September 2026
+			# tee.cfg claimed drivers/tee/Kconfig and the three printed
+			# names were arch/arm, arch/arm64 and arch/csky. True claim,
+			# no way to tell from the output.
+			#
+			# Markers come in three shapes across this tree: naming a
+			# path, naming symbols, or naming neither. Only the first can
+			# be checked here, so the other two are reported as unchecked
+			# rather than passed silently. A claim nobody can verify is
+			# not evidence, and saying so is cheaper than pretending.
+			named= ; missing=
+			for word in $marker_text; do
+				case $word in
+				*Kconfig*)
+					word=$(printf '%s' "$word" | tr -d ',.;')
+					if printf '%s\n' "$all" | grep -qx "$word"; then
+						named="$named $word"
+					else
+						missing="$missing $word"
+					fi
+					;;
+				esac
+			done
+
+			if [ -n "$missing" ]; then
+				echo "            FALSE CLAIM: the comment names$missing,"
+				echo "            which does not select CONFIG_$sym."
+				fail=1
+			elif [ -n "$named" ]; then
+				echo "            claim checks out:$named is among the" \
+					"$total selectors"
+			else
+				echo "            claim names no Kconfig file, so it was" \
+					"not checked against the tree"
+			fi
 		else
 			echo "PROMPTLESS  CONFIG_$sym has no prompt, so a fragment"
 			echo "            cannot set it. Selected by:" \

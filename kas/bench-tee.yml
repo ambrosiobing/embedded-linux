@@ -29,6 +29,32 @@ repos:
       meta-arm:
       meta-arm-toolchain:
 
+  # meta-python, for python3-gpiod.
+  #
+  # benchkey-leds is the daemon that makes the world switch visible, it is
+  # Python, and it drives the lines through the libgpiod v2 binding. That
+  # binding is packaged in meta-python and not in meta-oe, which is the
+  # only layer of this repository bench-rpi4.yml names. The repository and
+  # its branch are pinned there, so this block adds a layer rather than a
+  # second pin.
+  #
+  # FOUND BY THE BUILD, four seconds in, the first time this configuration
+  # was ever resolved into a task queue:
+  #
+  #     ERROR: Nothing RPROVIDES 'python3-gpiod'
+  #     ERROR: Required build target 'bench-tee-image' has no buildable
+  #            providers.
+  #
+  # Project 17 declares the same layer for the same binding in
+  # kas/bench-ble.yml and says so in a comment. The pattern existed, this
+  # file did not follow it, and nothing could detect that until a build
+  # tried: a kas layer list is not checked against the RDEPENDS of the
+  # recipes it is expected to supply.
+  meta-openembedded:
+    layers:
+      meta-oe:
+      meta-python:
+
 local_conf_header:
   tee: |
     # CONFIG_TEE and CONFIG_OPTEE. See the bbappend for why it is opt in.
