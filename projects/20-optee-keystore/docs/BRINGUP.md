@@ -13,9 +13,10 @@ before Linux exists, and a failure in any of them produces a board with no
 | Check | Why |
 |---|---|
 | The board is a Pi 3, and `machine:` in `kas/bench-rpi3.yml` is `raspberrypi3-64` | An image built for the Pi 4 does not boot here and does not say so; the symptom is a dark board that reads as dead hardware |
-| The USB/TTL cable is on pins 8, 10 and 6, red lead open | It is the only instrument that sees the secure world |
+| The USB/TTL cable: **black** lead to pin **6** (GND), **white** lead to pin **8** (GPIO14, `TXD0`, the board transmits), **green** lead to pin **10** (GPIO15, `RXD0`, the board receives), **red** lead connected to nothing | It is the only instrument that sees the secure world. Pins 6, 8 and 10 are three consecutive pins in the outer row, second to fourth from the corner where pin 2 sits. The red lead is 5 V and the board has its own supply. Colours are this bench's PL2303 cable; another adapter's printed labels win over them |
 | The three LEDs are on GPIO17, 27 and 22 with 330 ohm resistors, cathodes to pin 9 | Wrong pins drive whatever else is there |
-| The card is the one this project will own | Project 17 builds for the same `MACHINE`; the two images cannot be on one card |
+| The card's previous contents are archived, and the restore command is known | This bench has **one card**. Every flashed instance is archived with `./go archive` and copied to the Desktop before the card is reused, so "the card this project owns" is not how it works here. Mount the FAT partition read-only and say whose image is on it first; on Tuesday 22 September 2026 it was the NEO Air's provisioning card, restored by `./go neo-air card`. Project 17 builds for the same `MACHINE`, so its image and this one still cannot share a card at the same time |
+| The card is not the hot one | A microSD that is warm to the touch after a failed write is faulting, and through a reader it presents as USB resets and CRC errors that look exactly like a bad USB/IP link. One did on 22 September 2026 and was blamed on the link until a second card wrote clean. It is out of the pool |
 
 ## 1. Build both halves, and pin them to each other
 
@@ -25,13 +26,32 @@ Two builds, and the version they share is the thing to get right.
 # the normal world, the TA and the rootfs
 ./go tee
 
-# the secure world, in its own checkout, on the Linux filesystem
+# the secure world, in its own checkout, on the Linux filesystem.
+# Two host packages first; neither is in the OP-TEE build's own docs
+# for this platform and both stopped the first attempt:
+sudo apt-get install -y repo python3-pyelftools
 mkdir -p ~/optee-rpi3 && cd ~/optee-rpi3
 repo init -u https://github.com/OP-TEE/manifest.git -m rpi3.xml -b 4.1.0
-repo sync -j4
-cd build && make -j8 toolchains && make -j8
-ls ../out/boot        # armstub8.bin, u-boot files, uboot.env, config.txt
+repo sync -j4                                  # 2.1 GB, about four minutes
+cd build && make -j8 toolchains && make -j8 tf-a u-boot-env
+mkdir -p ../out/boot
+cp ../trusted-firmware-a/build/rpi3/debug/armstub8.bin ../out/uboot.env ../out/boot/
+ls -la ../out/boot     # armstub8.bin 1261624 bytes, uboot.env 16384 bytes
 ```
+
+**Not `make -j8`, and not `update_bootfs`, on purpose.** `all` also builds
+Buildroot, a Linaro 5.17 kernel and a rootfs this project never uses; the
+image is Yocto's. And `update_bootfs`, the target that fills `out/boot`,
+depends on `linux` and installs that kernel as `kernel8.img` together with
+`bootcode.bin` and friends from a **2019** firmware tag, over a Yocto boot
+partition that carries a 2025 set. `tf-a` and `u-boot-env` produce the two
+files `./go armstub install` actually reads. `armstub8.bin` embeds U-Boot
+as BL33 inside the FIP, so no separate `u-boot.bin` is wanted, and the
+installer writes its own three `config.txt` lines rather than copying the
+reference file. Built this way on Tuesday 22 September 2026 in about forty
+minutes including the toolchain download, at TF-A **v2.6**, which is what
+the 4.1.0 manifest pins; the kas comment's "TF-A 2.10" is about where
+`plat/rpi/rpi3` exists, not about the version built.
 
 **Write down what you built.** `repo manifest -r` prints every commit id;
 put its output in `docs/evidence/rpi3-manifest.txt`. OP-TEE moves fast and

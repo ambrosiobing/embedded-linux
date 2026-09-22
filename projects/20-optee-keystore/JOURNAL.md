@@ -602,3 +602,311 @@ pushes on shellcheck findings this laptop cannot see, and I pushed three
 of them without reading the first. The disk budget, the archive tiers,
 the dynamic layer and every one of those runs are in the commits between
 `c8d7043` and the image.
+
+## 18. The secure world, built in forty minutes once two facts were known
+
+Tuesday 22 September 2026, from about 07:00. `armstub8.bin` had never
+existed on this bench. It does now: 1,261,624 bytes, TF-A v2.6 debug with
+a FIP holding BL2, BL31, OP-TEE as BL32 at 0x7CED8 bytes and U-Boot as
+BL33 at 0x84B90, plus `uboot.env` at 16,384 bytes.
+
+**What the bring-up document did not say, and now does.** Two host
+prerequisites: `repo` (`apt-get install repo`, Ubuntu 26.04 ships 2.54)
+and `python3-pyelftools`, without which `optee_os` stops at
+`gen_ldelf_hex.py` with a message that names the package. The first
+`make` failed on it after U-Boot had already built; the second succeeded.
+
+**`make -j8` was the wrong target, and reading `rpi3.mk` said why.**
+`all` builds `buildroot`, `linux` and `update_rootfs`, none of which this
+project uses: the image is Yocto's. And `update_bootfs`, the target that
+populates `out/boot`, depends on `linux` and installs the Linaro 5.17
+kernel as `kernel8.img` plus `bootcode.bin` and friends from a **2019**
+firmware tag, over a Yocto boot partition carrying a 2025 set. What this
+project needs is three files: `armstub8.bin`, which embeds U-Boot in the
+FIP so no separate `u-boot.bin` is wanted; `out/uboot.env`; and a
+`config.txt` that the installer writes itself. `tf-a` and `u-boot-env`
+produce the first two and nothing else. `out/boot` is then two `cp`
+lines. `./go armstub install` reads exactly those two.
+
+**The manifest, saved.** `repo manifest -r` names all 11 components at
+their exact commits, every OP-TEE one at `refs/tags/4.1.0`, so the two
+halves agree on the version the recipes pin. It also says TF-A is
+**v2.6**, where the kas comment says 2.10; the comment only claims that
+`plat/rpi/rpi3` exists, which is true of both, but the evidence file
+carries the real one. It is in `out/rpi3-manifest.xml` and goes into
+`docs/evidence/` with the first console capture.
+
+**Entry 6 held.** `RPI3_PRELOADED_DTB_BASE=0x00010000` in the TF-A flags
+against `device_tree_address=0x01000000` in every `config.txt` looked like
+a mismatch that would stop the board with nothing on the console. The
+reference `uboot.env.txt` has `fdt_addr_r=0x01000000` and
+`kernel_addr_r=0x02000000`, the reference `config.txt` has the same two,
+and the installer's block has the same two. TF-A's constant is read only
+when TF-A boots a kernel itself; with U-Boot as BL33 it is inert, which is
+what entry 6 said and what the reference build ships and boots with.
+
+**Not yet read, and it matters for the first boot.** `uboot.env.txt` line
+31: `mmcboot=run load_kernel; run set_bootargs_tty set_bootargs_mmc
+set_common_args; run boot_it`. `booti` replaces the kernel command line
+the firmware built from `cmdline.txt` with U-Boot's own `bootargs`, so the
+kernel will see the reference environment's `root=` and `console=`, not
+Yocto's `root=/dev/mmcblk0p2 console=serial0,115200`. The three
+`set_bootargs_*` definitions were asked for four times tonight and never
+printed. If the first boot finds no root, this is the first place to look.
+
+## 19. One card, a hot one, and a diagnosis I got wrong out loud
+
+**The bench has one card.** The bring-up's step 0 said "the card is the
+one this project will own", written for a bench with more cards than this
+one. Joseph's practice is one card and an archive of every flashed
+instance before the card is reused, which is what `./go archive` and the
+Desktop copy are for. The document now says that.
+
+**The first flash died at three percent** with `fsync: Input/output
+error`, and `dmesg` showed `reset high-speed USB device ... using
+vhci_hcd`, a command aged 63 seconds, and `Sense Key 0xb, ASC 0x47/0x1`,
+a data-phase CRC error. I read that as USB/IP failing under a bulk write
+and said so with more confidence than the evidence carried. Two further
+`usbipd attach` attempts hung; the third said `Device busy (exported)`.
+Then the card was hot to the touch.
+
+A different card, the same reader and the same USB/IP path, wrote the
+same image in **16 seconds at 11.6 MiB/s** with no reset. The link was
+never the fault; the medium was, and a faulting card presents through a
+reader as exactly the resets and CRC errors I attributed to the link.
+Without a second card as a control the two are indistinguishable from the
+kernel log, and I did not say that when I named the cause. The hot card
+is out of the pool.
+
+**The second card was the NanoPi NEO Air's.** Mounted read-only before
+anything was written: `extlinux/`, `u-boot-sunxi-with-spl.bin`,
+`sun8i-h3-nanopi-neo-air.dtb`, `flash-emmc.sh`, hostname `neo-air`. It is
+the card Projects 2 and 3 provision the eMMC from, and Project 3 needs it
+again for `10-uboot`. It is archived as `proj02-neo-air` on the Desktop
+and `~/bench/neo-air/out` still holds everything `./go neo-air card`
+writes back in minutes. Erased knowingly, on Joseph's say-so, with the
+restore named. Project 3's journal carries the same note.
+
+**The install, proved by its own status.** Before: `armstub8.bin absent`,
+`uboot.env absent`, `config.txt does not mention it`, `kernel8.img
+present`. After: `armstub8.bin present, 1261624 bytes`, `uboot.env
+present`, `config.txt boots the secure world`, `kernel8.img present`, the
+original `config.txt` kept beside it. The merged `config.txt` has no
+second `kernel_address` or `device_tree_address` fighting the block, and
+no `arm_64bit=1`, which it does not need: the firmware selects 64-bit mode
+when `kernel8.img` is present, and the reference build's three-line
+`config.txt` relies on the same inference. The first TF-A banner is the
+proof of that; if it is absent, `arm_64bit=1` is the first line to add.
+
+**Corrected in entry 21 on Tuesday 22 September 2026.** That inference
+does not exist. With `armstub8.bin` present the board reaches 64-bit mode
+anyway, which is why this paragraph looked right; take the stub away and
+the same card boots to silence, because the firmware defaults `arm_64bit`
+to 0 on a Pi 3 and goes looking for a `kernel7.img` that is not there.
+
+**Two hand-over faults of mine, both now in the skill.** I gave a
+`wifi.conf` template with placeholder values as a runnable block and it
+was run as given: the card briefly carried a network called `YOUR_SSID`.
+The board's script wants the SSID bare and the PSK as 64 hex from
+`wpa_passphrase`, or a passphrase in double quotes; the skill had said so
+since before this project and I re-derived it from the script mid-flash
+because I had not read that section. And the release sequence was never
+written as a sequence: `umount` in WSL, `usbipd detach` in an
+Administrator PowerShell, then Windows' Safely Remove Hardware on the USB
+drive, in that order, each handing the device to the next owner. Joseph
+supplied the third step. Both are in `references/bench.md` now, with a
+pointer at the top of the skill saying to read that section before any
+card is touched.
+
+**Where it stands.** The card holds the Yocto normal world, the secure
+world, `uboot.env`, the installer's `config.txt` block and `wifi.conf`.
+It has not been powered. The board is the 3B, v1.2, Project 8's second
+board, chosen because OP-TEE's `plat-rpi3` was written against it and
+because the 3B+ is spoken for by Project 17 and by daqring. The first
+boot is watched on the console for three banners in order, TF-A, OP-TEE,
+U-Boot, and the whole capture is `docs/evidence/boot-console.txt`.
+
+## 20. Four CPUs, a TEE that bound, and a CPU that never came back
+
+Tuesday 22 September 2026, late. The board booted the secure world for
+the first time, reached a systemd start-up, and then one CPU disappeared
+into OP-TEE and took the machine with it. Both halves of that sentence
+are results.
+
+**The firmware's device tree is not the tree OP-TEE needs.** The
+Raspberry Pi firmware hands the kernel a tree with all four CPUs at
+`enable-method = "spin-table"`, no `/psci` node and no `/firmware` node.
+With TF-A underneath, the spin-table addresses are stale: CPU 0 comes up,
+CPUs 1 to 3 are released into nothing and the kernel spends about fifteen
+seconds timing out on them. And with no `/firmware/optee` the `optee`
+driver never probes, so a secure world that booted correctly is invisible
+to Linux.
+
+**Patched in RAM at the U-Boot prompt, deliberately, before writing
+anything permanent.** `fdt resize 4096`, then `/psci` with `compatible =
+"arm,psci-1.0"` and `method = "smc"`, then `enable-method psci` on
+`/cpus/cpu@0` through `cpu@3`, then `/firmware/optee` with `compatible =
+"linaro,optee-tz"` and `method = "smc"`, then `fdt rsvmem add 0x08000000
+0x400000` and `fdt rsvmem add 0x10100000 0xf00000`. Nothing touched the
+card. The point of doing it this way is that a permanent fix written
+before a proven one is a guess with a build attached to it.
+
+**It worked, and the log says so in four places.**
+
+```
+psci: PSCIv1.1 detected in firmware
+psci: Trusted OS migration not required
+smp: Brought up 1 node, 4 CPUs
+optee: revision 4.1 (18b424c2)
+optee: initialized driver
+```
+
+Fifteen seconds of CPU timeouts gone. The console survived past
+`bcm2835-aux-uart` because the firmware's own tree carries the pin
+muxing. `Run /sbin/init as init process`, then systemd 255.22, then a
+`tee-supplicant` slice.
+
+**Entry 18's open worry is closed, and it was a false alarm.** That entry
+said `booti` would replace the kernel command line the firmware built
+from `cmdline.txt` with U-Boot's own `bootargs`, and that the three
+`set_bootargs_*` definitions were the first place to look if the first
+boot found no root. They were never needed: `bootargs` is not set in this
+environment, so U-Boot left `/chosen` alone and the kernel saw Yocto's
+line intact, `root=/dev/mmcblk0p2 rootfstype=ext4 rootwait`, and mounted
+the right filesystem.
+
+**Then CPU 3 went into the secure world and did not return.** From about
+twenty seconds on, every RCU stall report names the same task:
+
+```
+Task dump for CPU 3:
+task:kworker/3:2  state:R  running task
+Workqueue: optee_bus_scan optee_bus_scan
+Call trace:
+ __switch_to+0xd8/0x140
+ 0x0
+```
+
+The trace ends at `0x0` because the unwinder cannot follow an `smc`
+instruction into EL3. That CPU also stopped taking its timer interrupt,
+which the report says in its own words, `Possible timer handling issue on
+cpu=3 timer-softirq=258`. `rcu_preempt` had last run there, so it starved,
+and every `umount` in systemd's path then blocked forever in
+`synchronize_rcu_expedited`. One `device.pta` session opened and closed
+cleanly just before Linux printed; the next entry into the secure world
+never came back.
+
+**The SD card went down with it**, which is what made one failure look
+like two. `mmc0: timeout waiting for hardware interrupt` from 19.9
+seconds, `rpi_firmware_property_list` hitting `Firmware transaction
+timeout` inside `bcm2835_sdhost_set_clock`, then `mmc0: tried to HW reset
+card, got error -110`, `mmc0: card 0001 removed`, the ext4 journal
+aborted and the root filesystem remounted read only. At the time I could
+not separate a wedged kernel from a failing card, and said so rather than
+picking one, having already named a card fault as a link fault once this
+week. Entry 21 separates them with a control.
+
+**Where the permanent fix stands.** Not designed yet, on purpose. The
+patch above is now known to produce a booting system, so the question is
+only where to put it: an overlay on the boot partition, a `bootcmd` in
+`uboot.env` running the same `fdt` commands, or a device tree shipped by
+the image. None of those is worth choosing while the secure world still
+wedges a CPU, because the next experiment may change what the tree has to
+contain.
+
+## 21. A control boot that would not boot, and a line missing since the image was first built
+
+Same night. To find out whether the SD failure belonged to OP-TEE or to
+the card, the obvious experiment is the same card in the same board with
+no secure world at all. It cost three hours and produced four findings,
+only one of which was the one I was looking for.
+
+**`./go armstub remove` does not remove the secure world, and the script
+says both things.** `do_install` explains that there is deliberately no
+`armstub=` line because the firmware loads a file named `armstub8.bin`
+whenever one is present. `do_remove` deletes the `config.txt` block, says
+in its own comment that this is enough to boot without the stub, and
+leaves `armstub8.bin` on the partition on purpose. Both cannot be true. I
+did not settle which by experiment; I renamed the file to
+`armstub8.bin.off` and moved on, so the contradiction is recorded rather
+than resolved. Whichever way it resolves, `do_remove` needs fixing:
+either its comment is wrong or its behaviour is.
+
+**`do_remove` also destroys the only record of a working
+configuration.** It restores `config.txt` by moving
+`config.txt.bench-orig` over it, so a hand edit is lost and the backup is
+consumed in the same operation. The edit at risk was
+`device_tree_address=0x04000000`, which is the line the whole of entry 20
+depends on. Copied to `~/config.txt.optee-secure.bak` first.
+
+**Every `./go armstub` line in the bring-up needs `sudo`.** Step 2 gives
+`./go armstub install /mnt/boot ...` with no `sudo`, against a partition
+the same document says to mount with `sudo mount`. It worked on Tuesday
+22 September 2026 only because that install happened to run as root.
+Without it the first write stops at `mv: replace '/mnt/boot/config.txt',
+overriding mode 0755?`, which nobody reads as a permissions problem.
+
+**And then the control boot produced nothing at all.** Console attached,
+picocom started before power, and not one byte. My first guess was that
+`enable_uart=1` had gone with the removed block. Wrong, and disproved
+from the file in a minute: it is at line 245 of the image's own
+`config.txt`, well before the block. That file has exactly five active
+settings in 252 lines, and the one that matters is the one that is not
+there.
+
+**There is no `arm_64bit=1`, and on a Raspberry Pi 3 it defaults to 0.**
+Three boots settle what that means, and no single one of them would have:
+
+| `armstub8.bin` | `arm_64bit` | Result |
+|---|---|---|
+| present | absent | boots, 64 bit, TF-A then OP-TEE then U-Boot then the kernel |
+| absent | absent | silence, green ACT LED blinks once and stops |
+| absent | `=1` | boots, firmware loads `kernel8.img` directly |
+
+So the claim at the end of entry 19, that `arm_64bit=1` is not needed
+because the firmware selects 64-bit mode when `kernel8.img` is present,
+is **wrong** and is corrected here. What is true is narrower: with
+`armstub8.bin` present the mode is entered anyway. Without it,
+`kernel8.img` alone is not enough, the firmware looks for a `kernel7.img`
+that this card has never had, and it stops without a word.
+`bench-tee-image` has therefore never been able to boot on a Pi 3 except
+through U-Boot, which loads `kernel8.img` by name, and nothing in the
+repository could have noticed.
+
+**`uart_2ndstage=1` paid for itself on the first boot it was present
+for.** The Raspberry Pi firmware is silent on the UART unless told
+otherwise, which is why a boot stage that fails before the kernel fails
+invisibly. With it set, the firmware names every file it reads and every
+address it picks:
+
+```
+Read File: config.txt, 2763
+dtb_file 'bcm2710-rpi-3-b.dtb'
+Loaded 'kernel8.img' to 0x200000 size 0x1a52a00
+Device tree loaded to 0x2eff6e00 (size 0x911c)
+```
+
+Two of those are worth keeping: left alone, this firmware puts the kernel
+at `0x200000` and the device tree at `0x2eff6e00`, nowhere near the
+`0x01000000` the installer's block asks for.
+
+**The control itself, which is the result the other three paid for.**
+Same card, same board, same reader, no secure world: four CPUs, root
+remounted read write, a login prompt, `dd if=/dev/mmcblk0 of=/dev/null
+bs=1M count=512` reading half a gigabyte straight off the raw device with
+no error, 207 seconds of uptime without a single `mmc0` timeout, and a
+clean `poweroff` with `All filesystems unmounted`. Against a first
+timeout at 19.9 seconds with the secure world in place.
+
+**So the card is exonerated and the failure is one failure, not two.**
+`mmc0: Problem switching card into high-speed mode!`, which I had flagged
+as possible evidence against the card, appears at 3.58 seconds in the
+clean boot and 4.2 seconds in the failed one. It is a constant of this
+card and this controller and it means nothing. What killed the SD stack
+was the machine dying around it.
+
+**Next.** The stub back in place, `arm_64bit=1` and `uart_2ndstage=1`
+kept, and `maxcpus=1` on the kernel command line, to ask whether OP-TEE
+wedges only when it is entered from a secondary CPU. That is one line of
+bootargs and it either localises the hang or rules out the cheapest
+explanation for it.

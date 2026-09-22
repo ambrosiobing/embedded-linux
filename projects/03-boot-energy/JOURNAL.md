@@ -1108,3 +1108,29 @@ Two things follow. A destination that must be a block device should be
 checked for being one. And the project's own rule, **never name the
 device, always derive it**, applies to instructions in a chat window
 exactly as much as it applies to a script.
+
+## 24. The provisioning card was erased for Project 20, and how it comes back
+
+Tuesday 22 September 2026. The microSD card that boots the NEO Air and
+runs `flash-emmc.sh` was identified read-only, `extlinux/`,
+`u-boot-sunxi-with-spl.bin`, `sun8i-h3-nanopi-neo-air.dtb`, hostname
+`neo-air`, and then erased to carry Project 20's Pi 3 image, because this
+bench has one card and every flashed instance is archived before it is
+reused. The board itself is untouched: it boots from its eMMC, and the
+`00-baseline` measurements were taken from the eMMC.
+
+**Before `10-uboot` is measured, the card is rebuilt.** The artefacts are
+in `~/bench/neo-air/out` on skyhorizon, unchanged since the baseline
+build, and the archive `proj02-neo-air` is on the Desktop. On skyhorizon,
+WSL, with the card in the reader and identified by `lsblk` first:
+
+    . projects/02-neo-air-mainline/toolchain.env
+    sudo ./go neo-air card /dev/sdX
+
+Then `wifi.conf` onto its boot partition before it leaves the reader,
+then the three-step release: `umount`, `usbipd detach`, Windows eject.
+
+The variant itself needs a new U-Boot on the card as well, built with
+`NEO_EXTRA_FRAGMENT=$P3/uboot/fragments/fast.config`, and `flash-emmc.sh`
+run from that card to re-provision the eMMC, so the card rebuild is the
+first step of the next variant rather than a separate errand.
