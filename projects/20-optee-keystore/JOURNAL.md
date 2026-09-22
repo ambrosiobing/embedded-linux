@@ -1036,6 +1036,17 @@ makes the call is excluded. What is left is **the `optee` driver's calls
 into OP-TEE**, and the only stack trace in evidence names
 `optee_bus_scan`, the device enumeration that runs once at probe.
 
+**Narrowed in entry 25, later the same night.** Naming `optee_bus_scan`
+was reading one stack trace as if it were the whole story. Loaded as a
+module at 197 seconds, the driver hangs earlier than that, inside
+`optee_probe`, at its very first call into the secure world: `optee:
+probing for conduit method` prints and `optee: revision 4.1` never does.
+The same call succeeds at 2.5 seconds during a built-in boot. So the
+variable is not which function calls into OP-TEE, it is when. The
+conclusion this paragraph draws, that the fault lives in the driver's
+calls rather than in the card or the secure world's presence, still
+stands; the function named does not.
+
 **A red herring I raised and then disproved.** Both failing boots had
 `brcmfmac: brcmf_sdio_htclk: HT Avail timeout` shortly before the
 trouble, and I said out loud that it might be the trigger that walks into
@@ -1131,3 +1142,93 @@ aquamarine; the kernel rebuild happens on win11 skyhorizon with
 the kas file should be deleted rather than left as a second way to build
 Project 20 that nobody remembers the purpose of. The recipe says so in
 its own comment.
+
+## 25. The first SMC, watched at last, and a correction to entry 23
+
+Tuesday 22 September 2026, late. The modular image did exactly what it
+was built for: the board booted on four CPUs with TF-A and OP-TEE
+resident, `/firmware/optee` in the device tree, no `optee:` lines
+anywhere, `modprobe.blacklist=optee` holding the driver off, a login
+prompt at 14 seconds and `/dev/tee*` absent. Then the failure was
+triggered by hand, with a shell, `dmesg` and a console still working.
+
+**The whole of the new evidence:**
+
+```
+[  197.568368] optee: probing for conduit method.
+             (nothing further from optee, ever)
+[  212.971325] mmc0: timeout waiting for hardware interrupt.
+[  218.591320] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  218.598284] rcu:     3-...0: (0 ticks this GP) idle=6914/1/...
+             Task dump for CPU 3:
+             task:modprobe   state:R  running task   pid:916   ppid:225
+             Call trace:
+              __switch_to+0xd8/0x140
+              0x0
+```
+
+Two facts, and both are new.
+
+**The wedged task has a name and a pid.** `modprobe`, 916, on CPU 3,
+reported identically at 218, 281 and 344 seconds. Not a workqueue, not
+`optee_bus_scan`. The driver never reached the bus scan.
+
+**`optee: revision 4.1` never printed.** In every built-in boot it
+followed `probing for conduit method` immediately. Those two lines sit
+either side of the driver's first call into the secure world, the one
+that asks OP-TEE for its API UID. The first SMC did not return.
+
+**Which corrects entry 23.** That entry concluded the fault was in
+`optee_bus_scan`, on the evidence of the only stack trace available at
+the time. It is narrower than that and also wider. At boot the probe
+succeeds, prints `revision 4.1` and `initialized driver`, and something
+later hangs. Loaded by hand at 197 seconds, the probe's own first SMC
+hangs. **The same call works at 2.5 seconds and hangs at 197.** So the
+variable is not which function calls into OP-TEE. It is when, or under
+what conditions, a call into OP-TEE is made at all.
+
+The `maxcpus=1` boot fits that reading and rules out the obvious
+simplification. There the driver was built in, probe completed on CPU 0
+at 2.50 seconds, and the machine died at 12.2. So CPU 0 is not a safe
+CPU and CPU 3 is not a cursed one; early boot is the only condition
+under which calls have ever succeeded.
+
+**What is now known, in order of confidence.** Calls into the secure
+world succeed during early driver probe and have never been observed to
+succeed at any later point. The board survives indefinitely with the
+secure world resident as long as nothing calls it. When a call does hang,
+the calling CPU stops taking its timer interrupt, and everything else
+that follows, the RCU stalls, `rpi_firmware_property_list` timing out
+inside `bcm2835_sdhost_set_clock`, `mmc0: card 0001 removed` and the
+ext4 I/O errors, is the machine dying around that one wedged CPU rather
+than a second fault.
+
+**Hypotheses, none tested.** Written down so the next session starts
+from a list rather than from a blank page.
+
+  - Something enabled between 2.5 and 12 seconds breaks entry into
+    OP-TEE. `cpuidle` is the obvious candidate: it is registered early
+    but CPUs only begin entering idle states once the system is
+    otherwise quiet.
+  - The rpi3 platform's handling of foreign interrupts. OP-TEE prints
+    `Asynchronous notifications are disabled` and `Dynamic shared memory
+    is disabled`, so the reserved shared memory path is the only one in
+    use.
+  - Something about the SD host's DMA and the reserved shared memory
+    window at `0x08000000`, although that region is in the reserve map
+    and the failures follow the hang rather than precede it.
+
+**Cheap experiments for next time, in cost order.** All of them are one
+line each on the modular image and need no rebuild.
+
+  1. `modprobe optee` **immediately** at the login prompt rather than
+     three minutes in. If it succeeds, the variable is elapsed time or
+     system activity, and that is a large narrowing for no work.
+  2. `taskset 1 modprobe optee`, pinning the load to CPU 0, the CPU the
+     successful boot-time probes ran on.
+  3. Boot with `cpuidle.off=1` and load the module normally.
+
+**Cost of this run.** The card took I/O errors again and the root
+filesystem was mounted read write when `mmc0` went, so it needs
+`e2fsck -f` before the next boot. The board had to be unplugged; there
+was no filesystem left to shut down.
