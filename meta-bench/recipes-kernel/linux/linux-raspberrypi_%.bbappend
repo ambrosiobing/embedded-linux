@@ -192,3 +192,17 @@ SRC_URI += '${@"file://lcd35a.cfg" if d.getVar("BENCH_LCD35A_KERNEL") == "1" els
 # as nobody enables the setting for an unrelated reason.
 BENCH_AB_KERNEL ?= "0"
 SRC_URI += '${@"file://watchdog.cfg" if d.getVar("BENCH_AB_KERNEL") == "1" else ""}'
+
+# And the USB gadget stack, same switch pattern. Project 14 turns the Pi
+# into a USB device rather than a host, which needs dwc2 and the configfs
+# gadget interface built in rather than modular: core-image-minimal
+# installs no kernel modules, and both are =m in bcm2711_defconfig.
+#
+# Opt in because it changes what the USB-C port IS. Together with
+# dtoverlay=dwc2,dr_mode=peripheral the port stops being a power inlet
+# and becomes a peripheral-mode data port. Every other image in this
+# repository is powered through that connector and wants the stock
+# behaviour, so this is the one switch here whose default being "0"
+# matters for the boards rather than only for the measurements.
+BENCH_GADGET_KERNEL ?= "0"
+SRC_URI += '${@"file://gadget.cfg" if d.getVar("BENCH_GADGET_KERNEL") == "1" else ""}'

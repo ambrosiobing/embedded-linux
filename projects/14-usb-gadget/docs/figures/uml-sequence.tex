@@ -1,0 +1,79 @@
+% One key press, from the glass to the host application.
+%
+% The thing to take away: the daemon never sends a release. Boot protocol
+% HID carries STATE, and the host computes presses and releases by
+% comparing consecutive reports.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\scriptsize]
+
+  \def\ybot{-12.2}
+
+  \foreach \x/\txt in {
+      0/{Pi keyboard},
+      2.9/{\texttt{usbhid} + evdev},
+      5.8/{\texttt{kbd-bridge}},
+      8.7/{\texttt{f\_hid} + \texttt{dwc2}},
+      11.9/{host HID driver}} {
+    \node[actor, text width=20mm] at (\x,0) {\txt};
+    \draw[lifeline] (\x,-0.6) -- (\x,\ybot);
+  }
+
+  %% ---------------- press ----------------
+  \draw[msg] (0,-1.1) -- node[lbl, above] {key down, on the host controller's IN poll} (2.9,-1.1);
+  \draw[msg] (2.9,-1.9) -- node[lbl, above] {\texttt{EV\_KEY} code=\texttt{KEY\_A} value=1} (5.8,-1.9);
+
+  \node[activation, minimum height=22mm] at (5.8,-3.0) {};
+  \node[umlnote, anchor=west, text width=30mm] at (6.0,-2.6)
+       {\texttt{report[2] = 0x04}\\
+        the WHOLE 8 bytes are\\rewritten and sent};
+
+  \draw[msg] (5.8,-4.4) -- node[lbl, above] {\texttt{write(hidg0, report, 8)}} (8.7,-4.4);
+  \node[activation, minimum height=12mm] at (8.7,-4.9) {};
+
+  \draw[msg] (11.9,-5.2) -- node[lbl, above] {IN token at \texttt{bInterval}} (8.7,-5.2);
+  \draw[reply] (8.7,-5.8) -- node[lbl, below] {the 8 byte report} (11.9,-5.8);
+
+  \node[umlnote, anchor=east, text width=30mm] at (11.7,-6.9)
+       {diff against the PREVIOUS\\report: A was pressed};
+
+  %% ---------------- release ----------------
+  \draw[msg] (0,-8.2) -- node[lbl, above] {key up} (2.9,-8.2);
+  \draw[msg] (2.9,-8.8) -- node[lbl, above] {\texttt{EV\_KEY} value=0} (5.8,-8.8);
+  \node[activation, minimum height=12mm] at (5.8,-9.4) {};
+  \node[umlnote, anchor=west, text width=30mm] at (6.0,-9.1)
+       {\texttt{report[2] = 0}};
+
+  \draw[msg] (5.8,-10.2) -- node[lbl, above] {\texttt{write(hidg0, report, 8)}} (8.7,-10.2);
+  \draw[reply] (8.7,-10.8) -- node[lbl, below] {the 8 byte report} (11.9,-10.8);
+  \node[umlnote, anchor=east, text width=30mm] at (11.7,-11.6)
+       {diff again: A was released};
+
+  %% ---------------- the three readings ----------------
+  \node[umlnote, anchor=north west, text width=122mm, align=left]
+       at (-1.0,-12.8)
+       {\textbf{The daemon never sends a release.} Boot protocol HID has
+        no press or release event: it carries STATE, eight bytes of it,
+        and the host works out both by comparing consecutive reports.
+        That is why the whole report goes out on every change, and why a
+        DROPPED report is a stuck key rather than a missed character.};
+
+  \node[umlnote, anchor=north west, text width=122mm, align=left]
+       at (-1.0,-14.6)
+       {\textbf{Autorepeat is the host's job.} evdev sends value 2 for
+        repeats and the bridge ignores them, because the host generates
+        its own repeat from the held state. Forwarding them would give
+        two repeat rates fighting each other.};
+
+  \node[umlnote, anchor=north west, text width=122mm, align=left]
+       at (-1.0,-16.4)
+       {\textbf{Six keys, then silence.} Bytes 2 to 7 hold up to six
+        simultaneous usages. A seventh press has nowhere to go and is
+        dropped, counted rather than silent, so the limit is a decision
+        with a number against it rather than a surprise. Fine for typing;
+        wrong for anything else.};
+
+\end{tikzpicture}
+\end{document}

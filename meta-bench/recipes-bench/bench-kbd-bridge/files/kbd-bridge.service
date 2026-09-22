@@ -1,0 +1,47 @@
+[Unit]
+Description=Physical keyboard to USB HID gadget bridge
+Documentation=https://docs.kernel.org/usb/gadget_hid.html
+
+# The escaped device unit name comes from
+#
+#     systemd-escape -p /dev/input/bench-kbd
+#
+# and it is written by hand here rather than guessed: the escaping of the
+# hyphen is the part people get wrong, and a BindsTo naming a unit that
+# does not exist is not an error, it is a dependency that is never
+# satisfied and a service that never starts.
+BindsTo=dev-input-bench\x2dkbd.device
+After=dev-input-bench\x2dkbd.device
+
+# hidg0 does not exist until the gadget has bound the UDC. Requires, not
+# Wants: a bridge with nowhere to write is a process that opens
+# /dev/hidg0, fails, and restarts forever.
+Requires=bench-gadget.service
+After=bench-gadget.service
+
+[Service]
+Type=simple
+
+# /run/kbd-bridge for the macro FIFO. RuntimeDirectory creates it with
+# the right ownership and removes it on stop, which is better than the
+# daemon doing it: a FIFO left behind in /run after a crash is a file
+# whose reader is gone and whose writers block.
+RuntimeDirectory=kbd-bridge
+RuntimeDirectoryMode=0700
+
+ExecStart=/usr/bin/kbd-bridge /dev/input/bench-kbd /dev/hidg0 /run/kbd-bridge/macro
+
+# The keyboard being unplugged stops this unit through BindsTo, so a
+# restart here is for a real failure rather than for the ordinary case.
+Restart=on-failure
+RestartSec=1
+
+# The bridge reads one input device and writes one HID device. It has no
+# reason to reach anything else.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

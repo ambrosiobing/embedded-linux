@@ -1,0 +1,52 @@
+# The gadget's Ethernet function, seen from the Pi.
+#
+# The project specification uses NetworkManager:
+#
+#   nmcli con add type ethernet ifname usb0 con-name pi-gadget \
+#        ipv4.method shared ipv4.addresses 10.42.0.1/24
+#
+# and names this alternative itself: "On a Yocto image without
+# NetworkManager, a systemd-networkd .network file with DHCPServer=yes
+# does the same."
+#
+# This is that image. NetworkManager appears in exactly one place in the
+# whole layer, Project 15's router; everything else here is networkd,
+# which is how Project 4 ships 10-eth0-netboot.network. Pulling
+# NetworkManager in for one interface would also be the wrong trade on a
+# board whose entire power budget is 500 mA from a host USB port.
+#
+# WHY 10.42.0.1. It is the range NetworkManager's shared mode uses, so a
+# host that has ever been plugged into a Raspberry Pi OS board sees the
+# same addresses from this one. Matching an existing convention costs
+# nothing and saves the reader a surprise.
+
+[Match]
+# usb0 is the name the ECM and NCM functions give the gadget side. It is
+# not a predictable-interface-name: the gadget driver names it, and
+# systemd leaves names beginning with usb alone.
+Name=usb0
+
+[Network]
+# A DHCP server, not a client. This end is the one handing out the lease;
+# the host PC is the client. That inversion is the thing to keep straight
+# when reading this file: on every other interface in this repository the
+# Pi is the one asking.
+Address=10.42.0.1/24
+DHCPServer=yes
+
+# No default route from this link and no DNS. The Pi is not the host's
+# way to the internet; it is a device on the end of a cable. A gadget
+# that advertised itself as a gateway would quietly become the host's
+# default route the moment it was plugged in, which is a surprising thing
+# for a keyboard to do.
+IPv6AcceptRA=no
+LinkLocalAddressing=no
+
+[DHCPServer]
+PoolOffset=10
+PoolSize=20
+
+# Deliberately NOT emitting a router or DNS, for the reason above. The
+# host gets an address on this link and nothing else.
+EmitRouter=no
+EmitDNS=no

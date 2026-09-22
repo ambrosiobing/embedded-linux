@@ -1,0 +1,107 @@
+% The composite gadget, from the configfs tree to the host's drivers.
+%
+% Two points the prose takes a paragraph each for: libcomposite builds
+% the descriptors from a DIRECTORY TREE, and the host needs no software
+% because all three functions are standard classes.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[node distance=5mm and 8mm]
+
+  %% ---------------- user space ----------------
+  \node[user] (gad) {\texttt{bench-gadget.service}\\[-1pt]
+                     {\scriptsize configfs tree, then \texttt{echo UDC}}};
+  \node[user, right=of gad] (net) {\texttt{systemd-networkd}\\[-1pt]
+                     {\scriptsize \texttt{usb0}, \texttt{DHCPServer=yes}}};
+  \node[user, right=of net] (getty) {\texttt{serial-getty@ttyGS0}\\[-1pt]
+                     {\scriptsize a login on the host's COM port}};
+  \node[user, right=of getty] (bridge) {\texttt{kbd-bridge}\\[-1pt]
+                     {\scriptsize libevdev grab, macro FIFO}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fit=(gad)(net)(getty)(bridge), inner ysep=7pt] (ul) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (ul.north west) {USER SPACE};
+
+  %% ---------------- kernel ----------------
+  \node[kern, below=11mm of gad] (lc)
+       {\texttt{libcomposite}\\[-1pt]
+        {\scriptsize descriptors FROM THE DIRECTORY TREE}};
+  \node[kern, below=11mm of net] (fecm)
+       {\texttt{f\_ecm} or \texttt{f\_ncm}\\[-1pt]
+        {\scriptsize CDC Ethernet, netdev \texttt{usb0}}};
+  \node[kern, below=11mm of getty] (facm)
+       {\texttt{f\_acm}\\[-1pt]{\scriptsize CDC ACM, \texttt{/dev/ttyGS0}}};
+  \node[kern, below=11mm of bridge] (fhid)
+       {\texttt{f\_hid}\\[-1pt]{\scriptsize \texttt{/dev/hidg0}, 8 byte reports}};
+
+  \node[kern, below=11mm of facm, xshift=-20mm, minimum width=64mm] (dwc2)
+       {\texttt{dwc2} \texttt{fe980000.usb}, PERIPHERAL mode\\[-1pt]
+        {\scriptsize EP0 plus seven data endpoints, high speed}};
+  \node[kern, below=11mm of fhid] (evdev)
+       {\texttt{xhci} + \texttt{usbhid} + evdev\\[-1pt]
+        {\scriptsize \texttt{/dev/input/bench-kbd}}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fit=(lc)(fecm)(facm)(fhid)(dwc2)(evdev), inner ysep=7pt] (kl) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (kl.north west) {KERNEL};
+
+  \draw[flow] (gad) -- node[lbl, right] {\texttt{mkdir}, \texttt{echo}} (lc);
+  \draw[flow] (lc.east) -- node[lbl, above] {binds} (fecm.west);
+  \draw[bus] (net) -- node[lbl, right] {\texttt{usb0}} (fecm);
+  \draw[bus] (getty) -- node[lbl, right] {\texttt{ttyGS0}} (facm);
+  \draw[flow] (bridge) -- node[lbl, right] {\texttt{write(report)}} (fhid);
+  \draw[irq] (evdev.east) -- ++(4mm,0) |-
+       node[lbl, pos=0.25, right] {\texttt{EV\_KEY}} (bridge.east);
+
+  \draw[bus] (fecm.south) -- (fecm.south |- dwc2.north);
+  \draw[bus] (facm.south) -- (facm.south |- dwc2.north);
+  \draw[bus] (fhid.south) -- ++(0,-3mm) -| ([xshift=-6mm]dwc2.north east);
+
+  %% ---------------- hardware ----------------
+  \node[hw, below=11mm of dwc2] (usbc)
+       {USB-C port\\[-1pt]{\scriptsize VBUS in, D+ and D-}};
+  \node[hw, below=11mm of evdev] (kbd)
+       {Pi keyboard\\[-1pt]{\scriptsize on a USB-A port}};
+
+  \begin{scope}[on background layer]
+    \node[layer, fit=(usbc)(kbd), inner ysep=7pt] (hl) {};
+  \end{scope}
+  \node[layerlabel, anchor=north west] at (hl.north west) {HARDWARE};
+
+  \draw[bus] (dwc2) -- (usbc);
+  \draw[bus] (kbd) -- (evdev);
+
+  %% ---------------- the host ----------------
+  \node[host, below=12mm of usbc, minimum width=96mm] (host)
+       {host PC: \texttt{cdc\_ether} or \texttt{cdc\_ncm}, \texttt{cdc\_acm},
+        \texttt{usbhid}\\[-1pt]
+        {\scriptsize all three are standard classes, so NO SOFTWARE IS
+         INSTALLED on the host}};
+
+  \draw[cable] (usbc) -- node[lbl, align=center]
+       {ONE USB-C cable:\\three functions\\\textbf{and the only 5 V supply}}
+       (host);
+
+  %% ---------------- the two notes ----------------
+  \node[umlnote, anchor=north west, text width=74mm]
+       at ($(hl.south west)+(0,-16mm)$)
+       {\textbf{Two USB controllers, and not the same silicon.} The USB-C
+        port is wired to the SoC's own dual-role \texttt{dwc2}; the USB-A
+        ports sit behind a separate host-only controller. That is why the
+        Pi 4 is the only board on this bench that can be a device on an
+        external connector, and why the keyboard and the gadget do not
+        contend.};
+
+  \node[umlnote, anchor=north east, text width=74mm]
+       at ($(hl.south east)+(0,-16mm)$)
+       {\textbf{The descriptors come from a directory tree.} No kernel
+        module is written for any of this: \texttt{libcomposite} reads
+        the configfs hierarchy and emits the descriptors at the moment
+        the controller name is written to \texttt{UDC}. The gadget is a
+        shell script and a unit.};
+
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,63 @@
+% What is on the desk. Deliberately almost nothing.
+%
+% The bench layout IS the power budget: every milliamp comes from one
+% host port, so the sparseness is a constraint rather than a preference.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, node distance=8mm]
+
+  \node[host, minimum width=58mm, minimum height=26mm, align=center] (pc) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(pc.north)+(0,-3mm)$) {host PC};
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(pc.north)+(0,-9mm)$)
+       {sees a network adapter,\\a COM port and a keyboard\\[-1pt]
+        and installs nothing};
+
+  \node[hw, below=26mm of pc, minimum width=58mm, minimum height=24mm,
+        align=center] (pi) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(pi.north)+(0,-3mm)$) {Raspberry Pi 4};
+  \node[font=\sffamily\scriptsize, anchor=north, align=center]
+       at ($(pi.north)+(0,-9mm)$)
+       {no HAT, no display,\\no second supply};
+
+  \draw[cable] ($(pc.south)+(-14mm,0)$) -- node[lbl, align=center]
+       {USB-C\\data AND\\all the power} ($(pi.north)+(-14mm,0)$);
+
+  \draw[bus] ($(pc.south)+(14mm,0)$) -- node[lbl, align=center]
+       {USB/TTL\\independent\\console} ($(pi.north)+(14mm,0)$);
+
+  \node[hw, right=18mm of pi, align=center, font=\sffamily\scriptsize] (kbd)
+       {Pi keyboard\\[-1pt]USB-A};
+  \draw[bus] (pi.east) -- (kbd);
+
+  %% ---------------- the readings ----------------
+  \node[umlnote, anchor=north west, text width=112mm, align=left]
+       at ($(pi.south west)+(-4mm,-10mm)$)
+       {\textbf{The layout is the power budget.} Everything on this desk
+        draws from one host USB port: 500 mA on USB 2.0, 900 mA on USB 3.
+        A Pi 4 idles near 550 mA. So the sparseness is not minimalism, it
+        is the constraint, and anything added has to come out of that
+        number.};
+
+  \node[umlnote, anchor=north west, text width=112mm, align=left]
+       at ($(pi.south west)+(-4mm,-26mm)$)
+       {\textbf{Two paths to the board, and only one of them is being
+        built.} The USB-C cable carries the network and the serial
+        console that this project creates. The USB/TTL cable carries a
+        console that exists whether or not the gadget works, which is why
+        it stays attached: rebuilding the gadget removes the other two at
+        the same moment, and the bridge takes the keyboard away from the
+        Pi as well.};
+
+  \node[umlnote, anchor=north west, text width=112mm, align=left]
+       at ($(pi.south west)+(-4mm,-44mm)$)
+       {\textbf{Order matters when moving the cable.} The board reboots
+        the moment the USB-C cable moves from its own supply to the host,
+        because the supply is what moved. Shut down first.};
+
+\end{tikzpicture}
+\end{document}

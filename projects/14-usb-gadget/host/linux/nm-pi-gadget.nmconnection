@@ -1,0 +1,49 @@
+# The gadget's network link, ON THE HOST.
+#
+# THIS FILE IS NOT INSTALLED BY ANY RECIPE AND IS NOT ON THE BOARD. It
+# belongs to the Linux machine the Pi is plugged into:
+#
+#     sudo install -m0600 -o root -g root nm-pi-gadget.nmconnection \
+#          /etc/NetworkManager/system-connections/
+#     sudo nmcli connection reload
+#
+# THE MODE IS 0600 AND NETWORKMANAGER ENFORCES IT. A connection file
+# that is group or world readable is ignored, silently, and the symptom
+# is a profile that does not appear in nmcli at all.
+#
+# ------------------------------------------------------------------
+# never-default=true IS THE WHOLE REASON THIS FILE EXISTS
+# ------------------------------------------------------------------
+#
+# Without it, a host that accepts the lease from the Pi can install a
+# default route through it. The Pi is a device on the end of a cable, not
+# the way to the internet, so the host would lose its own connectivity
+# the moment a keyboard was plugged in.
+#
+# The board side declines to offer one as well: 20-usb0.network sets
+# EmitRouter=no and EmitDNS=no. Both ends refuse independently, which is
+# deliberate: either alone would be enough, and neither can be relied on
+# when the other end is somebody else's machine.
+
+[connection]
+id=pi-gadget
+type=ethernet
+# The interface name the host derives from the MAC the gadget hands out.
+# bench-gadget fixes that MAC (02:22:82:00:00:01) precisely so this name
+# is stable; a random address would make a new name on every boot and
+# this line would stop matching.
+interface-name=enx022282000001
+autoconnect=true
+
+[ethernet]
+
+[ipv4]
+method=auto
+never-default=true
+# Do not take DNS from a keyboard.
+ignore-auto-dns=true
+
+[ipv6]
+method=disabled
+
+[proxy]

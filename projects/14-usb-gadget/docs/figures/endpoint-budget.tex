@@ -1,0 +1,86 @@
+% The constraint that decides what this device can be.
+%
+% Read this figure first. Three functions cost seven endpoints, the
+% controller has seven, and that is the whole reason a fourth function
+% does not fit. The specification asks for this to be written BEFORE the
+% gadget is built and checked against lsusb -v at the end.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, y=-8mm]
+
+  \node[font=\sffamily\small\bfseries, anchor=west] at (0,-0.9)
+       {dwc2 on the BCM2711: EP0 plus seven data endpoints};
+
+  %% ---------------- EP0 ----------------
+  \node[hw, anchor=west, minimum width=26mm, minimum height=6mm,
+        font=\sffamily\scriptsize] at (0,0) {EP0 control};
+  \node[anchor=west, font=\sffamily\scriptsize, text=linecol!70] at (3.0,0)
+       {always present, both directions, not one of the seven};
+
+  %% ---------------- the seven ----------------
+  \foreach \i/\name/\type/\dir/\what in {%
+    1/{\texttt{f\_ecm}}/{interrupt}/{IN}/{link up and down notifications},
+    2/{\texttt{f\_ecm}}/{bulk}/{IN}/{frames to the host},
+    3/{\texttt{f\_ecm}}/{bulk}/{OUT}/{frames from the host},
+    4/{\texttt{f\_acm}}/{interrupt}/{IN}/{serial state: DCD, DSR, ring},
+    5/{\texttt{f\_acm}}/{bulk}/{IN}/{bytes to the host},
+    6/{\texttt{f\_acm}}/{bulk}/{OUT}/{bytes from the host},
+    7/{\texttt{f\_hid}}/{interrupt}/{IN}/{the 8 byte keyboard report}%
+  }{
+    \node[ep, anchor=west, minimum width=26mm] at (0,\i)
+         {EP\i\ \ \name};
+    \node[anchor=west, font=\sffamily\scriptsize] at (3.0,\i)
+         {\type\ \dir \ \ \textcolor{linecol!70}{\what}};
+  }
+
+  %% ---------------- the line under it ----------------
+  \draw[badcol, very thick] (-0.1,7.6) -- (13.4,7.6);
+  \node[anchor=west, font=\sffamily\small\bfseries, text=badcol] at (0,8.2)
+       {7 of 7 used. None spare.};
+
+  \node[bad, anchor=west, text width=126mm, align=left,
+        font=\sffamily\scriptsize] at (0,9.6)
+       {\textbf{A fourth function does not fit.} Mass storage needs two
+        more endpoints and there are none, so writing the controller name
+        to \texttt{UDC} fails. The stretch goal is to add it, watch the
+        bind fail, and then drop ACM to make room: the failure is the
+        lesson, and it costs one \texttt{mkdir} to stage.};
+
+  %% ---------------- five interfaces ----------------
+  \node[anchor=west, font=\sffamily\small\bfseries] at (0,11.6)
+       {Five interfaces, not three, and this is the count that surprises};
+
+  \foreach \i/\num/\class/\owner in {%
+    0/{0}/{CDC Communications (0x02)}/{ECM control},
+    1/{1}/{CDC Data (0x0a)}/{ECM data},
+    2/{2}/{CDC Communications (0x02)}/{ACM control},
+    3/{3}/{CDC Data (0x0a)}/{ACM data},
+    4/{4}/{HID (0x03)}/{keyboard}%
+  }{
+    \pgfmathsetmacro{\row}{12.6+\i}
+    \node[cell, anchor=west, minimum width=14mm, align=center] at (0,\row)
+         {interface \num};
+    \node[cell, anchor=west, minimum width=52mm] at (1.6,\row) {\class};
+    \node[cell, anchor=west, minimum width=34mm] at (7.6,\row) {\owner};
+  }
+
+  \node[umlnote, anchor=west, text width=126mm, align=left] at (0,18.4)
+       {\textbf{Each CDC function is a PAIR of interfaces}, a control one
+        and a data one, grouped by an Interface Association Descriptor so
+        the host binds a single driver across both. So the host sees
+        2 + 2 + 1 = five, which is what acceptance criterion 1 checks. A
+        device reporting three means the association descriptors are
+        missing and the host has bound one driver per interface.};
+
+  \node[umlnote, anchor=west, text width=126mm, align=left] at (0,20.6)
+       {\textbf{Why HID costs only one endpoint.} The keyboard sends and
+        never receives on an endpoint of its own: the host's Caps Lock
+        and Num Lock state arrives as a \texttt{SET\_REPORT} control
+        transfer on EP0. That is why the report descriptor has Output
+        items while the budget has no HID OUT endpoint, and it is the
+        detail that makes the descriptor and the endpoint count agree.};
+
+\end{tikzpicture}
+\end{document}

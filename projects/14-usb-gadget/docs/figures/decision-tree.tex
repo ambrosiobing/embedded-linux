@@ -1,0 +1,97 @@
+% Given a symptom, which layer to suspect.
+%
+% Almost every failure in this project reaches the same place: the host
+% sees nothing. This is how to tell the five causes apart.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, node distance=10mm]
+
+  %% ================ branch A: nothing at all ================
+  \node[font=\sffamily\small\bfseries] (t1) {the host sees nothing at all};
+  \node[qst, below=5mm of t1] (udc)
+       {\texttt{ls /sys/class/udc}\\on the Pi: empty?};
+
+  \node[fix, below left=12mm and 18mm of udc] (mode)
+       {the port is still a HOST port\\
+        \scriptsize two causes, one symptom:\\
+        \scriptsize \ \ the overlay did not load, or\\
+        \scriptsize \ \ the driver lacks peripheral mode\\
+        \scriptsize \texttt{grep dwc2 /boot/config.txt}\\
+        \scriptsize \texttt{zcat /proc/config.gz | grep DWC2}};
+  \draw[trans] (udc) -| node[ans, above, pos=0.25] {empty} (mode);
+
+  \node[qst, below right=12mm and 6mm of udc] (bound)
+       {\texttt{bench-gadget status}:\\bound?};
+  \draw[trans] (udc) -| node[ans, above, pos=0.25] {a UDC is there} (bound);
+
+  \node[fix, below left=12mm and 2mm of bound] (notbound)
+       {run \texttt{bench-gadget up}\\
+        \scriptsize and READ the refusal: it names\\
+        \scriptsize which of the four preconditions failed};
+  \draw[trans] (bound) -| node[ans, above, pos=0.25] {no} (notbound);
+
+  \node[fix, below right=12mm and 0mm of bound] (cable)
+       {the cable\\
+        \scriptsize a charge-only USB-C cable has no\\
+        \scriptsize D+ / D- and looks exactly like this.\\
+        \scriptsize So does an e-marked cable on a rev 1.1 board.};
+  \draw[trans] (bound) -| node[ans, above, pos=0.25] {yes} (cable);
+
+  %% ================ branch B: partial ================
+  \node[font=\sffamily\small\bfseries, right=74mm of t1] (t2)
+       {a device appears, a function is missing};
+  \node[qst, below=5mm of t2] (eps)
+       {count \texttt{bEndpointAddress}\\in \texttt{lsusb -v}};
+
+  \node[fix, below left=12mm and 10mm of eps] (six)
+       {six, not seven\\
+        \scriptsize one function did not bind.\\
+        \scriptsize \texttt{dmesg} on the Pi names which.};
+  \draw[trans] (eps) -| node[ans, above, pos=0.25] {6} (six);
+
+  \node[fix, below right=12mm and 2mm of eps] (seven)
+       {seven, so the device is right\\
+        \scriptsize the HOST has no driver for it.\\
+        \scriptsize On Windows that is ECM:\\
+        \scriptsize rebuild the tree with \texttt{NET=ncm}.};
+  \draw[trans] (eps) -| node[ans, above, pos=0.25] {7} (seven);
+
+  %% ================ branch C: the keyboard ================
+  \node[font=\sffamily\small\bfseries, below=52mm of t1, xshift=36mm] (t3)
+       {keys go to the Pi instead of the host};
+  \node[qst, below=5mm of t3] (svc)
+       {\texttt{systemctl status kbd-bridge}};
+
+  \node[fix, below left=12mm and 12mm of svc] (rule)
+       {not running: the udev rule did not match\\
+        \scriptsize it ships with vendor \texttt{04d9} (Holtek),\\
+        \scriptsize which is the official Pi keyboard.\\
+        \scriptsize A rule that matches nothing is SILENT.\\
+        \scriptsize \texttt{udevadm info -a -n /dev/input/eventN}};
+  \draw[trans] (svc) -| node[ans, above, pos=0.25] {inactive} (rule);
+
+  \node[fix, below right=12mm and 2mm of svc] (wrongkbd)
+       {running, so it grabbed a DIFFERENT keyboard\\
+        \scriptsize \texttt{ls -l /dev/input/bench-kbd}\\
+        \scriptsize the one it holds types on the host;\\
+        \scriptsize the one in your hands does not.};
+  \draw[trans] (svc) -| node[ans, above, pos=0.25] {active} (wrongkbd);
+
+  %% ---------------- the reading ----------------
+  \node[umlnote, anchor=north west, text width=164mm, align=left]
+       at ($(rule.south west)+(-6mm,-8mm)$)
+       {\textbf{Five different causes reach the same symptom}, which is
+        why the first question is always \texttt{ls /sys/class/udc}
+        rather than anything about the host. An empty directory means the
+        port never became a device port and nothing above that matters; a
+        populated one means the problem is above the controller and the
+        host's own tools can see it.
+
+        \textbf{And the console is how you ask.} Every question in this
+        tree is asked ON the Pi, over a cable that is not the one being
+        debugged.};
+
+\end{tikzpicture}
+\end{document}

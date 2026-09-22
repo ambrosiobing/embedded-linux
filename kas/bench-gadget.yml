@@ -1,0 +1,61 @@
+# Project 14: the Pi as a USB device.
+#
+#   kas build kas/bench-gadget.yml        or  ./go gadget
+#
+# A Raspberry Pi 4, and it has to be. It is the only board on this bench
+# whose USB controller can run in peripheral mode on an external
+# connector: the USB-C port is wired to the SoC's own dual-role dwc2,
+# while the USB-A ports sit behind a separate host-only controller. On a
+# Pi 3 the equivalent port is the power inlet and nothing else.
+header:
+  version: 14
+  includes:
+    - bench-rpi4.yml
+
+target: bench-gadget-image
+
+local_conf_header:
+  gadget: |
+    # The kernel fragment: dwc2 and the configfs gadget interface built
+    # in rather than modular. See the bbappend for the switch and
+    # gadget.cfg for the seven promptless symbols it asserts.
+    BENCH_GADGET_KERNEL = "1"
+
+    # --- what turns the USB-C port into a device port -------------------
+    #
+    # The overlay is what selects the mode; the kernel fragment only
+    # makes the driver capable of it. Both are needed and neither is
+    # sufficient:
+    #
+    #   fragment only  the driver supports peripheral mode and the port
+    #                  still runs as a host. /sys/class/udc is empty.
+    #   overlay only   the device tree asks for a mode the driver was
+    #                  not built with. Same empty directory.
+    #
+    # That shared symptom is why bench-gadget's refusal names both
+    # things to check rather than just one.
+    #
+    # dwc2.dtbo is deployed by meta-raspberrypi's rpi-base.inc already,
+    # so this needs no extra recipe.
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=dwc2,dr_mode=peripheral"
+
+    # --- the power budget, which is a build setting here -----------------
+    #
+    # With the USB-C port carrying data, the host's port is the only
+    # supply: 500 mA on USB 2.0, 900 mA on USB 3, against a Pi 4 that
+    # idles near 550 mA and peaks above 1 A under load.
+    #
+    # Capping the clock is the specification's remedy for undervoltage
+    # warnings and it is applied here rather than left as advice,
+    # because the failure it prevents is not a clean one: a brown-out
+    # during enumeration looks like a gadget that does not work, and the
+    # journal entry that would explain it is on the board that just
+    # reset.
+    #
+    # Raise it once a board has run ten minutes with the keyboard
+    # attached and journalctl -k shows no undervoltage, which is
+    # acceptance criterion 7.
+    RPI_EXTRA_CONFIG:append = "\narm_freq=1000"
+
+    # --- keep what gets debugged -----------------------------------------
+    RM_WORK_EXCLUDE += "linux-raspberrypi bench-gadget bench-kbd-bridge"

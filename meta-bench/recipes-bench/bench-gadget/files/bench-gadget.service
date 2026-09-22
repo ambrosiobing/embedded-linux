@@ -1,0 +1,46 @@
+[Unit]
+Description=USB composite gadget (CDC ECM + CDC ACM + HID keyboard)
+Documentation=https://docs.kernel.org/usb/gadget_configfs.html
+
+# configfs is where the whole gadget is built. systemd mounts
+# /sys/kernel/config itself when CONFIGFS_FS is present, and this makes
+# the ordering explicit rather than relying on it happening first.
+RequiresMountsFor=/sys/kernel/config
+
+# BEFORE the network stack looks for interfaces, because usb0 does not
+# exist until this unit has run. systemd-networkd starting first would
+# find nothing to match 20-usb0.network against, and would not come back
+# to it: the interface appearing later is a hotplug event it handles, but
+# the ordering here removes the race rather than relying on that.
+Before=network-pre.target
+Wants=network-pre.target
+
+# Not Before=sysinit.target with DefaultDependencies=no. That would buy a
+# little boot time and cost the ordering against configfs and the
+# filesystems, which is the trade Project 13 also declined.
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# ecm for Linux and macOS hosts, ncm for Windows 11. Overridden per board
+# with a drop-in rather than by editing this file:
+#
+#   systemctl edit bench-gadget.service
+#   [Service]
+#   Environment=NET=ncm
+#
+# The board that lives on a Windows desk and the board that lives on a
+# Linux desk are the same image with different drop-ins.
+Environment=NET=ecm
+
+ExecStart=/usr/sbin/bench-gadget up
+ExecStop=/usr/sbin/bench-gadget down
+
+# A failed "up" leaves a half-built tree that the next "up" refuses.
+# Tearing down on failure means the next start begins from nothing, which
+# is the only state this script can reliably build from.
+ExecStopPost=-/usr/sbin/bench-gadget down
+
+[Install]
+WantedBy=sysinit.target

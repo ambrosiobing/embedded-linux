@@ -1,0 +1,77 @@
+% Enumeration, and who drives each transition.
+%
+% The point of the drawing: only the FIRST transition belongs to this
+% project. Everything from Powered onward is the host and the hardware,
+% and the three device nodes are live only in one state.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small, node distance=9mm]
+
+  \node[initial] (i0) {};
+  \node[state, below=6mm of i0, text width=46mm] (unb)
+       {Unbound\\[-1pt]{\tiny tree built in configfs, \texttt{UDC} empty}};
+  \node[state, below=of unb, text width=46mm] (bnd)
+       {Bound\\[-1pt]{\tiny \texttt{UDC} = \texttt{fe980000.usb}}};
+  \node[state, below=of bnd, text width=46mm] (pwr)
+       {Powered\\[-1pt]{\tiny VBUS present from the host}};
+  \node[state, below=of pwr, text width=46mm] (def)
+       {Default\\[-1pt]{\tiny after bus reset, 100 mA budget}};
+  \node[state, below=of def, text width=46mm] (adr)
+       {Addressed\\[-1pt]{\tiny \texttt{SET\_ADDRESS}}};
+  \node[state, below=of adr, text width=46mm, fill=okcol!25] (cfg)
+       {Configured\\[-1pt]
+        {\tiny \texttt{SET\_CONFIGURATION 1}}\\[-1pt]
+        {\tiny \textbf{usb0, ttyGS0 and hidg0 are live HERE and only here}}};
+  \node[state, below=of cfg, text width=46mm] (sus)
+       {Suspended\\[-1pt]{\tiny 3 ms idle, 2.5 mA budget}};
+
+  \draw[trans] (i0) -- (unb);
+  \draw[trans] (unb) -- node[right, font=\sffamily\scriptsize]
+       {\textbf{echo udc > UDC} \ \ ours} (bnd);
+  \draw[trans] (bnd) -- node[right, font=\sffamily\scriptsize]
+       {cable plugged} (pwr);
+  \draw[trans] (pwr) -- node[right, font=\sffamily\scriptsize]
+       {host bus reset} (def);
+  \draw[trans] (def) -- node[right, font=\sffamily\scriptsize]
+       {descriptors read} (adr);
+  \draw[trans] (adr) -- node[right, font=\sffamily\scriptsize]
+       {host binds its drivers} (cfg);
+  \draw[trans] (cfg) -- node[right, font=\sffamily\scriptsize]
+       {no traffic} (sus);
+
+  \draw[trans] (sus.west) to[out=180, in=180]
+       node[left, font=\sffamily\scriptsize] {resume} (cfg.west);
+  \draw[trans] (cfg.west) to[out=170, in=190]
+       node[left, font=\sffamily\scriptsize, pos=0.5] {bus reset} (pwr.west);
+  \draw[trans] (pwr.east) to[out=10, in=-10]
+       node[right, font=\sffamily\scriptsize, pos=0.5] {VBUS lost} (bnd.east);
+  \draw[trans] (bnd.west) to[out=170, in=190]
+       node[left, font=\sffamily\scriptsize] {echo "" > UDC} (unb.west);
+
+  %% ---------------- what this means for the code ----------------
+  \node[umlnote, anchor=north west, text width=70mm]
+       at ($(unb.east)+(14mm,4mm)$)
+       {\textbf{Only the first transition is ours.} One \texttt{echo},
+        and everything below it is the host and the hardware. That is
+        why the gadget is a shell script: there is nothing to drive.};
+
+  \node[umlnote, anchor=north west, text width=70mm]
+       at ($(pwr.east)+(14mm,4mm)$)
+       {\textbf{Build the WHOLE tree, then bind.} Writing \texttt{UDC}
+        while any function directory is incomplete fails with
+        \texttt{ENODEV} or \texttt{EINVAL} and no word about which part
+        was missing. The script builds everything and binds once, last,
+        and the test asserts that order.};
+
+  \node[umlnote, anchor=north west, text width=70mm]
+       at ($(cfg.east)+(14mm,2mm)$)
+       {\textbf{Writing to \texttt{hidg0} outside Configured returns
+        \texttt{ESHUTDOWN}.} Unplugging the cable is an ordinary event,
+        not a crash, so \texttt{kbd-bridge} counts those writes and
+        carries on. A bridge that exited on an unplugged cable would need
+        restarting by hand every time.};
+
+\end{tikzpicture}
+\end{document}

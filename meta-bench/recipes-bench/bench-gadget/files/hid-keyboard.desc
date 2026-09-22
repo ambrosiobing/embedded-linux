@@ -1,0 +1,64 @@
+# The boot-protocol keyboard HID report descriptor, 63 bytes.
+#
+# Checked in as annotated hex rather than as a binary blob, on purpose:
+# the structure of a HID descriptor is the thing worth reading, and a
+# .bin in a repository is 63 bytes nobody will ever look at again.
+#
+# The recipe converts this to bytes AT BUILD TIME and installs the
+# result, so the board needs no hex tool. The specification converts it
+# on the board with "xxd -r -p", which assumes xxd is present; on a
+# BusyBox image that is not a safe assumption, and a gadget that fails to
+# build its report descriptor fails at the last step, after everything
+# else looked right.
+#
+# The recipe also asserts the length is exactly 63. A descriptor that is
+# short by a byte is not a syntax error: it is a tree the host parses
+# differently, and the symptom is a keyboard that enumerates and types
+# nothing.
+#
+# This is the descriptor from the HID 1.11 specification that every BIOS
+# understands. Read it as two streams: Input items are what the device
+# SENDS (8 bytes), Output items are what the host SENDS BACK (1 byte of
+# LED state, readable from /dev/hidg0).
+
+05 01        # Usage Page (Generic Desktop)
+09 06        # Usage (Keyboard)
+a1 01        # Collection (Application)
+
+# ---- byte 0: the eight modifier keys, one bit each ----------------------
+05 07        #   Usage Page (Key Codes)
+19 e0        #   Usage Minimum (224) = Left Control
+29 e7        #   Usage Maximum (231) = Right GUI
+15 00        #   Logical Minimum (0)
+25 01        #   Logical Maximum (1)
+75 01        #   Report Size (1 bit)
+95 08        #   Report Count (8)
+81 02        #   Input (Data, Variable, Absolute)
+
+# ---- byte 1: reserved, always zero --------------------------------------
+95 01        #   Report Count (1)
+75 08        #   Report Size (8 bits)
+81 03        #   Input (Constant): the reserved byte
+
+# ---- host to device: five LED bits plus three of padding ----------------
+95 05        #   Report Count (5)
+75 01        #   Report Size (1 bit)
+05 08        #   Usage Page (LEDs)
+19 01        #   Usage Minimum (1) = Num Lock
+29 05        #   Usage Maximum (5) = Kana
+91 02        #   Output (Data, Variable, Absolute): the LED report
+95 01        #   Report Count (1)
+75 03        #   Report Size (3 bits)
+91 03        #   Output (Constant): padding to a whole byte
+
+# ---- bytes 2 to 7: up to six simultaneous key usages --------------------
+95 06        #   Report Count (6)
+75 08        #   Report Size (8 bits)
+15 00        #   Logical Minimum (0)
+25 65        #   Logical Maximum (101)
+05 07        #   Usage Page (Key Codes)
+19 00        #   Usage Minimum (0)
+29 65        #   Usage Maximum (101)
+81 00        #   Input (Data, Array): the six key slots
+
+c0           # End Collection

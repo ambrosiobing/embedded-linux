@@ -1,0 +1,37 @@
+# The physical keyboard that gets bridged to the host.
+#
+# Two things happen here: a stable symlink, and a systemd dependency that
+# starts the bridge when the keyboard appears and stops it when the
+# keyboard is unplugged. No polling anywhere.
+#
+# ---------------------------------------------------------------------
+# THE VENDOR ID BELOW IS A DEFAULT AND MUST BE CONFIRMED ON YOUR BOARD.
+# ---------------------------------------------------------------------
+#
+# 04d9 is Holtek, which is what the official Raspberry Pi keyboard
+# reports. A different keyboard has a different id, and a rule that
+# matches nothing is not an error: udev creates no symlink, the device
+# unit never appears, the bridge never starts, and nothing anywhere says
+# why. Confirm before trusting it:
+#
+#     lsusb
+#     udevadm info -a -n /dev/input/eventN | grep -m1 idVendor
+#     bench-gadget status
+#
+# WHAT THIS RULE COSTS WHEN IT MATCHES THE WRONG KEYBOARD. The bridge
+# grabs whatever it is pointed at, and a grabbed keyboard is invisible to
+# the Pi itself. If you plug a keyboard into this board intending to type
+# on the Pi and this rule matches it, that keyboard will type on the HOST
+# instead and the Pi will appear to ignore it. The way back is the
+# USB/TTL serial console, which is why that cable is not optional in this
+# project.
+#
+# ENV{ID_INPUT_KEYBOARD}=="1" is what keeps this from matching the mouse
+# and the consumer-control interface that most keyboards also present.
+# Without it a composite keyboard produces two or three event devices and
+# the symlink lands on whichever enumerated last.
+
+ACTION=="add|change", SUBSYSTEM=="input", KERNEL=="event*", \
+    ENV{ID_INPUT_KEYBOARD}=="1", ATTRS{idVendor}=="04d9", \
+    SYMLINK+="input/bench-kbd", \
+    TAG+="systemd", ENV{SYSTEMD_WANTS}="kbd-bridge.service"

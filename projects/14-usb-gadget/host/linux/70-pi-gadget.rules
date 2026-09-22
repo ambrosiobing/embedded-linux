@@ -1,0 +1,33 @@
+# A fixed name for the gadget's serial port, ON THE HOST.
+#
+# THIS FILE IS NOT INSTALLED BY ANY RECIPE AND IS NOT ON THE BOARD. It
+# belongs to the machine the Pi is plugged into. Copy it there:
+#
+#     sudo install -m0644 70-pi-gadget.rules /etc/udev/rules.d/
+#     sudo udevadm control --reload
+#
+# WHY IT EXISTS
+#
+# The ACM function appears on the host as /dev/ttyACM0, or ttyACM1, or
+# whichever number is free when it enumerates. Anything that scripts
+# against it breaks the day a second ACM device is plugged in, and the
+# symptom is a terminal that opens successfully onto the wrong device.
+#
+# /dev/pi-console is stable because it is matched on the vendor and
+# product ids of the gadget itself.
+#
+# 1d6b:0104 is the Linux Foundation's own vendor id and the multifunction
+# composite gadget product id, which is what bench-gadget writes into
+# idVendor and idProduct. If those are ever changed on the board, this
+# rule has to change with them.
+
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1d6b", ATTRS{idProduct}=="0104", \
+    SYMLINK+="pi-console"
+
+# The keyboard function is deliberately NOT given a symlink. It is a
+# plain HID keyboard and the host should treat it as one: adding a rule
+# would suggest there is something to configure, and there is not. That
+# is the point of using boot protocol.
+#
+# The network function is handled by NetworkManager rather than udev;
+# see nm-pi-gadget.nmconnection beside this file.

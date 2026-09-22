@@ -1,0 +1,101 @@
+% Two cables, and the constraint that shapes the whole project.
+%
+% Electrically this is almost nothing. The drawing exists for the three
+% facts that are not obvious from it and that each cost something: where
+% the power comes from, what a second supply does, and which cable is not
+% optional.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small]
+
+  %% ---------------- the host ----------------
+  \node[host, minimum width=34mm, minimum height=28mm, align=center] (pc)
+       {host PC\\[-1pt]{\scriptsize USB-A or USB-C port}};
+
+  %% ---------------- the board ----------------
+  \node[hw, right=46mm of pc, minimum width=54mm, minimum height=58mm,
+        align=center] (pi) {};
+  \node[font=\sffamily\small\bfseries, anchor=north]
+       at ($(pi.north)+(0,-3mm)$) {Raspberry Pi 4};
+
+  \coordinate (usbc) at ($(pi.west)+(0,16mm)$);
+  \coordinate (usba) at ($(pi.east)+(0,16mm)$);
+  \coordinate (p8)  at ($(pi.east)+(0,-4mm)$);
+  \coordinate (p10) at ($(pi.east)+(0,-9mm)$);
+  \coordinate (p6)  at ($(pi.east)+(0,-14mm)$);
+  \coordinate (p2)  at ($(pi.east)+(0,4mm)$);
+
+  \node[font=\sffamily\scriptsize, anchor=west, inner sep=1pt]
+       at ($(usbc)+(2mm,0)$) {USB-C};
+  \node[font=\sffamily\scriptsize, anchor=east, inner sep=1pt]
+       at ($(usba)+(-2mm,0)$) {USB-A};
+  \fill[linecol] (usbc) circle (0.7mm);
+  \fill[linecol] (usba) circle (0.7mm);
+
+  \foreach \p/\name in {p2/{pin 2\ 5V}, p8/{pin 8\ GPIO14},
+                        p10/{pin 10\ GPIO15}, p6/{pin 6\ GND}} {
+    \fill[linecol] (\p) circle (0.5mm);
+    \node[font=\sffamily\scriptsize, anchor=east, inner sep=1pt]
+         at ($(\p)+(-1mm,0)$) {\name};
+  }
+
+  %% ---------------- the one cable ----------------
+  \draw[cable] (pc.east|-usbc) -- node[lbl, align=center]
+       {plain USB-C cable\\VBUS + D+ / D-\\\textbf{the ONLY supply}} (usbc);
+
+  %% ---------------- keyboard ----------------
+  \node[hw, right=16mm of usba, align=center, font=\sffamily\scriptsize] (kbd)
+       {Pi keyboard\\[-1pt]separate host controller};
+  \draw[bus] (usba) -- (kbd);
+
+  %% ---------------- console ----------------
+  \node[host, below right=14mm and 10mm of p10, align=left,
+        font=\sffamily\scriptsize, minimum height=14mm] (ttl)
+       {USB/TTL cable\\[-1pt]
+        white = RX, green = TX, black = GND\\[-1pt]
+        \textcolor{badcol}{red = 5V, LEFT OPEN}};
+  \draw[thick] (p8) -- ++(6mm,0) |- (ttl.west);
+  \draw[thick] (p10) -- ++(4mm,0) |- ($(ttl.west)+(0,-2mm)$);
+  \draw[thick] (p6) -- ++(2mm,0) |- ($(ttl.west)+(0,-4mm)$);
+
+  %% ---------------- the forbidden supply ----------------
+  \node[bad, left=16mm of p2, align=center, font=\sffamily\scriptsize,
+        minimum height=8mm] (bad2) {a second 5 V supply};
+  \draw[badcol, very thick, dashed] (bad2.east) -- (p2);
+  \draw[badcol, very thick] ($(bad2.east)!0.5!(p2)+(-2mm,-2mm)$) --
+       ($(bad2.east)!0.5!(p2)+(2mm,2mm)$);
+  \draw[badcol, very thick] ($(bad2.east)!0.5!(p2)+(-2mm,2mm)$) --
+       ($(bad2.east)!0.5!(p2)+(2mm,-2mm)$);
+
+  %% ---------------- the three notes ----------------
+  \node[umlnote, anchor=north west, text width=122mm, align=left]
+       at ($(pi.south west)+(-44mm,-8mm)$)
+       {\textbf{The host's port is the supply.} 500 mA on USB 2.0, 900 mA
+        on USB 3, against a Pi 4 that idles near 550 mA and peaks above
+        1 A. No display, no HAT, no second board. \texttt{arm\_freq=1000}
+        is set in advance because a brown-out during enumeration looks
+        like a gadget that does not work, and the journal entry that
+        would explain it is on a board that just reset.};
+
+  \node[bad, anchor=north west, text width=122mm, align=left,
+        font=\sffamily\scriptsize]
+       at ($(pi.south west)+(-44mm,-24mm)$)
+       {\textbf{Do NOT feed 5 V into header pin 2 or 4 while the host
+        provides VBUS.} They are joined through a fuse on the board, so a
+        second supply back-feeds the host's port. This is the one project
+        on the bench where the wiring can damage the other machine.};
+
+  \node[umlnote, anchor=north west, text width=122mm, align=left]
+       at ($(pi.south west)+(-44mm,-38mm)$)
+       {\textbf{The USB/TTL console is not optional here.} The bridge
+        grabs the keyboard, so the Pi has no local input; and rebuilding
+        the gadget takes the network and the serial port away at the same
+        moment, because both are functions of the thing being rebuilt.
+        Without this cable a failed \texttt{bench-gadget up} leaves a
+        board with no way in at all. Use a PLAIN USB-C cable: one with an
+        e-marker chip does not power a revision 1.1 board.};
+
+\end{tikzpicture}
+\end{document}

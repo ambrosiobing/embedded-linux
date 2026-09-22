@@ -1,0 +1,258 @@
+#!/bin/sh
+# bench-gadget - build or tear down the composite USB gadget.
+#
+#   bench-gadget up      build the configfs tree and bind it
+#   bench-gadget down    unbind and remove the tree
+#   bench-gadget status  what exists and what is bound
+#
+# Normally run by bench-gadget.service rather than by hand. Run it by
+# hand only over the USB/TTL console, never over the gadget's own network
+# or serial port: "down" removes the thing you are connected through.
+#
+# NET=ecm (default) or NET=ncm selects the Ethernet function.
+#   ecm  Linux and macOS hosts. No in-box driver on Windows.
+#   ncm  Windows 11 binds its UsbNcm class driver. Also fine on Linux.
+# It is an environment variable rather than a build option because the
+# same board gets plugged into both kinds of host.
+#
+# THE ORDER IS THE WHOLE POINT. libcomposite turns the directory tree
+# into descriptors at the moment the controller name is written to UDC,
+# and not before. Writing UDC while any function directory is incomplete
+# fails with ENODEV or EINVAL and no explanation of which part was
+# missing. So: build everything, then bind, once, last. Teardown is the
+# same list backwards, and it starts by emptying UDC.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+G=/sys/kernel/config/usb_gadget/bench
+NET=${NET:-ecm}
+DESC=/usr/share/bench-gadget/hid-keyboard.bin
+
+# Locally administered MAC addresses: the second hex digit must be 2, 6,
+# A or E. Fixed rather than random, because the host derives its
+# interface name from the address it is given and a new address every
+# boot means a new interface name every boot, which breaks every host
+# side .network file and udev rule that refers to it.
+HOST_MAC=${HOST_MAC:-02:22:82:00:00:01}
+DEV_MAC=${DEV_MAC:-02:22:82:00:00:02}
+
+die() {
+	echo "bench-gadget: $*" >&2
+	exit 1
+}
+
+# The controller. A glob rather than "ls | head", whose output format is
+# not an interface (SC2012), and which would also hide the case of there
+# being no controller at all.
+find_udc() {
+	for udc in /sys/class/udc/*; do
+		if [ -e "$udc" ]; then
+			basename "$udc"
+			return 0
+		fi
+	done
+	return 1
+}
+
+up() {
+	[ -d /sys/kernel/config ] ||
+		die "/sys/kernel/config is not mounted. configfs is built in on
+    this image; if it is missing the kernel fragment did not take.
+    Check: zcat /proc/config.gz | grep CONFIGFS"
+
+	udc=$(find_udc) ||
+		die "no UDC in /sys/class/udc, so there is no controller to bind.
+    The USB-C port is not in peripheral mode. Check in this order:
+      1. dtoverlay=dwc2,dr_mode=peripheral in config.txt
+      2. dmesg | grep -i dwc2
+    Without the overlay the port is a host port and this never appears."
+
+	[ -f "$DESC" ] ||
+		die "$DESC is missing. It is built from hid-keyboard.desc by the
+    recipe; an image without it has a broken bench-gadget package."
+
+	case $NET in
+	ecm | ncm) ;;
+	*) die "NET must be ecm or ncm, not '$NET'" ;;
+	esac
+
+	if [ -d "$G" ]; then
+		echo "bench-gadget: $G already exists; run 'bench-gadget down' first" >&2
+		return 0
+	fi
+
+	mkdir -p "$G"
+
+	# --- the device descriptor -------------------------------------------
+	# The Linux Foundation's own vendor id and the multifunction composite
+	# product id. These are reserved for exactly this and are not a
+	# borrowed vendor's: a gadget that claims somebody else's id will bind
+	# their driver on the host.
+	echo 0x1d6b >"$G/idVendor"
+	echo 0x0104 >"$G/idProduct"
+	echo 0x0200 >"$G/bcdUSB"
+	echo 0x0100 >"$G/bcdDevice"
+
+	mkdir -p "$G/strings/0x409"
+	echo "bench-0001" >"$G/strings/0x409/serialnumber"
+	echo "Bench" >"$G/strings/0x409/manufacturer"
+	echo "Pi 4 composite gadget" >"$G/strings/0x409/product"
+
+	# --- one configuration ------------------------------------------------
+	mkdir -p "$G/configs/c.1/strings/0x409"
+	echo "ECM + ACM + HID" >"$G/configs/c.1/strings/0x409/configuration"
+	# What the device ASKS the host for, in mA. The host is free to refuse.
+	echo 500 >"$G/configs/c.1/MaxPower"
+
+	# --- the three functions, seven endpoints -----------------------------
+	# ecm/ncm: interrupt IN + bulk IN + bulk OUT
+	mkdir -p "$G/functions/$NET.usb0"
+	echo "$HOST_MAC" >"$G/functions/$NET.usb0/host_addr"
+	echo "$DEV_MAC" >"$G/functions/$NET.usb0/dev_addr"
+
+	# acm: interrupt IN + bulk IN + bulk OUT
+	mkdir -p "$G/functions/acm.usb0"
+
+	# hid: one interrupt IN
+	mkdir -p "$G/functions/hid.usb0"
+	echo 1 >"$G/functions/hid.usb0/protocol"   # 1 = keyboard
+	echo 1 >"$G/functions/hid.usb0/subclass"   # 1 = boot interface
+	echo 8 >"$G/functions/hid.usb0/report_length"
+	cat "$DESC" >"$G/functions/hid.usb0/report_desc"
+
+	ln -sf "$G/functions/$NET.usb0" "$G/configs/c.1/"
+	ln -sf "$G/functions/acm.usb0" "$G/configs/c.1/"
+	ln -sf "$G/functions/hid.usb0" "$G/configs/c.1/"
+
+	# --- bind: enumeration starts on this line ----------------------------
+	echo "$udc" >"$G/UDC"
+	echo "bench-gadget: bound to $udc with $NET, acm and hid"
+}
+
+down() {
+	[ -d "$G" ] || { echo "bench-gadget: nothing to tear down"; return 0; }
+
+	# TEARDOWN DOES NOT ABORT. Everything below runs even when a step
+	# fails, and what could not be removed is named at the end.
+	#
+	# This is the opposite of up(), and deliberately so. A failed "up"
+	# should stop at the first problem, because continuing builds a tree
+	# that cannot bind. A failed "down" must not stop, because the state
+	# it would leave is the half-removed tree that makes the NEXT "up"
+	# refuse, and the unit's ExecStopPost has no third chance.
+	#
+	# Found by running this function against a fake tree where the
+	# function links were directories rather than symlinks: the rm failed
+	# and set -e took the rest of the teardown with it, silently, without
+	# even printing the final line.
+	set +e
+
+	# Unbind first. Removing a function that is still bound fails, and the
+	# tree is then half gone, which is harder to recover from than either
+	# end state.
+	if [ -w "$G/UDC" ]; then
+		echo "" >"$G/UDC" 2>/dev/null
+	fi
+
+	# On configfs these are symlinks, so rm is right. If one is somehow
+	# not a symlink, say which rather than failing the whole teardown.
+	for link in "$G"/configs/c.1/*.usb0; do
+		[ -e "$link" ] || continue
+		if ! rm -f "$link" 2>/dev/null; then
+			echo "bench-gadget: could not remove $link" >&2
+		fi
+	done
+
+	# rmdir, not rm -rf: configfs directories are objects, and rm -r on
+	# them fails in ways that leave the kernel's view and the directory
+	# listing disagreeing.
+	#
+	# Every removal is an if rather than
+	#
+	#     [ -d "$d" ] && rmdir "$d"
+	#
+	# and the reason is readability, not correctness. It is worth saying
+	# which, because the correctness argument is the one that suggests
+	# itself and it is wrong: errexit is suppressed for a command whose
+	# status is being tested, which includes the left operand of &&, so a
+	# missing directory does NOT exit the script here. That was checked
+	# with a three line reproduction rather than reasoned about.
+	#
+	# What IS a real hazard is the three-part form, "A && B || C", where
+	# C runs when A succeeds and B fails. scripts/lint.py rejects it and
+	# this repository has paid thirteen red CI runs for it. Keeping every
+	# conditional in one shape means that form never gets written by
+	# habit.
+	rmdir_if_present() {
+		[ -d "$1" ] || return 0
+		if ! rmdir "$1" 2>/dev/null; then
+			echo "bench-gadget: could not remove $1" >&2
+		fi
+	}
+
+	for d in "$G"/functions/*.usb0; do
+		rmdir_if_present "$d"
+	done
+	rmdir_if_present "$G/configs/c.1/strings/0x409"
+	rmdir_if_present "$G/configs/c.1"
+	rmdir_if_present "$G/strings/0x409"
+	rmdir_if_present "$G"
+
+	# Report the end state rather than assuming it. A teardown that
+	# cannot finish is the one case where the next "up" will refuse, so
+	# it has to be visible here and not discovered later.
+	if [ -d "$G" ]; then
+		echo "bench-gadget: PARTIAL teardown, $G still exists" >&2
+		echo "  the next 'up' will refuse until this is gone" >&2
+		set -e
+		return 1
+	fi
+
+	set -e
+	echo "bench-gadget: torn down"
+}
+
+status() {
+	if [ ! -d "$G" ]; then
+		echo "tree:  absent"
+	else
+		echo "tree:  $G"
+		bound=$(cat "$G/UDC" 2>/dev/null || echo "")
+		if [ -n "$bound" ]; then
+			echo "bound: $bound"
+		else
+			echo "bound: no (tree built, UDC empty)"
+		fi
+		echo "funcs: $(echo "$G"/configs/c.1/*.usb0 | sed "s|$G/configs/c.1/||g")"
+	fi
+
+	if udc=$(find_udc); then
+		echo "udc:   $udc"
+	else
+		echo "udc:   none. The port is not in peripheral mode."
+	fi
+
+	# An if, not "A && B || C". That pattern is not if-then-else: when A
+	# succeeds and B fails, C runs too. Harmless here and still not
+	# written, because it has cost this repository thirteen red CI runs
+	# in one sitting.
+	for node in /dev/hidg0 /dev/ttyGS0; do
+		if [ -e "$node" ]; then
+			echo "node:  $node"
+		else
+			echo "node:  $node absent"
+		fi
+	done
+}
+
+case "${1:-}" in
+up) up ;;
+down) down ;;
+status) status ;;
+*)
+	echo "usage: bench-gadget up|down|status" >&2
+	exit 2
+	;;
+esac
