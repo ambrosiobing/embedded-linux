@@ -36,9 +36,11 @@ usage() {
 	exit 2
 }
 
-# The three lines the firmware needs, and no more. The reference build's
-# whole config.txt is these three, which is worth knowing before copying
-# a distribution's file full of settings that predate the secure world.
+# The five lines the firmware needs, and no more. Three of them are the
+# reference build's whole config.txt, which is worth knowing before
+# copying a distribution's file full of settings that predate the secure
+# world. The other two were added on Tuesday 22 September 2026, after a
+# board spent an evening proving they were missing.
 #
 # There is no "armstub=" line, and that is not an omission: in 64-bit
 # mode the Raspberry Pi firmware loads a file called armstub8.bin if one
@@ -62,6 +64,19 @@ write_block() {
 		echo "enable_uart=1"
 		echo "kernel_address=0x02000000"
 		echo "device_tree_address=0x01000000"
+		echo "# arm_64bit=1 reads as redundant and is not. With"
+		echo "# armstub8.bin present the board reaches 64-bit mode"
+		echo "# anyway, which is why its absence went unnoticed"
+		echo "# until the stub was taken away: the same card then"
+		echo "# boots to silence, because the firmware defaults"
+		echo "# arm_64bit to 0 on a Pi 3 and goes looking for a"
+		echo "# kernel7.img that a 64-bit image does not have."
+		echo "arm_64bit=1"
+		echo "# uart_2ndstage=1 makes start.elf itself report on"
+		echo "# the serial line. Without it every failure before"
+		echo "# the kernel is a blinking LED and no message, which"
+		echo "# is how the line above cost an evening to find."
+		echo "uart_2ndstage=1"
 		printf '%s\n' "$END"
 	} >>"$tmp"
 	mv "$tmp" "$config"
@@ -94,6 +109,14 @@ do_install() {
 
 	note "armstub  $src/armstub8.bin"
 	cp "$src/armstub8.bin" "$boot/armstub8.bin"
+
+	# A previous "remove" leaves armstub8.bin.off behind. The fresh
+	# stub has just been written over the name that matters, so the
+	# old one is now only a way to be confused in a month.
+	if [ -f "$boot/armstub8.bin.off" ]; then
+		rm -f "$boot/armstub8.bin.off"
+		note "cleared armstub8.bin.off left by an earlier remove"
+	fi
 
 	# uboot.env is U-Boot's environment, and it carries the commands
 	# that load kernel8.img and the device tree. Without it U-Boot
@@ -128,12 +151,45 @@ do_remove() {
 		note "removed the block; there was no original to restore"
 	fi
 
-	# The stub itself is left in place deliberately. Removing the
-	# config.txt lines is enough to boot without it, and keeping the
-	# file means putting the secure world back is one command rather
-	# than another full build of the reference stack.
+	# A card that has just had the secure world removed has to still
+	# boot, and until Tuesday 22 September 2026 it did not.
+	#
+	# The image's own config.txt carries no arm_64bit=1. With the stub
+	# in place that costs nothing, because the board reaches 64-bit
+	# mode anyway; restore that config.txt and take the stub away and
+	# the firmware goes looking for a kernel7.img the image has never
+	# shipped, finds nothing, and stops without printing a character.
+	# So "remove" used to return a brick and say it had restored the
+	# card. One line, and it does not.
+	if ! grep -q '^arm_64bit=' "$boot/config.txt"; then
+		{
+			echo "# Added by optee-armstub.sh remove. Without it the"
+			echo "# firmware looks for kernel7.img on a Pi 3 and this"
+			echo "# image ships only kernel8.img, so the board boots"
+			echo "# to silence."
+			echo "arm_64bit=1"
+		} >>"$boot/config.txt"
+		note "appended arm_64bit=1; without it the card would not boot"
+	fi
+
+	# The stub is moved aside, not deleted and not left in place.
+	#
+	# This used to leave it where it was, with a comment saying the
+	# config.txt lines were enough to boot without it. That
+	# contradicted do_install's comment above, which says the firmware
+	# loads a file named armstub8.bin whenever one is present, no
+	# armstub= line required. Both cannot be true, and on Tuesday 22
+	# September 2026 nobody settled which: the file was renamed by
+	# hand and the board booted straight to the kernel.
+	#
+	# Renaming is the answer that does not depend on knowing. It costs
+	# nothing, it keeps the file so that putting the secure world back
+	# is one command rather than another build of the reference stack,
+	# and it is correct whichever of those two claims holds.
 	if [ -f "$boot/armstub8.bin" ]; then
-		note "armstub8.bin left in place; install puts it back in use"
+		mv "$boot/armstub8.bin" "$boot/armstub8.bin.off"
+		note "armstub8.bin renamed to armstub8.bin.off"
+		note "install puts it back; the firmware ignores the new name"
 	fi
 }
 
@@ -144,6 +200,9 @@ do_status() {
 
 	if [ -f "$boot/armstub8.bin" ]; then
 		note "armstub8.bin present, $(wc -c <"$boot/armstub8.bin") bytes"
+	elif [ -f "$boot/armstub8.bin.off" ]; then
+		note "armstub8.bin absent, but armstub8.bin.off is here:"
+		note "  this card had the secure world and it was removed"
 	else
 		note "armstub8.bin absent"
 	fi

@@ -83,10 +83,20 @@ Before paying for the long build, check the fragment:
 
 ```sh
 ./go flash /dev/sdX
-# mount the FAT partition, then
-./go armstub install /mnt/boot ~/optee-rpi3/out/boot
-./go armstub status /mnt/boot
+sudo mkdir -p /mnt/boot && sudo mount /dev/sdX1 /mnt/boot
+sudo ./go armstub install /mnt/boot ~/optee-rpi3/out/boot
+sudo ./go armstub status /mnt/boot
 ```
+
+**The `sudo` on those two lines is not decoration.** A partition mounted
+by `sudo mount` belongs to root at mode 0755, so the installer's first
+write fails as an ordinary user, and it fails with `mv: replace
+'/mnt/boot/config.txt', overriding mode 0755 (rwxr-xr-x)?`, which reads
+as a prompt about file permissions rather than as "you are not root".
+This page gave the commands without `sudo` until Tuesday 22 September
+2026, and they only ever worked because the first install happened to be
+run as root. The alternative, if you would rather not run the script as
+root, is to mount with `-o uid=$(id -u)` instead.
 
 `status` should report `armstub8.bin present`, `uboot.env present`,
 `config.txt boots the secure world` and `kernel8.img present`. That last
@@ -94,15 +104,30 @@ one matters: U-Boot loads `kernel8.img` from partition 1, so an image
 whose kernel is named anything else stops at a U-Boot prompt that looks
 like a hang to anyone not watching the console.
 
-To go back to a board with no secure world, `./go armstub remove
-/mnt/boot` restores the `config.txt` that was there before.
+To go back to a board with no secure world, `sudo ./go armstub remove
+/mnt/boot` restores the `config.txt` that was there before and renames
+`armstub8.bin` to `armstub8.bin.off`. The rename matters: in 64-bit mode
+the firmware loads a file called `armstub8.bin` whenever one is present,
+so taking the `config.txt` lines away on their own does not give you a
+board without a secure world, it gives you one with a secure world and
+no load addresses. `install` puts the name back.
+
+Two things to know before using `remove` on a card you care about.
+`config.txt` is restored by **moving** `config.txt.bench-orig` over it,
+so any hand edit inside the installed block is gone and the backup is
+consumed in the same operation; copy the file somewhere else first if it
+carries anything you want. And `remove` appends `arm_64bit=1` to the
+restored file if it is not already there, because the image's own
+`config.txt` does not carry it and a card without it boots to silence on
+a Pi 3. Before Tuesday 22 September 2026 `remove` returned a card that
+could not boot and said it had restored it.
 
 ## 3. The first boot, watched
 
 Console attached, at 115200. Three banners, in this order:
 
 ```
-NOTICE:  BL1: v2.10 ...
+NOTICE:  BL1: v2.6 ...
 I/TC: OP-TEE version: 4.1.0 ...
 U-Boot 20xx.xx ...
 ```
@@ -111,6 +136,45 @@ Then the kernel. If any of the three is missing, stop and use the
 [decision tree](DESIGN.md#where-a-failure-lives): each missing banner puts
 the fault in a different place, and the first two questions need nothing
 but this console.
+
+**The kernel will not come up on its own, and this is the part the page
+did not know until Tuesday 22 September 2026.** The device tree the
+Raspberry Pi firmware hands over has no `/psci` node, no `/firmware`
+node, and all four CPUs at `enable-method = "spin-table"`. With TF-A
+underneath, those spin-table addresses are stale, so CPU 0 starts, the
+kernel spends about fifteen seconds timing out on CPUs 1 to 3, and with
+no `/firmware/optee` the `optee` driver never probes at all. A secure
+world that booted perfectly is then invisible to Linux.
+
+Until the permanent fix exists, patch it in RAM. Stop at the `U-Boot>`
+prompt, and run these, which touch nothing on the card and are gone at
+the next reset:
+
+```sh
+fdt resize 4096
+fdt mknode / psci
+fdt set /psci compatible arm,psci-1.0
+fdt set /psci method smc
+fdt set /cpus/cpu@0 enable-method psci
+fdt set /cpus/cpu@1 enable-method psci
+fdt set /cpus/cpu@2 enable-method psci
+fdt set /cpus/cpu@3 enable-method psci
+fdt mknode / firmware
+fdt mknode /firmware optee
+fdt set /firmware/optee compatible linaro,optee-tz
+fdt set /firmware/optee method smc
+fdt rsvmem add 0x08000000 0x400000
+fdt rsvmem add 0x10100000 0xf00000
+fatload mmc 0:1 ${kernel_addr_r} kernel8.img
+booti ${kernel_addr_r} - 0x04000000
+```
+
+The last argument is a literal, not `${fdt_addr_r}`, and that is the
+other half of it. The firmware puts the tree wherever
+`device_tree_address` says, `uboot.env` carries `fdt_addr_r` from the
+reference build, and the two do not agree; the address above is where
+the tree actually was, confirmed with `md.l 0x04000000 4` returning
+`edfe0dd0`. Journal entry 20 has the whole sequence and what it proved.
 
 Once Linux is up:
 

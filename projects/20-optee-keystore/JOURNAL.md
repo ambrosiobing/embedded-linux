@@ -910,3 +910,56 @@ kept, and `maxcpus=1` on the kernel command line, to ask whether OP-TEE
 wedges only when it is entered from a secondary CPU. That is one line of
 bootargs and it either localises the hang or rules out the cheapest
 explanation for it.
+
+## 22. The three defects, fixed, and a fourth that only a test found
+
+Tuesday 22 September 2026, after the control boot. Entry 21 listed three
+things the board had proved were wrong with this repository and left them
+unfixed, which is the right order but a poor place to stop. All three are
+fixed now, and exercising the fix found a fourth that no boot had yet
+reached.
+
+**`write_block` writes five settings, not three.** `arm_64bit=1` and
+`uart_2ndstage=1` join `enable_uart=1`, `kernel_address` and
+`device_tree_address`, each with the comment that says why it is not
+redundant. The next card carries them without a hand edit.
+
+**`do_remove` renames the stub instead of arguing about it.**
+`armstub8.bin` becomes `armstub8.bin.off`. The script used to contain two
+comments that could not both be true, `do_install` saying the firmware
+loads that file whenever it is present and `do_remove` saying the
+`config.txt` lines were enough to boot without it. Renaming is correct
+under either, costs nothing, and keeps the file so that putting the
+secure world back stays one command. `do_install` clears a stale `.off`,
+and `do_status` now says "armstub8.bin absent, but armstub8.bin.off is
+here", because "absent" on its own is a card whose history you cannot
+see.
+
+**The bring-up says `sudo`.** Every `./go armstub` line, against a
+partition the same page mounts with `sudo mount`, with the actual failure
+quoted, `mv: replace '/mnt/boot/config.txt', overriding mode 0755?`,
+because nobody reads that as a permissions problem. The alternative,
+mounting with `-o uid=$(id -u)`, is named for anyone who would rather not
+run the script as root. Step 3 also gained the fourteen `fdt` commands
+that make the firmware's tree usable, and its TF-A banner now reads v2.6
+rather than v2.10.
+
+**And the fourth, which came out of running the thing rather than
+reading it.** Installed, removed, and looked at what `remove` had
+produced: the image's original `config.txt`, faithfully restored, with no
+`arm_64bit=1` in it. So `remove` returned a card that cannot boot and
+reported that it had restored it. That is worse than the failure it was
+meant to undo, and it is what I had done to this card an hour earlier
+without noticing, which is why the control boot was silent. `do_remove`
+now appends `arm_64bit=1` when the restored file lacks it, and running
+`remove` twice leaves exactly one copy.
+
+**Exercised end to end on win11 aquamarine** against a fake boot
+partition, not on the card: install, status, remove, status, remove
+again, install again. The `config.txt` comes back byte for byte apart
+from the appended line, the `.off` is cleared on reinstall, and the
+`arm_64bit` append does not duplicate. `sh -n` clean, lint clean.
+
+None of this touches the thing that actually matters next, which is why
+OP-TEE wedges CPU 3. It removes the traps between here and asking that
+question again.
