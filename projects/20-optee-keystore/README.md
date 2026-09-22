@@ -26,12 +26,29 @@ that does enforce the boundary.
 
 ## State
 
-**Everything is written and nothing has been run.** No image has been
-built, no board has been booted, and no secure world has ever started.
-There are no measurements in this README, and the rows that will hold them
-say so.
+**Both halves are built, the board has booted them, and the first call
+into the secure world never returns.** The image was built at `4f84a65`
+and the secure world on Tuesday 22 September 2026; the board reaches a
+login with TF-A and OP-TEE resident and Linux running under PSCI on all
+four CPUs. What it has not done is complete a single call into OP-TEE.
+There are still no measurements in this README, and the rows that will
+hold them say so.
 
-What is proven today, on a laptop:
+What is proven on the board, each with the journal entry that holds the
+console:
+
+| Proven | Where |
+|---|---|
+| TF-A, OP-TEE and U-Boot boot in order from `armstub8.bin`, and Linux mounts Yocto's root with the kernel command line intact | entry 20 |
+| The firmware's device tree has no `/psci` and no `/firmware/optee`; patched in RAM at the U-Boot prompt, Linux brings up four CPUs under PSCI v1.1 and the driver probes | entries 20 and 25, the fifteen commands in [BRINGUP.md](docs/BRINGUP.md) |
+| `optee: revision 4.1 (18b424c2)` printed once, on the first boot, with the driver built in | entry 20 |
+| The driver's first call into the secure world never returns, on every one of the four CPUs, at uptimes from twenty seconds to 551 | entries 20, 23, 25 to 29 |
+| Within one second of that call the VideoCore firmware mailbox stops answering unrelated, healthy CPUs, seen six times from two independent consumers | entries 26 to 29, `docs/evidence/boot-console-2026-09-22.txt` |
+| The card and the SD controller were never at fault: a 207 second control boot without the secure world ran clean | entry 21 |
+| A read-only root with `systemd.mask=systemd-remount-fs.service` survives the hang intact, where three read-write runs each cost a filesystem | entries 27 and 28 |
+| No normal-world observer that forks can survive the event, and SysRq does not answer on this kernel | entry 29 |
+
+What is proven on a laptop:
 
 | Proven | How |
 |---|---|
@@ -40,10 +57,11 @@ What is proven today, on a laptop:
 | The four commands, their errors, and what survives a reboot | `tests/keystore-policy-test.sh`, 29 assertions |
 | The UUID, the command ids and the lengths agree across five files | `tests/keystore-header-test.sh`, 28 assertions |
 | `CONFIG_TEE` and `CONFIG_OPTEE` exist and are settable | read out of `drivers/tee/Kconfig` at `rpi-6.6.y` |
-| OP-TEE and TF-A both support this board | `core/arch/arm/plat-rpi3` at 4.1.0, `plat/rpi/rpi3` at 2.10 |
+| OP-TEE and TF-A both support this board | `core/arch/arm/plat-rpi3` at 4.1.0, `plat/rpi/rpi3` at 2.10 in the tree the kas file pins; the `armstub8.bin` actually built carries TF-A v2.6, see journal entry 18 |
 | meta-arm can build them for it | `optee.inc` names `.bbappend or .conf` as the place to say so |
 
-What none of that proves is that a secure world boots on this board. The
+What none of that proves is that a MAC ever came out of a secure world,
+and nothing on the board has proven it either. The
 [acceptance table](#acceptance-criteria) says which rows are evidence and
 which are still plans.
 
@@ -51,9 +69,11 @@ which are still plans.
 
 | Path | What |
 |---|---|
-| `meta-bench/recipes-kernel/linux/files/tee.cfg` | The opt-in kernel fragment: the TEE subsystem and the OP-TEE driver |
+| `meta-bench/recipes-kernel/linux/files/tee.cfg` | The opt-in kernel fragment: the TEE subsystem. The driver is chosen by the next line |
+| `meta-bench/recipes-kernel/linux/files/tee-builtin.cfg` and `tee-modular.cfg` | `CONFIG_OPTEE=y`, the product answer, or `CONFIG_OPTEE=m`, the debugging answer, picked by `BENCH_TEE_MODULAR` |
 | `kas/bench-tee.yml` | meta-arm, the machine declaration OP-TEE asks for, and the version pin that has to match |
 | `meta-bench/recipes-core/images/bench-tee-image.bb` | `bench-image` plus the client, the conformance suite and the keystore |
+| `meta-bench/recipes-core/images/bench-tee-modular-image.bb` and `kas/bench-tee-modular.yml` | The same image with the driver as a module and `kernel-module-optee` installed, for a hang at probe; to be deleted when the hang is understood |
 | `meta-bench/recipes-bench/bench-keystore/` | The TA, the client library, the CLI, the Python binding, the verifier, the LED daemon and two units |
 | `scripts/optee-armstub.sh` | Puts the secure world on a card the image is already on |
 | `tests/keystore-canonical-test.sh` and two more | What can be proven without a TEE |
@@ -64,12 +84,18 @@ which are still plans.
 ```sh
 ./go check                   # about 2 minutes, no board and no TEE
 ./go tee                     # bench-tee-image for the Raspberry Pi 3
+./go tee-mod                 # the same, driver as a module, for debugging the hang
 ./go flash /dev/sdX
-./go armstub install /mnt/boot ~/optee-rpi3/out/boot
+sudo ./go armstub install /mnt/boot ~/optee-rpi3/out/boot
 ```
 
-The fourth line is the one that is unlike the rest of this repository, and
-[the next section](#two-builds-one-card) explains why it exists.
+The fifth line is the one that is unlike the rest of this repository, and
+[the next section](#two-builds-one-card) explains why it exists. Today the
+board also needs fifteen `fdt` commands at the `U-Boot>` prompt before
+`booti`, because the firmware's device tree has no `/psci` and no
+`/firmware/optee`. [docs/BRINGUP.md](docs/BRINGUP.md) has them in order,
+and a permanent home for them is deliberately not chosen until the hang
+they expose is understood.
 
 On the board:
 
@@ -169,13 +195,13 @@ passed to OP-TEE as `PLATFORM=`, so without a line it would look for
 
 | # | Criterion | Evidence | State |
 |---|---|---|---|
-| 1 | Three banners on the console in order, then `dmesg` reports the OP-TEE revision and `/dev/tee0` exists | a console capture in `docs/evidence/` | **not started**, needs a board |
-| 2 | `xtest` completes with zero failures on this image | `docs/evidence/xtest-report.txt` | **not started** |
+| 1 | Three banners on the console in order, then `dmesg` reports the OP-TEE revision and `/dev/tee0` exists | a console capture in `docs/evidence/` | **reached once, not held**: on Tuesday 22 September 2026 the three banners printed in order and `dmesg` reported `optee: revision 4.1 (18b424c2)`, then the board wedged on the driver's first call before `/dev/tee0` was checked. That console is quoted in journal entry 20; the capture in `docs/evidence/` is of two later boots in which the revision line never appears |
+| 2 | `xtest` completes with zero failures on this image | `docs/evidence/xtest-report.txt` | **blocked** on criterion 1 |
 | 3 | `generate` succeeds once and returns `ACCESS_CONFLICT` on a second call; the key object is an encrypted file under `/var/lib/tee` and is not plaintext | the CLI output and a hexdump | **policy proven against a model**, unproven on a TEE |
 | 4 | `sign` of the same input gives the same 32 bytes before and after a reboot; `export-once` works exactly once | the CLI output across a reboot | **policy proven against a model**, unproven on a TEE |
 | 5 | The verifier prints OK for a device record and BAD for an altered one | `tests/keystore-canonical-test.sh` today, and the same command against real records later | **met in software**, unproven end to end |
-| 6 | A single signing call completes in under 1 ms | a timing table in `docs/evidence/` | **not started** |
-| 7 | Removing the TA makes `TEEC_OpenSession` fail with `ITEM_NOT_FOUND` and origin `TEE`, and the red LED comes on | the CLI output and a photograph | **not started** |
+| 6 | A single signing call completes in under 1 ms | a timing table in `docs/evidence/` | **blocked** on criterion 1 |
+| 7 | Removing the TA makes `TEEC_OpenSession` fail with `ITEM_NOT_FOUND` and origin `TEE`, and the red LED comes on | the CLI output and a photograph | **blocked** on criterion 1 |
 
 Criterion 5 is the one to read carefully. The suite proves that the signer
 and the verifier agree about bytes, which is the part that was wrong
@@ -191,10 +217,11 @@ that a MAC ever came out of a secure world.
 | The five restatements | `sh tests/keystore-header-test.sh` | That the UUID, the command ids, the lengths, the object names and the LED bytes have not drifted between C, Python, a makefile and a recipe |
 | The fragment | `./go ksym -f tee` then `./go kconfig -f tee` | That every symbol exists, and that it reached the built kernel |
 
-Not covered, and only a board can cover it: that TF-A loads, that OP-TEE
-initialises, that the driver probes, that the TA is signed with a key this
-OP-TEE trusts, that `xtest` passes, and every number in the acceptance
-table.
+Not covered, and only a board can cover it. The board has now covered the
+first three: TF-A loads, OP-TEE initialises, and the driver probes. It has
+not covered the rest, because the driver's first call into the secure
+world never returns: that the TA is signed with a key this OP-TEE trusts,
+that `xtest` passes, and every number in the acceptance table.
 
 ## Departures from the original scope
 
@@ -218,6 +245,9 @@ table.
 | Parameter type mismatches between client and TA | One shared header, and a test that parses it |
 | The two builds drifting apart in version | The kas file pins, and the bring-up notes check on the board |
 | A wrong `enable_uart` | The schematic says the secure world prints before the clock is pinned, so the garbage is from TF-A and OP-TEE only |
+| A `config.txt` without `arm_64bit=1` | The firmware loads `armstub8.bin` only in 64-bit mode, and without the line the card is silent from power on. `./go armstub remove` appends it, and BRINGUP has the three-boot table that proved it |
+| The firmware's device tree, which has no `/psci` and no `/firmware/optee` | Fifteen `fdt` commands at the `U-Boot>` prompt, `fdt addr 0x04000000` first, in BRINGUP. Without that first one the next command answers `No FDT memory address configured` and nothing else runs |
+| A driver that hangs at probe, on a read-write root | Three runs each cost a filesystem. `./go tee-mod` makes the call from a login, `ro` plus `systemd.mask=systemd-remount-fs.service` keeps the root untouched, and since no observer that forks survives the event, the observer is started first |
 | Calling this "secure key storage on the Pi" | The first paragraph, the threat model, and the sentence to use instead |
 
 ---

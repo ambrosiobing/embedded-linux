@@ -1,9 +1,21 @@
 # Portfolio evidence
 
-What goes here, and how each item is produced. Empty until the board has
-actually run; nothing in this folder should be written from expectation.
+What goes here, and how each item is produced. Nothing in this folder is
+written from expectation.
 
-No secure world has ever started. The [project README](../../README.md)
+What is here today, Tuesday 22 September 2026:
+
+| File | What it is |
+|---|---|
+| `boot-console-2026-09-22.txt` | The picocom log of two boots of the modular image, whole: firmware, TF-A, OP-TEE, U-Boot, the fifteen `fdt` commands, login, then `modprobe optee` and the hang. The fifth and sixth sightings of the mailbox stopping one second after the first call into the secure world. Carriage returns and the nulls of three serial breaks stripped, the Ethernet MAC redacted. Journal entries 28 and 29 read from it |
+
+Still to copy from the build host: `rpi3-manifest.xml`, the `repo
+manifest -r` of the secure-world build, every OP-TEE component at
+`refs/tags/4.1.0` and TF-A at v2.6, from `out/` in the OP-TEE build
+checkout. Journal entry 18 describes it.
+
+A secure world has started, six times, and no call into it has ever
+returned. The [project README](../../README.md)
 marks two criteria "policy proven against a model" and one "met in
 software", and the distinction those phrases carry is the whole point of
 this folder: a model can prove that the policy is consistent, and only a
@@ -11,7 +23,7 @@ board can prove that a MAC came out of a secure world.
 
 | File | How to produce it |
 |---|---|
-| `boot-console.txt` | The serial console from power on, kept whole. Criterion 1 wants three banners in order, then `dmesg` reporting the OP-TEE revision, then `/dev/tee0` present. The order is the claim, so a summary of it is not the evidence |
+| `boot-console.txt` | The serial console of a boot that satisfies criterion 1, kept whole: three banners in order, then `dmesg` reporting the OP-TEE revision, then `/dev/tee0` present. The order is the claim, so a summary of it is not the evidence. The file above is not this one: the revision line never appears in it, which is the finding |
 | `xtest-report.txt` | `xtest` on this image, whole output. Criterion 2 is zero failures, and the run also states which suites the build actually included |
 | `generate-twice.txt` | `benchkey generate` twice, with a hexdump of the object under `/var/lib/tee` between them. Criterion 3 wants success, then `ACCESS_CONFLICT`, and a file that is visibly not plaintext |
 | `sign-across-reboot.txt` | `benchkey sign` of one input, a reboot, the same call again, and `benchkey export-once` twice. Criterion 4 is the same 32 bytes both times and an export that works exactly once |
