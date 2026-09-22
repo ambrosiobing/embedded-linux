@@ -1414,3 +1414,86 @@ cat /sys/class/thermal/thermal_zone0/temp
 
 A number, then an empty file, and the inference above becomes a
 measurement.
+
+## 28. The measurement that could not be taken, and why that is the result
+
+Tuesday 22 September 2026, continuing the same session. The card was the
+same one, the boot was the same one, and the command was the one entry 27
+ended with, rewritten to background the read into tmpfs because `timeout`
+does not exist here:
+
+```sh
+(modprobe optee &); sleep 5
+(cat /sys/class/thermal/thermal_zone0/temp > /tmp/t 2>&1 &); sleep 10
+echo '--- file ---'; cat /tmp/t
+```
+
+The before-reading was taken and is on the record: `44008`.
+
+**Then the marker never printed.** `--- file ---` was due about fifteen
+seconds after `optee: probing for conduit method.` at 63.26, so at roughly
+uptime 78. The serial console went on carrying kernel messages at 84, 147,
+210 and 242 seconds, so the console path was alive for another three
+minutes. The shell was not. Nothing the shell was asked to do after the
+call into the secure world ever came out.
+
+**At 242.66 the kernel said why.** Two hung-task reports arrived together:
+
+```
+INFO: task systemd:1 blocked for more than 120 seconds.
+  synchronize_rcu / rcu_sync_enter / percpu_down_write
+  cgroup_procs_write_start / __cgroup_procs_write / vfs_write
+INFO: task (ch-state):486 blocked for more than 120 seconds.
+  mutex_lock / cgroup_kn_lock_live / __cgroup_procs_write / vfs_write
+```
+
+The chain reads straight through. CPU 3 entered the secure world and never
+came back, so it never reports a quiescent state, so no RCU grace period
+can ever complete. `synchronize_rcu` therefore never returns. systemd is
+the first to wait on one, and it is holding the cgroup mutex while it
+waits, so the next process that has to be placed in a cgroup queues behind
+it. That process is pid 486, forked one after `modprobe`'s 485. From there
+userland is finished, and the four RCU stall reports naming `modprobe` on
+CPU 3 at 84, 147 and 210 seconds are the same fact seen from the other end.
+
+**The lesson is about experiment design and it is the point of this entry.
+After the first SMC, no experiment that requires userland to act can
+produce a result.** The observer has to be already running before the call
+is made, and its reporting path must not depend on anything the call can
+take away. Entry 27's plan was wrong for a reason that had nothing to do
+with the missing `timeout`: it asked a shell that was about to freeze to
+report on the freeze. This is the same error as the `BEFORE-FAILED` string
+in one more disguise, and it deserves the same permanent rule. Never build
+a measurement whose reporting path runs through the thing being measured.
+
+**What the run does add is the fifth independent sighting**, this time on
+CPU 1, one second after the probe, in the cpufreq path:
+
+```
+[   63.259334] optee: probing for conduit method.
+[   64.292007] Firmware transaction timeout
+[   64.292065] WARNING: CPU: 1 PID: 55 at rpi_firmware_property_list
+               raspberrypi_fw_set_rate / clk_set_rate
+               __cpufreq_driver_target / od_dbs_update / dbs_work_handler
+[   64.533962] raspberrypi-clk soc:firmware:clocks:
+               Failed to change fw-clk-arm frequency: -110
+```
+
+That evidence survives the userland freeze intact, because it is a kernel
+workqueue on a different CPU that waits on no grace period. `optee:
+revision 4.1` has still never printed.
+
+**What must not be counted.** The userland freeze is fully explained by RCU
+and says nothing whatever about the mailbox. It is not a sixth sighting and
+it is not evidence that the thermal read blocked. The measurement stands
+where entry 27 left it: still inferred, not yet measured.
+
+**Next, designed against the failure above.** Start the observer first, give
+it a reporting path that is a partial line already flushed to the console,
+and point it at a file that certainly goes through the firmware mailbox,
+which the thermal zone may not. Check `/sys/class/hwmon/*/name` for
+`rpi_volt` and use its `in0_lcrit_alarm`, which calls
+`rpi_firmware_property` on every read. Print `tick N read=` before the
+read and the value after it. A tick that ends at `read=` with no number,
+and no tick after it, is the measurement: the same read, alive one second
+earlier, blocked after the first entry into the secure world.
