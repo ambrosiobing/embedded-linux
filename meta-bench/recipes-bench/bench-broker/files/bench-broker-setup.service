@@ -1,0 +1,18 @@
+[Unit]
+Description=Install the broker's certificates from the boot partition
+Documentation=https://github.com/ambrosiobing/embedded-linux
+After=boot.mount
+Wants=boot.mount
+# Before the thing that reads them. The broker will not start without a
+# certificate, so an ordering mistake here is a broker that fails on first
+# boot and starts on the second, which is the kind of intermittent nobody
+# enjoys.
+Before=mosquitto.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/bench-broker-setup
+
+[Install]
+WantedBy=multi-user.target

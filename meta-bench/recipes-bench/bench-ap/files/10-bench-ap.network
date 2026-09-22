@@ -1,0 +1,25 @@
+# The access point's own address, Project 18.
+#
+# hostapd owns the BSS, which is layer two. Nothing in hostapd gives the
+# interface an address, so this does, and the two are not in conflict: they
+# own different layers of the same interface.
+#
+# Static, necessarily. An access point cannot ask anybody for its own
+# address, and this one is the DHCP server.
+
+[Match]
+Name=wlan0
+
+[Network]
+Address=10.18.0.1/24
+# No gateway and no DNS, because there is neither. Stating it is not the
+# same as leaving it out: a board that later grows an uplink should have to
+# change this file on purpose.
+IPv6AcceptRA=no
+LinkLocalAddressing=no
+DHCP=no
+
+[Link]
+# The interface must come up even with no station associated, or the
+# address is not assigned until somebody joins and the broker cannot bind.
+RequiredForOnline=no

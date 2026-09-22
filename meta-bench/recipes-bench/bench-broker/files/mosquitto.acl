@@ -1,0 +1,68 @@
+# Who may publish what, Project 18.
+#
+# The username here is the certificate's common name, because
+# use_identity_as_username is on. So every line below is enforced against
+# something the private CA vouched for, rather than against a string the
+# client chose.
+#
+# THE RULE IS MECHANICAL: A DEVICE WRITES UNDER ITS OWN NAME.
+#
+#   bench/<common name>/...
+#
+# That is a rule rather than a list, and the difference matters. A list of
+# hand-assigned prefixes drifts: somebody adds a device, picks a prefix
+# that looks free, and the ACL no longer says anything a reader can check.
+# With the rule, the prefix is derived from the identity the certificate
+# already carries, and tests/broker-config-test.sh asserts it mechanically
+# for every user rather than one rule at a time.
+#
+# It also removes a whole class of mistake. Two devices cannot be given
+# overlapping subtrees by accident, because their names are already
+# distinct: the certificate authority refuses to issue two certificates
+# with the same common name into the same ACL slot, and if it did the
+# second device would simply be the first one.
+#
+# READ THE DIRECTION OF THESE RULES.
+#
+# Publishers write and do not read. That is the whole practical benefit of
+# giving each device its own certificate: a sensor that is compromised can
+# lie about itself and learn nothing about anything else. Written the other
+# way round, with readwrite everywhere, the PKI would still authenticate
+# everyone correctly and one broken device would see the entire bench.
+# Decision 112.
+#
+# There is no topic line outside a user block, so there is no default
+# permission: an identity not named here connects and can do nothing.
+
+# Project 17's BLE gateway, which today publishes to a localhost broker
+# that its own README calls a test fixture.
+#
+# ITS TOPIC HAS TO BE SET WHEN IT IS POINTED AT THIS BROKER. That project
+# publishes to "bench/stwin" by default, which is not under its own name
+# and would be refused here. The knob already exists and is one line:
+# STWIN_TOPIC in meta-bench/recipes-bench/bench-stwin/files/stwin.conf,
+# which becomes bench/ble-gateway/stwin. Nothing in that project is
+# changed from here; the requirement is recorded in docs/PROTOCOL.md and
+# the change belongs to whoever connects the two.
+user ble-gateway
+topic write bench/ble-gateway/#
+
+# Project 20's keystore verifier publishes a value and subscribes for the
+# answer, so this one genuinely needs both directions. It is the exception,
+# and naming it as one is the point: an exception in a file is visible,
+# an exception implied by a default is not.
+user keystore-verify
+topic readwrite bench/keystore-verify/#
+
+# The ESP32 station. Confined to its own name, so a second station cannot
+# overwrite the first one's readings.
+user esp32-01
+topic write bench/esp32-01/#
+
+# The laptop, for looking. Read only: a subscriber that can also publish is
+# a debugging tool that can inject a reading into somebody's results.
+#
+# The only identity whose prefix is not its own name, because its job is to
+# see everything. It is also the only one that cannot write.
+user bench-laptop
+topic read bench/#

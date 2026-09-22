@@ -1,0 +1,18 @@
+[Unit]
+Description=Build hostapd configuration from the boot partition
+Documentation=https://github.com/ambrosiobing/embedded-linux
+# /boot has to be mounted before the credentials can be read.
+After=boot.mount
+Wants=boot.mount
+# Ordered before the thing that consumes its output rather than the other
+# way round, so that a hostapd started by hand after a failure still finds
+# whatever this last wrote.
+Before=bench-hostapd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/bench-ap-setup
+
+[Install]
+WantedBy=multi-user.target

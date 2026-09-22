@@ -1,0 +1,77 @@
+# Project 18: the edge access point with MQTT over TLS.
+#
+#   kas build kas/bench-ap.yml        or  ./go ap
+#
+# A separate configuration rather than a change to bench-rpi3.yml, for the
+# reason stated in the repository README: a project that needs a different
+# kernel or a different image adds its own kas file next to the others.
+header:
+  version: 14
+  includes:
+    - bench-rpi3.yml
+
+target: bench-ap-image
+
+repos:
+  # hostapd, dnsmasq and mosquitto are all in meta-networking. It is a
+  # second layer from the repository that bench-rpi3.yml already pins, so
+  # the branch is pinned there and this file only names the layer.
+  #
+  # Two other configurations in this repository already do exactly this,
+  # kas/bench-router.yml and kas/bench-ble.yml, and bench-ble-image already
+  # installs mosquitto. So the layer and the recipe are known to build on
+  # this bench; what was not known is the line below.
+  meta-openembedded:
+    layers:
+      meta-oe:
+      meta-networking:
+      meta-python:
+
+local_conf_header:
+  ap: |
+    # THE ONE LINE THIS PROJECT CANNOT DO WITHOUT.
+    #
+    # A configuration file proves nothing about whether a feature is in the
+    # binary. That is the first rule in this bench's trap list, and Project
+    # 15 lost a build to it: NetworkManager parsed a connectivity
+    # configuration without complaint and the feature was not compiled in.
+    #
+    # Everything in this project is TLS. If mosquitto is built without ssl
+    # then /etc/bench/mosquitto.conf is a file full of options the binary
+    # does not recognise, there is no 8883, and the failure arrives on a
+    # board after a three hour build.
+    #
+    # Whether scarthgap's mosquitto already has ssl in its PACKAGECONFIG
+    # default has not been read, because poky and meta-openembedded live on
+    # the WSL laptop and not on the one this was written on. Appending it
+    # is the cheap side of that unknown: PACKAGECONFIG is a space separated
+    # list, so asking for something already present costs nothing, and
+    # asking for something absent is the difference between this project
+    # working and not.
+    #
+    # Read it anyway, once, and record it:
+    #   ./go shell bench-ap
+    #   bitbake -e mosquitto | grep '^PACKAGECONFIG='
+    # into projects/18-edge-ap-mqtt/docs/evidence/, because a PACKAGECONFIG
+    # is a property of a pinned layer revision rather than of a name.
+    PACKAGECONFIG:append:pn-mosquitto = " ssl"
+
+    # NO KERNEL FRAGMENT IS TURNED ON HERE, AND THAT IS NOT AN OMISSION.
+    #
+    # Access point mode on this board is a question about the chip's
+    # firmware rather than about the kernel: brcmfmac is a FullMAC driver,
+    # so the MAC layer runs in the chip and the host speaks cfg80211. Until
+    # `iw list` on the board has been read and shown to say "* AP", there
+    # is nothing to write a fragment about, and a fragment written from a
+    # guess is how Project 1 lost two rounds on wlan0 and Project 8 lost a
+    # flash to spidev.
+    #
+    # If it turns out something is missing, the switch goes here and the
+    # fragment in meta-bench/recipes-kernel/linux/files/ap.cfg, the way
+    # every other project in this repository does it.
+
+    # The broker's configuration and the access point's are what this
+    # project is debugged through, far more than the kernel, so keeping the
+    # sources means a change can be tried against a built tree rather than
+    # from the start.
+    RM_WORK_EXCLUDE += "bench-ap bench-broker mosquitto hostapd"

@@ -1,0 +1,24 @@
+[Unit]
+Description=Access point on wlan0, Project 18
+Documentation=https://github.com/ambrosiobing/embedded-linux
+After=bench-ap-setup.service sys-subsystem-net-devices-wlan0.device
+Requires=bench-ap-setup.service
+BindsTo=sys-subsystem-net-devices-wlan0.device
+
+# Its own unit rather than the one the hostapd recipe ships, which reads
+# /etc/hostapd.conf. The configuration here is generated into /run at every
+# boot because it carries a passphrase, so the path differs, and overriding
+# a distribution unit's ExecStart is a change that goes silently missing
+# the day that recipe is updated.
+[Service]
+Type=exec
+ExecStart=/usr/sbin/hostapd /run/bench/hostapd.conf
+ExecReload=/bin/kill -HUP $MAINPID
+# Restart, because this is the board's only network. A hostapd that exits
+# for a transient reason and stays dead leaves a machine reachable only
+# from the serial console.
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

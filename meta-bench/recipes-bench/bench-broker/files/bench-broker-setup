@@ -1,0 +1,150 @@
+#!/bin/sh
+#
+# bench-broker-setup - install the broker's certificates from the card.
+#
+# The image carries the capability to be a broker. The card carries the
+# identity, the same way it carries the wireless passphrase. This script is
+# the step in between, and it exists for three reasons that a plain `cp` in
+# a bring-up document does not cover.
+#
+# WHY NOT JUST PUT THEM IN /etc AND FLASH THAT.
+#
+# Because the rootfs is ext4 and the authoring laptop is Windows, which
+# cannot mount it. /boot is FAT and every machine can write it. So the
+# files arrive on the partition that can be written and are installed onto
+# the one the broker reads, at first boot.
+#
+# WHAT IT REFUSES, AND WHY THAT IS THE WHOLE POINT.
+#
+# A CA private key on the card. Everything in the certificate directory
+# looks alike, and the one file that must never leave the laptop sits next
+# to three that must. A card is a small object that gets handed around, put
+# in a drawer, photographed, and posted. A CA key that has left the laptop
+# is not recoverable by deleting it: every certificate it ever signed has
+# to be reissued.
+#
+# bench-pki.sh deploy already refuses to copy it. This is the second guard,
+# on the other side, because that one only helps the person who used it.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+SRC=${BENCH_BROKER_SOURCE:-/boot/pki}
+DST=${BENCH_BROKER_TARGET:-/etc/bench/pki}
+OWNER=${BENCH_BROKER_OWNER:-mosquitto}
+
+WANTED="ca.crt bench-ca.crl bench-ap.crt bench-ap.key"
+
+fail() {
+	echo "bench-broker-setup: $*" >&2
+	exit 1
+}
+
+# THE REFUSAL COMES FIRST, BEFORE ANYTHING IS COPIED OR EVEN CHECKED.
+#
+# If a CA key is on this card, nothing else about the run matters, and
+# copying the good files first would leave a board that works and a problem
+# nobody looks for again.
+if [ -d "$SRC" ]; then
+	for danger in ca.key private index.txt serial openssl.cnf; do
+		if [ -e "$SRC/$danger" ]; then
+			fail "STOP. $SRC/$danger is on this card.
+
+       That is part of the certificate authority, which lives on the
+       laptop and never travels. If it is a private key, treat it as
+       compromised: reissue the CA and every certificate under it.
+
+       The card should carry exactly four files:
+         $WANTED
+
+       Remove the rest before this board is used."
+		fi
+	done
+fi
+
+if [ ! -d "$SRC" ]; then
+	# Not an error on its own. A board that was provisioned on a previous
+	# boot has its certificates already and does not need the card again,
+	# and leaving them on the card is worse than taking them off.
+	missing=
+	for f in $WANTED; do
+		[ -f "$DST/$f" ] || missing="$missing $f"
+	done
+	if [ -z "$missing" ]; then
+		echo "bench-broker-setup: no $SRC, and $DST is already complete"
+		exit 0
+	fi
+	fail "no $SRC on the boot partition, and $DST is missing:$missing
+
+       The broker will not start without them. Issue them on the laptop
+       and copy them onto the card's boot partition:
+
+         bench-pki.sh server bench-ap 10.18.0.1
+         bench-pki.sh deploy bench-ap /media/BOOT/pki"
+fi
+
+missing=
+for f in $WANTED; do
+	[ -s "$SRC/$f" ] || missing="$missing $f"
+done
+[ -z "$missing" ] ||
+	fail "$SRC is missing or has empty:$missing
+       bench-pki.sh deploy writes all four together."
+
+# THE CERTIFICATE AND THE KEY HAVE TO BE A PAIR.
+#
+# Copying a certificate from one issue and a key from another is easy: the
+# filenames are the same and the contents are opaque. Mosquitto's own
+# complaint about it is a TLS initialisation error that names neither file,
+# on a board whose only other way in is a serial cable. Comparing the
+# public keys costs one exec at boot and turns that into a sentence.
+if command -v openssl >/dev/null 2>&1; then
+	crt_pub=$(openssl x509 -in "$SRC/bench-ap.crt" -noout -pubkey 2>/dev/null || true)
+	key_pub=$(openssl pkey -in "$SRC/bench-ap.key" -pubout 2>/dev/null || true)
+	if [ -z "$crt_pub" ] || [ -z "$key_pub" ]; then
+		fail "could not read bench-ap.crt or bench-ap.key on $SRC.
+       One of them is not what its name says it is."
+	fi
+	if [ "$crt_pub" != "$key_pub" ]; then
+		fail "bench-ap.crt and bench-ap.key on $SRC are not a pair.
+
+       They were issued at different times, or copied from different
+       runs. Reissue and redeploy both together:
+         bench-pki.sh server bench-ap 10.18.0.1
+         bench-pki.sh deploy bench-ap /media/BOOT/pki"
+	fi
+	# The certificate must also be one this CA signed, or the broker
+	# presents a chain no client on the bench can verify.
+	if ! openssl verify -CAfile "$SRC/ca.crt" "$SRC/bench-ap.crt" \
+		>/dev/null 2>&1; then
+		fail "bench-ap.crt on $SRC was not signed by the ca.crt beside it.
+
+       Every client checks exactly that, so no client would connect."
+	fi
+fi
+
+mkdir -p "$DST"
+for f in $WANTED; do
+	cp "$SRC/$f" "$DST/$f.new"
+	mv "$DST/$f.new" "$DST/$f"
+done
+
+# The key is the only secret here. Everything else is public by design: a
+# certificate and a revocation list are meant to be handed out.
+chmod 0644 "$DST/ca.crt" "$DST/bench-ca.crl" "$DST/bench-ap.crt"
+chmod 0640 "$DST/bench-ap.key"
+if id "$OWNER" >/dev/null 2>&1; then
+	chown "root:$OWNER" "$DST/bench-ap.key"
+	chmod 0750 "$DST"
+	chown "root:$OWNER" "$DST"
+else
+	# Named rather than silent. A broker that cannot read its own key
+	# fails with a permission error and nothing explains why the group
+	# does not exist.
+	echo "bench-broker-setup: no '$OWNER' user, leaving $DST owned by root" >&2
+fi
+
+echo "bench-broker-setup: installed $WANTED into $DST"
+openssl x509 -in "$DST/bench-ap.crt" -noout -subject -dates 2>/dev/null ||
+	true

@@ -9,6 +9,10 @@
 #   ./go rpi3         build the same layer for a Raspberry Pi 3
 #   ./go router       build bench-router-image, the LTE router of Project 15
 #   ./go tracker      build bench-tracker-image, Project 16's NB-IoT tracker
+#   ./go ap           build bench-ap-image, Project 18's access point and broker
+#   ./go pki SUB      Project 18's private CA, on this laptop and never a board:
+#                     init | server CN ADDR | client CN | revoke CN | verify CN
+#                     | list | deploy CN DIR | clock-rule STAMP
 #   ./go release      build with SBOM, CVE check and source archive
 #   ./go rt           build bench-rt-image, the PREEMPT_RT lab of Project 8
 #   ./go rt-generic   the same image on the same kernel, without PREEMPT_RT
@@ -66,6 +70,8 @@ dev)        exec sh ./scripts/build.sh bench-dev ;;
 rpi3)       exec sh ./scripts/build.sh bench-rpi3 ;;
 router)     exec sh ./scripts/build.sh bench-router ;;
 tracker)    exec sh ./scripts/build.sh bench-tracker ;;
+ap)         exec sh ./scripts/build.sh bench-ap ;;
+pki)        shift; exec sh ./projects/18-edge-ap-mqtt/pki/bench-pki.sh "$@" ;;
 release)    exec sh ./scripts/build.sh bench-release ;;
 rt)         exec sh ./scripts/build.sh bench-rt ;;
 rt-generic) exec sh ./scripts/build.sh bench-rt-generic ;;

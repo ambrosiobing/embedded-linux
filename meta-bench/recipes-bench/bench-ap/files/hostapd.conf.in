@@ -1,0 +1,57 @@
+# hostapd, Project 18. Generated into /run by bench-ap-setup; the file with
+# the passphrase in it never touches the rootfs.
+#
+# The placeholders are filled from /boot/ap.conf. Everything else here is a
+# decision rather than a default, and the comments say which.
+
+interface=wlan0
+driver=nl80211
+ssid=@SSID@
+country_code=@COUNTRY@
+hw_mode=@HW_MODE@
+channel=@CHANNEL@
+
+# 802.11d advertises the regulatory domain to clients, and 802.11h the
+# channel switching that goes with it. Both are cheap and both stop a
+# client in another country associating on a channel it may not use.
+ieee80211d=1
+ieee80211n=1
+wmm_enabled=1
+
+# WPA2 PSK with CCMP, and nothing else.
+#
+# wpa=2 is RSN only, so no WPA1 fallback. TKIP is absent on purpose: it is
+# broken, and leaving it in the pairwise list is how a network that looks
+# like WPA2 negotiates something weaker with an old client.
+#
+# WPA3 SAE is NOT here, and that is a finding rather than laziness. The
+# Pi's brcmfmac is a FullMAC driver, so access point behaviour is decided
+# by the chip's firmware and not by hostapd, and nothing on this bench has
+# established that this firmware does SAE. It is a board experiment, and
+# projects/18-edge-ap-mqtt/docs/evidence/README.md says how to ask.
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+wpa_passphrase=@PASSPHRASE@
+
+# Protected management frames, where the client supports them. Optional
+# rather than required, because required is a WPA3 posture and would lock
+# out the ESP8266 that is one of this project's two station clients.
+ieee80211w=1
+
+# Clients cannot talk to each other, only to the broker.
+#
+# This is the access point half of the same argument the broker's ACL
+# makes: a compromised sensor should be able to lie about itself and
+# nothing else. Without this line every station on the network can reach
+# every other one directly, and the ACL protects only what goes through
+# MQTT.
+ap_isolate=1
+
+# No hidden SSID. Hiding one is not a security measure, it is a client
+# that broadcasts the name it is looking for wherever it goes.
+ignore_broadcast_ssid=0
+
+logger_syslog=-1
+logger_syslog_level=2

@@ -3436,3 +3436,193 @@ two doors cannot.
 **When one suite is still right.** When it runs everywhere. The split costs
 a second file and is only worth it where a genuine host capability, a pty,
 a GPIO chip, a kernel tree, divides the suite in two.
+
+## 111. A device with no clock cannot check a certificate, so the CA is older than the image
+
+**Context.** Project 18 puts a TLS broker on a Raspberry Pi that serves its
+own wireless network and has no uplink. Certificate validation is a
+comparison against the current time, and that board has no way to know it:
+a Pi has no battery-backed real-time clock, and this one has no network to
+learn from. At boot, systemd moves the clock forward to the latest of the
+saved timestamp and the image build time, and stops there.
+
+**Decision.** The certificate authority is created **before** the image is
+built, and the rule is a command rather than a sentence:
+`bench-pki.sh clock-rule "$(cat /etc/timestamp)"`, which compares the CA's
+`notBefore` with the image's build stamp and refuses with both dates when
+the CA is the newer one.
+
+**Rejected.** Three alternatives, each reasonable somewhere else.
+
+Adding a real-time clock. This bench has one, on the Explorer 700 HAT that
+Project 6 uses, and it would solve the problem exactly. It also occupies
+the 40-pin header and makes an access point project depend on a peripheral
+project. Recorded in the design as available and not taken.
+
+Issuing certificates with a `notBefore` far in the past. Taken as well, but
+not on its own: it widens the window in which a stolen key is usable, and
+it does not help if the CA itself is newer than the image.
+
+Running NTP. There is no uplink, by design, because a second interface
+would make the interesting failure impossible.
+
+**Why.** The failure this prevents is expensive out of all proportion to
+its cause. Every client fails, all at once, and the error each one reports
+names the certificate. Nothing in it mentions the clock, so the search
+starts at the subjectAltName, the chain and the CA, and the actual cause is
+a file timestamp on a different machine.
+
+**Consequence, and who has to remember something.** An ordering constraint
+between two things that look unrelated: when the CA was created, and when
+the image was built. Rebuilding the image is always safe; recreating the CA
+is not. That is now checkable with no board, which is the only reason it
+will survive contact with a bench.
+
+**Where else this applies.** Any device that validates certificates and
+does not know the time: an offline gateway, a device on an isolated
+network, anything that boots from cold into a job before it can reach a
+time source. The general form is that certificate validity is an assertion
+about a clock, and a device without one is trusting its image build date.
+
+## 112. A publisher can write and cannot read, or per-device identity buys nothing
+
+**Context.** Project 18's broker takes each client's certificate common
+name as its MQTT username, so authorisation is enforced against something
+the private CA vouched for rather than against a string the client chose.
+The access control list then has to say what each identity may do, and the
+obvious spelling gives each device its own topic subtree with full access
+to it.
+
+**Decision.** Publishers get `write` and nothing else. Only the one
+identity that exists for looking at the bench gets `read`, and it cannot
+publish. There is no rule outside a user block, so an identity nobody has
+written a rule for connects and can do nothing.
+
+**Rejected.** `readwrite` on each device's own subtree, which is what
+almost every MQTT example does and which looks equivalent.
+
+**Why.** It is not equivalent, and the difference only shows up after
+something has gone wrong. With `readwrite`, a device that is taken over can
+still be confined to its own subtree, but it can read back everything
+written there, including whatever the fleet's other half publishes into it.
+With `write` alone, a compromised sensor can lie about itself and learn
+nothing at all. That is the entire practical benefit of giving every device
+its own certificate rather than sharing one, and it is invisible unless the
+rules are written this way round.
+
+The read-only observer is the mirror of the same argument. A subscriber
+that can also publish is a debugging tool that can inject a reading into
+somebody else's results, and the day that happens nobody suspects the
+laptop.
+
+**Consequence.** A device that genuinely needs both directions has to be
+given both explicitly, and Project 20's keystore verifier is one: it
+publishes a value and subscribes for the answer. Naming it as the exception
+is the point, because it makes the exception visible in a file rather than
+implied by a default.
+
+**And the rule that makes all of it real.** `use_identity_as_username`.
+Without it the broker authenticates a certificate and then authorises an
+unrelated username, so every rule above is enforced against something the
+certificate authority never vouched for, and the PKI decorates a system
+whose real access control is somewhere else entirely.
+
+## 113. An isolated network serves its own time, because its clients have none at all
+
+**Context.** Decision 111 settles how the board of Project 18 gets a clock
+good enough to validate certificates: it has none, so systemd brings it up
+at about the image build date, and the certificate authority is created
+before the image so that date is late enough. That reasoning covers one
+machine. The clients it serves are worse off. An ESP32 and an ESP8266 have
+no clock whatsoever and power up in 1970, check the broker's certificate,
+find a `notBefore` years ahead, and refuse to connect with an error that
+says the certificate is not yet valid and mentions no clock at all.
+
+**Decision.** The access point runs `chronyd` with
+`local stratum 10 orphan`, serving its own unsynchronised clock, and hands
+the address out over DHCP option 42. Decision 111 guarantees that clock is
+no earlier than the certificate authority, so every client that syncs to it
+lands in a time where every certificate on the island is valid.
+
+**Rejected.** Three, each reasonable elsewhere.
+
+Hardcoding a build timestamp into each client's firmware. It works, and it
+has to be redone for every client and every firmware build, and the failure
+when somebody forgets is the one above, found on a board.
+
+Disabling certificate time validation on the clients. This removes the
+check that makes an expired or a not-yet-valid certificate fail, which is
+most of what a validity period is for, and it removes it from the machines
+least able to notice.
+
+An upstream time source. There is no uplink, deliberately, because a second
+interface would make the interesting failure impossible to observe.
+
+**Why.** It is the only option that fixes every client at once, needs
+nothing of the clients but a standard DHCP option, and adds one small
+daemon to a board that is already the network's only service. Without
+`local stratum`, chronyd refuses to answer at all, because by default a
+server will not hand out a time it cannot vouch for; that refusal is
+correct on the internet and here it leaves every client in 1970.
+
+**Consequence, and it has to be said in more than one place.** This is not
+accurate time and must never be used as if it were. It is the image build
+date plus uptime, wrong by days or weeks, and monotonic. Certificate
+validity is the one thing that needs exactly that and nothing more. No
+measurement on such a network should be timestamped from it, which is why
+Projects 3 and 8 both take their timing from a board's own monotonic clock.
+
+The stratum is deliberately poor, 10, so that any client which can reach a
+real source prefers it and only a client with nothing better falls back
+here.
+
+**Where else this applies.** Any network with no uplink whose members
+validate certificates: an isolated test bench, a vehicle, a site with a
+gateway that is itself offline. The general form is that the machine with
+the best guess at the time becomes the time source for the ones with no
+guess at all, and that this composes with an ordering rule about when the
+certificate authority was created, rather than replacing it.
+
+## 114. The secure world is two make targets, not the reference build's `all`
+
+**Context.** Project 20's `armstub8.bin` comes from the OP-TEE build
+repository, checked out at the same 4.1.0 tag the recipes pin, because a
+TF-A recipe that produces a FIP with U-Boot as BL33 is a project in itself
+and one that looks right and is wrong is worse than a documented manual
+step. The bring-up document said `make -j8`, which is that repository's
+`all`, and its Makefile says what `all` is: `tf-a buildroot optee-os
+u-boot linux update_bootfs update_rootfs`.
+
+**Decision.** `make toolchains`, then `make tf-a u-boot-env`, then two
+`cp` lines into `out/boot`. Nothing else in that tree is built.
+
+**Rejected.** `all`, and `update_bootfs` on its own.
+
+`all` builds Buildroot, a Linaro 5.17 kernel and a root filesystem. This
+project's kernel and rootfs are Yocto's, so every one of those is thrown
+away, at the cost of most of an hour and most of the disk budget on a
+machine with 22 GB free.
+
+`update_bootfs` is the target that populates `out/boot`, so it reads as
+the right one. It depends on `linux` and installs that kernel as
+`kernel8.img`, both `bcm2710-*.dtb` files from it, and `bootcode.bin`,
+`start.elf` and the `fixup*.dat` set from a firmware tag dated 2019, over
+a Yocto boot partition carrying the 2025 set. Run as written it replaces
+the image's kernel and firmware with the reference build's.
+
+**Why.** `./go armstub install` reads two files: `armstub8.bin` and
+`uboot.env`. `tf-a` produces the first, with OP-TEE as BL32 and U-Boot as
+BL33 inside the FIP, so no separate `u-boot.bin` is wanted; `u-boot-env`
+produces the second. The installer writes its own three `config.txt`
+lines into the partition's existing file rather than copying the
+reference one. Everything the project needs from that tree is those two
+files, and the two targets that make them are the whole build.
+
+**Consequence.** `out/boot` is assembled by hand, and the bring-up
+document says so. The manifest, `repo manifest -r`, is saved beside it,
+because it names TF-A at v2.6 where a comment in the kas file says 2.10,
+and the evidence file should carry the version that was built rather
+than the one that was remembered. First applied Tuesday 22 September
+2026; the build took about forty minutes including the toolchains, and
+the two host packages it needed, `repo` and `python3-pyelftools`, are now
+in the bring-up document too.

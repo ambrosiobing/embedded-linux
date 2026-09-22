@@ -1,0 +1,19 @@
+[Unit]
+Description=DHCP for the access point, Project 18
+Documentation=https://github.com/ambrosiobing/embedded-linux
+# The address has to exist before dnsmasq binds to it. bind-interfaces in
+# the configuration means it binds the address rather than the wildcard, so
+# starting early is not a slow start, it is a failure to start.
+After=bench-hostapd.service systemd-networkd.service
+Wants=bench-hostapd.service
+
+[Service]
+Type=exec
+ExecStartPre=/usr/bin/mkdir -p /run/bench
+ExecStart=/usr/bin/dnsmasq --keep-in-foreground --conf-file=/etc/bench/dnsmasq-ap.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

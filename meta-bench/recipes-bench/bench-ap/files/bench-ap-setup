@@ -1,0 +1,159 @@
+#!/bin/sh
+#
+# bench-ap-setup - build hostapd's configuration from the boot partition.
+#
+# The image carries the capability to be an access point. The card carries
+# the network's identity. /boot is the FAT partition of the same card, so
+# the file is written from any machine after flashing, with any text
+# editor, and the repository never sees a passphrase.
+#
+# /boot/ap.conf holds two required lines and three optional ones:
+#
+#   SSID=bench-18
+#   PASSPHRASE=at least eight characters
+#   CHANNEL=6
+#   COUNTRY=DE
+#   HW_MODE=g
+#
+# THE OUTPUT GOES TO /run, WHICH IS A TMPFS.
+#
+# A passphrase written into /etc would sit in the rootfs, survive reboots,
+# and end up in any image anybody copied off the card afterwards. The
+# generated file lives for one boot and is rebuilt on the next.
+#
+# THIS SCRIPT IS THE RECOVERY PATH'S DEPENDENCY, WHICH DECIDES ITS ORDER.
+#
+# On this board the access point is the only network. If hostapd does not
+# start there is no ssh, no fallback station, nothing but the serial
+# console. This repository has already lost a board that way: a first-boot
+# script under "set -e" hit a missing template, died before it reached the
+# block that wrote the access point, and left a machine with no Ethernet
+# reachable only from the console.
+#
+# So the order here is deliberate. Everything the access point needs is
+# validated and written first. Anything optional happens afterwards, and
+# anything that fails after that point leaves a working network behind.
+#
+# SPDX-License-Identifier: MIT
+
+set -eu
+
+SRC=${BENCH_AP_SOURCE:-/boot/ap.conf}
+TEMPLATE=${BENCH_AP_TEMPLATE:-/etc/bench/hostapd.conf.in}
+DST=${BENCH_AP_TARGET:-/run/bench/hostapd.conf}
+
+fail() {
+	# A refusal names what it matched. A board that will not come up on the
+	# network can only be debugged from the console, and a message that
+	# says "bad configuration" costs somebody the walk to find the cable.
+	echo "bench-ap-setup: $*" >&2
+	exit 1
+}
+
+[ -r "$TEMPLATE" ] ||
+	fail "no template at $TEMPLATE. The bench-ap package is incomplete;
+       this is a packaging fault rather than anything to do with the card."
+
+if [ ! -r "$SRC" ]; then
+	fail "no $SRC on the boot partition.
+
+       The access point is this board's only network, so without it the
+       board is reachable only from the serial console. Write $SRC with
+       at least:
+
+         SSID=bench-18
+         PASSPHRASE=something-at-least-eight-characters
+
+       then power cycle."
+fi
+
+ssid=
+passphrase=
+channel=
+country=
+hw_mode=
+
+# The three Windows text traps, all of which this bench has met.
+#
+# The "|| [ -n \"\$key\" ]" is the third of them: read returns false on a
+# final line with no trailing newline, which ends the loop before the body
+# runs, so the last key in the file is silently dropped. Notepad writes
+# files without a final newline, and this file is written in Notepad.
+while IFS='=' read -r key value || [ -n "$key" ]; do
+	# Keeping only the characters a key can contain drops a UTF-8 byte
+	# order mark, which Notepad writes by default and which would
+	# otherwise make the first key unrecognisable, and any stray carriage
+	# return.
+	key=$(printf '%s' "$key" | tr -cd 'A-Za-z0-9_')
+	value=$(printf '%s' "$value" | tr -d '\r')
+	case $key in
+	SSID) ssid=$value ;;
+	PASSPHRASE) passphrase=$value ;;
+	CHANNEL) channel=$value ;;
+	COUNTRY) country=$value ;;
+	HW_MODE) hw_mode=$value ;;
+	esac
+done <"$SRC"
+
+channel=${channel:-6}
+country=${country:-DE}
+hw_mode=${hw_mode:-g}
+
+[ -n "$ssid" ] || fail "no SSID= line in $SRC"
+[ -n "$passphrase" ] || fail "no PASSPHRASE= line in $SRC"
+
+# WPA2 defines the passphrase as 8 to 63 characters, and hostapd refuses to
+# start outside that. Refusing here rather than there turns a board with no
+# network and a line in a log into a board with no network and a message
+# that names the file, the key and the length.
+len=$(printf '%s' "$passphrase" | wc -c)
+if [ "$len" -lt 8 ] || [ "$len" -gt 63 ]; then
+	fail "PASSPHRASE in $SRC is $len characters.
+       WPA2 requires 8 to 63, and hostapd will not start outside that."
+fi
+
+case "$ssid" in
+*[!\ -~]* | "") fail "SSID in $SRC has characters outside printable ASCII" ;;
+esac
+
+# An SSID is up to 32 octets. Longer is rejected by hostapd with a message
+# about the configuration file line rather than about the length.
+ssid_len=$(printf '%s' "$ssid" | wc -c)
+[ "$ssid_len" -le 32 ] ||
+	fail "SSID in $SRC is $ssid_len characters; the maximum is 32"
+
+case "$channel" in
+'' | *[!0-9]*) fail "CHANNEL in $SRC is '$channel', which is not a number" ;;
+esac
+
+# A regulatory domain is two letters and it is not cosmetic: hostapd with
+# an unknown country and ieee80211d enabled refuses to bring the interface
+# up at all, which on this board means no network.
+case "$country" in
+[A-Z][A-Z]) ;;
+*) fail "COUNTRY in $SRC is '$country'; it must be two capital letters" ;;
+esac
+
+mkdir -p "$(dirname "$DST")"
+
+# Written to a temporary file in the same directory and moved into place, so
+# that a hostapd started while this runs sees either the old file or the new
+# one and never half of one.
+tmp=$DST.new
+sed \
+	-e "s|@SSID@|$ssid|" \
+	-e "s|@PASSPHRASE@|$passphrase|" \
+	-e "s|@CHANNEL@|$channel|" \
+	-e "s|@COUNTRY@|$country|" \
+	-e "s|@HW_MODE@|$hw_mode|" \
+	"$TEMPLATE" >"$tmp"
+
+# The passphrase is in this file, so it is never group or world readable.
+chmod 600 "$tmp"
+mv "$tmp" "$DST"
+
+# Deliberately does not print the passphrase, and prints the length instead,
+# because this runs at boot and the console is the one place somebody is
+# watching.
+echo "bench-ap-setup: wrote $DST for SSID '$ssid' on channel $channel"
+echo "bench-ap-setup: country $country, passphrase $len characters"
