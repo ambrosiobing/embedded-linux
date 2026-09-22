@@ -1428,7 +1428,9 @@ does not exist here:
 echo '--- file ---'; cat /tmp/t
 ```
 
-The before-reading was taken and is on the record: `44008`.
+The before-reading was taken and is on the record: `44008`. **Corrected
+the same night, see the end of this entry: that number never crossed the
+mailbox and is not a baseline for anything.**
 
 **Then the marker never printed.** `--- file ---` was due about fifteen
 seconds after `optee: probing for conduit method.` at 63.26, so at roughly
@@ -1488,12 +1490,159 @@ and says nothing whatever about the mailbox. It is not a sixth sighting and
 it is not evidence that the thermal read blocked. The measurement stands
 where entry 27 left it: still inferred, not yet measured.
 
-**Next, designed against the failure above.** Start the observer first, give
-it a reporting path that is a partial line already flushed to the console,
-and point it at a file that certainly goes through the firmware mailbox,
-which the thermal zone may not. Check `/sys/class/hwmon/*/name` for
-`rpi_volt` and use its `in0_lcrit_alarm`, which calls
-`rpi_firmware_property` on every read. Print `tick N read=` before the
-read and the value after it. A tick that ends at `read=` with no number,
-and no tick after it, is the measurement: the same read, alive one second
-earlier, blocked after the first entry into the secure world.
+**Next, designed against the failure above, and then abandoned an hour
+later.** The plan was to start the observer first, give it a reporting
+path that is a partial line already flushed to the console, and point it
+at a file that certainly crosses the firmware mailbox. Three commands on
+the board killed it:
+
+  - `grep -l rpi_volt /sys/class/hwmon/*/name` prints nothing.
+    `raspberrypi-hwmon` is not on this image, so there is no userland file
+    that crosses the mailbox on demand.
+  - `command -v taskset` prints `NO-TASKSET`. There is no pinning, so the
+    observer cannot be kept off the CPU that will make the call, which was
+    the entire defence against the freeze described above.
+  - `/sys/bus/platform/drivers` lists `bcm2835_thermal`, and
+    `/sys/class/thermal/thermal_zone0/type` is `cpu-thermal`, the
+    device-tree node name. The Pi 3 thermal zone is the on-chip AVS
+    sensor, read straight from a register. **So `44008` never crossed the
+    mailbox.** It was a baseline for nothing, and every earlier plan built
+    on it, this entry's included, was aimed at the wrong file.
+
+What replaces it costs nothing and needs no tool that is missing.
+`/proc/interrupts` is kernel memory and never touches the mailbox, but it
+counts the mailbox's own completion interrupts, on line 2,
+`3f00b880.mailbox`, which at 202 seconds of uptime stood at 553, 556, 530
+and 551 across the four CPUs, so about eleven interrupts per second. A
+counter that stops climbing at the instant of the first SMC is a direct
+observation of the firmware going quiet. Two independent loggers print
+uptime and that counter once a second, started before `modprobe`, so that
+if one lands on the CPU that wedges the other still reports.
+
+**And the instrument we have been missing for five hangs.** TF-A and
+OP-TEE print on the PL011 at `0x3f201000`. Linux uses `ttyS0`, the mini
+UART at `0x3f215040`. On the Raspberry Pi 3 only one of the two is
+connected to GPIO 14 and 15 at a time, which is why `I/TC:` lines appear
+during boot and nothing from the secure world appears afterwards. The
+secure world has probably been printing through every one of these hangs,
+onto a UART that is no longer wired to the pins. `dtoverlay=disable-bt` in
+`config.txt` with `console=ttyAMA0,115200` in `cmdline.txt` puts both
+worlds on the same wire. That is the next cycle, and it is worth more than
+any further refinement of the normal-world side.
+
+## 29. Why no observer can survive, and the instrument we never wired up
+
+Tuesday 22 September 2026, the last boot of the night. The card was
+unchanged, because entry 28's read-only root held and left it untouched.
+picocom was started with `--logfile /home/bing/boot-measure.txt`, which
+should have been done a week ago and settles the evidence capture at the
+same time.
+
+**The device-tree block went in clean for the first time**, in four
+pasted groups of five, five, five and two, with `fdt addr 0x04000000` as
+the new first line. That line was missing from BRINGUP.md and the page as
+printed could not have worked: without it the next command answers `No
+FDT memory address configured` and nothing else runs. Fixed there.
+
+Two things in the boot log that had not been noticed in any previous run:
+
+  - `ERROR: rpi3_sdhost: transfer FIFO word 1: 0x21` appears inside
+    **BL2**, before Linux exists, with the full HC register dump, and TF-A
+    retried through it. The SD path is unhappy at a level far below the
+    kernel. One more reason the card was never the fault.
+  - `systemd[1]: Created slice Slice /system/tee-supplicant`. This image
+    ships a `tee-supplicant` unit. It cannot have run, because `/dev/tee0`
+    does not exist while the driver is blacklisted, but it is a second
+    thing that would call the secure world the moment the driver loads,
+    and it needs to be accounted for before any result is interpreted.
+
+**The pre-flight, three commands, which killed the planned experiment and
+one earlier number.** `grep -l rpi_volt /sys/class/hwmon/*/name` prints
+nothing, so there is no userland file that crosses the mailbox on demand.
+`command -v taskset` prints `NO-TASKSET`, so there is no pinning.
+`/sys/bus/platform/drivers` lists `bcm2835_thermal`, so the thermal zone
+is the on-chip AVS sensor read from a register, and the `44008` of entry
+28 never crossed the mailbox at all. Entry 28 has been corrected in place.
+
+**What replaced it.** `/proc/interrupts` is kernel memory and touches no
+mailbox, but line 2, `3f00b880.mailbox`, counts the mailbox's own
+completion interrupts. Three loggers were started before the call, two of
+them by accident when the second command was entered twice, each printing
+uptime and that counter once a second. Baseline measured on this boot
+rather than assumed: 4950 at uptime 445 rising to 5942 at 496, about
+nineteen interrupts per second, all three loggers agreeing.
+
+**The sixth sighting**, and the tightest yet:
+
+```
+[  551.394125] optee: probing for conduit method.
+[  552.415184] ------------[ cut here ]------------
+[  552.420466] Firmware transaction timeout
+[  552.420542] WARNING: CPU: 0 PID: 8 ... rpi_firmware_property_list
+               raspberrypi_fw_set_rate / clk_set_rate
+               __cpufreq_driver_target / od_dbs_update / dbs_work_handler
+[  552.664158] raspberrypi-clk soc:firmware:clocks:
+               Failed to change fw-clk-arm frequency: -110
+```
+
+One second and twenty one milliseconds from probe to timeout, the same
+gap as every other run. The wedged task this time is on CPU 1, pid 2522,
+while the healthy CPU that reports is CPU 0.
+
+**And not one logger line appears after 551.394.** All three stopped
+together, in the same second as the probe, and never resumed through 635.
+
+**That failure is the result, and the mechanism is in the log.** Look at
+the audit lines running all evening: `prog-id=N op=LOAD` then `op=UNLOAD`,
+every five seconds. That is systemd starting and stopping something on a
+timer, and each one writes to a cgroup. `__cgroup_procs_write` takes
+`cgroup_threadgroup_rwsem` for writing, and taking a percpu rwsem for
+writing begins with `synchronize_rcu`, which can never complete while a
+CPU sits parked in the secure world. A pending writer on that lock blocks
+every new reader, and **`fork()` takes it for reading**. Our loggers fork
+`awk` and `sleep` once a second. So within about one second of the first
+SMC, every process on the board that forks anything is stopped. That is
+exactly what happened to the shell in entry 28, and now it has happened to
+three independent observers at once.
+
+**So a whole family of experiments is retired, not merely one.** No
+observer that forks can survive this event, on this image, ever. Any
+future normal-world observer has to run on shell builtins alone after the
+call is made, with no `sleep`, no `awk`, no command substitution. That is
+buildable, but it is not where the next hour should go.
+
+**Magic SysRq was tried properly and did not answer.** SysRq runs in
+interrupt context, takes no locks and forks nothing, so it is the one
+instrument that can speak to a board whose userland is dead, which is why
+it was worth the keystrokes. picocom sends the break with `Ctrl-A` then
+`Ctrl-Backslash`, and on a German keyboard the backslash is `AltGr` plus
+the `ß` key, so the sequence is `Ctrl-A`, then `Ctrl` and `AltGr` and `ß`
+together. picocom confirmed `*** break sent ***`. Neither `l`, for
+per-CPU backtraces, nor `w`, for tasks in uninterruptible sleep, produced
+anything.
+
+So the break reached the kernel and the kernel ignored it. That leaves
+two possibilities and they are separated by one command on the **next**
+boot, before anything is at risk: `cat /proc/sys/kernel/sysrq`. If it
+reads `0`, SysRq is compiled in and merely disabled, `echo 1 >
+/proc/sys/kernel/sysrq` turns it on, and we gain an observer that survives
+the freeze when every forking one cannot. If the file does not exist,
+`CONFIG_MAGIC_SYSRQ` is not in this kernel and it becomes a fragment for
+`meta-bench`. Either way it is cheap, and it is the first thing to do
+after login from now on.
+
+**The instrument we have never wired up, and the next cycle.** TF-A and
+OP-TEE print on the PL011 at `0x3f201000`. Linux uses `ttyS0`, the mini
+UART at `0x3f215040`. On the Raspberry Pi 3 only one of the two reaches
+GPIO 14 and 15 at a time, which is why `I/TC:` lines fill the boot log and
+then the secure world falls silent forever. It has almost certainly been
+printing through all six of these hangs, into a UART with nothing attached
+to it. `dtoverlay=disable-bt` in `config.txt` and `console=ttyAMA0,115200`
+in `cmdline.txt` put both worlds on the same wire.
+
+That is the next thing to do, and it is worth more than any further
+refinement of the normal-world side, because every measurement so far has
+been an attempt to infer from outside what the secure world would simply
+have told us. Change the UART first, confirm an ordinary boot and login
+before anything else is touched, and keep the byte-for-byte backup of the
+working `config.txt` and `cmdline.txt` as always.

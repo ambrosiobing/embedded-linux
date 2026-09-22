@@ -151,6 +151,7 @@ prompt, and run these, which touch nothing on the card and are gone at
 the next reset:
 
 ```sh
+fdt addr 0x04000000
 fdt resize 4096
 fdt mknode / psci
 fdt set /psci compatible arm,psci-1.0
@@ -169,8 +170,13 @@ fatload mmc 0:1 ${kernel_addr_r} kernel8.img
 booti ${kernel_addr_r} - 0x04000000
 ```
 
-The last argument is a literal, not `${fdt_addr_r}`, and that is the
-other half of it. The firmware puts the tree wherever
+The first line is not optional either. Without `fdt addr` the very next
+command answers `No FDT memory address configured` and nothing else in
+the block runs, and `${fdt_addr_r}` is the wrong value to give it for the
+reason below.
+
+The last argument of `booti` is a literal, not `${fdt_addr_r}`, and that
+is the other half of it. The firmware puts the tree wherever
 `device_tree_address` says, `uboot.env` carries `fdt_addr_r` from the
 reference build, and the two do not agree; the address above is where
 the tree actually was, confirmed with `md.l 0x04000000 4` returning
