@@ -1,0 +1,35 @@
+# Project 20, debugging variant: the OP-TEE driver as a loadable module.
+#
+#   kas build kas/bench-tee-modular.yml      or  ./go tee-mod
+#
+# Identical to kas/bench-tee.yml in every respect except that the driver
+# is =m rather than =y and the module package is in the image. Same
+# machine, same layers, same OP-TEE version pins, same trusted
+# application, same secure world on the card.
+#
+# It exists because a driver that hangs at probe cannot be debugged from
+# a board that never finishes booting. On Tuesday 22 September 2026 the
+# secure world booted correctly on a Raspberry Pi 3 and then wedged the
+# CPU that called into it, during optee_bus_scan. Four boots narrowed the
+# fault to the driver's own calls and stopped there, because every
+# remaining question needs a running system to ask it from. Journal
+# entries 20, 21 and 23.
+#
+# THE KERNEL COMMAND LINE MATTERS FOR THIS IMAGE. The driver carries an
+# OF match on "linaro,optee-tz", so with /firmware/optee in the device
+# tree udev autoloads the module during boot and the board dies exactly
+# as it did before. Boot with modprobe.blacklist=optee; an explicit
+# "modprobe optee" still works. docs/BRINGUP.md says where to put it.
+header:
+  version: 14
+  includes:
+    - bench-tee.yml
+
+target: bench-tee-modular-image
+
+local_conf_header:
+  tee-modular: |
+    # Selects tee-modular.cfg instead of tee-builtin.cfg. BENCH_TEE_KERNEL
+    # is already "1" from bench-tee.yml; this is the second switch under
+    # it, and the bbappend explains why there are two.
+    BENCH_TEE_MODULAR = "1"

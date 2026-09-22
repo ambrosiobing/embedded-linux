@@ -32,6 +32,7 @@
 #   ./go ab-broken    the bundle that must roll back: criterion 5
 #   ./go ab-wrong     the bundle that must be refused: criterion 7
 #   ./go tee          build bench-tee-image, the OP-TEE keystore of Project 20
+#   ./go tee-mod      the same image with the OP-TEE driver as a module
 #   ./go gadget       build bench-gadget-image, the USB gadget of Project 14
 #   ./go kiosk        build bench-kiosk-image, the Wayland HMI of Project 13
 #   ./go debug        build bench-debug-image, the debugging lab of Project 9
@@ -90,6 +91,7 @@ ab-bundle)  exec sh ./scripts/build.sh bench-ab-bundle ;;
 ab-broken)  exec sh ./scripts/build.sh bench-ab-bundle-broken ;;
 ab-wrong)   exec sh ./scripts/build.sh bench-ab-bundle-wrong ;;
 tee)        exec sh ./scripts/build.sh bench-tee ;;
+tee-mod)    exec sh ./scripts/build.sh bench-tee-modular ;;
 gadget)     exec sh ./scripts/build.sh bench-gadget ;;
 kiosk)      exec sh ./scripts/build.sh bench-kiosk ;;
 debug)      exec sh ./scripts/build.sh bench-debug ;;

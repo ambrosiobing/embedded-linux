@@ -3626,3 +3626,54 @@ than the one that was remembered. First applied Tuesday 22 September
 2026; the build took about forty minutes including the toolchains, and
 the two host packages it needed, `repo` and `python3-pyelftools`, are now
 in the bring-up document too.
+
+## 115. A driver that hangs at probe is debugged as a module, chosen by a switch that picks a file
+
+**Context.** Project 20's OP-TEE driver is `CONFIG_OPTEE=y`, and
+`tee.cfg` argues for that at length: this image installs no kernel
+modules, so `=m` is a driver present in the build tree, absent from the
+card, and indistinguishable at the console from a secure world that never
+booted. On Tuesday 22 September 2026 four boots narrowed a hang to the
+driver's own calls into OP-TEE, during `optee_bus_scan`, which runs once
+at probe. Built in, that probe happens while the kernel is still bringing
+up drivers, so the board dies before there is a shell, a login or a
+readable `dmesg`. Journal entries 20, 21 and 23.
+
+**Decision.** `CONFIG_OPTEE` leaves `tee.cfg` and becomes two one-line
+fragments, `tee-builtin.cfg` and `tee-modular.cfg`. `BENCH_TEE_MODULAR`
+in the kernel bbappend selects exactly one. The modular arm is completed
+by `bench-tee-modular-image.bb`, which installs `kernel-module-optee`,
+and by `modprobe.blacklist=optee` on the kernel command line.
+
+**Rejected.** Changing `tee.cfg` to `=m` in place, and adding a second
+fragment that overrides it.
+
+**Why.** Changing it in place leaves the repository arguing with itself:
+the file's own header explains why the driver is built in, and a
+portfolio repository whose comments contradict its contents reads as
+carelessness rather than as a decision.
+
+Overriding fails the repository's own checks. Two fragments setting one
+symbol to different values is an override, `merge_config` takes the last
+and warns, and `./go kconfig -f tee` then reports the losing fragment's
+line as one that never reached `.config`. A switch that selects between
+files has neither problem, and it is the pattern already used six times
+in this bbappend for the router, real-time, Bluetooth, netboot, IIO and
+Explorer fragments.
+
+The two completions are not optional and both have cost a bring-up
+elsewhere. `core-image-minimal` installs no kernel modules, so a module
+nobody names is a module nobody gets; `scripts/lint.py` has checked for
+that since Project 1 lost two rounds to it. And the driver carries an OF
+match on `linaro,optee-tz`, so with `/firmware/optee` in the device tree
+udev autoloads the module during boot and reproduces the failure the
+variant exists to escape.
+
+**Consequence.** Two ways to build Project 20 exist, and the second one
+is temporary by construction: `bench-tee-modular-image.bb` says in its
+own comment that when the hang is understood, the fragment, the image and
+the kas file should be deleted rather than left as a second build nobody
+remembers the purpose of. Until then the debugging path is `./go tee-mod`,
+a card prepared as in bring-up steps 2 and 3, `modprobe.blacklist=optee`
+added to `cmdline.txt`, and the failure triggered by hand at a shell with
+`dmesg`, `/proc` and a serial console still available.

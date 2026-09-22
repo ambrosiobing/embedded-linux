@@ -288,6 +288,59 @@ reports otherwise. `plat-rpi3/conf.mk` already sets `CFG_WITH_STATS=y`, so
 the figures are available; record the real number and the journal entry
 that corrects the guess.
 
+## When the driver hangs at probe
+
+Known behaviour on this bench as of Tuesday 22 September 2026, and the
+reason `kas/bench-tee-modular.yml` exists.
+
+The secure world boots correctly, `optee: revision 4.1` appears, `optee:
+initialized driver` appears, and then the CPU that called into OP-TEE
+during `optee_bus_scan` never comes back. With four CPUs the other three
+carry on long enough to fill the console with RCU stall reports and then
+lose the SD card; with one CPU the machine stops dead and prints nothing
+at all, because the CPU that hangs is the only one there was to print
+with.
+
+Four boots of one card narrowed it, and the fourth is the one that
+matters: identical to the failing boot except that `/firmware/optee` is
+absent from the device tree, so the driver never probes. That boot ran
+for 317 seconds, reached a login prompt and powered off cleanly, with
+TF-A and OP-TEE resident underneath it the whole time. So the card, the
+SD controller, the presence of a secure world and the choice of CPU are
+all excluded, and what is left is the driver's own calls. Journal entries
+20, 21 and 23.
+
+To debug it, build the variant where the driver is a module:
+
+```sh
+./go tee-mod
+```
+
+Flash and install the secure world exactly as in steps 2 and 3, then add
+one thing to the kernel command line on the boot partition:
+
+```sh
+sudo sh -c 'tr -d "\r\n" < /mnt/boot/cmdline.txt > /tmp/cl && printf " modprobe.blacklist=optee\n" >> /tmp/cl && cp /tmp/cl /mnt/boot/cmdline.txt'
+```
+
+Without that the module autoloads during boot anyway: the driver carries
+an OF match on `linaro,optee-tz` and udev acts on it, which reproduces
+the failure the variant exists to escape. Blacklisting stops the
+alias-driven load and leaves an explicit `modprobe` working.
+
+The board then boots to a login prompt with the secure world underneath
+it and no TEE driver. From there:
+
+```sh
+ls /dev/tee*                 # nothing yet, which is the point
+dmesg | grep -i optee        # nothing yet either
+modprobe optee               # and this is where it goes wrong
+```
+
+Everything a running system offers is available up to that last line:
+`dmesg`, `/proc`, `/sys`, a second console, `sysrq` over the serial
+break. None of it was available when the driver was built in.
+
 ## What a recipe for the secure world would have to settle
 
 `./go armstub` exists because the secure world is not built by bitbake

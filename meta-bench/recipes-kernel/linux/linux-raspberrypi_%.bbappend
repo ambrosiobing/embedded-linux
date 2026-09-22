@@ -85,6 +85,35 @@ SRC_URI += '${@"file://netboot.cfg" if d.getVar("BENCH_NETBOOT_KERNEL") == "1" e
 BENCH_TEE_KERNEL ?= "0"
 SRC_URI += '${@"file://tee.cfg" if d.getVar("BENCH_TEE_KERNEL") == "1" else ""}'
 
+# And a second switch under the first, which is the only pair here that
+# works that way, so it is worth saying why rather than leaving it to be
+# inferred from the expressions.
+#
+# tee.cfg deliberately does not contain CONFIG_OPTEE. The driver is =y
+# for the product and =m when the driver itself is what is being
+# debugged, and the two answers live in tee-builtin.cfg and
+# tee-modular.cfg. Exactly one of them is ever added, because two
+# fragments setting one symbol to different values is an override:
+# merge_config takes the last and warns, and ./go kconfig then reports
+# the losing fragment's line as one that never reached .config. A switch
+# that selects between files has neither problem.
+#
+# The modular arm exists because on Tuesday 22 September 2026 the driver
+# wedged the CPU during optee_bus_scan, which runs at probe. Built in,
+# that kills the board before there is a shell to debug it from; as a
+# module the same board boots and the failure waits for modprobe.
+# Journal entries 20, 21 and 23.
+#
+# Turning this on is not sufficient by itself, in the same way
+# BENCH_RT_KERNEL is not: the module has to be installed by the image,
+# which is what bench-tee-modular-image.bb is for, and it has to be kept
+# from autoloading, which is modprobe.blacklist=optee on the kernel
+# command line. kas/bench-tee-modular.yml sets the switch and selects
+# that image; docs/BRINGUP.md carries the command line.
+BENCH_TEE_MODULAR ?= "0"
+SRC_URI += '${@"file://tee-builtin.cfg" if d.getVar("BENCH_TEE_KERNEL") == "1" and d.getVar("BENCH_TEE_MODULAR") != "1" else ""}'
+SRC_URI += '${@"file://tee-modular.cfg" if d.getVar("BENCH_TEE_KERNEL") == "1" and d.getVar("BENCH_TEE_MODULAR") == "1" else ""}'
+
 # And the IIO sensor fragment, same switch pattern. Project 10 binds four
 # sensors of an X-NUCLEO-IKS4A1 to in-tree drivers and measures three ways
 # of getting data out of them. The drivers are modules and cost nothing in

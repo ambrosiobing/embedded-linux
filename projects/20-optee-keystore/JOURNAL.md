@@ -1071,3 +1071,63 @@ prompt with the secure world underneath it, and `modprobe optee` moves
 the failure to a moment of our choosing, with `dmesg`, `/proc` and a
 working console still available. Every question after this one needs
 that.
+
+## 24. The driver becomes selectable, and the linter caught two comments
+
+Tuesday 22 September 2026, after entry 23. The next question needs a
+board that boots, so the driver becomes a module. That is one symbol and
+five files, and the gap between those two numbers is the entry.
+
+**What it is not.** Not `CONFIG_OPTEE=m` in `tee.cfg`. That file's header
+argues for built in and the argument is right for the product: this image
+installs no kernel modules, so `=m` without a matching package is a
+driver that exists in the build tree, is absent from the card, and looks
+at the console exactly like a secure world that never booted. Changing it
+in place would have left the repository arguing with itself.
+
+**What it is.** The driver symbol moved out of `tee.cfg` into two
+siblings, `tee-builtin.cfg` and `tee-modular.cfg`, one line each and a
+header saying which question they answer. `BENCH_TEE_MODULAR` in the
+bbappend picks exactly one. Everything else the TEE subsystem needs stays
+in `tee.cfg` rather than being written twice.
+
+A switch that picks between files rather than overriding a symbol is not
+style. Two fragments setting one symbol to different values is an
+override: `merge_config` takes the last and warns, and `./go kconfig`
+then reports the losing fragment's line as one that never reached
+`.config`. The repository's own check would have failed on the overlay
+version.
+
+**Two things the switch is not sufficient for, both of which cost a
+bring-up if missed.** The module has to be in the image, so
+`bench-tee-modular-image.bb` names `kernel-module-optee`; without it the
+build succeeds, the card boots, and `modprobe` says the module is not
+found. And the module must not load itself: the driver carries an OF
+match on `linaro,optee-tz`, so with `/firmware/optee` in the device tree
+udev autoloads it during boot and reproduces the exact failure the
+variant exists to escape. `modprobe.blacklist=optee` on the kernel
+command line stops the alias-driven load and leaves an explicit
+`modprobe optee` working. Both are in the bring-up now.
+
+**`scripts/lint.py` caught two of my comments, and both were real.**
+
+The first was a line whose first word after the hash was a config symbol,
+written to explain where that symbol had moved to. `merge_config` parses
+such a line as a directive turning the option **off**, so a sentence
+explaining the split would have quietly unset the thing it described.
+
+The second was a comment saying that no module package exists for the TEE
+subsystem itself and none is wanted. The linter reads `kernel-module-*`
+names out of image comments and fails any that no image installs, a rule
+written after Project 1 lost two rounds to a driver described in three
+paragraphs and named in no image at all. Mentioning a package in order to
+say it does not exist trips it, correctly: the checker cannot read intent,
+and a rule that could would not have caught Project 1's defect either.
+Reworded to name no package.
+
+**Nothing is built yet.** This is five files and a lint run on win11
+aquamarine; the kernel rebuild happens on win11 skyhorizon with
+`./go tee-mod`. When the hang is understood, the fragment, the image and
+the kas file should be deleted rather than left as a second way to build
+Project 20 that nobody remembers the purpose of. The recipe says so in
+its own comment.
