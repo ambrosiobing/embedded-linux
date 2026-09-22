@@ -1,0 +1,2574 @@
+
+
+
+
+Raspberry Pi Bootcode
+Read File: config.txt, 3627
+Read File: start.elf, 2988128 (bytes)
+Read File: fixup.dat, 7325 (bytes)
+MESS:00:00:01.012755:0: boot-part: 0 fs-type: 0
+MESS:00:00:01.015584:0: boot-part: 0 fs-type: 3
+MESS:00:00:01.036724:0: brfs: File read: /mfs/sd/config.txt
+MESS:00:00:01.042933:0: brfs: File read: 3627 bytes
+MESS:00:00:01.079912:0: HDMI0:EDID error reading EDID block 0 attempt 0
+MESS:00:00:01.086073:0: HDMI0:EDID error reading EDID block 0 attempt 1
+MESS:00:00:01.092409:0: HDMI0:EDID error reading EDID block 0 attempt 2
+MESS:00:00:01.098747:0: HDMI0:EDID error reading EDID block 0 attempt 3
+MESS:00:00:01.105083:0: HDMI0:EDID error reading EDID block 0 attempt 4
+MESS:00:00:01.111421:0: HDMI0:EDID error reading EDID block 0 attempt 5
+MESS:00:00:01.117757:0: HDMI0:EDID error reading EDID block 0 attempt 6
+MESS:00:00:01.124093:0: HDMI0:EDID error reading EDID block 0 attempt 7
+MESS:00:00:01.130431:0: HDMI0:EDID error reading EDID block 0 attempt 8
+MESS:00:00:01.136767:0: HDMI0:EDID error reading EDID block 0 attempt 9
+MESS:00:00:01.142863:0: HDMI0:EDID giving up on reading EDID block 0
+MESS:00:00:01.149991:0: brfs: File read: /mfs/sd/config.txt
+MESS:00:00:01.156322:0: gpioman: gpioman_get_pin_num: pin LEDS_PWR_OK not defined
+MESS:00:00:01.356363:0: gpioman: gpioman_get_pin_num: pin DISPLAY_DSI_PORT not defined
+MESS:00:00:01.363394:0: gpioman: gpioman_get_pin_num: pin DISPLAY_DSI_PORT not defined
+MESS:00:00:01.371185:0: gpioman: gpioman_get_pin_num: pin LEDS_PWR_OK not defined
+MESS:00:00:01.377466:0: *** Restart logging
+MESS:00:00:01.381341:0: brfs: File read: 3627 bytes
+MESS:00:00:01.386798:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 0
+MESS:00:00:01.394043:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 1
+MESS:00:00:01.400902:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 2
+MESS:00:00:01.407759:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 3
+MESS:00:00:01.414617:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 4
+MESS:00:00:01.421475:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 5
+MESS:00:00:01.428332:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 6
+MESS:00:00:01.435190:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 7
+MESS:00:00:01.442048:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 8
+MESS:00:00:01.448905:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 9
+MESS:00:00:01.455521:0: hdmi: HDMI0:EDID giving up on reading EDID block 0
+MESS:00:00:01.461426:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 0
+MESS:00:00:01.469218:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 1
+MESS:00:00:01.476075:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 2
+MESS:00:00:01.482933:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 3
+MESS:00:00:01.489791:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 4
+MESS:00:00:01.496648:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 5
+MESS:00:00:01.503506:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 6
+MESS:00:00:01.510364:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 7
+MESS:00:00:01.517221:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 8
+MESS:00:00:01.524079:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 9
+MESS:00:00:01.530695:0: hdmi: HDMI0:EDID giving up on reading EDID block 0
+MESS:00:00:01.536557:0: hdmi: HDMI:hdmi_get_state is deprecated, use hdmi_get_display_state instead
+MESS:00:00:01.545054:0: HDMI0: hdmi_pixel_encoding: 162000000
+MESS:00:00:01.550780:0: vec: vec_middleware_power_on: vec_base: 0x7e806000 rev-id 0x00002708 @ vec: 0x7e806100 @ 0x00000420 enc: 0x7e806060 @ 0x00000220 cgmsae: 0x7e80605c @ 0x00000000
+MESS:00:00:01.577739:0: dtb_file 'bcm2710-rpi-3-b.dtb'
+MESS:00:00:01.585403:0: brfs: File read: /mfs/sd/bcm2710-rpi-3-b.dtb
+MESS:00:00:01.590066:0: Loaded 'bcm2710-rpi-3-b.dtb' to 0x4000000 size 0x8797
+MESS:00:00:01.612585:0: brfs: File read: 34711 bytes
+MESS:00:00:01.618656:0: brfs: File read: /mfs/sd/overlays/overlay_map.dtb
+MESS:00:00:01.652012:0: brfs: File read: 5451 bytes
+MESS:00:00:01.657250:0: brfs: File read: /mfs/sd/config.txt
+MESS:00:00:01.664528:0: brfs: File read: 3627 bytes
+MESS:00:00:01.672883:0: brfs: File read: /mfs/sd/overlays/vc4-fkms-v3d.dtbo
+MESS:00:00:01.699470:0: Loaded overlay 'vc4-fkms-v3d'
+MESS:00:00:01.743168:0: brfs: File read: 1559 bytes
+MESS:00:00:01.751589:0: brfs: File read: /mfs/sd/overlays/vc4-kms-dsi-7inch.dtbo
+MESS:00:00:01.791427:0: Loaded overlay 'vc4-kms-dsi-7inch'
+MESS:00:00:01.795273:0: dtparam: audio=on
+MESS:00:00:01.933623:0: brfs: File read: 4336 bytes
+MESS:00:00:01.937446:0: brfs: File read: /mfs/sd/cmdline.txt
+MESS:00:00:01.942235:0: Read command line from file 'cmdline.txt':
+MESS:00:00:01.948090:0: 'dwc_otg.lpm_enable=0 console=serial0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rootwait  net.ifnames=0 console=tty1 ro modprobe.blacklist=optee systemd.mask=systemd-remount-fs.service'
+MESS:00:00:01.986445:0: gpioman: gpioman_get_pin_num: pin EMMC_ENABLE not defined
+MESS:00:00:02.288835:0: brfs: File read: 185 bytes
+MESS:00:00:02.366624:0: brfs: File read: /mfs/sd/armstub8.bin
+MESS:00:00:02.370652:0: Loaded 'armstub8.bin' to 0x0 size 0x134038
+MESS:00:00:02.376573:0: brfs: File read: 1261624 bytes
+MESS:00:00:03.965315:0: brfs: File read: /mfs/sd/kernel8.img
+MESS:00:00:03.969258:0: Loaded 'kernel8.img' to 0x2000000 size 0x1a52200
+MESS:00:00:04.006954:0: Kernel relocated to 0x200000
+MESS:00:00:04.010198:0: Device tree loaded to 0x4000000 (size 0x9160)
+MESS:00:00:04.017714:0: uart: Set PL011 baud rate to 103448.300000 Hz
+MESS:00:00:04.024057:0: uart: Baud rate change done...
+MESS:00:00:04.027470:0: uart: Baud rateNOTICE:  Booting Trusted Firmware
+NOTICE:  BL1: v2.6(debug):v2.6
+NOTICE:  BL1: Built : 07:45:23, Sep 22 2026
+INFO:    BL1: RAM 0x100ee000 - 0x100f7000
+INFO:    BL1: cortex_a53: CPU workaround for 843419 was applied
+INFO:    BL1: cortex_a53: CPU workaround for 855873 was applied
+WARNING: BL1: cortex_a53: CPU workaround for 1530924 was missing!
+NOTICE:  rpi3: Detected: Raspberry Pi 3 Model B (1GB, Embest, China) [0x00a22082]
+INFO:    BL1: Loading BL2
+INFO:    Loading image id=1 at address 0x100b4000
+INFO:    Image id=1 loaded: 0x100b4000 - 0x100bc419
+NOTICE:  BL1: Booting BL2
+INFO:    Entry point address = 0x100b4000
+INFO:    SPSR = 0x3c5
+NOTICE:  BL2: v2.6(debug):v2.6
+NOTICE:  BL2: Built : 07:45:23, Sep 22 2026
+INFO:    BL2: Doing platform setup
+INFO:    BL2: Loading image id 3
+INFO:    Loading image id=3 at address 0x100e0000
+INFO:    Image id=3 loaded: 0x100e0000 - 0x100ea073
+INFO:    BL2: Loading image id 4
+INFO:    Loading image id=4 at address 0x10100000
+INFO:    Image id=4 loaded: 0x10100000 - 0x1010001c
+INFO:    OPTEE ep=0x10100000
+INFO:    OPTEE header info:
+INFO:          magic=0x4554504f
+INFO:          version=0x2
+INFO:          arch=0x1
+INFO:          flags=0x0
+INFO:          nb_images=0x1
+INFO:    BL2: Loading image id 21
+INFO:    Loading image id=21 at address 0x10100000
+INFO:    Image id=21 loaded: 0x10100000 - 0x1017ced8
+INFO:    BL2: Skip loading image id 22
+INFO:    BL2: Loading image id 5
+INFO:    Loading image id=5 at address 0x11000000
+INFO:    Image id=5 loaded: 0x11000000 - 0x11084b90
+NOTICE:  BL1: Booting BL31
+INFO:    Entry point address = 0x100e0000
+INFO:    SPSR = 0x3cd
+NOTICE:  BL31: v2.6(debug):v2.6
+NOTICE:  BL31: Built : 07:45:23, Sep 22 2026
+INFO:    rpi3: Checking DTB...
+INFO:    BL31: Initializing runtime services
+INFO:    BL31: cortex_a53: CPU workaround for 843419 was applied
+INFO:    BL31: cortex_a53: CPU workaround for 855873 was applied
+WARNING: BL31: cortex_a53: CPU workaround for 1530924 was missing!
+INFO:    BL31: Initializing BL32
+D/TC:0   plat_get_aslr_seed:113 Warning: no ASLR seed
+D/TC:0   add_phys_mem:666 VCORE_UNPG_RX_PA type TEE_RAM_RX 0x10100000 size 0x00079000
+D/TC:0   add_phys_mem:666 VCORE_UNPG_RW_PA type TEE_RAM_RW 0x10179000 size 0x00687000
+D/TC:0   add_phys_mem:666 ta_base type TA_RAM 0x10800000 size 0x00800000
+D/TC:0   add_phys_mem:666 CONSOLE_UART_BASE type IO_NSEC 0x3f200000 size 0x00200000
+D/TC:0   add_phys_mem:666 TEE_SHMEM_START type NSEC_SHM 0x08000000 size 0x00400000
+D/TC:0   add_va_space:706 type RES_VASPACE size 0x00a00000
+D/TC:0   add_va_space:706 type SHM_VASPACE size 0x02000000
+D/TC:0   dump_mmap_table:838 type TEE_RAM_RX   va 0x10100000..0x10178fff pa 0x10100000..0x10178fff size 0x00079000 (smallpg)
+D/TC:0   dump_mmap_table:838 type TEE_RAM_RW   va 0x10179000..0x107fffff pa 0x10179000..0x107fffff size 0x00687000 (smallpg)
+D/TC:0   dump_mmap_table:838 type RES_VASPACE  va 0x10800000..0x111fffff pa 0x00000000..0x009fffff size 0x00a00000 (pgdir)
+D/TC:0   dump_mmap_table:838 type SHM_VASPACE  va 0x11200000..0x131fffff pa 0x00000000..0x01ffffff size 0x02000000 (pgdir)
+D/TC:0   dump_mmap_table:838 type NSEC_SHM     va 0x13200000..0x135fffff pa 0x08000000..0x083fffff size 0x00400000 (pgdir)
+D/TC:0   dump_mmap_table:838 type TA_RAM       va 0x13600000..0x13dfffff pa 0x10800000..0x10ffffff size 0x00800000 (pgdir)
+D/TC:0   dump_mmap_table:838 type IO_NSEC      va 0x13e00000..0x13ffffff pa 0x3f200000..0x3f3fffff size 0x00200000 (pgdir)
+D/TC:0   core_mmu_xlat_table_alloc:527 xlat tables used 1 / 8
+D/TC:0   core_mmu_xlat_table_alloc:527 xlat tables used 2 / 8
+I/TC: 
+I/TC: OP-TEE version: 4.1.0 (gcc version 11.3.1 20220712 (Arm GNU Toolchain 11.3.Rel1)) #1 Tue Sep 22 05:45:13 UTC 2026 aarch64
+I/TC: WARNING: This OP-TEE configuration might be insecure!
+I/TC: WARNING: Please check https://optee.readthedocs.io/en/latest/architecture/porting_guidelines.html
+I/TC: Primary CPU initializing
+D/TC:0 0 boot_init_primary_late:1211 Executing at offset 0 with virtual load address 0x10100000
+D/TC:0 0 call_preinitcalls:21 level 2 mobj_mapped_shm_init()
+D/TC:0 0 mobj_mapped_shm_init:470 Shared memory address range: 11200000, 13200000
+D/TC:0 0 call_initcalls:40 level 1 register_time_source()
+D/TC:0 0 call_initcalls:40 level 1 teecore_init_pub_ram()
+D/TC:0 0 call_initcalls:40 level 3 check_ta_store()
+D/TC:0 0 check_ta_store:454 TA store: "early TA"
+D/TC:0 0 check_ta_store:454 TA store: "Secure Storage TA"
+D/TC:0 0 check_ta_store:454 TA store: "REE"
+D/TC:0 0 call_initcalls:40 level 3 early_ta_init()
+D/TC:0 0 early_ta_init:56 Early TA f04a0fe7-1f5d-4b9b-abf7-619b85b4ce8c size 48611 (compressed, uncompressed 109256)
+D/TC:0 0 call_initcalls:40 level 3 verify_pseudo_tas_conformance()
+D/TC:0 0 call_initcalls:40 level 3 tee_cryp_init()
+D/TC:0 0 call_initcalls:40 level 4 tee_fs_init_key_manager()
+D/TC:0 0 call_initcalls:40 level 6 mobj_init()
+D/TC:0 0 call_initcalls:40 level 6 default_mobj_init()
+D/TC:0 0 call_initcalls:40 level 6 ftmn_boot_tests()
+D/TC:0 0 ftmn_boot_tests:198 Calling simple_call()
+D/TC:0 0 ftmn_boot_tests:198 Return from simple_call()
+D/TC:0 0 ftmn_boot_tests:199 Calling two_level_call()
+D/TC:0 0 ftmn_boot_tests:199 Return from two_level_call()
+D/TC:0 0 ftmn_boot_tests:200 Calling chained_calls()
+D/TC:0 0 ftmn_boot_tests:200 Return from chained_calls()
+D/TC:0 0 ftmn_boot_tests:202 *************************************************
+D/TC:0 0 ftmn_boot_tests:203 **************  Tests complete  *****************
+D/TC:0 0 ftmn_boot_tests:204 *************************************************
+D/TC:0 0 call_finalcalls:59 level 1 init_multi_core_panic_handler()
+I/TC: Primary CPU switching to normal world boot
+INFO:    BL31: Preparing for EL3 exit to normal world
+INFO:    Entry point address = 0x11000000
+INFO:    SPSR = 0x3c9
+
+
+U-Boot 2021.10 (Sep 22 2026 - 07:45:14 +0200)
+
+DRAM:  948 MiB
+RPI 3 Model B (0xa22082)
+MMC:   mmc@7e202000: 0, sdhci@7e300000: 1
+Loading Environment from FAT... OK
+In:    serial
+Out:   serial
+Err:   serial
+Net:   No ethernet found.
+starting USB...
+Bus usb@7e980000: USB DWC2
+scanning bus usb@7e980000 for devices... 3 USB Device(s) found
+       scanning usb for storage devices... 0 Storage Device(s) found
+Hit any key to stop autoboot:  3  0
+U-Boot>               
+U-Boot> 
+U-Boot> fdt addr 0x04000000; fdt resize 4096; fdt mknode / psci; fdt set /psci compatible arm,psci-1.0; fdt set /psci method smc
+U-Boot> fdt set /cpus/cpu@0 enable-method psci; fdt set /cpus/cpu@1 enable-method psci; fdt set /cpus/cpu@2 enable-method psci; fdt set /cpus/cpu@3 enable-method psci
+U-Boot> fdt mknode / firmware; fdt mknode /firmware optee; fdt set /firmware/optee compatible linaro,optee-tz; fdt set /firmware/optee method smc
+U-Boot> fdt rsvmem add 0x08000000 0x400000; fdt rsvmem add 0x10100000 0xf00000; fdt print /firmware
+firmware {
+	optee {
+		method = "smc";
+		compatible = "linaro,optee-tz";
+	};
+};
+U-Boot> fatload mmc 0:1 ${kernel_addr_r} kernel8.img; booti ${kernel_addr_r} - 0x04000000
+27599360 bytes read in 2291 ms (11.5 MiB/s)
+## Flattened Device Tree blob at 04000000
+   Booting using the fdt blob at 0x4000000
+   Loading Device Tree to 000000003af49000, end 000000003af59fff ... OK
+
+Starting kernel ...
+
+I/TC: Secondary CPU 1 initializing
+I/TC: Secondary CPU 1 switching to normal world boot
+I/TC: Secondary CPU 2 initializing
+I/TC: Secondary CPU 2 switching to normal world boot
+I/TC: Secondary CPU 3 initializing
+I/TC: Secondary CPU 3 switching to normal world boot
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+[    0.000000] Linux version 6.6.63-v8 (oe-user@oe-host) (aarch64-poky-linux-gcc (GCC) 13.4.0, GNU ld (GNU Binutils) 2.42.0.20240723) #1 SMP PREEMPT Fri Dec  6 10:10:05 UTC 2024
+[    0.000000] KASLR enabled
+[    0.000000] random: crng init done
+[    0.000000] Machine model: Raspberry Pi 3 Model B Rev 1.2
+[    0.000000] efi: UEFI not found.
+[    0.000000] Reserved memory: created CMA memory pool at 0x000000002ac00000, size 256 MiB
+[    0.000000] OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
+[    0.000000] OF: reserved mem: 0x000000002ac00000..0x000000003abfffff (262144 KiB) map reusable linux,cma
+[    0.000000] NUMA: No NUMA configuration found
+[    0.000000] NUMA: Faking a node at [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000] NUMA: NODE_DATA [mem 0x3b1f33c0-0x3b1f5fff]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA      [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000]   DMA32    empty
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000] On node 0, zone DMA: 19456 pages in unavailable ranges
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv1.1 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: Trusted OS migration not required
+[    0.000000] psci: SMC Calling Convention v1.2
+[    0.000000] percpu: Embedded 31 pages/cpu s86888 r8192 d31896 u126976
+[    0.000000] Detected VIPT I-cache on CPU0
+[    0.000000] CPU features: kernel page table isolation forced ON by KASLR
+[    0.000000] CPU features: detected: Kernel page table isolation (KPTI)
+[    0.000000] CPU features: detected: ARM erratum 843419
+[    0.000000] CPU features: detected: ARM erratum 845719
+[    0.000000] alternatives: applying boot alternatives
+[    0.000000] Kernel command line: coherent_pool=1M 8250.nr_uarts=1 snd_bcm2835.enable_headphones=0 cgroup_disable=memory clk_ignore_unused snd_bcm2835.enable_headphones=1 snd_bcm2835.enable_hdmi=1  vc_mem.mem_base=0x3ec00000 vc_mem.mem_size=0x40000000  dwc_otg.lpm_enable=0 console=ttyS0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rootwait  net.ifnames=0 console=tty1 ro modprobe.blacklist=optee systemd.mask=systemd-remount-fs.service
+[    0.000000] cgroup: Disabling memory control group subsystem
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 238896
+[    0.000000] Policy zone: DMA
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] Memory: 640496K/970752K available (14592K kernel code, 2248K rwdata, 4784K rodata, 5184K init, 1098K bss, 68112K reserved, 262144K cma-reserved)
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
+[    0.000000] ftrace: allocating 47192 entries in 185 pages
+[    0.000000] ftrace: allocated 185 pages with 5 groups
+[    0.000000] trace event string verifier disabled
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU event tracing is enabled.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=256 to nr_cpu_ids=4.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Rude variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=4
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] Root IRQ handler: bcm2836_arm_irqchip_handle_irq
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] arch_timer: cp15 timer(s) running at 19.20MHz (phys).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x46d987e47, max_idle_ns: 440795202767 ns
+[    0.000001] sched_clock: 56 bits at 19MHz, resolution 52ns, wraps every 4398046511078ns
+[    0.000396] Console: colour dummy device 80x25
+[    0.000413] printk: console [tty1] enabled
+[    0.001541] Calibrating delay loop (skipped), value calculated using timer frequency.. 38.40 BogoMIPS (lpj=76800)
+[    0.001591] pid_max: default: 32768 minimum: 301
+[    0.001715] LSM: initializing lsm=capability,integrity
+[    0.001966] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.002019] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.005565] RCU Tasks: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.005786] RCU Tasks Rude: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.006001] RCU Tasks Trace: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.006468] rcu: Hierarchical SRCU implementation.
+[    0.006495] rcu: 	Max phase no-delay instances is 1000.
+[    0.008979] EFI services will not be available.
+[    0.009555] smp: Bringing up secondary CPUs ...
+[    0.018622] Detected VIPT I-cache on CPU1
+[    0.018773] CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+[    0.028557] Detected VIPT I-cache on CPU2
+[    0.028675] CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+[    0.038312] Detected VIPT I-cache on CPU3
+[    0.038431] CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+[    0.039113] smp: Brought up 1 node, 4 CPUs
+[    0.039249] SMP: Total of 4 processors activated.
+[    0.039277] CPU features: detected: 32-bit EL0 Support
+[    0.039299] CPU features: detected: 32-bit EL1 Support
+[    0.039325] CPU features: detected: CRC32 instructions
+[    0.039469] CPU: All CPU(s) started at EL2
+[    0.039504] alternatives: applying system-wide alternatives
+[    0.042791] devtmpfs: initialized
+[    0.067147] Enabled cp15_barrier support
+[    0.067216] Enabled setend support
+[    0.067848] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.067907] futex hash table entries: 1024 (order: 4, 65536 bytes, linear)
+[    0.093236] pinctrl core: initialized pinctrl subsystem
+[    0.094297] DMI not present or invalid.
+[    0.095134] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.105949] DMA: preallocated 1024 KiB GFP_KERNEL pool for atomic allocations
+[    0.106483] DMA: preallocated 1024 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.107632] DMA: preallocated 1024 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.107824] audit: initializing netlink subsys (disabled)
+[    0.108200] audit: type=2000 audit(0.104:1): state=initialized audit_enabled=0 res=1
+[    0.109537] thermal_sys: Registered thermal governor 'step_wise'
+[    0.109629] cpuidle: using governor menu
+[    0.110123] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.110320] ASID allocator initialised with 32768 entries
+[    0.111558] Serial: AMBA PL011 UART driver
+[    0.122784] platform 3f101000.cprman: Fixed dependency cycle(s) with /soc/dsi@7e700000
+[    0.124060] bcm2835-mbox 3f00b880.mailbox: mailbox enabled
+[    0.128650] platform 3f101000.cprman: Fixed dependency cycle(s) with /soc/dsi@7e700000
+[    0.128851] platform 3f700000.dsi: Fixed dependency cycle(s) with /soc/dsi@7e700000/bridge@0
+[    0.128944] platform 3f700000.dsi: Fixed dependency cycle(s) with /soc/cprman@7e101000
+[    0.141081] raspberrypi-firmware soc:firmware: Attached to firmware from 2025-04-30T13:35:18, variant start
+[    0.145083] raspberrypi-firmware soc:firmware: Firmware hash is 5560078dcc8591a00f57b9068d13e5544aeef3aa
+[    0.157614] Modules: 2G module region forced by RANDOMIZE_MODULE_REGION_FULL
+[    0.157659] Modules: 0 pages in range for non-PLT usage
+[    0.157668] Modules: 517264 pages in range for PLT usage
+[    0.164312] bcm2835-dma 3f007000.dma-controller: DMA legacy API manager, dmachans=0x1
+[    0.167231] iommu: Default domain type: Translated
+[    0.167265] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.167934] SCSI subsystem initialized
+[    0.168345] usbcore: registered new interface driver usbfs
+[    0.168442] usbcore: registered new interface driver hub
+[    0.168560] usbcore: registered new device driver usb
+[    0.171965] pps_core: LinuxPPS API ver. 1 registered
+[    0.172007] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.172066] PTP clock support registered
+[    0.172714] Advanced Linux Sound Architecture Driver Initialized.
+[    0.174452] vgaarb: loaded
+[    0.175244] clocksource: Switched to clocksource arch_sys_counter
+[    1.818338] VFS: Disk quotas dquot_6.6.0
+[    1.818463] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    1.818757] FS-Cache: Loaded
+[    1.819137] CacheFiles: Loaded
+[    1.835654] NET: Registered PF_INET protocol family
+[    1.836009] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    1.838098] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    1.838166] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    1.838307] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    1.838453] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    1.838837] TCP: Hash tables configured (established 8192 bind 8192)
+[    1.839311] MPTCP token hash table entries: 1024 (order: 2, 24576 bytes, linear)
+[    1.839433] UDP hash table entries: 512 (order: 2, 16384 bytes, linear)
+[    1.839509] UDP-Lite hash table entries: 512 (order: 2, 16384 bytes, linear)
+[    1.839845] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    1.840717] RPC: Registered named UNIX socket transport module.
+[    1.840750] RPC: Registered udp transport module.
+[    1.840775] RPC: Registered tcp transport module.
+[    1.840798] RPC: Registered tcp-with-tls transport module.
+[    1.840823] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    1.840868] PCI: CLS 0 bytes, default 64
+[    1.841617] kvm [1]: IPA Size Limit: 40 bits
+[    1.843647] kvm [1]: Hyp mode initialized successfully
+[    1.850587] Initialise system trusted keyrings
+[    1.851038] workingset: timestamp_bits=42 max_order=18 bucket_order=0
+[    1.851188] zbud: loaded
+[    1.852429] NFS: Registering the id_resolver key type
+[    1.852485] Key type id_resolver registered
+[    1.852510] Key type id_legacy registered
+[    1.852566] nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+[    1.852604] nfs4flexfilelayout_init: NFSv4 Flexfile Layout Driver Registering...
+[    1.853662] Key type asymmetric registered
+[    1.853695] Asymmetric key parser 'x509' registered
+[    1.853809] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 244)
+[    1.854097] io scheduler mq-deadline registered
+[    1.854130] io scheduler kyber registered
+[    1.854195] io scheduler bfq registered
+[    1.860077] pinctrl-bcm2835 3f200000.gpio: GPIO_OUT persistence: yes
+[    1.866122] simple-framebuffer 3eaa9000.framebuffer: framebuffer at 0x3eaa9000, 0x151800 bytes
+[    1.866184] simple-framebuffer 3eaa9000.framebuffer: format=a8r8g8b8, mode=720x480x32, linelength=2880
+[    1.869950] Console: switching to colour frame buffer device 90x30
+[    1.874746] simple-framebuffer 3eaa9000.framebuffer: fb0: simplefb registered!
+[    1.883370] Serial: 8250/16550 driver, 1 ports, IRQ sharing enabled
+[    1.889394] bcm2835-rng 3f104000.rng: hwrng registered
+[    1.892038] vc-mem: phys_addr:0x00000000 mem_base=0x3ec00000 mem_size:0x40000000(1024 MiB)
+[    1.899261] vc4_dsi 3f700000.dsi: Fixed dependency cycle(s) with /soc/dsi@7e700000/bridge@0
+[    1.903266] platform 1.panel_disp: Fixed dependency cycle(s) with /soc/dsi@7e700000/bridge@0
+[    1.907442] mipi-dsi 3f700000.dsi.0: Fixed dependency cycle(s) with /soc/dsi@7e700000
+[    1.909696] mipi-dsi 3f700000.dsi.0: Fixed dependency cycle(s) with /panel_disp@1
+[    1.938705] brd: module loaded
+[    1.954871] loop: module loaded
+[    1.958026] Loading iSCSI transport class v2.0-870.
+[    1.968632] usbcore: registered new device driver r8152-cfgselector
+[    1.970725] usbcore: registered new interface driver r8152
+[    1.972764] usbcore: registered new interface driver lan78xx
+[    1.974770] usbcore: registered new interface driver smsc95xx
+[    1.977193] dwc_otg: version 3.00a 10-AUG-2012 (platform bus)
+[    2.179994] Core Release: 2.80a
+[    2.181876] Setting default values for core params
+[    2.183766] Finished setting default values for core params
+[    2.386052] Using Buffer DMA mode
+[    2.387846] Periodic Transfer Interrupt Enhancement - disabled
+[    2.389642] Multiprocessor Interrupt Enhancement - disabled
+[    2.391431] OTG VER PARAM: 0, OTG VER FLAG: 0
+[    2.393175] Dedicated Tx FIFOs mode
+[    2.397556] 
+[    2.397564] WARN::dwc_otg_hcd_init:1070: FIQ DMA bounce buffers: virt = ffffffc080489000 dma = 0x00000000eb000000 len=9024
+[    2.402518] FIQ FSM acceleration enabled for :
+[    2.402518] Non-periodic Split Transactions
+[    2.402518] Periodic Split Transactions
+[    2.402518] High-Speed Isochronous Endpoints
+[    2.402518] Interrupt/Control Split Transaction hack enabled
+[    2.409968] 
+[    2.409974] WARN::hcd_init_fiq:496: MPHI regs_base at ffffffc08006d000
+[    2.412910] dwc_otg 3f980000.usb: DWC OTG Controller
+[    2.414437] dwc_otg 3f980000.usb: new USB bus registered, assigned bus number 1
+[    2.416021] dwc_otg 3f980000.usb: irq 74, io mem 0x00000000
+[    2.417568] Init: Port Power? op_state=1
+[    2.419083] Init: Power Port (0)
+[    2.420955] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.06
+[    2.424127] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.425819] usb usb1: Product: DWC OTG Controller
+[    2.427495] usb usb1: Manufacturer: Linux 6.6.63-v8 dwc_otg_hcd
+[    2.429162] usb usb1: SerialNumber: 3f980000.usb
+[    2.431993] hub 1-0:1.0: USB hub found
+[    2.433656] hub 1-0:1.0: 1 port detected
+[    2.437720] usbcore: registered new interface driver uas
+[    2.439476] usbcore: registered new interface driver usb-storage
+[    2.442089] mousedev: PS/2 mouse device common for all mice
+[    2.450566] sdhci: Secure Digital Host Controller Interface driver
+[    2.452197] sdhci: Copyright(c) Pierre Ossman
+[    2.453403] sdhci-pltfm: SDHCI platform and OF driver helper
+[    2.456573] ledtrig-cpu: registered to indicate activity on CPUs
+[    2.457750] SMCCC: SOC_ID: ARCH_SOC_ID not implemented, skipping ....
+[    2.458673] hid: raw HID events driver (C) Jiri Kosina
+[    2.459648] usbcore: registered new interface driver usbhid
+[    2.460480] usbhid: USB HID core driver
+[    2.466387] hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 counters available
+[    2.470218] NET: Registered PF_PACKET protocol family
+[    2.471211] Key type dns_resolver registered
+[    2.504580] registered taskstats version 1
+[    2.505743] Loading compiled-in X.509 certificates
+[    2.518661] Key type .fscrypt registered
+[    2.519761] Key type fscrypt-provisioning registered
+[    2.530804] uart-pl011 3f201000.serial: cts_event_workaround enabled
+[    2.532049] 3f201000.serial: ttyAMA1 at MMIO 0x3f201000 (irq = 99, base_baud = 0) is a PL011 rev2
+[    2.533926] serial serial0: tty port ttyAMA1 registered
+[    2.536755] bcm2835-aux-uart 3f215040.serial: there is not valid maps for state default
+[    2.538528] printk: console [ttyS0] disabled
+[    2.540273] 3f215040.serial: ttyS0 at MMIO 0x3f215040 (irq = 71, base_baud = 50000000) is a 16550
+[    2.542193] printk: console [ttyS0] enabled
+[    3.971729] Indeed it is in host mode hprt0 = 00021501
+[    3.973097] bcm2835-wdt bcm2835-wdt: Poweroff handler already present!
+[    3.985523] bcm2835-wdt bcm2835-wdt: Broadcom BCM2835 watchdog timer
+[    3.993234] bcm2835-power bcm2835-power: Broadcom BCM2835 power domains driver
+[    4.004101] mmc-bcm2835 3f300000.mmcnr: mmc_debug:0 mmc_debug2:0
+[    4.011187] mmc-bcm2835 3f300000.mmcnr: DMA channel allocated
+[    4.044277] sdhost: log_buf @ 00000000815f021f (c1577000)
+[    4.100962] mmc0: sdhost-bcm2835 loaded - DMA enabled (>1)
+[    4.113845] of_cfs_init
+[    4.117726] of_cfs_init: OK
+[    4.121952] clk: Not disabling unused clocks
+[    4.127330] ALSA device list:
+[    4.131413]   No soundcards found.
+[    4.136222] Waiting for root device /dev/mmcblk0p2...
+[    4.146225] mmc0: host does not support reading read-only switch, assuming write-enable
+[    4.157142] mmc0: Problem switching card into high-speed mode!
+[    4.163247] usb 1-1: new high-speed USB device number 2 using dwc_otg
+[    4.171510] mmc0: Host Software Queue enabled
+[    4.171601] Indeed it is in host mode hprt0 = 00001101
+[    4.172397] mmc0: new SDHC card at address 0001
+[    4.190018] mmcblk0: mmc0:0001 ASTC 14.6 GiB
+[    4.198762]  mmcblk0: p1 p2
+[    4.203360] mmcblk0: mmc0:0001 ASTC 14.6 GiB
+[    4.251691] mmc1: new high speed SDIO card at address 0001
+[    4.266016] EXT4-fs (mmcblk0p2): orphan cleanup on readonly fs
+[    4.273614] EXT4-fs (mmcblk0p2): mounted filesystem b40011db-babb-4687-a73e-f66171b15079 ro with ordered data mode. Quota mode: none.
+[    4.288340] VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
+[    4.297727] devtmpfs: mounted
+[    4.308970] Freeing unused kernel memory: 5184K
+[    4.314534] Run /sbin/init as init process
+[    4.379704] usb 1-1: New USB device found, idVendor=0424, idProduct=9514, bcdDevice= 2.00
+[    4.390842] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    4.400172] hub 1-1:1.0: USB hub found
+[    4.405036] hub 1-1:1.0: 5 ports detected
+[    4.695315] usb 1-1.1: new high-speed USB device number 3 using dwc_otg
+[    4.803769] usb 1-1.1: New USB device found, idVendor=0424, idProduct=ec00, bcdDevice= 2.00
+[    4.815927] usb 1-1.1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    4.828353] smsc95xx v2.0.0
+[    5.320471] systemd[1]: System time before build time, advancing clock.
+[    5.334467] SMSC LAN8700 usb-001:003:01: attached PHY driver (mii_bus:phy_addr=usb-001:003:01, irq=184)
+[    5.347654] smsc95xx 1-1.1:1.0 eth0: register 'smsc95xx' at usb-3f980000.usb-1.1, smsc95xx USB 2.0 Ethernet, MAC-REDACTED
+[    5.452440] NET: Registered PF_INET6 protocol family
+[    5.459924] Segment Routing with IPv6
+[    5.464743] In-situ OAM (IOAM) with IPv6
+[    5.539559] systemd[1]: systemd 255.22^ running in system mode (-PAM -AUDIT -SELINUX -APPARMOR +IMA -SMACK +SECCOMP -GCRYPT -GNUTLS -OPENSSL +ACL +BLKID -CURL -ELFUTILS -FIDO2 -IDN2 -IDN -IPTC +KMOD -LIBCRYPTSETUP +LIBFDISK -PCRE2 -PWQUALITY -P11KIT -QRENCODE -TPM2 -BZIP2 -LZ4 -XZ -ZLIB +ZSTD -BPF_FRAMEWORK +XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified)
+[    5.579836] systemd[1]: Detected architecture arm64.
+[    5.604783] systemd[1]: Hostname set to <raspberrypi3-64>.
+[    5.624543] systemd[1]: Initializing machine ID from random generator.
+[    5.632783] systemd[1]: Installed transient /etc/machine-id file.
+[    6.353338] systemd[1]: Queued start job for default target Multi-User System.
+[    6.405094] systemd[1]: Created slice Slice /system/getty.
+[    6.416644] systemd[1]: Created slice Slice /system/modprobe.
+[    6.426296] systemd[1]: Created slice Slice /system/serial-getty.
+[    6.436333] systemd[1]: Created slice Slice /system/tee-supplicant.
+[    6.446473] systemd[1]: Created slice Slice /system/wpa_supplicant.
+[    6.456193] systemd[1]: Created slice User and Session Slice.
+[    6.464766] systemd[1]: Started Dispatch Password Requests to Console Directory Watch.
+[    6.475413] systemd[1]: Started Forward Password Requests to Wall Directory Watch.
+[    6.485520] systemd[1]: Expecting device /dev/mmcblk0p1...
+[    6.493351] systemd[1]: Expecting device /sys/subsystem/net/devices/wlan0...
+[    6.502917] systemd[1]: Reached target Path Units.
+[    6.510115] systemd[1]: Reached target Remote File Systems.
+[    6.518115] systemd[1]: Reached target Slice Units.
+[    6.525405] systemd[1]: Reached target Swaps.
+[    6.532982] systemd[1]: Listening on Syslog Socket.
+[    6.540684] systemd[1]: Listening on initctl Compatibility Named Pipe.
+[    6.550780] systemd[1]: Listening on Journal Audit Socket.
+[    6.559388] systemd[1]: Listening on Journal Socket (/dev/log).
+[    6.568391] systemd[1]: Listening on Journal Socket.
+[    6.576632] systemd[1]: Listening on Network Service Netlink Socket.
+[    6.586183] systemd[1]: Listening on udev Control Socket.
+[    6.594485] systemd[1]: Listening on udev Kernel Socket.
+[    6.602660] systemd[1]: Listening on User Database Manager Socket.
+[    6.611838] systemd[1]: Huge Pages File System was skipped because of an unmet condition check (ConditionPathExists=/sys/kernel/mm/hugepages).
+[    6.647736] systemd[1]: Mounting POSIX Message Queue File System...
+[    6.660591] systemd[1]: Mounting Kernel Debug File System...
+[    6.672873] systemd[1]: Mounting Kernel Trace File System...
+[    6.688392] systemd[1]: Mounting Temporary Directory /tmp...
+[    6.702315] systemd[1]: Starting Create List of Static Device Nodes...
+[    6.716943] systemd[1]: Starting Load Kernel Module configfs...
+[    6.730813] systemd[1]: Starting Load Kernel Module drm...
+[    6.744254] systemd[1]: Starting Load Kernel Module fuse...
+[    6.757270] systemd[1]: Starting File System Check on Root Device...
+[    6.770176] systemd[1]: Rebuild Hardware Database was skipped because of an unmet condition check (ConditionNeedsUpdate=/etc).
+[    6.792870] systemd[1]: Starting Journal Service...
+[    6.804400] systemd[1]: Load Kernel Modules was skipped because no trigger condition checks were met.
+[    6.820035] systemd[1]: Starting Generate network units from Kernel command line...
+[    6.835072] systemd[1]: Starting Apply Kernel Variables...
+[    6.855656] systemd[1]: Starting Coldplug All udev Devices...
+[    6.876739] systemd[1]: Mounted POSIX Message Queue File System.
+[    6.886541] systemd[1]: Mounted Kernel Debug File System.
+[    6.901418] systemd[1]: Mounted Kernel Trace File System.
+[    6.910361] systemd[1]: Mounted Temporary Directory /tmp.
+[    6.920344] systemd[1]: Finished Create List of Static Device Nodes.
+[    6.932045] systemd[1]: modprobe@configfs.service: Deactivated successfully.
+[    6.942974] systemd[1]: Finished Load Kernel Module configfs.
+[    6.952828] systemd[1]: modprobe@drm.service: Deactivated successfully.
+[    6.962050] systemd[1]: Finished Load Kernel Module drm.
+[    6.973599] systemd[1]: modprobe@fuse.service: Deactivated successfully.
+[    6.982437] systemd[1]: Finished Load Kernel Module fuse.
+[    6.992159] systemd[1]: Finished Generate network units from Kernel command line.
+[    7.007764] systemd[1]: Reached target Preparation for Network.
+[    7.017033] systemd[1]: FUSE Control File System was skipped because of an unmet condition check (ConditionPathExists=/sys/fs/fuse/connections).
+[    7.033213] systemd-journald[122]: Collecting audit messages is enabled.
+[    7.063757] systemd[1]: Mounting Kernel Configuration File System...
+[    7.083877] systemd[1]: Starting Create Static Device Nodes in /dev gracefully...
+[    7.100498] systemd[1]: Mounted Kernel Configuration File System.
+[    7.123133] systemd[1]: Finished Apply Kernel Variables.
+[    7.171472] systemd[1]: Started Journal Service.
+[    7.267613] systemd-journald[122]: Received client request to flush runtime journal.
+[    7.347108] audit: type=1334 audit(1750927455.019:2): prog-id=6 op=LOAD
+[    7.356148] audit: type=1334 audit(1750927455.019:3): prog-id=7 op=LOAD
+[    7.598987] audit: type=1334 audit(1750927455.271:4): prog-id=8 op=LOAD
+[    7.750743] audit: type=1334 audit(1750927455.423:5): prog-id=9 op=LOAD
+[    7.761337] audit: type=1334 audit(1750927455.427:6): prog-id=10 op=LOAD
+[    7.774032] audit: type=1334 audit(1750927455.435:7): prog-id=11 op=LOAD
+[    8.197144] FAT-fs (mmcblk0p1): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+[    8.301876] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[    8.336353] Loaded X.509 cert 'benh@debian.org: 577e021cb980e0e820821ba7b54b4961b8b4fadf'
+[    8.347923] Loaded X.509 cert 'romain.perier@gmail.com: 3abbc6ec146e09d1b6016ab9d6cf71dd233f0328'
+[    8.348740] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[    8.366911] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[    8.378509] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
+[    8.389961] cfg80211: failed to load regulatory.db
+[    8.478256] audit: type=1334 audit(1750927456.151:8): prog-id=12 op=LOAD
+[    8.493264] brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430-sdio for chip BCM43430/1
+[    8.505889] usbcore: registered new interface driver brcmfmac
+[    8.513190] brcmfmac mmc1:0001:1: Direct firmware load for brcm/brcmfmac43430-sdio.raspberrypi,3-model-b.bin failed with error -2
+[    8.527696] brcmfmac mmc1:0001:1: Direct firmware load for brcm/brcmfmac43430-sdio.bin failed with error -2
+[    8.546657] audit: type=1334 audit(1750927456.219:9): prog-id=13 op=LOAD
+[    8.590855] smsc95xx 1-1.1:1.0 eth0: hardware isn't capable of remote wakeup
+[    8.602402] smsc95xx 1-1.1:1.0 eth0: Link is Down
+[    8.917074] audit: type=1334 audit(1750927456.591:10): prog-id=14 op=LOAD
+[    8.931583] audit: type=1334 audit(1750927456.607:11): prog-id=15 op=LOAD
+[    9.546697] brcmfmac: brcmf_sdio_htclk: HT Avail timeout (1000000): clkctl 0x50
+
+Poky (Yocto Project Reference Distro) 5.0.20 raspberrypi3-64 ttyS0
+
+raspberrypi3-64 login: [   15.502556] kauditd_printk_skb: 4 callbacks suppressed
+[   15.502572] audit: type=1334 audit(1750927463.175:16): prog-id=19 op=LOAD
+[   15.949122] audit: type=1334 audit(1750927463.623:17): prog-id=19 op=UNLOAD
+[   18.656315] platform 1.reg_bridge: deferred probe pending
+[   21.002112] audit: type=1334 audit(1750927468.675:18): prog-id=20 op=LOAD
+[   21.415415] audit: type=1334 audit(1750927469.091:19): prog-id=20 op=UNLOAD
+
+raspberrypi3-64 login: [   26.500863] audit: type=1334 audit(1750927474.175:20): prog-id=21 op=LOAD
+
+raspberrypi3-64 login: 
+raspberrypi3-64 login: [   26.923522] audit: type=1334 audit(1750927474.599:21): prog-id=21 op=UNLOAD
+
+raspberrypi3-64 login: 
+raspberrypi3-64 login: 
+raspberrypi3-64 login: 
+raspberrypi3-64 login: cat /sys/class/thermal/thermal_zone0/temp
+Password: [   32.003006] audit: type=1334 audit(1750927479.675:22): prog-id=22 op=LOAD
+[   32.451616] audit: type=1334 audit(1750927480.127:23): prog-id=22 op=UNLOAD
+
+
+
+Login incorrect
+
+raspberrypi3-64 login: 
+raspberrypi3-64 login: 
+raspberrypi3-64 login: ro[   37.500847] audit: type=1334 audit(1750927485.175:24): prog-id=23 op=LOAD
+ot[   37.919585] audit: type=1334 audit(1750927485.595:25): prog-id=23 op=UNLOAD
+
+
+WARNING: Poky is a reference Yocto Project distribution that should be used for
+testing and development purposes only. It is recommended that you create your
+own distribution for production use.
+
+7[r[999;999H[6n8root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# cat /sys/class/thermal/thermal_zone0/temp
+44008
+root@raspberrypi3-64:~# [   43.002090] audit: type=1334 audit(1750927490.675:26): prog-id=24 op=LOAD
+[   43.441145] audit: type=1334 audit(1750927491.115:27): prog-id=24 op=UNLOAD
+[   48.500884] audit: type=1334 audit(1750927496.175:28): prog-id=25 op=LOAD
+[   48.923488] audit: type=1334 audit(1750927496.599:29): prog-id=25 op=UNLOAD
+[   54.000284] audit: type=1334 audit(1750927501.675:30): prog-id=26 op=LOAD
+[   54.423615] audit: type=1334 audit(1750927502.099:31): prog-id=26 op=UNLOAD
+[   59.538596] audit: type=1334 audit(1750927507.211:32): prog-id=27 op=LOAD
+[   59.975653] audit: type=1334 audit(1750927507.651:33): prog-id=27 op=UNLOAD
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# (modprobe optee &); sleep 5; (cat /sys/class/thermal/thermal_zone0/temp > /tmp/t 2>&1 &); sleep 10; echo '--- file ---'; cat /tmp/t; echo
+ '--- end, empty means the read never returned ---'
+[   63.259334] optee: probing for conduit method.
+[   64.287241] ------------[ cut here ]------------
+[   64.292007] Firmware transaction timeout
+[   64.292065] WARNING: CPU: 1 PID: 55 at /drivers/firmware/raspberrypi.c:69 rpi_firmware_property_list+0x26c/0x290
+[   64.306483] Modules linked in: optee(+) brcmfmac cfg80211 rfkill brcmutil sch_fq_codel ipv6
+[   64.315865] CPU: 1 PID: 55 Comm: kworker/1:1 Not tainted 6.6.63-v8 #1
+[   64.323253] Hardware name: Raspberry Pi 3 Model B Rev 1.2 (DT)
+[   64.330012] Workqueue: events dbs_work_handler
+[   64.335356] pstate: 60000005 (nZCv daif -PAN -UAO -TCO -DIT -SSBS BTYPE=--)
+[   64.343257] pc : rpi_firmware_property_list+0x26c/0x290
+[   64.349408] lr : rpi_firmware_property_list+0x26c/0x290
+[   64.355528] sp : ffffffc0805f3940
+[   64.359678] x29: ffffffc0805f3960 x28: 0000000000000000 x27: ffffff800062dcc0
+[   64.367758] x26: 000000000000000a x25: ffffffc080497008 x24: 0000000000001000
+[   64.375856] x23: ffffff8004a94700 x22: ffffffe0bd1d08f8 x21: 0000000000000018
+[   64.383957] x20: ffffff800062dc80 x19: ffffffc080497000 x18: 0000000000000006
+[   64.392071] x17: 0000000000000020 x16: 0000000000000002 x15: ffffffc0805f32a0
+[   64.400195] x14: 0000000000000000 x13: 74756f656d697420 x12: 6e6f69746361736e
+[   64.408341] x11: fffffffffffe0000 x10: ffffffe0bd0a7998 x9 : ffffffe0bb917e6c
+[   64.416515] x8 : 00000000ffffefff x7 : ffffffe0bd0a53a0 x6 : 0000000000000195
+[   64.424695] x5 : 0000000000000000 x4 : 0000000000000000 x3 : 0000000000000027
+[   64.432896] x2 : 0000000000000000 x1 : 0000000000000000 x0 : ffffff8000eadc40
+[   64.441095] Call trace:
+[   64.444523]  rpi_firmware_property_list+0x26c/0x290
+[   64.450445]  rpi_firmware_property+0x78/0x120
+[   64.455835]  raspberrypi_fw_set_rate+0x60/0xf0
+[   64.461323]  clk_change_rate+0xe0/0x518
+[   64.466201]  clk_core_set_rate_nolock+0x188/0x2d8
+[   64.471945]  clk_set_rate+0x40/0x190
+[   64.476531]  _opp_config_clk_single+0x38/0xb8
+[   64.481912]  _set_opp+0x108/0x410
+[   64.486207]  dev_pm_opp_set_rate+0x198/0x298
+[   64.491448]  set_target+0x38/0x50
+[   64.495686]  __cpufreq_driver_target+0x25c/0x6b0
+[   64.501227]  od_dbs_update+0x14c/0x1c0
+[   64.505862]  dbs_work_handler+0x48/0x90
+[   64.510569]  process_one_work+0x148/0x3b8
+[   64.515441]  worker_thread+0x324/0x448
+[   64.520023]  kthread+0x104/0x118
+[   64.524054]  ret_from_fork+0x10/0x20
+[   64.528443] ---[ end trace 0000000000000000 ]---
+[   64.533962] raspberrypi-clk soc:firmware:clocks: Failed to change fw-clk-arm frequency: -110
+[   84.267224] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[   84.274294] rcu: 	3-...0: (0 ticks this GP) idle=9004/1/0x4000000000000000 softirq=3054/3063 fqs=2596
+[   84.285357] rcu: 	(detected by 0, t=5255 jiffies, g=4245, q=533 ncpus=4)
+[   84.293047] Task dump for CPU 3:
+[   84.297186] task:modprobe        state:R  running task     stack:0     pid:485   ppid:1      flags:0x00000206
+[   84.309042] Call trace:
+[   84.312400]  __switch_to+0xd8/0x140
+[   84.316811]  0xffffffff
+[  147.339225] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  147.346362] rcu: 	3-...0: (0 ticks this GP) idle=9004/1/0x4000000000000000 softirq=3054/3063 fqs=10476
+[  147.357661] rcu: 	(detected by 1, t=21020 jiffies, g=4245, q=617 ncpus=4)
+[  147.365532] Task dump for CPU 3:
+[  147.369769] task:modprobe        state:R  running task     stack:0     pid:485   ppid:1      flags:0x00000206
+[  147.381850] Call trace:
+[  147.385318]  __switch_to+0xd8/0x140
+[  147.389864]  0xffffffff
+[  210.403225] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  210.410458] rcu: 	3-...0: (0 ticks this GP) idle=9004/1/0x4000000000000000 softirq=3054/3063 fqs=18353
+[  210.422006] rcu: 	(detected by 1, t=36786 jiffies, g=4245, q=693 ncpus=4)
+[  210.429991] Task dump for CPU 3:
+[  210.434363] task:modprobe        state:R  running task     stack:0     pid:485   ppid:1      flags:0x00000206
+[  210.446708] Call trace:
+[  210.450286]  __switch_to+0xd8/0x140
+[  210.454911]  0xffffffff
+[  242.659242] INFO: task systemd:1 blocked for more than 120 seconds.
+[  242.666736]       Tainted: G        W          6.6.63-v8 #1
+[  242.673477] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  242.682500] task:systemd         state:D stack:0     pid:1     ppid:0      flags:0x00000004
+[  242.693095] Call trace:
+[  242.696593]  __switch_to+0xd8/0x140
+[  242.701180]  __schedule+0x374/0xd50
+[  242.705749]  schedule+0x60/0x100
+[  242.710054]  schedule_timeout+0x1a8/0x1c0
+[  242.715155]  wait_for_completion+0xc8/0x170
+[  242.720402]  __wait_rcu_gp+0x160/0x200
+[  242.725172]  synchronize_rcu+0x9c/0xb0
+[  242.729914]  rcu_sync_enter+0x60/0x128
+[  242.734628]  percpu_down_write+0x34/0x220
+[  242.739594]  cgroup_procs_write_start+0x88/0x1a0
+[  242.745165]  __cgroup_procs_write+0x74/0x1e8
+[  242.750389]  cgroup_procs_write+0x24/0x48
+[  242.755350]  cgroup_file_write+0xb0/0x1c8
+[  242.760308]  kernfs_fop_write_iter+0x128/0x1e0
+[  242.765699]  vfs_write+0x1d4/0x3b0
+[  242.770028]  ksys_write+0x7c/0x120
+[  242.774287]  __arm64_sys_write+0x24/0x38
+[  242.779058]  invoke_syscall+0x50/0x128
+[  242.783649]  el0_svc_common.constprop.0+0x48/0xf0
+[  242.789190]  do_el0_svc+0x24/0x38
+[  242.793313]  el0_svc+0x38/0xc8
+[  242.797156]  el0t_64_sync_handler+0x120/0x130
+[  242.802325]  el0t_64_sync+0x190/0x198
+[  242.806883] INFO: task (ch-state):486 blocked for more than 120 seconds.
+[  242.814459]       Tainted: G        W          6.6.63-v8 #1
+[  242.820867] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  242.829596] task:(ch-state)      state:D stack:0     pid:486   ppid:1      flags:0x00000204
+[  242.839562] Call trace:
+[  242.842771]  __switch_to+0xd8/0x140
+[  242.847065]  __schedule+0x374/0xd50
+[  242.851359]  schedule+0x60/0x100
+[  242.855382]  schedule_preempt_disabled+0x20/0x40
+[  242.860831]  __mutex_lock.constprop.0+0x2e4/0x598
+[  242.866381]  __mutex_lock_slowpath+0x1c/0x30
+[  242.871473]  mutex_lock+0x50/0x68
+[  242.875589]  cgroup_kn_lock_live+0x60/0x1b8
+[  242.880600]  __cgroup_procs_write+0x58/0x1e8
+[  242.885695]  cgroup_procs_write+0x24/0x48
+[  242.890530]  cgroup_file_write+0xb0/0x1c8
+[  242.895351]  kernfs_fop_write_iter+0x128/0x1e0
+[  242.900627]  vfs_write+0x1d4/0x3b0
+[  242.904844]  ksys_write+0x7c/0x120
+[  242.909043]  __arm64_sys_write+0x24/0x38
+[  242.913773]  invoke_syscall+0x50/0x128
+[  242.918328]  el0_svc_common.constprop.0+0xc8/0xf0
+[  242.923865]  do_el0_svc+0x24/0x38
+[  242.927986]  el0_svc+0x38/0xc8
+[  242.931832]  el0t_64_sync_handler+0x120/0x130
+[  242.937005]  el0t_64_sync+0x190/0x198
+[  273.467224] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  273.474230] rcu: 	3-...0: (0 ticks this GP) idle=9004/1/0x4000000000000000 softirq=3054/3063 fqs=26231
+[  273.485265] rcu: 	(detected by 2, t=52555 jiffies, g=4245, q=829 ncpus=4)
+[  273.492967] Task dump for CPU 3:
+[  273.497025] task:modprobe        state:R  running task     stack:0     pid:485   ppid:1      flags:0x00000206
+[  273.508679] Call trace:
+[  273.511930]  __switch_to+0xd8/0x140
+[  273.516259]  0xffffffff
+[  336.539226] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  336.546285] rcu: 	3-...0: (0 ticks this GP) idle=9004/1/0x4000000000000000 softirq=3054/3063 fqs=34111
+[  336.557429] rcu: 	(detected by 1, t=68320 jiffies, g=4245, q=1270 ncpus=4)
+[  336.565309] Task dump for CPU 3:
+[  336.569480] task:modprobe        state:R  running task     stack:0     pid:485   ppid:1      flags:0x00000206
+[  336.581424] Call trace:
+[  336.584823]  __switch_to+0xd8/0x140
+[  336.589307]  0xffffffff
+[  363.491241] INFO: task systemd:1 blocked for more than 241 seconds.
+[  363.498615]       Tainted: G        W          6.6.63-v8 #1
+[  363.505287] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  363.514264] task:systemd         state:D stack:0     pid:1     ppid:0      flags:0x00000004
+[  363.524811] Call trace:
+[  363.528304]  __switch_to+0xd8/0x140
+[  363.532895]  __schedule+0x374/0xd50
+[  363.537464]  schedule+0x60/0x100
+[  363.541774]  schedule_timeout+0x1a8/0x1c0
+[  363.546870]  wait_for_completion+0xc8/0x170
+[  363.552113]  __wait_rcu_gp+0x160/0x200
+[  363.556897]  synchronize_rcu+0x9c/0xb0
+[  363.561642]  rcu_sync_enter+0x60/0x128
+[  363.566357]  percpu_down_write+0x34/0x220
+[  363.571326]  cgroup_procs_write_start+0x88/0x1a0
+[  363.576893]  __cgroup_procs_write+0x74/0x1e8
+[  363.582115]  cgroup_procs_write+0x24/0x48
+[  363.587076]  cgroup_file_write+0xb0/0x1c8
+[  363.592041]  kernfs_fop_write_iter+0x128/0x1e0
+[  363.597428]  vfs_write+0x1d4/0x3b0
+[  363.601754]  ksys_write+0x7c/0x120
+[  363.606025]  __arm64_sys_write+0x24/0x38
+[  363.610793]  invoke_syscall+0x50/0x128
+[  363.615384]  el0_svc_common.constprop.0+0x48/0xf0
+[  363.620927]  do_el0_svc+0x24/0x38
+[  363.625029]  el0_svc+0x38/0xc8
+[  363.628863]  el0t_64_sync_handler+0x120/0x130
+[  363.634036]  el0t_64_sync+0x190/0x198
+[  363.638599] INFO: task (ch-state):486 blocked for more than 241 seconds.
+[  363.646172]       Tainted: G        W          6.6.63-v8 #1
+[  363.652581] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  363.661314] task:(ch-state)      state:D stack:0     pid:486   ppid:1      flags:0x00000204
+[  363.671287] Call trace:
+[  363.674503]  __switch_to+0xd8/0x140
+[  363.678783]  __schedule+0x374/0xd50
+[  363.683072]  schedule+0x60/0x100
+[  363.687093]  schedule_preempt_disabled+0x20/0x40
+[  363.692545]  __mutex_lock.constprop.0+0x2e4/0x598
+[  363.698098]  __mutex_lock_slowpath+0x1c/0x30
+[  363.703194]  mutex_lock+0x50/0x68
+[  363.707314]  cgroup_kn_lock_live+0x60/0x1b8
+[  363.712329]  __cgroup_procs_write+0x58/0x1e8
+[  363.717427]  cgroup_procs_write+0x24/0x48
+[  363.722272]  cgroup_file_write+0xb0/0x1c8
+[  363.727095]  kernfs_fop_write_iter+0x128/0x1e0
+[  363.732377]  vfs_write+0x1d4/0x3b0
+[  363.736592]  ksys_write+0x7c/0x120
+[  363.740796]  __arm64_sys_write+0x24/0x38
+[  363.745535]  invoke_syscall+0x50/0x128
+[  363.750092]  el0_svc_common.constprop.0+0xc8/0xf0
+[  363.755625]  do_el0_svc+0x24/0x38
+[  363.759747]  el0_svc+0x38/0xc8
+[  363.763591]  el0t_64_sync_handler+0x120/0x130
+[  363.768764]  el0t_64_sync+0x190/0x198
+[  399.603225] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  399.610220] rcu: 	3-...0: (0 ticks this GP) idle=9004/1/0x4000000000000000 softirq=3054/3063 fqs=41989
+[  399.621234] rcu: 	(detected by 2, t=84090 jiffies, g=4245, q=1410 ncpus=4)
+[  399.629027] Task dump for CPU 3:
+[  399.633088] task:modprobe        state:R  running task     stack:0     pid:485   ppid:1      flags:0x00000206
+[  399.644741] Call trace:
+[  399.647992]  __switch_to+0xd8/0x140
+[  399.652323]  0xffffffff
+
+
+
+
+Raspberry Pi Bootcode
+Read File: config.txt, 3627
+Read File: start.elf, 2988128 (bytes)
+Read File: fixup.dat, 7325 (bytes)
+MESS:00:00:01.012719:0: boot-part: 0 fs-type: 0
+MESS:00:00:01.015548:0: boot-part: 0 fs-type: 3
+MESS:00:00:01.036694:0: brfs: File read: /mfs/sd/config.txt
+MESS:00:00:01.042903:0: brfs: File read: 3627 bytes
+MESS:00:00:01.079908:0: HDMI0:EDID error reading EDID block 0 attempt 0
+MESS:00:00:01.086069:0: HDMI0:EDID error reading EDID block 0 attempt 1
+MESS:00:00:01.092406:0: HDMI0:EDID error reading EDID block 0 attempt 2
+MESS:00:00:01.098744:0: HDMI0:EDID error reading EDID block 0 attempt 3
+MESS:00:00:01.105080:0: HDMI0:EDID error reading EDID block 0 attempt 4
+MESS:00:00:01.111417:0: HDMI0:EDID error reading EDID block 0 attempt 5
+MESS:00:00:01.117753:0: HDMI0:EDID error reading EDID block 0 attempt 6
+MESS:00:00:01.124090:0: HDMI0:EDID error reading EDID block 0 attempt 7
+MESS:00:00:01.130428:0: HDMI0:EDID error reading EDID block 0 attempt 8
+MESS:00:00:01.136764:0: HDMI0:EDID error reading EDID block 0 attempt 9
+MESS:00:00:01.142858:0: HDMI0:EDID giving up on reading EDID block 0
+MESS:00:00:01.149988:0: brfs: File read: /mfs/sd/config.txt
+MESS:00:00:01.156317:0: gpioman: gpioman_get_pin_num: pin LEDS_PWR_OK not defined
+MESS:00:00:01.356356:0: gpioman: gpioman_get_pin_num: pin DISPLAY_DSI_PORT not defined
+MESS:00:00:01.363392:0: gpioman: gpioman_get_pin_num: pin DISPLAY_DSI_PORT not defined
+MESS:00:00:01.371178:0: gpioman: gpioman_get_pin_num: pin LEDS_PWR_OK not defined
+MESS:00:00:01.377459:0: *** Restart logging
+MESS:00:00:01.381334:0: brfs: File read: 3627 bytes
+MESS:00:00:01.386791:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 0
+MESS:00:00:01.394037:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 1
+MESS:00:00:01.400895:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 2
+MESS:00:00:01.407753:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 3
+MESS:00:00:01.414610:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 4
+MESS:00:00:01.421468:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 5
+MESS:00:00:01.428326:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 6
+MESS:00:00:01.435183:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 7
+MESS:00:00:01.442041:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 8
+MESS:00:00:01.448899:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 9
+MESS:00:00:01.455514:0: hdmi: HDMI0:EDID giving up on reading EDID block 0
+MESS:00:00:01.461419:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 0
+MESS:00:00:01.469211:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 1
+MESS:00:00:01.476069:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 2
+MESS:00:00:01.482926:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 3
+MESS:00:00:01.489784:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 4
+MESS:00:00:01.496642:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 5
+MESS:00:00:01.503499:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 6
+MESS:00:00:01.510357:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 7
+MESS:00:00:01.517214:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 8
+MESS:00:00:01.524072:0: hdmi: HDMI0:EDID error reading EDID block 0 attempt 9
+MESS:00:00:01.530688:0: hdmi: HDMI0:EDID giving up on reading EDID block 0
+MESS:00:00:01.536555:0: hdmi: HDMI:hdmi_get_state is deprecated, use hdmi_get_display_state instead
+MESS:00:00:01.545048:0: HDMI0: hdmi_pixel_encoding: 162000000
+MESS:00:00:01.550774:0: vec: vec_middleware_power_on: vec_base: 0x7e806000 rev-id 0x00002708 @ vec: 0x7e806100 @ 0x00000420 enc: 0x7e806060 @ 0x00000220 cgmsae: 0x7e80605c @ 0x00000000
+MESS:00:00:01.577729:0: dtb_file 'bcm2710-rpi-3-b.dtb'
+MESS:00:00:01.585392:0: brfs: File read: /mfs/sd/bcm2710-rpi-3-b.dtb
+MESS:00:00:01.590055:0: Loaded 'bcm2710-rpi-3-b.dtb' to 0x4000000 size 0x8797
+MESS:00:00:01.612513:0: brfs: File read: 34711 bytes
+MESS:00:00:01.618586:0: brfs: File read: /mfs/sd/overlays/overlay_map.dtb
+MESS:00:00:01.651941:0: brfs: File read: 5451 bytes
+MESS:00:00:01.657176:0: brfs: File read: /mfs/sd/config.txt
+MESS:00:00:01.664455:0: brfs: File read: 3627 bytes
+MESS:00:00:01.672822:0: brfs: File read: /mfs/sd/overlays/vc4-fkms-v3d.dtbo
+MESS:00:00:01.699410:0: Loaded overlay 'vc4-fkms-v3d'
+MESS:00:00:01.743108:0: brfs: File read: 1559 bytes
+MESS:00:00:01.751547:0: brfs: File read: /mfs/sd/overlays/vc4-kms-dsi-7inch.dtbo
+MESS:00:00:01.791385:0: Loaded overlay 'vc4-kms-dsi-7inch'
+MESS:00:00:01.795230:0: dtparam: audio=on
+MESS:00:00:01.933582:0: brfs: File read: 4336 bytes
+MESS:00:00:01.937403:0: brfs: File read: /mfs/sd/cmdline.txt
+MESS:00:00:01.942193:0: Read command line from file 'cmdline.txt':
+MESS:00:00:01.948049:0: 'dwc_otg.lpm_enable=0 console=serial0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rootwait  net.ifnames=0 console=tty1 ro modprobe.blacklist=optee systemd.mask=systemd-remount-fs.service'
+MESS:00:00:01.986400:0: gpioman: gpioman_get_pin_num: pin EMMC_ENABLE not defined
+MESS:00:00:02.291875:0: brfs: File read: 185 bytes
+MESS:00:00:02.369665:0: brfs: File read: /mfs/sd/armstub8.bin
+MESS:00:00:02.373696:0: Loaded 'armstub8.bin' to 0x0 size 0x134038
+MESS:00:00:02.379616:0: brfs: File read: 1261624 bytes
+MESS:00:00:03.968389:0: brfs: File read: /mfs/sd/kernel8.img
+MESS:00:00:03.972333:0: Loaded 'kernel8.img' to 0x2000000 size 0x1a52200
+MESS:00:00:04.010026:0: Kernel relocated to 0x200000
+MESS:00:00:04.013272:0: Device tree loaded to 0x4000000 (size 0x9160)
+MESS:00:00:04.020785:0: uart: Set PL011 baud rate to 103448.300000 Hz
+MESS:00:00:04.027130:0: uart: Baud rate change done...
+MESS:00:00:04.030544:0: uart: Baud rateNOTICE:  Booting Trusted Firmware
+NOTICE:  BL1: v2.6(debug):v2.6
+NOTICE:  BL1: Built : 07:45:23, Sep 22 2026
+INFO:    BL1: RAM 0x100ee000 - 0x100f7000
+INFO:    BL1: cortex_a53: CPU workaround for 843419 was applied
+INFO:    BL1: cortex_a53: CPU workaround for 855873 was applied
+WARNING: BL1: cortex_a53: CPU workaround for 1530924 was missing!
+NOTICE:  rpi3: Detected: Raspberry Pi 3 Model B (1GB, Embest, China) [0x00a22082]
+INFO:    BL1: Loading BL2
+INFO:    Loading image id=1 at address 0x100b4000
+INFO:    Image id=1 loaded: 0x100b4000 - 0x100bc419
+NOTICE:  BL1: Booting BL2
+INFO:    Entry point address = 0x100b4000
+INFO:    SPSR = 0x3c5
+ERROR:   rpi3_sdhost: transfer FIFO word 1: 0x21
+INFO:    rpi3_sdhost: HC_COMMAND:        0x00004073
+INFO:    rpi3_sdhost: HC_ARGUMENT:       0x00000000
+INFO:    rpi3_sdhost: HC_TIMEOUTCOUNTER: 0x00f00000
+INFO:    rpi3_sdhost: HC_CLOCKDIVISOR:   0x0000027b
+INFO:    rpi3_sdhost: HC_RESPONSE_0:     0x00000920
+INFO:    rpi3_sdhost: HC_RESPONSE_1:     0x00003348
+INFO:    rpi3_sdhost: HC_RESPONSE_2:     0xffffffff
+INFO:    rpi3_sdhost: HC_RESPONSE_3:     0x0002480c
+INFO:    rpi3_sdhost: HC_HOSTSTATUS:     0x00000021
+INFO:    rpi3_sdhost: HC_POWER:          0x00000001
+INFO:    rpi3_sdhost: HC_DEBUG:          0x00010861
+INFO:    rpi3_sdhost: HC_HOSTCONFIG:     0x00000400
+INFO:    rpi3_sdhost: HC_BLOCKSIZE:      0x00000008
+INFO:    rpi3_sdhost: HC_BLOCKCOUNT:     0x00000001
+NOTICE:  BL2: v2.6(debug):v2.6
+NOTICE:  BL2: Built : 07:45:23, Sep 22 2026
+INFO:    BL2: Doing platform setup
+INFO:    BL2: Loading image id 3
+INFO:    Loading image id=3 at address 0x100e0000
+INFO:    Image id=3 loaded: 0x100e0000 - 0x100ea073
+INFO:    BL2: Loading image id 4
+INFO:    Loading image id=4 at address 0x10100000
+INFO:    Image id=4 loaded: 0x10100000 - 0x1010001c
+INFO:    OPTEE ep=0x10100000
+INFO:    OPTEE header info:
+INFO:          magic=0x4554504f
+INFO:          version=0x2
+INFO:          arch=0x1
+INFO:          flags=0x0
+INFO:          nb_images=0x1
+INFO:    BL2: Loading image id 21
+INFO:    Loading image id=21 at address 0x10100000
+INFO:    Image id=21 loaded: 0x10100000 - 0x1017ced8
+INFO:    BL2: Skip loading image id 22
+INFO:    BL2: Loading image id 5
+INFO:    Loading image id=5 at address 0x11000000
+INFO:    Image id=5 loaded: 0x11000000 - 0x11084b90
+NOTICE:  BL1: Booting BL31
+INFO:    Entry point address = 0x100e0000
+INFO:    SPSR = 0x3cd
+NOTICE:  BL31: v2.6(debug):v2.6
+NOTICE:  BL31: Built : 07:45:23, Sep 22 2026
+INFO:    rpi3: Checking DTB...
+INFO:    BL31: Initializing runtime services
+INFO:    BL31: cortex_a53: CPU workaround for 843419 was applied
+INFO:    BL31: cortex_a53: CPU workaround for 855873 was applied
+WARNING: BL31: cortex_a53: CPU workaround for 1530924 was missing!
+INFO:    BL31: Initializing BL32
+D/TC:0   plat_get_aslr_seed:113 Warning: no ASLR seed
+D/TC:0   add_phys_mem:666 VCORE_UNPG_RX_PA type TEE_RAM_RX 0x10100000 size 0x00079000
+D/TC:0   add_phys_mem:666 VCORE_UNPG_RW_PA type TEE_RAM_RW 0x10179000 size 0x00687000
+D/TC:0   add_phys_mem:666 ta_base type TA_RAM 0x10800000 size 0x00800000
+D/TC:0   add_phys_mem:666 CONSOLE_UART_BASE type IO_NSEC 0x3f200000 size 0x00200000
+D/TC:0   add_phys_mem:666 TEE_SHMEM_START type NSEC_SHM 0x08000000 size 0x00400000
+D/TC:0   add_va_space:706 type RES_VASPACE size 0x00a00000
+D/TC:0   add_va_space:706 type SHM_VASPACE size 0x02000000
+D/TC:0   dump_mmap_table:838 type TEE_RAM_RX   va 0x10100000..0x10178fff pa 0x10100000..0x10178fff size 0x00079000 (smallpg)
+D/TC:0   dump_mmap_table:838 type TEE_RAM_RW   va 0x10179000..0x107fffff pa 0x10179000..0x107fffff size 0x00687000 (smallpg)
+D/TC:0   dump_mmap_table:838 type RES_VASPACE  va 0x10800000..0x111fffff pa 0x00000000..0x009fffff size 0x00a00000 (pgdir)
+D/TC:0   dump_mmap_table:838 type SHM_VASPACE  va 0x11200000..0x131fffff pa 0x00000000..0x01ffffff size 0x02000000 (pgdir)
+D/TC:0   dump_mmap_table:838 type NSEC_SHM     va 0x13200000..0x135fffff pa 0x08000000..0x083fffff size 0x00400000 (pgdir)
+D/TC:0   dump_mmap_table:838 type TA_RAM       va 0x13600000..0x13dfffff pa 0x10800000..0x10ffffff size 0x00800000 (pgdir)
+D/TC:0   dump_mmap_table:838 type IO_NSEC      va 0x13e00000..0x13ffffff pa 0x3f200000..0x3f3fffff size 0x00200000 (pgdir)
+D/TC:0   core_mmu_xlat_table_alloc:527 xlat tables used 1 / 8
+D/TC:0   core_mmu_xlat_table_alloc:527 xlat tables used 2 / 8
+I/TC: 
+I/TC: OP-TEE version: 4.1.0 (gcc version 11.3.1 20220712 (Arm GNU Toolchain 11.3.Rel1)) #1 Tue Sep 22 05:45:13 UTC 2026 aarch64
+I/TC: WARNING: This OP-TEE configuration might be insecure!
+I/TC: WARNING: Please check https://optee.readthedocs.io/en/latest/architecture/porting_guidelines.html
+I/TC: Primary CPU initializing
+D/TC:0 0 boot_init_primary_late:1211 Executing at offset 0 with virtual load address 0x10100000
+D/TC:0 0 call_preinitcalls:21 level 2 mobj_mapped_shm_init()
+D/TC:0 0 mobj_mapped_shm_init:470 Shared memory address range: 11200000, 13200000
+D/TC:0 0 call_initcalls:40 level 1 register_time_source()
+D/TC:0 0 call_initcalls:40 level 1 teecore_init_pub_ram()
+D/TC:0 0 call_initcalls:40 level 3 check_ta_store()
+D/TC:0 0 check_ta_store:454 TA store: "early TA"
+D/TC:0 0 check_ta_store:454 TA store: "Secure Storage TA"
+D/TC:0 0 check_ta_store:454 TA store: "REE"
+D/TC:0 0 call_initcalls:40 level 3 early_ta_init()
+D/TC:0 0 early_ta_init:56 Early TA f04a0fe7-1f5d-4b9b-abf7-619b85b4ce8c size 48611 (compressed, uncompressed 109256)
+D/TC:0 0 call_initcalls:40 level 3 verify_pseudo_tas_conformance()
+D/TC:0 0 call_initcalls:40 level 3 tee_cryp_init()
+D/TC:0 0 call_initcalls:40 level 4 tee_fs_init_key_manager()
+D/TC:0 0 call_initcalls:40 level 6 mobj_init()
+D/TC:0 0 call_initcalls:40 level 6 default_mobj_init()
+D/TC:0 0 call_initcalls:40 level 6 ftmn_boot_tests()
+D/TC:0 0 ftmn_boot_tests:198 Calling simple_call()
+D/TC:0 0 ftmn_boot_tests:198 Return from simple_call()
+D/TC:0 0 ftmn_boot_tests:199 Calling two_level_call()
+D/TC:0 0 ftmn_boot_tests:199 Return from two_level_call()
+D/TC:0 0 ftmn_boot_tests:200 Calling chained_calls()
+D/TC:0 0 ftmn_boot_tests:200 Return from chained_calls()
+D/TC:0 0 ftmn_boot_tests:202 *************************************************
+D/TC:0 0 ftmn_boot_tests:203 **************  Tests complete  *****************
+D/TC:0 0 ftmn_boot_tests:204 *************************************************
+D/TC:0 0 call_finalcalls:59 level 1 init_multi_core_panic_handler()
+I/TC: Primary CPU switching to normal world boot
+INFO:    BL31: Preparing for EL3 exit to normal world
+INFO:    Entry point address = 0x11000000
+INFO:    SPSR = 0x3c9
+
+
+U-Boot 2021.10 (Sep 22 2026 - 07:45:14 +0200)
+
+DRAM:  948 MiB
+RPI 3 Model B (0xa22082)
+MMC:   mmc@7e202000: 0, sdhci@7e300000: 1
+Loading Environment from FAT... OK
+In:    serial
+Out:   serial
+Err:   serial
+Net:   No ethernet found.
+starting USB...
+Bus usb@7e980000: USB DWC2
+scanning bus usb@7e980000 for devices... 3 USB Device(s) found
+       scanning usb for storage devices... 0 Storage Device(s) found
+Hit any key to stop autoboot:  3  0
+U-Boot>     
+U-Boot> 
+U-Boot> 
+U-Boot> fdt addr 0x04000000; fdt resize 4096; fdt mknode / psci; fdt set /psci compatible arm,psci-1.0; fdt set /psci method smc
+U-Boot> fdt set /cpus/cpu@0 enable-method psci; fdt set /cpus/cpu@1 enable-method psci; fdt set /cpus/cpu@2 enable-method psci; fdt set /cpus/cpu@3 enable-method psci; fdt mknode / firmware
+U-Boot> fdt mknode /firmware optee; fdt set /firmware/optee compatible linaro,optee-tz; fdt set /firmware/optee method smc; fdt rsvmem add 0x08000000 0x400000; fdt rsvmem add 0x10100000 0xf00000
+U-Boot> fatload mmc 0:1 ${kernel_addr_r} kernel8.img; booti ${kernel_addr_r} - 0x04000000
+27599360 bytes read in 2292 ms (11.5 MiB/s)
+## Flattened Device Tree blob at 04000000
+   Booting using the fdt blob at 0x4000000
+   Loading Device Tree to 000000003af49000, end 000000003af59fff ... OK
+
+Starting kernel ...
+
+I/TC: Secondary CPU 1 initializing
+I/TC: Secondary CPU 1 switching to normal world boot
+I/TC: Secondary CPU 2 initializing
+I/TC: Secondary CPU 2 switching to normal world boot
+I/TC: Secondary CPU 3 initializing
+I/TC: Secondary CPU 3 switching to normal world boot
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+[    0.000000] Linux version 6.6.63-v8 (oe-user@oe-host) (aarch64-poky-linux-gcc (GCC) 13.4.0, GNU ld (GNU Binutils) 2.42.0.20240723) #1 SMP PREEMPT Fri Dec  6 10:10:05 UTC 2024
+[    0.000000] KASLR enabled
+[    0.000000] random: crng init done
+[    0.000000] Machine model: Raspberry Pi 3 Model B Rev 1.2
+[    0.000000] efi: UEFI not found.
+[    0.000000] Reserved memory: created CMA memory pool at 0x000000002ac00000, size 256 MiB
+[    0.000000] OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
+[    0.000000] OF: reserved mem: 0x000000002ac00000..0x000000003abfffff (262144 KiB) map reusable linux,cma
+[    0.000000] NUMA: No NUMA configuration found
+[    0.000000] NUMA: Faking a node at [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000] NUMA: NODE_DATA [mem 0x3b1f33c0-0x3b1f5fff]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA      [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000]   DMA32    empty
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000000000000-0x000000003b3fffff]
+[    0.000000] On node 0, zone DMA: 19456 pages in unavailable ranges
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv1.1 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: Trusted OS migration not required
+[    0.000000] psci: SMC Calling Convention v1.2
+[    0.000000] percpu: Embedded 31 pages/cpu s86888 r8192 d31896 u126976
+[    0.000000] Detected VIPT I-cache on CPU0
+[    0.000000] CPU features: kernel page table isolation forced ON by KASLR
+[    0.000000] CPU features: detected: Kernel page table isolation (KPTI)
+[    0.000000] CPU features: detected: ARM erratum 843419
+[    0.000000] CPU features: detected: ARM erratum 845719
+[    0.000000] alternatives: applying boot alternatives
+[    0.000000] Kernel command line: coherent_pool=1M 8250.nr_uarts=1 snd_bcm2835.enable_headphones=0 cgroup_disable=memory clk_ignore_unused snd_bcm2835.enable_headphones=1 snd_bcm2835.enable_hdmi=1  vc_mem.mem_base=0x3ec00000 vc_mem.mem_size=0x40000000  dwc_otg.lpm_enable=0 console=ttyS0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rootwait  net.ifnames=0 console=tty1 ro modprobe.blacklist=optee systemd.mask=systemd-remount-fs.service
+[    0.000000] cgroup: Disabling memory control group subsystem
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 238896
+[    0.000000] Policy zone: DMA
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] Memory: 640496K/970752K available (14592K kernel code, 2248K rwdata, 4784K rodata, 5184K init, 1098K bss, 68112K reserved, 262144K cma-reserved)
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
+[    0.000000] ftrace: allocating 47192 entries in 185 pages
+[    0.000000] ftrace: allocated 185 pages with 5 groups
+[    0.000000] trace event string verifier disabled
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU event tracing is enabled.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=256 to nr_cpu_ids=4.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Rude variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=4
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] Root IRQ handler: bcm2836_arm_irqchip_handle_irq
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] arch_timer: cp15 timer(s) running at 19.20MHz (phys).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x46d987e47, max_idle_ns: 440795202767 ns
+[    0.000001] sched_clock: 56 bits at 19MHz, resolution 52ns, wraps every 4398046511078ns
+[    0.000393] Console: colour dummy device 80x25
+[    0.000410] printk: console [tty1] enabled
+[    0.001536] Calibrating delay loop (skipped), value calculated using timer frequency.. 38.40 BogoMIPS (lpj=76800)
+[    0.001585] pid_max: default: 32768 minimum: 301
+[    0.001709] LSM: initializing lsm=capability,integrity
+[    0.001959] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.002013] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.005552] RCU Tasks: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.005770] RCU Tasks Rude: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.005986] RCU Tasks Trace: Setting shift to 2 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=4.
+[    0.006453] rcu: Hierarchical SRCU implementation.
+[    0.006481] rcu: 	Max phase no-delay instances is 1000.
+[    0.008964] EFI services will not be available.
+[    0.009528] smp: Bringing up secondary CPUs ...
+[    0.018605] Detected VIPT I-cache on CPU1
+[    0.018757] CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+[    0.028534] Detected VIPT I-cache on CPU2
+[    0.028656] CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+[    0.038290] Detected VIPT I-cache on CPU3
+[    0.038411] CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+[    0.039091] smp: Brought up 1 node, 4 CPUs
+[    0.039225] SMP: Total of 4 processors activated.
+[    0.039251] CPU features: detected: 32-bit EL0 Support
+[    0.039274] CPU features: detected: 32-bit EL1 Support
+[    0.039300] CPU features: detected: CRC32 instructions
+[    0.039444] CPU: All CPU(s) started at EL2
+[    0.039479] alternatives: applying system-wide alternatives
+[    0.042759] devtmpfs: initialized
+[    0.067097] Enabled cp15_barrier support
+[    0.067166] Enabled setend support
+[    0.067798] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.067857] futex hash table entries: 1024 (order: 4, 65536 bytes, linear)
+[    0.093207] pinctrl core: initialized pinctrl subsystem
+[    0.094281] DMI not present or invalid.
+[    0.095122] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.105948] DMA: preallocated 1024 KiB GFP_KERNEL pool for atomic allocations
+[    0.106484] DMA: preallocated 1024 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.107633] DMA: preallocated 1024 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.107826] audit: initializing netlink subsys (disabled)
+[    0.108201] audit: type=2000 audit(0.104:1): state=initialized audit_enabled=0 res=1
+[    0.109535] thermal_sys: Registered thermal governor 'step_wise'
+[    0.109626] cpuidle: using governor menu
+[    0.110113] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.110313] ASID allocator initialised with 32768 entries
+[    0.111548] Serial: AMBA PL011 UART driver
+[    0.122780] platform 3f101000.cprman: Fixed dependency cycle(s) with /soc/dsi@7e700000
+[    0.124055] bcm2835-mbox 3f00b880.mailbox: mailbox enabled
+[    0.128586] platform 3f101000.cprman: Fixed dependency cycle(s) with /soc/dsi@7e700000
+[    0.128787] platform 3f700000.dsi: Fixed dependency cycle(s) with /soc/dsi@7e700000/bridge@0
+[    0.128880] platform 3f700000.dsi: Fixed dependency cycle(s) with /soc/cprman@7e101000
+[    0.141026] raspberrypi-firmware soc:firmware: Attached to firmware from 2025-04-30T13:35:18, variant start
+[    0.145038] raspberrypi-firmware soc:firmware: Firmware hash is 5560078dcc8591a00f57b9068d13e5544aeef3aa
+[    0.157556] Modules: 2G module region forced by RANDOMIZE_MODULE_REGION_FULL
+[    0.157601] Modules: 0 pages in range for non-PLT usage
+[    0.157611] Modules: 517264 pages in range for PLT usage
+[    0.164276] bcm2835-dma 3f007000.dma-controller: DMA legacy API manager, dmachans=0x1
+[    0.167187] iommu: Default domain type: Translated
+[    0.167219] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.167886] SCSI subsystem initialized
+[    0.168292] usbcore: registered new interface driver usbfs
+[    0.168389] usbcore: registered new interface driver hub
+[    0.168506] usbcore: registered new device driver usb
+[    0.171910] pps_core: LinuxPPS API ver. 1 registered
+[    0.171952] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.172012] PTP clock support registered
+[    0.172663] Advanced Linux Sound Architecture Driver Initialized.
+[    0.174384] vgaarb: loaded
+[    0.175177] clocksource: Switched to clocksource arch_sys_counter
+[    1.816046] VFS: Disk quotas dquot_6.6.0
+[    1.816177] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    1.816462] FS-Cache: Loaded
+[    1.816884] CacheFiles: Loaded
+[    1.832765] NET: Registered PF_INET protocol family
+[    1.833087] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    1.835265] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    1.835335] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    1.835500] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    1.835653] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    1.836038] TCP: Hash tables configured (established 8192 bind 8192)
+[    1.836453] MPTCP token hash table entries: 1024 (order: 2, 24576 bytes, linear)
+[    1.836574] UDP hash table entries: 512 (order: 2, 16384 bytes, linear)
+[    1.836649] UDP-Lite hash table entries: 512 (order: 2, 16384 bytes, linear)
+[    1.836976] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    1.837870] RPC: Registered named UNIX socket transport module.
+[    1.837904] RPC: Registered udp transport module.
+[    1.837929] RPC: Registered tcp transport module.
+[    1.837953] RPC: Registered tcp-with-tls transport module.
+[    1.837977] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    1.838024] PCI: CLS 0 bytes, default 64
+[    1.839251] kvm [1]: IPA Size Limit: 40 bits
+[    1.841226] kvm [1]: Hyp mode initialized successfully
+[    1.848200] Initialise system trusted keyrings
+[    1.848629] workingset: timestamp_bits=42 max_order=18 bucket_order=0
+[    1.848778] zbud: loaded
+[    1.849959] NFS: Registering the id_resolver key type
+[    1.850028] Key type id_resolver registered
+[    1.850054] Key type id_legacy registered
+[    1.850115] nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+[    1.850149] nfs4flexfilelayout_init: NFSv4 Flexfile Layout Driver Registering...
+[    1.851238] Key type asymmetric registered
+[    1.851270] Asymmetric key parser 'x509' registered
+[    1.851384] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 244)
+[    1.851674] io scheduler mq-deadline registered
+[    1.851707] io scheduler kyber registered
+[    1.851772] io scheduler bfq registered
+[    1.857123] pinctrl-bcm2835 3f200000.gpio: GPIO_OUT persistence: yes
+[    1.863261] simple-framebuffer 3eaa9000.framebuffer: framebuffer at 0x3eaa9000, 0x151800 bytes
+[    1.863324] simple-framebuffer 3eaa9000.framebuffer: format=a8r8g8b8, mode=720x480x32, linelength=2880
+[    1.867112] Console: switching to colour frame buffer device 90x30
+[    1.871903] simple-framebuffer 3eaa9000.framebuffer: fb0: simplefb registered!
+[    1.880589] Serial: 8250/16550 driver, 1 ports, IRQ sharing enabled
+[    1.886548] bcm2835-rng 3f104000.rng: hwrng registered
+[    1.889176] vc-mem: phys_addr:0x00000000 mem_base=0x3ec00000 mem_size:0x40000000(1024 MiB)
+[    1.896447] vc4_dsi 3f700000.dsi: Fixed dependency cycle(s) with /soc/dsi@7e700000/bridge@0
+[    1.900456] platform 1.panel_disp: Fixed dependency cycle(s) with /soc/dsi@7e700000/bridge@0
+[    1.904621] mipi-dsi 3f700000.dsi.0: Fixed dependency cycle(s) with /soc/dsi@7e700000
+[    1.906876] mipi-dsi 3f700000.dsi.0: Fixed dependency cycle(s) with /panel_disp@1
+[    1.936158] brd: module loaded
+[    1.952343] loop: module loaded
+[    1.955497] Loading iSCSI transport class v2.0-870.
+[    1.966018] usbcore: registered new device driver r8152-cfgselector
+[    1.968119] usbcore: registered new interface driver r8152
+[    1.970137] usbcore: registered new interface driver lan78xx
+[    1.972156] usbcore: registered new interface driver smsc95xx
+[    1.974565] dwc_otg: version 3.00a 10-AUG-2012 (platform bus)
+[    2.177397] Core Release: 2.80a
+[    2.179320] Setting default values for core params
+[    2.181194] Finished setting default values for core params
+[    2.383491] Using Buffer DMA mode
+[    2.385270] Periodic Transfer Interrupt Enhancement - disabled
+[    2.387066] Multiprocessor Interrupt Enhancement - disabled
+[    2.388851] OTG VER PARAM: 0, OTG VER FLAG: 0
+[    2.390594] Dedicated Tx FIFOs mode
+[    2.395055] 
+[    2.395064] WARN::dwc_otg_hcd_init:1070: FIQ DMA bounce buffers: virt = ffffffc080489000 dma = 0x00000000eb000000 len=9024
+[    2.400037] FIQ FSM acceleration enabled for :
+[    2.400037] Non-periodic Split Transactions
+[    2.400037] Periodic Split Transactions
+[    2.400037] High-Speed Isochronous Endpoints
+[    2.400037] Interrupt/Control Split Transaction hack enabled
+[    2.407489] 
+[    2.407496] WARN::hcd_init_fiq:496: MPHI regs_base at ffffffc08006d000
+[    2.410426] dwc_otg 3f980000.usb: DWC OTG Controller
+[    2.411961] dwc_otg 3f980000.usb: new USB bus registered, assigned bus number 1
+[    2.413522] dwc_otg 3f980000.usb: irq 74, io mem 0x00000000
+[    2.415070] Init: Port Power? op_state=1
+[    2.416603] Init: Power Port (0)
+[    2.418408] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.06
+[    2.421584] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.423290] usb usb1: Product: DWC OTG Controller
+[    2.424951] usb usb1: Manufacturer: Linux 6.6.63-v8 dwc_otg_hcd
+[    2.426620] usb usb1: SerialNumber: 3f980000.usb
+[    2.429415] hub 1-0:1.0: USB hub found
+[    2.431098] hub 1-0:1.0: 1 port detected
+[    2.435150] usbcore: registered new interface driver uas
+[    2.436900] usbcore: registered new interface driver usb-storage
+[    2.439705] mousedev: PS/2 mouse device common for all mice
+[    2.448080] sdhci: Secure Digital Host Controller Interface driver
+[    2.449666] sdhci: Copyright(c) Pierre Ossman
+[    2.451790] sdhci-pltfm: SDHCI platform and OF driver helper
+[    2.455007] ledtrig-cpu: registered to indicate activity on CPUs
+[    2.456189] SMCCC: SOC_ID: ARCH_SOC_ID not implemented, skipping ....
+[    2.457118] hid: raw HID events driver (C) Jiri Kosina
+[    2.458058] usbcore: registered new interface driver usbhid
+[    2.458890] usbhid: USB HID core driver
+[    2.466160] hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 counters available
+[    2.470311] NET: Registered PF_PACKET protocol family
+[    2.471447] Key type dns_resolver registered
+[    2.504408] registered taskstats version 1
+[    2.505554] Loading compiled-in X.509 certificates
+[    2.519198] Key type .fscrypt registered
+[    2.520055] Key type fscrypt-provisioning registered
+[    2.531746] uart-pl011 3f201000.serial: cts_event_workaround enabled
+[    2.532961] 3f201000.serial: ttyAMA1 at MMIO 0x3f201000 (irq = 99, base_baud = 0) is a PL011 rev2
+[    2.534841] serial serial0: tty port ttyAMA1 registered
+[    2.537740] bcm2835-aux-uart 3f215040.serial: there is not valid maps for state default
+[    2.539435] printk: console [ttyS0] disabled
+[    2.541147] 3f215040.serial: ttyS0 at MMIO 0x3f215040 (irq = 71, base_baud = 50000000) is a 16550
+[    2.543051] printk: console [ttyS0] enabled
+[    3.972587] Indeed it is in host mode hprt0 = 00021501
+[    3.973882] bcm2835-wdt bcm2835-wdt: Poweroff handler already present!
+[    3.986346] bcm2835-wdt bcm2835-wdt: Broadcom BCM2835 watchdog timer
+[    3.994037] bcm2835-power bcm2835-power: Broadcom BCM2835 power domains driver
+[    4.004837] mmc-bcm2835 3f300000.mmcnr: mmc_debug:0 mmc_debug2:0
+[    4.011917] mmc-bcm2835 3f300000.mmcnr: DMA channel allocated
+[    4.044087] sdhost: log_buf @ 000000009d53545c (c11bd000)
+[    4.101012] mmc0: sdhost-bcm2835 loaded - DMA enabled (>1)
+[    4.113805] of_cfs_init
+[    4.117710] of_cfs_init: OK
+[    4.122379] clk: Not disabling unused clocks
+[    4.127811] ALSA device list:
+[    4.131733]   No soundcards found.
+[    4.136390] Waiting for root device /dev/mmcblk0p2...
+[    4.150509] mmc0: host does not support reading read-only switch, assuming write-enable
+[    4.161480] mmc0: Problem switching card into high-speed mode!
+[    4.168504] usb 1-1: new high-speed USB device number 2 using dwc_otg
+[    4.176313] Indeed it is in host mode hprt0 = 00001101
+[    4.182659] mmc0: Host Software Queue enabled
+[    4.188161] mmc0: new SDHC card at address 0001
+[    4.200023] mmcblk0: mmc0:0001 ASTC 14.6 GiB
+[    4.213597]  mmcblk0: p1 p2
+[    4.219598] mmcblk0: mmc0:0001 ASTC 14.6 GiB
+[    4.250519] mmc1: new high speed SDIO card at address 0001
+[    4.283123] EXT4-fs (mmcblk0p2): orphan cleanup on readonly fs
+[    4.291033] EXT4-fs (mmcblk0p2): mounted filesystem b40011db-babb-4687-a73e-f66171b15079 ro with ordered data mode. Quota mode: none.
+[    4.306053] VFS: Mounted root (ext4 filesystem) readonly on device 179:2.
+[    4.315188] devtmpfs: mounted
+[    4.326369] Freeing unused kernel memory: 5184K
+[    4.332039] Run /sbin/init as init process
+[    4.415668] usb 1-1: New USB device found, idVendor=0424, idProduct=9514, bcdDevice= 2.00
+[    4.426802] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    4.436854] hub 1-1:1.0: USB hub found
+[    4.442002] hub 1-1:1.0: 5 ports detected
+[    4.735245] usb 1-1.1: new high-speed USB device number 3 using dwc_otg
+[    4.843717] usb 1-1.1: New USB device found, idVendor=0424, idProduct=ec00, bcdDevice= 2.00
+[    4.855405] usb 1-1.1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    4.867000] smsc95xx v2.0.0
+[    5.328888] systemd[1]: System time before build time, advancing clock.
+[    5.342053] SMSC LAN8700 usb-001:003:01: attached PHY driver (mii_bus:phy_addr=usb-001:003:01, irq=184)
+[    5.355066] smsc95xx 1-1.1:1.0 eth0: register 'smsc95xx' at usb-3f980000.usb-1.1, smsc95xx USB 2.0 Ethernet, MAC-REDACTED
+[    5.458509] NET: Registered PF_INET6 protocol family
+[    5.465971] Segment Routing with IPv6
+[    5.470818] In-situ OAM (IOAM) with IPv6
+[    5.543496] systemd[1]: systemd 255.22^ running in system mode (-PAM -AUDIT -SELINUX -APPARMOR +IMA -SMACK +SECCOMP -GCRYPT -GNUTLS -OPENSSL +ACL +BLKID -CURL -ELFUTILS -FIDO2 -IDN2 -IDN -IPTC +KMOD -LIBCRYPTSETUP +LIBFDISK -PCRE2 -PWQUALITY -P11KIT -QRENCODE -TPM2 -BZIP2 -LZ4 -XZ -ZLIB +ZSTD -BPF_FRAMEWORK +XKBCOMMON +UTMP +SYSVINIT default-hierarchy=unified)
+[    5.585074] systemd[1]: Detected architecture arm64.
+[    5.610793] systemd[1]: Hostname set to <raspberrypi3-64>.
+[    5.630676] systemd[1]: Initializing machine ID from random generator.
+[    5.639338] systemd[1]: Installed transient /etc/machine-id file.
+[    6.354630] systemd[1]: Queued start job for default target Multi-User System.
+[    6.409030] systemd[1]: Created slice Slice /system/getty.
+[    6.420467] systemd[1]: Created slice Slice /system/modprobe.
+[    6.430249] systemd[1]: Created slice Slice /system/serial-getty.
+[    6.440857] systemd[1]: Created slice Slice /system/tee-supplicant.
+[    6.451795] systemd[1]: Created slice Slice /system/wpa_supplicant.
+[    6.461467] systemd[1]: Created slice User and Session Slice.
+[    6.470034] systemd[1]: Started Dispatch Password Requests to Console Directory Watch.
+[    6.480712] systemd[1]: Started Forward Password Requests to Wall Directory Watch.
+[    6.490860] systemd[1]: Expecting device /dev/mmcblk0p1...
+[    6.498769] systemd[1]: Expecting device /sys/subsystem/net/devices/wlan0...
+[    6.508408] systemd[1]: Reached target Path Units.
+[    6.515637] systemd[1]: Reached target Remote File Systems.
+[    6.523652] systemd[1]: Reached target Slice Units.
+[    6.530965] systemd[1]: Reached target Swaps.
+[    6.538555] systemd[1]: Listening on Syslog Socket.
+[    6.546287] systemd[1]: Listening on initctl Compatibility Named Pipe.
+[    6.556478] systemd[1]: Listening on Journal Audit Socket.
+[    6.565033] systemd[1]: Listening on Journal Socket (/dev/log).
+[    6.574025] systemd[1]: Listening on Journal Socket.
+[    6.582145] systemd[1]: Listening on Network Service Netlink Socket.
+[    6.591686] systemd[1]: Listening on udev Control Socket.
+[    6.599962] systemd[1]: Listening on udev Kernel Socket.
+[    6.608156] systemd[1]: Listening on User Database Manager Socket.
+[    6.617229] systemd[1]: Huge Pages File System was skipped because of an unmet condition check (ConditionPathExists=/sys/kernel/mm/hugepages).
+[    6.655677] systemd[1]: Mounting POSIX Message Queue File System...
+[    6.668876] systemd[1]: Mounting Kernel Debug File System...
+[    6.681499] systemd[1]: Mounting Kernel Trace File System...
+[    6.695066] systemd[1]: Mounting Temporary Directory /tmp...
+[    6.709261] systemd[1]: Starting Create List of Static Device Nodes...
+[    6.723975] systemd[1]: Starting Load Kernel Module configfs...
+[    6.737910] systemd[1]: Starting Load Kernel Module drm...
+[    6.751332] systemd[1]: Starting Load Kernel Module fuse...
+[    6.764618] systemd[1]: Starting File System Check on Root Device...
+[    6.777596] systemd[1]: Rebuild Hardware Database was skipped because of an unmet condition check (ConditionNeedsUpdate=/etc).
+[    6.800326] systemd[1]: Starting Journal Service...
+[    6.811661] systemd[1]: Load Kernel Modules was skipped because no trigger condition checks were met.
+[    6.827418] systemd[1]: Starting Generate network units from Kernel command line...
+[    6.842515] systemd[1]: Starting Apply Kernel Variables...
+[    6.862530] systemd[1]: Starting Coldplug All udev Devices...
+[    6.881763] systemd[1]: Mounted POSIX Message Queue File System.
+[    6.900465] systemd[1]: Mounted Kernel Debug File System.
+[    6.913307] systemd[1]: Mounted Kernel Trace File System.
+[    6.926939] systemd[1]: Mounted Temporary Directory /tmp.
+[    6.936545] systemd[1]: Finished Create List of Static Device Nodes.
+[    6.947560] systemd[1]: modprobe@configfs.service: Deactivated successfully.
+[    6.957134] systemd[1]: Finished Load Kernel Module configfs.
+[    6.966723] systemd[1]: modprobe@drm.service: Deactivated successfully.
+[    6.975565] systemd[1]: Finished Load Kernel Module drm.
+[    6.985088] systemd[1]: modprobe@fuse.service: Deactivated successfully.
+[    6.995381] systemd[1]: Finished Load Kernel Module fuse.
+[    7.005345] systemd[1]: Finished Generate network units from Kernel command line.
+[    7.017141] systemd[1]: Reached target Preparation for Network.
+[    7.026735] systemd[1]: FUSE Control File System was skipped because of an unmet condition check (ConditionPathExists=/sys/fs/fuse/connections).
+[    7.075671] systemd-journald[122]: Collecting audit messages is enabled.
+[    7.083841] systemd[1]: Mounting Kernel Configuration File System...
+[    7.097938] systemd[1]: Starting Create Static Device Nodes in /dev gracefully...
+[    7.111727] systemd[1]: Mounted Kernel Configuration File System.
+[    7.155315] systemd[1]: Finished Apply Kernel Variables.
+[    7.179015] systemd[1]: Started Journal Service.
+[    7.281814] systemd-journald[122]: Received client request to flush runtime journal.
+[    7.375562] audit: type=1334 audit(1750927455.043:2): prog-id=6 op=LOAD
+[    7.388122] audit: type=1334 audit(1750927455.043:3): prog-id=7 op=LOAD
+[    7.639345] audit: type=1334 audit(1750927455.299:4): prog-id=8 op=LOAD
+[    7.817475] audit: type=1334 audit(1750927455.483:5): prog-id=9 op=LOAD
+[    7.826279] audit: type=1334 audit(1750927455.491:6): prog-id=10 op=LOAD
+[    7.834956] audit: type=1334 audit(1750927455.491:7): prog-id=11 op=LOAD
+[    8.220941] FAT-fs (mmcblk0p1): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+[    8.352917] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[    8.378417] Loaded X.509 cert 'benh@debian.org: 577e021cb980e0e820821ba7b54b4961b8b4fadf'
+[    8.389502] Loaded X.509 cert 'romain.perier@gmail.com: 3abbc6ec146e09d1b6016ab9d6cf71dd233f0328'
+[    8.401310] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[    8.409002] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[    8.421365] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
+[    8.433767] cfg80211: failed to load regulatory.db
+[    8.516816] brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430-sdio for chip BCM43430/1
+[    8.528993] usbcore: registered new interface driver brcmfmac
+[    8.529488] brcmfmac mmc1:0001:1: Direct firmware load for brcm/brcmfmac43430-sdio.raspberrypi,3-model-b.bin failed with error -2
+[    8.529616] brcmfmac mmc1:0001:1: Direct firmware load for brcm/brcmfmac43430-sdio.bin failed with error -2
+[    8.575589] audit: type=1334 audit(1750927456.243:8): prog-id=12 op=LOAD
+[    8.590521] smsc95xx 1-1.1:1.0 eth0: hardware isn't capable of remote wakeup
+[    8.601703] smsc95xx 1-1.1:1.0 eth0: Link is Down
+[    8.622328] audit: type=1334 audit(1750927456.287:9): prog-id=13 op=LOAD
+[    9.007656] audit: type=1334 audit(1750927456.675:10): prog-id=14 op=LOAD
+[    9.021973] audit: type=1334 audit(1750927456.687:11): prog-id=15 op=LOAD
+[    9.547791] brcmfmac: brcmf_sdio_htclk: HT Avail timeout (1000000): clkctl 0x50
+
+Poky (Yocto Project Reference Distro) 5.0.20 raspberrypi3-64 ttyS0
+
+raspberrypi3-64 login: [   15.631275] kauditd_printk_skb: 4 callbacks suppressed
+[   15.631294] audit: type=1334 audit(1750927463.295:16): prog-id=19 op=LOAD
+[   16.066504] audit: type=1334 audit(1750927463.731:17): prog-id=19 op=UNLOAD
+[   21.130158] audit: type=1334 audit(1750927468.795:18): prog-id=20 op=LOAD
+[   21.587461] audit: type=1334 audit(1750927469.255:19): prog-id=20 op=UNLOAD
+[   26.629822] audit: type=1334 audit(1750927474.295:20): prog-id=21 op=LOAD
+[   27.055477] audit: type=1334 audit(1750927474.723:21): prog-id=21 op=UNLOAD
+[   32.170719] audit: type=1334 audit(1750927479.835:22): prog-id=22 op=LOAD
+[   32.599442] audit: type=1334 audit(1750927480.267:23): prog-id=22 op=UNLOAD
+[   37.629472] audit: type=1334 audit(1750927485.295:24): prog-id=23 op=LOAD
+[   38.063571] audit: type=1334 audit(1750927485.731:25): prog-id=23 op=UNLOAD
+[   43.131291] audit: type=1334 audit(1750927490.795:26): prog-id=24 op=LOAD
+[   43.567465] audit: type=1334 audit(1750927491.235:27): prog-id=24 op=UNLOAD
+[   48.628991] audit: type=1334 audit(1750927496.295:28): prog-id=25 op=LOAD
+[   49.051393] audit: type=1334 audit(1750927496.719:29): prog-id=25 op=UNLOAD
+
+raspberrypi3-64 login: root
+
+WARNING: Poky is a reference Yocto Project distribution that should be used for
+testing and development purposes only. It is recommended that you create your
+own distribution for production use.
+
+7[r[999;999H[6n8root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# grep -l rpi_volt /sys/class/hwmon/*/name; command -v taskset || echo NO-TASKSET; cat /sys/class/thermal/thermal_zone0/type
+NO-TASKSET
+cpu-thermal
+root@raspberrypi3-64:~# [   54.126034] audit: type=1334 audit(1750927501.791:30): prog-id=26 op=LOAD
+[   54.571506] audit: type=1334 audit(1750927502.239:31): prog-id=26 op=UNLOAD
+[   59.629235] audit: type=1334 audit(1750927507.295:32): prog-id=27 op=LOAD
+[   60.075413] audit: type=1334 audit(1750927507.743:33): prog-id=27 op=UNLOAD
+[   65.130176] audit: type=1334 audit(1750927512.795:34): prog-id=28 op=LOAD
+[   65.563480] audit: type=1334 audit(1750927513.231:35): prog-id=28 op=UNLOAD
+[   70.629641] audit: type=1334 audit(1750927518.295:36): prog-id=29 op=LOAD
+[   71.055386] audit: type=1334 audit(1750927518.723:37): prog-id=29 op=UNLOAD
+[   76.130055] audit: type=1334 audit(1750927523.795:38): prog-id=30 op=LOAD
+[   76.559360] audit: type=1334 audit(1750927524.227:39): prog-id=30 op=UNLOAD
+[   81.629309] audit: type=1334 audit(1750927529.295:40): prog-id=31 op=LOAD
+[   82.051516] audit: type=1334 audit(1750927529.719:41): prog-id=31 op=UNLOAD
+[   87.129556] audit: type=1334 audit(1750927534.795:42): prog-id=32 op=LOAD
+[   87.563441] audit: type=1334 audit(1750927535.231:43): prog-id=32 op=UNLOAD
+[   92.629118] audit: type=1334 audit(1750927540.295:44): prog-id=33 op=LOAD
+[   93.055357] audit: type=1334 audit(1750927540.723:45): prog-id=33 op=UNLOAD
+[   98.128656] audit: type=1334 audit(1750927545.795:46): prog-id=34 op=LOAD
+[   98.555346] audit: type=1334 audit(1750927546.223:47): prog-id=34 op=UNLOAD
+[  103.629583] audit: type=1334 audit(1750927551.295:48): prog-id=35 op=LOAD
+[  104.047463] audit: type=1334 audit(1750927551.715:49): prog-id=35 op=UNLOAD
+[  109.130090] audit: type=1334 audit(1750927556.795:50): prog-id=36 op=LOAD
+[  109.551478] audit: type=1334 audit(1750927557.219:51): prog-id=36 op=UNLOAD
+[  114.629472] audit: type=1334 audit(1750927562.295:52): prog-id=37 op=LOAD
+[  115.062038] audit: type=1334 audit(1750927562.727:53): prog-id=37 op=UNLOAD
+[  120.129912] audit: type=1334 audit(1750927567.795:54): prog-id=38 op=LOAD
+[  120.563521] audit: type=1334 audit(1750927568.231:55): prog-id=38 op=UNLOAD
+[  125.629806] audit: type=1334 audit(1750927573.295:56): prog-id=39 op=LOAD
+[  126.083373] audit: type=1334 audit(1750927573.751:57): prog-id=39 op=UNLOAD
+[  131.129062] audit: type=1334 audit(1750927578.795:58): prog-id=40 op=LOAD
+[  131.551535] audit: type=1334 audit(1750927579.219:59): prog-id=40 op=UNLOAD
+[  136.629466] audit: type=1334 audit(1750927584.295:60): prog-id=41 op=LOAD
+[  137.073544] audit: type=1334 audit(1750927584.739:61): prog-id=41 op=UNLOAD
+[  142.131329] audit: type=1334 audit(1750927589.795:62): prog-id=42 op=LOAD
+[  142.551536] audit: type=1334 audit(1750927590.219:63): prog-id=42 op=UNLOAD
+[  147.629719] audit: type=1334 audit(1750927595.295:64): prog-id=43 op=LOAD
+[  148.051530] audit: type=1334 audit(1750927595.719:65): prog-id=43 op=UNLOAD
+[  153.129863] audit: type=1334 audit(1750927600.795:66): prog-id=44 op=LOAD
+[  153.559537] audit: type=1334 audit(1750927601.227:67): prog-id=44 op=UNLOAD
+[  158.629884] audit: type=1334 audit(1750927606.295:68): prog-id=45 op=LOAD
+[  159.069628] audit: type=1334 audit(1750927606.735:69): prog-id=45 op=UNLOAD
+[  164.129423] audit: type=1334 audit(1750927611.795:70): prog-id=46 op=LOAD
+[  164.563541] audit: type=1334 audit(1750927612.231:71): prog-id=46 op=UNLOAD
+[  169.631295] audit: type=1334 audit(1750927617.295:72): prog-id=47 op=LOAD
+[  170.047456] audit: type=1334 audit(1750927617.715:73): prog-id=47 op=UNLOAD
+[  175.129962] audit: type=1334 audit(1750927622.795:74): prog-id=48 op=LOAD
+[  175.551434] audit: type=1334 audit(1750927623.219:75): prog-id=48 op=UNLOAD
+[  180.630229] audit: type=1334 audit(1750927628.295:76): prog-id=49 op=LOAD
+[  181.061696] audit: type=1334 audit(1750927628.727:77): prog-id=49 op=UNLOAD
+[  186.128551] audit: type=1334 audit(1750927633.795:78): prog-id=50 op=LOAD
+[  186.547461] audit: type=1334 audit(1750927634.215:79): prog-id=50 op=UNLOAD
+[  191.628460] audit: type=1334 audit(1750927639.295:80): prog-id=51 op=LOAD
+[  192.043350] audit: type=1334 audit(1750927639.711:81): prog-id=51 op=UNLOAD
+[  197.129667] audit: type=1334 audit(1750927644.795:82): prog-id=52 op=LOAD
+[  197.547423] audit: type=1334 audit(1750927645.215:83): prog-id=52 op=UNLOAD
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# ls /sys/class/hwmon/; echo "--- irq ---"; grep -i -e mbox -e mailbox /proc/interrupts; echo "--- therm ---"; ls /sys/bus/platform/drivers
+ | grep -i -e therm -e avs
+hwmon0
+--- irq ---
+  2:        553        556        530        551  ARMCTRL-level   1 Edge      3f00b880.mailbox
+--- therm ---
+bcm2711_thermal
+bcm2835_thermal
+brcmstb-avs-cpufreq
+root@raspberrypi3-64:~# [  202.630770] audit: type=1334 audit(1750927650.295:84): prog-id=53 op=LOAD
+[  203.047402] audit: type=1334 audit(1750927650.715:85): prog-id=53 op=UNLOAD
+[  208.129843] audit: type=1334 audit(1750927655.795:86): prog-id=54 op=LOAD
+[  208.555557] audit: type=1334 audit(1750927656.223:87): prog-id=54 op=UNLOAD
+[  213.629424] audit: type=1334 audit(1750927661.295:88): prog-id=55 op=LOAD
+[  214.059494] audit: type=1334 audit(1750927661.727:89): prog-id=55 op=UNLOAD
+[  219.128790] audit: type=1334 audit(1750927666.795:90): prog-id=56 op=LOAD
+[  219.551399] audit: type=1334 audit(1750927667.219:91): prog-id=56 op=UNLOAD
+
+root@raspberrypi3-64:~# [  224.628911] audit: type=1334 audit(1750927672.295:92): prog-id=57 op=LOAD
+[  225.085300] audit: type=1334 audit(1750927672.751:93): prog-id=57 op=UNLOAD
+[  230.130418] audit: type=1334 audit(1750927677.795:94): prog-id=58 op=LOAD
+[  230.551487] audit: type=1334 audit(1750927678.219:95): prog-id=58 op=UNLOAD
+[  235.629895] audit: type=1334 audit(1750927683.295:96): prog-id=59 op=LOAD
+[  236.067593] audit: type=1334 audit(1750927683.735:97): prog-id=59 op=UNLOAD
+[  241.129934] audit: type=1334 audit(1750927688.795:98): prog-id=60 op=LOAD
+[  241.551385] audit: type=1334 audit(1750927689.219:99): prog-id=60 op=UNLOAD
+[  246.630046] audit: type=1334 audit(1750927694.295:100): prog-id=61 op=LOAD
+[  247.074645] audit: type=1334 audit(1750927694.739:101): prog-id=61 op=UNLOAD
+[  252.129369] audit: type=1334 audit(1750927699.795:102): prog-id=62 op=LOAD
+[  252.547489] audit: type=1334 audit(1750927700.215:103): prog-id=62 op=UNLOAD
+[  257.629662] audit: type=1334 audit(1750927705.295:104): prog-id=63 op=LOAD
+[  258.055412] audit: type=1334 audit(1750927705.723:105): prog-id=63 op=UNLOAD
+[  263.130003] audit: type=1334 audit(1750927710.795:106): prog-id=64 op=LOAD
+[  263.575378] audit: type=1334 audit(1750927711.243:107): prog-id=64 op=UNLOAD
+[  268.630456] audit: type=1334 audit(1750927716.295:108): prog-id=65 op=LOAD
+[  269.057874] audit: type=1334 audit(1750927716.723:109): prog-id=65 op=UNLOAD
+[  274.128460] audit: type=1334 audit(1750927721.795:110): prog-id=66 op=LOAD
+[  274.543378] audit: type=1334 audit(1750927722.211:111): prog-id=66 op=UNLOAD
+[  279.630176] audit: type=1334 audit(1750927727.295:112): prog-id=67 op=LOAD
+[  280.087373] audit: type=1334 audit(1750927727.755:113): prog-id=67 op=UNLOAD
+[  285.130293] audit: type=1334 audit(1750927732.795:114): prog-id=68 op=LOAD
+[  285.575460] audit: type=1334 audit(1750927733.243:115): prog-id=68 op=UNLOAD
+[  290.629956] audit: type=1334 audit(1750927738.295:116): prog-id=69 op=LOAD
+[  291.069530] audit: type=1334 audit(1750927738.735:117): prog-id=69 op=UNLOAD
+[  296.129837] audit: type=1334 audit(1750927743.795:118): prog-id=70 op=LOAD
+[  296.571436] audit: type=1334 audit(1750927744.239:119): prog-id=70 op=UNLOAD
+[  301.629431] audit: type=1334 audit(1750927749.295:120): prog-id=71 op=LOAD
+[  302.067348] audit: type=1334 audit(1750927749.735:121): prog-id=71 op=UNLOAD
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# (n=0; while :; do n=$((n+1)); read u < /proc/uptime; echo "A $n up=${u%% *} mbox=$(awk '/3f00b880.mailbox/{print $2+$3+$4+$5}' /proc/inte
+rrupts)"; sleep 1; done) &[  307.128946] audit: type=1334 audit(1750927754.795:122): prog-id=72 op=LOAD
+
+root@raspberrypi3-64:~# A 1 up=307.19 mbox=3172
+[  307.555555] audit: type=1334 audit(1750927755.223:123): prog-id=72 op=UNLOAD
+A 2 up=308.19 mbox=3182
+A 3 up=309.20 mbox=3202
+A 4 up=310.21 mbox=3208
+A 5 up=311.22 mbox=3236
+A 6 up=312.23 mbox=3240
+[  312.630122] audit: type=1334 audit(1750927760.295:124): prog-id=73 op=LOAD
+[  313.101542] audit: type=1334 audit(1750927760.767:125): prog-id=73 op=UNLOAD
+A 7 up=313.24 mbox=3280
+A 8 up=314.24 mbox=3284
+A 9 up=315.25 mbox=3288
+A 10 up=316.26 mbox=3314
+A 11 up=317.27 mbox=3318
+[  318.129478] audit: type=1334 audit(1750927765.795:126): prog-id=74 op=LOAD
+A 12 up=318.28 mbox=3352
+[  318.555429] audit: type=1334 audit(1750927766.223:127): prog-id=74 op=UNLOAD
+A 13 up=319.28 mbox=3360
+A 14 up=320.29 mbox=3364
+A 15 up=321.30 mbox=3386
+A 16 up=322.31 mbox=3390
+A 17 up=323.32 mbox=3410
+[  323.628534] audit: type=1334 audit(1750927771.295:128): prog-id=75 op=LOAD
+[  324.039407] audit: type=1334 audit(1750927771.707:129): prog-id=75 op=UNLOAD
+A 18 up=324.33 mbox=3422
+A 19 up=325.34 mbox=3426
+A 20 up=326.34 mbox=3446
+A 21 up=327.35 mbox=3450
+A 22 up=328.36 mbox=3468
+[  329.129947] audit: type=1334 audit(1750927776.795:130): prog-id=76 op=LOAD
+A 23 up=329.37 mbox=3480
+[  329.555497] audit: type=1334 audit(1750927777.223:131): prog-id=76 op=UNLOAD
+A 24 up=330.38 mbox=3494
+A 25 up=331.39 mbox=3510
+A 26 up=332.39 mbox=3514
+A 27 up=333.40 mbox=3532
+A 28 up=334.41 mbox=3538
+[  334.630003] audit: type=1334 audit(1750927782.295:132): prog-id=77 op=LOAD
+[  335.063701] audit: type=1334 audit(1750927782.731:133): prog-id=77 op=UNLOAD
+A 29 up=335.42 mbox=3564
+A 30 up=336.43 mbox=3568
+A 31 up=337.44 mbox=3582
+A 32 up=338.44 mbox=3590
+A 33 up=339.45 mbox=3594
+[  340.129271] audit: type=1334 audit(1750927787.795:134): prog-id=78 op=LOAD
+A 34 up=340.46 mbox=3620
+[  340.551551] audit: type=1334 audit(1750927788.219:135): prog-id=78 op=UNLOAD
+A 35 up=341.47 mbox=3626
+A 36 up=342.47 mbox=3644
+A 37 up=343.48 mbox=3648
+A 38 up=344.49 mbox=3652
+A 39 up=345.50 mbox=3674
+[  345.630047] audit: type=1334 audit(1750927793.295:136): prog-id=79 op=LOAD
+[  346.039379] audit: type=1334 audit(1750927793.707:137): prog-id=79 op=UNLOAD
+A 40 up=346.51 mbox=3692
+A 41 up=347.52 mbox=3716
+A 42 up=348.53 mbox=3722
+A 43 up=349.53 mbox=3726
+A 44 up=350.54 mbox=3746
+[  351.129605] audit: type=1334 audit(1750927798.795:138): prog-id=80 op=LOAD
+[  351.555364] audit: type=1334 audit(1750927799.223:139): prog-id=80 op=UNLOAD
+A 45 up=351.56 mbox=3762
+A 46 up=352.56 mbox=3780
+A 47 up=353.57 mbox=3784
+A 48 up=354.58 mbox=3788
+A 49 up=355.59 mbox=3806
+A 50 up=356.60 mbox=3810
+[  356.628571] audit: type=1334 audit(1750927804.295:140): prog-id=81 op=LOAD
+[  357.063475] audit: type=1334 audit(1750927804.731:141): prog-id=81 op=UNLOAD
+A 51 up=357.61 mbox=3834
+A 52 up=358.62 mbox=3838
+A 53 up=359.62 mbox=3856
+A 54 up=360.63 mbox=3860
+A 55 up=361.64 mbox=3864
+[  362.129870] audit: type=1334 audit(1750927809.795:142): prog-id=82 op=LOAD
+[  362.559578] audit: type=1334 audit(1750927810.227:143): prog-id=82 op=UNLOAD
+A 56 up=362.65 mbox=3894
+A 57 up=363.66 mbox=3898
+A 58 up=364.67 mbox=3914
+A 59 up=365.68 mbox=3918
+A 60 up=366.69 mbox=3924
+[  367.632774] audit: type=1334 audit(1750927815.299:144): prog-id=83 op=LOAD
+A 61 up=367.69 mbox=3956
+[  368.047365] audit: type=1334 audit(1750927815.715:145): prog-id=83 op=UNLOAD
+A 62 up=368.70 mbox=3962
+A 63 up=369.71 mbox=3980
+A 64 up=370.72 mbox=3984
+A 65 up=371.72 mbox=3988
+A 66 up=372.73 mbox=4002
+[  373.129972] audit: type=1334 audit(1750927820.795:146): prog-id=84 op=LOAD
+[  373.599531] audit: type=1334 audit(1750927821.267:147): prog-id=84 op=UNLOAD
+A 67 up=373.74 mbox=4026
+A 68 up=374.75 mbox=4042
+A 69 up=375.76 mbox=4048
+A 70 up=376.77 mbox=4052
+A 71 up=377.78 mbox=4072
+[  378.629509] audit: type=1334 audit(1750927826.295:148): prog-id=85 op=LOAD
+A 72 up=378.79 mbox=4088
+[  379.093278] audit: type=1334 audit(1750927826.759:149): prog-id=85 op=UNLOAD
+A 73 up=379.79 mbox=4106
+A 74 up=380.80 mbox=4110
+A 75 up=381.81 mbox=4128
+A 76 up=382.82 mbox=4132
+A 77 up=383.83 mbox=4136
+[  384.129936] audit: type=1334 audit(1750927831.795:150): prog-id=86 op=LOAD
+[  384.555513] audit: type=1334 audit(1750927832.223:151): prog-id=86 op=UNLOAD
+A 78 up=384.84 mbox=4168
+A 79 up=385.85 mbox=4174
+A 80 up=386.85 mbox=4190
+A 81 up=387.86 mbox=4194
+A 82 up=388.87 mbox=4200
+[  389.631354] audit: type=1334 audit(1750927837.295:152): prog-id=87 op=LOAD
+A 83 up=389.88 mbox=4222
+[  390.055336] audit: type=1334 audit(1750927837.723:153): prog-id=87 op=UNLOAD
+A 84 up=390.88 mbox=4232
+A 85 up=391.89 mbox=4252
+A 86 up=392.90 mbox=4256
+A 87 up=393.91 mbox=4264
+A 88 up=394.92 mbox=4274
+[  395.130403] audit: type=1334 audit(1750927842.795:154): prog-id=88 op=LOAD
+[  395.555399] audit: type=1334 audit(1750927843.223:155): prog-id=88 op=UNLOAD
+A 89 up=395.93 mbox=4288
+A 90 up=396.94 mbox=4302
+A 91 up=397.94 mbox=4306
+A 92 up=398.95 mbox=4324
+A 93 up=399.96 mbox=4328
+[  400.629068] audit: type=1334 audit(1750927848.295:156): prog-id=89 op=LOAD
+A 94 up=400.97 mbox=4348
+[  401.105812] audit: type=1334 audit(1750927848.771:157): prog-id=89 op=UNLOAD
+A 95 up=401.98 mbox=4368
+A 96 up=402.99 mbox=4372
+A 97 up=403.99 mbox=4388
+A 98 up=405.00 mbox=4392
+A 99 up=406.01 mbox=4416
+[  406.129423] audit: type=1334 audit(1750927853.795:158): prog-id=90 op=LOAD
+[  406.547503] audit: type=1334 audit(1750927854.215:159): prog-id=90 op=UNLOAD
+A 100 up=407.02 mbox=4436
+A 101 up=408.03 mbox=4440
+A 102 up=409.04 mbox=4460
+A 103 up=410.05 mbox=4464
+A 104 up=411.06 mbox=4486
+[  411.629305] audit: type=1334 audit(1750927859.295:160): prog-id=91 op=LOAD
+[  412.071495] audit: type=1334 audit(1750927859.739:161): prog-id=91 op=UNLOAD
+A 105 up=412.06 mbox=4508
+A 106 up=413.07 mbox=4514
+A 107 up=414.08 mbox=4532
+A 108 up=415.09 mbox=4536
+A 109 up=416.10 mbox=4558
+A 110 up=417.11 mbox=4562
+[  417.129051] audit: type=1334 audit(1750927864.795:162): prog-id=92 op=LOAD
+[  417.551419] audit: type=1334 audit(1750927865.219:163): prog-id=92 op=UNLOAD
+A 111 up=418.12 mbox=4578
+A 112 up=419.13 mbox=4596
+A 113 up=420.13 mbox=4600
+A 114 up=421.14 mbox=4618
+A 115 up=422.15 mbox=4622
+[  422.629424] audit: type=1334 audit(1750927870.295:164): prog-id=93 op=LOAD
+[  423.101170] audit: type=1334 audit(1750927870.767:165): prog-id=93 op=UNLOAD
+A 116 up=423.16 mbox=4656
+A 117 up=424.17 mbox=4660
+A 118 up=425.18 mbox=4664
+A 119 up=426.19 mbox=4684
+A 120 up=427.20 mbox=4688
+[  428.130357] audit: type=1334 audit(1750927875.795:166): prog-id=94 op=LOAD
+A 121 up=428.20 mbox=4724
+[  428.559609] audit: type=1334 audit(1750927876.227:167): prog-id=94 op=UNLOAD
+A 122 up=429.21 mbox=4732
+A 123 up=430.22 mbox=4736
+A 124 up=431.23 mbox=4762
+A 125 up=432.24 mbox=4766
+A 126 up=433.24 mbox=4786
+[  433.628347] audit: type=1334 audit(1750927881.295:168): prog-id=95 op=LOAD
+[  434.039359] audit: type=1334 audit(1750927881.707:169): prog-id=95 op=UNLOAD
+A 127 up=434.25 mbox=4810
+A 128 up=435.26 mbox=4814
+A 129 up=436.27 mbox=4830
+A 130 up=437.28 mbox=4834
+A 131 up=438.29 mbox=4852
+[  439.129961] audit: type=1334 audit(1750927886.795:170): prog-id=96 op=LOAD
+A 132 up=439.30 mbox=4860
+[  439.543346] audit: type=1334 audit(1750927887.211:171): prog-id=96 op=UNLOAD
+A 133 up=440.30 mbox=4866
+A 134 up=441.31 mbox=4888
+A 135 up=442.32 mbox=4892
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# A 136 up=443.33 mbox=4912
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# A 137 up=444.34 mbox=4916
+[  444.628832] audit: type=1334 audit(1750927892.295:172): prog-id=97 op=LOAD
+(n=0; while :; do n=$((n+1)); read u < /proc/uptime; echo "B $n up=${u%% *} mbox=$(awk '/3f00b880.mailbox/{print $2+$3+$4+$5}' /proc/inte
+rrupts)"; sleep 1; done) &[  445.065650] audit: type=1334 audit(1750927892.731:173): prog-id=97 op=UNLOAD
+
+root@raspberrypi3-64:~# B 1 up=445.27 mbox=4950
+A 138 up=445.35 mbox=4954
+B 2 up=446.28 mbox=4958
+A 139 up=446.35 mbox=4964
+B 3 up=447.29 mbox=4968
+A 140 up=447.36 mbox=4974
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# B 4 up=448.30 mbox=4990
+A 141 up=448.37 mbox=4994
+
+root@raspberrypi3-64:~# B 5 up=449.31 mbox=4998
+A 142 up=449.38 mbox=5002
+(n=0; while :; do n=$((n+1)); read u < /proc/uptime; echo "B $n up=${u%% *} mbox=$(awk '/3f00b880.mailbox/{print $2+$3+$4+$5}' /proc/inte
+rrupts)"; sleep 1; done) &[  450.129905] audit: type=1334 audit(1750927897.795:174): prog-id=98 op=LOAD
+
+root@raspberrypi3-64:~# B 1 up=450.13 mbox=5026
+B 6 up=450.32 mbox=5026
+A 143 up=450.39 mbox=5026
+[  450.563572] audit: type=1334 audit(1750927898.231:175): prog-id=98 op=UNLOAD
+B 2 up=451.14 mbox=5032
+B 7 up=451.32 mbox=5036
+A 144 up=451.39 mbox=5042
+B 3 up=452.15 mbox=5046
+B 8 up=452.33 mbox=5050
+A 145 up=452.40 mbox=5062
+B 4 up=453.16 mbox=5070
+B 9 up=453.34 mbox=5074
+A 146 up=453.41 mbox=5078
+B 5 up=454.17 mbox=5082
+B 10 up=454.35 mbox=5086
+A 147 up=454.42 mbox=5090
+B 6 up=455.17 mbox=5110
+B 11 up=455.36 mbox=5114
+A 148 up=455.43 mbox=5118
+[  455.629402] audit: type=1334 audit(1750927903.295:176): prog-id=99 op=LOAD
+[  456.047406] audit: type=1334 audit(1750927903.715:177): prog-id=99 op=UNLOAD
+B 7 up=456.18 mbox=5138
+B 12 up=456.37 mbox=5142
+A 149 up=456.44 mbox=5146
+B 8 up=457.19 mbox=5150
+B 13 up=457.38 mbox=5156
+A 150 up=457.45 mbox=5164
+B 9 up=458.20 mbox=5168
+B 14 up=458.38 mbox=5172
+A 151 up=458.45 mbox=5176
+B 10 up=459.21 mbox=5180
+B 15 up=459.39 mbox=5184
+A 152 up=459.46 mbox=5188
+B 11 up=460.22 mbox=5206
+B 16 up=460.40 mbox=5210
+A 153 up=460.47 mbox=5214
+[  461.128785] audit: type=1334 audit(1750927908.795:178): prog-id=100 op=LOAD
+B 12 up=461.23 mbox=5226
+B 17 up=461.41 mbox=5226
+A 154 up=461.48 mbox=5226
+[  461.555486] audit: type=1334 audit(1750927909.223:179): prog-id=100 op=UNLOAD
+B 13 up=462.23 mbox=5234
+B 18 up=462.42 mbox=5244
+A 155 up=462.48 mbox=5252
+B 14 up=463.24 mbox=5256
+B 19 up=463.42 mbox=5262
+A 156 up=463.49 mbox=5266
+B 15 up=464.25 mbox=5270
+B 20 up=464.43 mbox=5274
+A 157 up=464.50 mbox=5278
+B 16 up=465.26 mbox=5302
+B 21 up=465.44 mbox=5306
+A 158 up=465.51 mbox=5310
+B 17 up=466.27 mbox=5314
+B 22 up=466.45 mbox=5318
+A 159 up=466.52 mbox=5322
+[  466.630051] audit: type=1334 audit(1750927914.295:180): prog-id=101 op=LOAD
+[  467.057870] audit: type=1334 audit(1750927914.723:181): prog-id=101 op=UNLOAD
+B 18 up=467.28 mbox=5346
+B 23 up=467.46 mbox=5350
+A 160 up=467.53 mbox=5354
+B 19 up=468.29 mbox=5358
+B 24 up=468.46 mbox=5362
+A 161 up=468.54 mbox=5366
+B 20 up=469.29 mbox=5370
+B 25 up=469.47 mbox=5392
+A 162 up=469.54 mbox=5396
+B 21 up=470.30 mbox=5400
+B 26 up=470.48 mbox=5404
+A 163 up=470.55 mbox=5408
+B 22 up=471.31 mbox=5412
+B 27 up=471.49 mbox=5416
+A 164 up=471.56 mbox=5420
+[  472.130682] audit: type=1334 audit(1750927919.795:182): prog-id=102 op=LOAD
+B 23 up=472.32 mbox=5454
+B 28 up=472.50 mbox=5454
+[  472.555458] audit: type=1334 audit(1750927920.223:183): prog-id=102 op=UNLOAD
+A 165 up=472.57 mbox=5462
+B 24 up=473.33 mbox=5466
+B 29 up=473.50 mbox=5470
+A 166 up=473.58 mbox=5474
+B 25 up=474.34 mbox=5480
+B 30 up=474.51 mbox=5498
+A 167 up=474.59 mbox=5502
+B 26 up=475.34 mbox=5506
+B 31 up=475.52 mbox=5510
+A 168 up=475.60 mbox=5514
+B 27 up=476.35 mbox=5518
+B 32 up=476.53 mbox=5524
+A 169 up=476.61 mbox=5528
+B 28 up=477.36 mbox=5552
+B 33 up=477.54 mbox=5556
+[  477.630890] audit: type=1334 audit(1750927925.295:184): prog-id=103 op=LOAD
+A 170 up=477.62 mbox=5560
+[  478.063460] audit: type=1334 audit(1750927925.731:185): prog-id=103 op=UNLOAD
+B 29 up=478.37 mbox=5580
+B 34 up=478.55 mbox=5584
+A 171 up=478.63 mbox=5588
+B 30 up=479.38 mbox=5596
+B 35 up=479.56 mbox=5608
+A 172 up=479.64 mbox=5614
+B 31 up=480.38 mbox=5618
+B 36 up=480.56 mbox=5624
+A 173 up=480.65 mbox=5628
+B 32 up=481.39 mbox=5632
+B 37 up=481.57 mbox=5638
+A 174 up=481.66 mbox=5642
+B 33 up=482.40 mbox=5662
+B 38 up=482.58 mbox=5666
+A 175 up=482.67 mbox=5670
+[  483.130559] audit: type=1334 audit(1750927930.795:186): prog-id=104 op=LOAD
+B 34 up=483.41 mbox=5678
+[  483.555470] audit: type=1334 audit(1750927931.223:187): prog-id=104 op=UNLOAD
+B 39 up=483.59 mbox=5684
+A 176 up=483.68 mbox=5688
+B 35 up=484.42 mbox=5698
+B 40 up=484.60 mbox=5704
+A 177 up=484.68 mbox=5708
+B 36 up=485.42 mbox=5712
+B 41 up=485.61 mbox=5716
+A 178 up=485.69 mbox=5720
+B 37 up=486.43 mbox=5724
+B 42 up=486.62 mbox=5728
+A 179 up=486.70 mbox=5732
+B 38 up=487.44 mbox=5748
+B 43 up=487.63 mbox=5752
+A 180 up=487.71 mbox=5756
+B 39 up=488.45 mbox=5760
+[  488.630019] audit: type=1334 audit(1750927936.295:188): prog-id=105 op=LOAD
+B 44 up=488.63 mbox=5768
+A 181 up=488.72 mbox=5772
+[  489.073490] audit: type=1334 audit(1750927936.739:189): prog-id=105 op=UNLOAD
+B 40 up=489.46 mbox=5792
+B 45 up=489.64 mbox=5796
+A 182 up=489.72 mbox=5800
+B 41 up=490.47 mbox=5804
+B 46 up=490.65 mbox=5808
+A 183 up=490.73 mbox=5812
+B 42 up=491.48 mbox=5834
+B 47 up=491.66 mbox=5838
+A 184 up=491.74 mbox=5842
+B 43 up=492.49 mbox=5846
+B 48 up=492.67 mbox=5850
+A 185 up=492.75 mbox=5854
+B 44 up=493.49 mbox=5860
+B 49 up=493.67 mbox=5864
+A 186 up=493.76 mbox=5868
+[  494.130153] audit: type=1334 audit(1750927941.795:190): prog-id=106 op=LOAD
+B 45 up=494.50 mbox=5900
+[  494.547387] audit: type=1334 audit(1750927942.215:191): prog-id=106 op=UNLOAD
+B 50 up=494.68 mbox=5908
+A 187 up=494.77 mbox=5912
+B 46 up=495.51 mbox=5916
+B 51 up=495.69 mbox=5920
+A 188 up=495.78 mbox=5924
+B 47 up=496.52 mbox=5942
+B 52 up=496.70 mbox=5948
+A 189 up=496.79 mbox=5952
+B 48 up=497.53 mbox=5956
+B 53 up=497.71 mbox=5960
+A 190 up=497.80 mbox=5964
+B 49 up=498.53 mbox=5968
+B 54 up=498.72 mbox=5972
+A 191 up=498.80 mbox=5976
+B 50 up=499.54 mbox=5998
+[  499.628579] audit: type=1334 audit(1750927947.295:192): prog-id=107 op=LOAD
+B 55 up=499.73 mbox=6010
+A 192 up=499.81 mbox=6010
+[  500.047515] audit: type=1334 audit(1750927947.715:193): prog-id=107 op=UNLOAD
+B 51 up=500.55 mbox=6016
+B 56 up=500.73 mbox=6020
+A 193 up=500.82 mbox=6024
+B 52 up=501.56 mbox=6042
+B 57 up=501.74 mbox=6046
+A 194 up=501.83 mbox=6050
+B 53 up=502.57 mbox=6054
+B 58 up=502.75 mbox=6058
+A 195 up=502.84 mbox=6062
+B 54 up=503.58 mbox=6066
+B 59 up=503.76 mbox=6070
+A 196 up=503.85 mbox=6074
+B 55 up=504.59 mbox=6094
+B 60 up=504.77 mbox=6098
+A 197 up=504.85 mbox=6104
+[  505.129944] audit: type=1334 audit(1750927952.795:194): prog-id=108 op=LOAD
+[  505.555438] audit: type=1334 audit(1750927953.223:195): prog-id=108 op=UNLOAD
+B 56 up=505.60 mbox=6126
+B 61 up=505.78 mbox=6132
+A 198 up=505.86 mbox=6136
+B 57 up=506.60 mbox=6154
+B 62 up=506.79 mbox=6160
+A 199 up=506.87 mbox=6164
+B 58 up=507.61 mbox=6168
+B 63 up=507.79 mbox=6172
+A 200 up=507.88 mbox=6176
+B 59 up=508.62 mbox=6180
+B 64 up=508.80 mbox=6184
+A 201 up=508.89 mbox=6194
+B 60 up=509.63 mbox=6202
+B 65 up=509.81 mbox=6206
+A 202 up=509.90 mbox=6210
+[  510.629423] audit: type=1334 audit(1750927958.295:196): prog-id=109 op=LOAD
+B 61 up=510.64 mbox=6220
+B 66 up=510.82 mbox=6224
+A 203 up=510.90 mbox=6224
+[  511.073556] audit: type=1334 audit(1750927958.739:197): prog-id=109 op=UNLOAD
+B 62 up=511.65 mbox=6246
+B 67 up=511.83 mbox=6250
+A 204 up=511.91 mbox=6254
+B 63 up=512.65 mbox=6258
+B 68 up=512.83 mbox=6262
+A 205 up=512.92 mbox=6266
+B 64 up=513.66 mbox=6282
+B 69 up=513.84 mbox=6286
+A 206 up=513.93 mbox=6290
+B 65 up=514.67 mbox=6294
+B 70 up=514.85 mbox=6300
+A 207 up=514.94 mbox=6304
+B 66 up=515.68 mbox=6308
+B 71 up=515.86 mbox=6314
+A 208 up=515.94 mbox=6328
+[  516.129430] audit: type=1334 audit(1750927963.795:198): prog-id=110 op=LOAD
+[  516.547563] audit: type=1334 audit(1750927964.215:199): prog-id=110 op=UNLOAD
+B 67 up=516.69 mbox=6348
+B 72 up=516.87 mbox=6352
+A 209 up=516.95 mbox=6356
+B 68 up=517.70 mbox=6360
+B 73 up=517.88 mbox=6364
+A 210 up=517.96 mbox=6368
+B 69 up=518.71 mbox=6388
+B 74 up=518.89 mbox=6392
+A 211 up=518.97 mbox=6396
+B 70 up=519.72 mbox=6402
+B 75 up=519.90 mbox=6408
+A 212 up=519.98 mbox=6412
+B 71 up=520.72 mbox=6416
+B 76 up=520.90 mbox=6426
+A 213 up=520.99 mbox=6438
+[  521.629867] audit: type=1334 audit(1750927969.295:200): prog-id=111 op=LOAD
+B 72 up=521.73 mbox=6454
+B 77 up=521.91 mbox=6454
+A 214 up=522.00 mbox=6454
+[  522.059472] audit: type=1334 audit(1750927969.727:201): prog-id=111 op=UNLOAD
+B 73 up=522.74 mbox=6464
+B 78 up=522.92 mbox=6468
+A 215 up=523.00 mbox=6472
+B 74 up=523.75 mbox=6486
+B 79 up=523.93 mbox=6490
+A 216 up=524.01 mbox=6494
+B 75 up=524.76 mbox=6498
+B 80 up=524.93 mbox=6502
+A 217 up=525.02 mbox=6506
+B 76 up=525.77 mbox=6510
+B 81 up=525.94 mbox=6526
+A 218 up=526.03 mbox=6530
+B 77 up=526.77 mbox=6536
+B 82 up=526.95 mbox=6540
+A 219 up=527.04 mbox=6544
+[  527.129511] audit: type=1334 audit(1750927974.795:202): prog-id=112 op=LOAD
+[  527.575446] audit: type=1334 audit(1750927975.243:203): prog-id=112 op=UNLOAD
+B 78 up=527.78 mbox=6570
+B 83 up=527.96 mbox=6574
+A 220 up=528.05 mbox=6578
+B 79 up=528.79 mbox=6592
+B 84 up=528.97 mbox=6598
+A 221 up=529.05 mbox=6602
+B 80 up=529.80 mbox=6606
+B 85 up=529.98 mbox=6610
+A 222 up=530.06 mbox=6614
+B 81 up=530.81 mbox=6618
+B 86 up=530.99 mbox=6636
+A 223 up=531.07 mbox=6640
+B 82 up=531.82 mbox=6644
+B 87 up=532.00 mbox=6648
+A 224 up=532.08 mbox=6652
+[  532.628644] audit: type=1334 audit(1750927980.295:204): prog-id=113 op=LOAD
+B 83 up=532.83 mbox=6664
+B 88 up=533.00 mbox=6664
+[  533.069799] audit: type=1334 audit(1750927980.735:205): prog-id=113 op=UNLOAD
+A 225 up=533.09 mbox=6672
+B 84 up=533.83 mbox=6678
+B 89 up=534.01 mbox=6684
+A 226 up=534.10 mbox=6688
+B 85 up=534.84 mbox=6692
+B 90 up=535.02 mbox=6696
+A 227 up=535.10 mbox=6700
+B 86 up=535.85 mbox=6722
+B 91 up=536.03 mbox=6726
+A 228 up=536.11 mbox=6730
+B 87 up=536.86 mbox=6734
+B 92 up=537.04 mbox=6738
+A 229 up=537.12 mbox=6742
+B 88 up=537.87 mbox=6746
+B 93 up=538.05 mbox=6758
+[  538.129541] audit: type=1334 audit(1750927985.795:206): prog-id=114 op=LOAD
+A 230 up=538.13 mbox=6768
+[  538.559442] audit: type=1334 audit(1750927986.227:207): prog-id=114 op=UNLOAD
+B 89 up=538.88 mbox=6778
+B 94 up=539.05 mbox=6782
+A 231 up=539.14 mbox=6786
+B 90 up=539.89 mbox=6790
+B 95 up=540.06 mbox=6794
+A 232 up=540.15 mbox=6798
+B 91 up=540.90 mbox=6816
+B 96 up=541.07 mbox=6820
+A 233 up=541.15 mbox=6824
+B 92 up=541.90 mbox=6828
+B 97 up=542.08 mbox=6832
+A 234 up=542.16 mbox=6836
+B 93 up=542.91 mbox=6846
+B 98 up=543.09 mbox=6852
+A 235 up=543.17 mbox=6856
+[  543.629854] audit: type=1334 audit(1750927991.295:208): prog-id=115 op=LOAD
+B 94 up=543.92 mbox=6864
+[  544.063430] audit: type=1334 audit(1750927991.731:209): prog-id=115 op=UNLOAD
+B 99 up=544.10 mbox=6874
+A 236 up=544.18 mbox=6878
+B 95 up=544.93 mbox=6882
+B 100 up=545.11 mbox=6886
+A 237 up=545.19 mbox=6892
+B 96 up=545.93 mbox=6908
+B 101 up=546.12 mbox=6912
+A 238 up=546.20 mbox=6916
+B 97 up=546.94 mbox=6920
+B 102 up=547.13 mbox=6924
+A 239 up=547.21 mbox=6928
+B 98 up=547.95 mbox=6948
+B 103 up=548.13 mbox=6952
+
+root@raspberrypi3-64:~# A 240 up=548.21 mbox=6956
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# B 99 up=548.96 mbox=6960
+
+root@raspberrypi3-64:~# [  549.130535] audit: type=1334 audit(1750927996.795:210): prog-id=116 op=LOAD
+B 104 up=549.15 mbox=6968
+A 241 up=549.22 mbox=6972
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# [  549.559512] audit: type=1334 audit(1750927997.227:211): prog-id=116 op=UNLOAD
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# B 100 up=549.97 mbox=6982
+
+root@raspberrypi3-64:~# B 105 up=550.15 mbox=6986
+A 242 up=550.23 mbox=6990
+
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# 
+root@raspberrypi3-64:~# B 101 up=550.98 mbox=7006
+modprobe optee &B 106 up=551.16 mbox=7014
+A 243 up=551.24 mbox=7018
+
+root@raspberrypi3-64:~# [  551.394125] optee: probing for conduit method.
+[  552.415184] ------------[ cut here ]------------
+[  552.420466] Firmware transaction timeout
+[  552.420542] WARNING: CPU: 0 PID: 8 at /drivers/firmware/raspberrypi.c:69 rpi_firmware_property_list+0x26c/0x290
+[  552.436519] Modules linked in: optee(+) brcmfmac cfg80211 rfkill brcmutil sch_fq_codel ipv6
+[  552.446360] CPU: 0 PID: 8 Comm: kworker/0:0 Not tainted 6.6.63-v8 #1
+[  552.453532] Hardware name: Raspberry Pi 3 Model B Rev 1.2 (DT)
+[  552.460190] Workqueue: events dbs_work_handler
+[  552.465457] pstate: 60000005 (nZCv daif -PAN -UAO -TCO -DIT -SSBS BTYPE=--)
+[  552.473306] pc : rpi_firmware_property_list+0x26c/0x290
+[  552.479412] lr : rpi_firmware_property_list+0x26c/0x290
+[  552.485510] sp : ffffffc08005b940
+[  552.489662] x29: ffffffc08005b960 x28: 0000000000000000 x27: ffffff800062dcc0
+[  552.497746] x26: 0000000000000006 x25: ffffffc080497008 x24: 0000000000001000
+[  552.505853] x23: ffffff8005a403c0 x22: ffffffe673dd08f8 x21: 0000000000000018
+[  552.513969] x20: ffffff800062dc80 x19: ffffffc080497000 x18: 0000000000000006
+[  552.522087] x17: 0000000000000020 x16: 0000000000000002 x15: ffffffc08005b2a0
+[  552.530227] x14: 0000004786bc9a14 x13: 0001272661d21a8e x12: 00000000eac0c6e6
+[  552.538386] x11: 00000000000003dd x10: 0000000000001a60 x9 : ffffffe67322e550
+[  552.546557] x8 : ffffff8000647700 x7 : 000000000000000a x6 : 0000000000000000
+[  552.554742] x5 : ffffffe673c2f000 x4 : 0000000000000001 x3 : ffffffe673c2f168
+[  552.562938] x2 : 0000000000000000 x1 : 0000000000000000 x0 : ffffff8000645c40
+[  552.571142] Call trace:
+[  552.574575]  rpi_firmware_property_list+0x26c/0x290
+[  552.580506]  rpi_firmware_property+0x78/0x120
+[  552.585905]  raspberrypi_fw_set_rate+0x60/0xf0
+[  552.591403]  clk_change_rate+0xe0/0x518
+[  552.596287]  clk_core_set_rate_nolock+0x188/0x2d8
+[  552.602036]  clk_set_rate+0x40/0x190
+[  552.606625]  _opp_config_clk_single+0x38/0xb8
+[  552.612017]  _set_opp+0x108/0x410
+[  552.616315]  dev_pm_opp_set_rate+0x198/0x298
+[  552.621564]  set_target+0x38/0x50
+[  552.625805]  __cpufreq_driver_target+0x25c/0x6b0
+[  552.631351]  od_dbs_update+0x14c/0x1c0
+[  552.635992]  dbs_work_handler+0x48/0x90
+[  552.640705]  process_one_work+0x148/0x3b8
+[  552.645583]  worker_thread+0x324/0x448
+[  552.650174]  kthread+0x104/0x118
+[  552.654223]  ret_from_fork+0x10/0x20
+[  552.658630] ---[ end trace 0000000000000000 ]---
+[  552.664158] raspberrypi-clk soc:firmware:clocks: Failed to change fw-clk-arm frequency: -110
+[  572.415161] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  572.422235] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=1158
+[  572.433477] rcu: 	(detected by 3, t=5256 jiffies, g=38269, q=3206 ncpus=4)
+[  572.441342] Task dump for CPU 1:
+[  572.445489] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[  572.457367] Call trace:
+[  572.460736]  __switch_to+0xd8/0x140
+[  572.465160]  0x0
+[  635.475161] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  635.482292] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=4311
+[  635.493682] rcu: 	(detected by 2, t=21021 jiffies, g=38269, q=10752 ncpus=4)
+[  635.501819] Task dump for CPU 1:
+[  635.506068] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[  635.518164] Call trace:
+[  635.521645]  __switch_to+0xd8/0x140
+[  635.526201]  0x0
+[  698.535160] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  698.542404] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=7464
+[  698.554063] rcu: 	(detected by 2, t=36786 jiffies, g=38269, q=10822 ncpus=4)
+[  698.562334] Task dump for CPU 1:
+[  698.566724] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[  698.579100] Call trace:
+[  698.582702]  __switch_to+0xd8/0x140
+[  698.587347]  0x0
+[  725.999179] INFO: task systemd:1 blocked for more than 120 seconds.
+[  726.006656]       Tainted: G        W          6.6.63-v8 #1
+[  726.013412] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  726.022468] task:systemd         state:D stack:0     pid:1     ppid:0      flags:0x00000004
+[  726.033093] Call trace:
+[  726.036605]  __switch_to+0xd8/0x140
+[  726.041200]  __schedule+0x374/0xd50
+[  726.045794]  schedule+0x60/0x100
+[  726.050111]  schedule_timeout+0x1a8/0x1c0
+[  726.055209]  wait_for_completion+0xc8/0x170
+[  726.060465]  __wait_rcu_gp+0x160/0x200
+[  726.065245]  synchronize_rcu+0x9c/0xb0
+[  726.069993]  rcu_sync_enter+0x60/0x128
+[  726.074728]  percpu_down_write+0x34/0x220
+[  726.079699]  cgroup_procs_write_start+0x88/0x1a0
+[  726.085294]  __cgroup_procs_write+0x74/0x1e8
+[  726.090522]  cgroup_procs_write+0x24/0x48
+[  726.095496]  cgroup_file_write+0xb0/0x1c8
+[  726.100460]  kernfs_fop_write_iter+0x128/0x1e0
+[  726.105873]  vfs_write+0x1d4/0x3b0
+[  726.110173]  ksys_write+0x7c/0x120
+[  726.114447]  __arm64_sys_write+0x24/0x38
+[  726.119250]  invoke_syscall+0x50/0x128
+[  726.123833]  el0_svc_common.constprop.0+0x48/0xf0
+[  726.129381]  do_el0_svc+0x24/0x38
+[  726.133487]  el0_svc+0x38/0xc8
+[  726.137328]  el0t_64_sync_handler+0x120/0x130
+[  726.142515]  el0t_64_sync+0x190/0x198
+[  726.147042] INFO: task systemd-journal:122 blocked for more than 120 seconds.
+[  726.155073]       Tainted: G        W          6.6.63-v8 #1
+[  726.161491] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  726.170225] task:systemd-journal state:D stack:0     pid:122   ppid:1      flags:0x00000804
+[  726.180205] Call trace:
+[  726.183448]  __switch_to+0xd8/0x140
+[  726.187749]  __schedule+0x374/0xd50
+[  726.192045]  schedule+0x60/0x100
+[  726.196075]  schedule_preempt_disabled+0x20/0x40
+[  726.201533]  __mutex_lock.constprop.0+0x2e4/0x598
+[  726.207091]  __mutex_lock_slowpath+0x1c/0x30
+[  726.212180]  mutex_lock+0x50/0x68
+[  726.216302]  proc_cgroup_show+0x60/0x3a0
+[  726.221065]  proc_single_show+0x68/0x128
+[  726.225803]  seq_read_iter+0xe4/0x470
+[  726.230273]  seq_read+0x9c/0xe0
+[  726.234209]  vfs_read+0xcc/0x2d0
+[  726.238210]  ksys_read+0x7c/0x120
+[  726.242297]  __arm64_sys_read+0x24/0x38
+[  726.246925]  invoke_syscall+0x50/0x128
+[  726.251456]  el0_svc_common.constprop.0+0xc8/0xf0
+[  726.256983]  do_el0_svc+0x24/0x38
+[  726.261087]  el0_svc+0x38/0xc8
+[  726.264910]  el0t_64_sync_handler+0x120/0x130
+[  726.270077]  el0t_64_sync+0x190/0x198
+[  726.274532] INFO: task (ch-state):2525 blocked for more than 121 seconds.
+[  726.282201]       Tainted: G        W          6.6.63-v8 #1
+[  726.288621] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  726.297369] task:(ch-state)      state:D stack:0     pid:2525  ppid:1      flags:0x00000204
+[  726.307540] Call trace:
+[  726.310760]  __switch_to+0xd8/0x140
+[  726.315041]  __schedule+0x374/0xd50
+[  726.319309]  schedule+0x60/0x100
+[  726.323294]  schedule_preempt_disabled+0x20/0x40
+[  726.328705]  __mutex_lock.constprop.0+0x2e4/0x598
+[  726.334218]  __mutex_lock_slowpath+0x1c/0x30
+[  726.339276]  mutex_lock+0x50/0x68
+[  726.343346]  cgroup_kn_lock_live+0x60/0x1b8
+[  726.348328]  __cgroup_procs_write+0x58/0x1e8
+[  726.353391]  cgroup_procs_write+0x24/0x48
+[  726.358188]  cgroup_file_write+0xb0/0x1c8
+[  726.362990]  kernfs_fop_write_iter+0x128/0x1e0
+[  726.368239]  vfs_write+0x1d4/0x3b0
+[  726.372426]  ksys_write+0x7c/0x120
+[  726.376607]  __arm64_sys_write+0x24/0x38
+[  726.381338]  invoke_syscall+0x50/0x128
+[  726.385907]  el0_svc_common.constprop.0+0xc8/0xf0
+[  726.391441]  do_el0_svc+0x24/0x38
+[  726.395555]  el0_svc+0x38/0xc8
+[  726.399416]  el0t_64_sync_handler+0x120/0x130
+[  726.404593]  el0t_64_sync+0x190/0x198
+[  761.595161] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  761.602154] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=10616
+[  761.613369] rcu: 	(detected by 0, t=52551 jiffies, g=38269, q=10891 ncpus=4)
+[  761.621346] Task dump for CPU 1:
+[  761.625414] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[  761.637080] Call trace:
+[  761.640337]  __switch_to+0xd8/0x140
+[  761.644678]  0x0
+[  824.655161] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  824.662214] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=13767
+[  824.673562] rcu: 	(detected by 0, t=68316 jiffies, g=38269, q=10954 ncpus=4)
+[  824.681626] Task dump for CPU 1:
+[  824.685806] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[  824.697769] Call trace:
+[  824.701183]  __switch_to+0xd8/0x140
+[  824.705675]  0x0
+[  846.815181] INFO: task systemd:1 blocked for more than 241 seconds.
+[  846.822571]       Tainted: G        W          6.6.63-v8 #1
+[  846.829238] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  846.838244] task:systemd         state:D stack:0     pid:1     ppid:0      flags:0x00000004
+[  846.848835] Call trace:
+[  846.852365]  __switch_to+0xd8/0x140
+[  846.856963]  __schedule+0x374/0xd50
+[  846.861546]  schedule+0x60/0x100
+[  846.865870]  schedule_timeout+0x1a8/0x1c0
+[  846.870962]  wait_for_completion+0xc8/0x170
+[  846.876228]  __wait_rcu_gp+0x160/0x200
+[  846.880991]  synchronize_rcu+0x9c/0xb0
+[  846.885738]  rcu_sync_enter+0x60/0x128
+[  846.890471]  percpu_down_write+0x34/0x220
+[  846.895443]  cgroup_procs_write_start+0x88/0x1a0
+[  846.901030]  __cgroup_procs_write+0x74/0x1e8
+[  846.906257]  cgroup_procs_write+0x24/0x48
+[  846.911245]  cgroup_file_write+0xb0/0x1c8
+[  846.916196]  kernfs_fop_write_iter+0x128/0x1e0
+[  846.921605]  vfs_write+0x1d4/0x3b0
+[  846.925919]  ksys_write+0x7c/0x120
+[  846.930185]  __arm64_sys_write+0x24/0x38
+[  846.934978]  invoke_syscall+0x50/0x128
+[  846.939568]  el0_svc_common.constprop.0+0x48/0xf0
+[  846.945123]  do_el0_svc+0x24/0x38
+[  846.949222]  el0_svc+0x38/0xc8
+[  846.953059]  el0t_64_sync_handler+0x120/0x130
+[  846.958240]  el0t_64_sync+0x190/0x198
+[  846.962764] INFO: task systemd-journal:122 blocked for more than 241 seconds.
+[  846.970798]       Tainted: G        W          6.6.63-v8 #1
+[  846.977221] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  846.985964] task:systemd-journal state:D stack:0     pid:122   ppid:1      flags:0x00000804
+[  846.995946] Call trace:
+[  846.999188]  __switch_to+0xd8/0x140
+[  847.003488]  __schedule+0x374/0xd50
+[  847.007785]  schedule+0x60/0x100
+[  847.011833]  schedule_preempt_disabled+0x20/0x40
+[  847.017290]  __mutex_lock.constprop.0+0x2e4/0x598
+[  847.022851]  __mutex_lock_slowpath+0x1c/0x30
+[  847.027949]  mutex_lock+0x50/0x68
+[  847.032059]  proc_cgroup_show+0x60/0x3a0
+[  847.036804]  proc_single_show+0x68/0x128
+[  847.041543]  seq_read_iter+0xe4/0x470
+[  847.046027]  seq_read+0x9c/0xe0
+[  847.049950]  vfs_read+0xcc/0x2d0
+[  847.053950]  ksys_read+0x7c/0x120
+[  847.058051]  __arm64_sys_read+0x24/0x38
+[  847.062669]  invoke_syscall+0x50/0x128
+[  847.067198]  el0_svc_common.constprop.0+0xc8/0xf0
+[  847.072724]  do_el0_svc+0x24/0x38
+[  847.076823]  el0_svc+0x38/0xc8
+[  847.080637]  el0t_64_sync_handler+0x120/0x130
+[  847.085805]  el0t_64_sync+0x190/0x198
+[  847.090263] INFO: task (ch-state):2525 blocked for more than 241 seconds.
+[  847.097933]       Tainted: G        W          6.6.63-v8 #1
+[  847.104355] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  847.113123] task:(ch-state)      state:D stack:0     pid:2525  ppid:1      flags:0x00000204
+[  847.123190] Call trace:
+[  847.126416]  __switch_to+0xd8/0x140
+[  847.130684]  __schedule+0x374/0xd50
+[  847.134930]  schedule+0x60/0x100
+[  847.138910]  schedule_preempt_disabled+0x20/0x40
+[  847.144316]  __mutex_lock.constprop.0+0x2e4/0x598
+[  847.149841]  __mutex_lock_slowpath+0x1c/0x30
+[  847.154900]  mutex_lock+0x50/0x68
+[  847.158974]  cgroup_kn_lock_live+0x60/0x1b8
+[  847.163964]  __cgroup_procs_write+0x58/0x1e8
+[  847.169024]  cgroup_procs_write+0x24/0x48
+[  847.173817]  cgroup_file_write+0xb0/0x1c8
+[  847.178602]  kernfs_fop_write_iter+0x128/0x1e0
+[  847.183839]  vfs_write+0x1d4/0x3b0
+[  847.188038]  ksys_write+0x7c/0x120
+[  847.192224]  __arm64_sys_write+0x24/0x38
+[  847.196955]  invoke_syscall+0x50/0x128
+[  847.201523]  el0_svc_common.constprop.0+0xc8/0xf0
+[  847.207060]  do_el0_svc+0x24/0x38
+[  847.211185]  el0_svc+0x38/0xc8
+[  847.215013]  el0t_64_sync_handler+0x120/0x130
+[  847.220193]  el0t_64_sync+0x190/0x198
+[  887.715162] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  887.722161] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=16918
+[  887.733370] rcu: 	(detected by 0, t=84081 jiffies, g=38269, q=11043 ncpus=4)
+[  887.741340] Task dump for CPU 1:
+[  887.745403] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[  887.757062] Call trace:
+[  887.760316]  __switch_to+0xd8/0x140
+[  887.764650]  0x0
+[  950.775161] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  950.782206] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=20070
+[  950.793533] rcu: 	(detected by 3, t=99846 jiffies, g=38269, q=11106 ncpus=4)
+[  950.801595] Task dump for CPU 1:
+[  950.805771] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[  950.817729] Call trace:
+[  950.821142]  __switch_to+0xd8/0x140
+[  950.825632]  0x0
+[  967.655181] INFO: task systemd:1 blocked for more than 362 seconds.
+[  967.662542]       Tainted: G        W          6.6.63-v8 #1
+[  967.669211] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  967.678208] task:systemd         state:D stack:0     pid:1     ppid:0      flags:0x00000004
+[  967.688791] Call trace:
+[  967.692319]  __switch_to+0xd8/0x140
+[  967.696909]  __schedule+0x374/0xd50
+[  967.701474]  schedule+0x60/0x100
+[  967.705804]  schedule_timeout+0x1a8/0x1c0
+[  967.710895]  wait_for_completion+0xc8/0x170
+[  967.716163]  __wait_rcu_gp+0x160/0x200
+[  967.720933]  synchronize_rcu+0x9c/0xb0
+[  967.725680]  rcu_sync_enter+0x60/0x128
+[  967.730414]  percpu_down_write+0x34/0x220
+[  967.735377]  cgroup_procs_write_start+0x88/0x1a0
+[  967.740965]  __cgroup_procs_write+0x74/0x1e8
+[  967.746192]  cgroup_procs_write+0x24/0x48
+[  967.751177]  cgroup_file_write+0xb0/0x1c8
+[  967.756140]  kernfs_fop_write_iter+0x128/0x1e0
+[  967.761547]  vfs_write+0x1d4/0x3b0
+[  967.765861]  ksys_write+0x7c/0x120
+[  967.770126]  __arm64_sys_write+0x24/0x38
+[  967.774918]  invoke_syscall+0x50/0x128
+[  967.779505]  el0_svc_common.constprop.0+0x48/0xf0
+[  967.785059]  do_el0_svc+0x24/0x38
+[  967.789161]  el0_svc+0x38/0xc8
+[  967.792995]  el0t_64_sync_handler+0x120/0x130
+[  967.798169]  el0t_64_sync+0x190/0x198
+[  967.802707] INFO: task systemd-journal:122 blocked for more than 362 seconds.
+[  967.810740]       Tainted: G        W          6.6.63-v8 #1
+[  967.817160] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  967.825892] task:systemd-journal state:D stack:0     pid:122   ppid:1      flags:0x00000804
+[  967.835892] Call trace:
+[  967.839108]  __switch_to+0xd8/0x140
+[  967.843411]  __schedule+0x374/0xd50
+[  967.847725]  schedule+0x60/0x100
+[  967.851767]  schedule_preempt_disabled+0x20/0x40
+[  967.857245]  __mutex_lock.constprop.0+0x2e4/0x598
+[  967.862789]  __mutex_lock_slowpath+0x1c/0x30
+[  967.867889]  mutex_lock+0x50/0x68
+[  967.872060]  proc_cgroup_show+0x60/0x3a0
+[  967.876818]  proc_single_show+0x68/0x128
+[  967.881560]  seq_read_iter+0xe4/0x470
+[  967.886056]  seq_read+0x9c/0xe0
+[  967.889981]  vfs_read+0xcc/0x2d0
+[  967.893982]  ksys_read+0x7c/0x120
+[  967.898086]  __arm64_sys_read+0x24/0x38
+[  967.902716]  invoke_syscall+0x50/0x128
+[  967.907244]  el0_svc_common.constprop.0+0xc8/0xf0
+[  967.912769]  do_el0_svc+0x24/0x38
+[  967.916869]  el0_svc+0x38/0xc8
+[  967.920693]  el0t_64_sync_handler+0x120/0x130
+[  967.925858]  el0t_64_sync+0x190/0x198
+[  967.930307] INFO: task (ch-state):2525 blocked for more than 362 seconds.
+[  967.937973]       Tainted: G        W          6.6.63-v8 #1
+[  967.944395] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  967.953165] task:(ch-state)      state:D stack:0     pid:2525  ppid:1      flags:0x00000204
+[  967.963233] Call trace:
+[  967.966456]  __switch_to+0xd8/0x140
+[  967.970732]  __schedule+0x374/0xd50
+[  967.974974]  schedule+0x60/0x100
+[  967.978952]  schedule_preempt_disabled+0x20/0x40
+[  967.984359]  __mutex_lock.constprop.0+0x2e4/0x598
+[  967.989871]  __mutex_lock_slowpath+0x1c/0x30
+[  967.994922]  mutex_lock+0x50/0x68
+[  967.998996]  cgroup_kn_lock_live+0x60/0x1b8
+[  968.003972]  __cgroup_procs_write+0x58/0x1e8
+[  968.009032]  cgroup_procs_write+0x24/0x48
+[  968.013825]  cgroup_file_write+0xb0/0x1c8
+[  968.018604]  kernfs_fop_write_iter+0x128/0x1e0
+[  968.023850]  vfs_write+0x1d4/0x3b0
+[  968.028048]  ksys_write+0x7c/0x120
+[  968.032236]  __arm64_sys_write+0x24/0x38
+[  968.036956]  invoke_syscall+0x50/0x128
+[  968.041522]  el0_svc_common.constprop.0+0xc8/0xf0
+[  968.047059]  do_el0_svc+0x24/0x38
+[  968.051177]  el0_svc+0x38/0xc8
+[  968.055014]  el0t_64_sync_handler+0x120/0x130
+[  968.060191]  el0t_64_sync+0x190/0x198
+[ 1013.835162] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[ 1013.842146] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=23223
+[ 1013.853356] rcu: 	(detected by 3, t=115611 jiffies, g=38269, q=11175 ncpus=4)
+[ 1013.861422] Task dump for CPU 1:
+[ 1013.865479] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[ 1013.877153] Call trace:
+[ 1013.880424]  __switch_to+0xd8/0x140
+[ 1013.884762]  0x0
+[ 1076.895161] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[ 1076.902199] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=26376
+[ 1076.913549] rcu: 	(detected by 2, t=131376 jiffies, g=38269, q=11238 ncpus=4)
+[ 1076.921707] Task dump for CPU 1:
+[ 1076.925890] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[ 1076.937854] Call trace:
+[ 1076.941270]  __switch_to+0xd8/0x140
+[ 1076.945752]  0x0
+[ 1088.495181] INFO: task systemd:1 blocked for more than 483 seconds.
+[ 1088.502564]       Tainted: G        W          6.6.63-v8 #1
+[ 1088.509216] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[ 1088.518217] task:systemd         state:D stack:0     pid:1     ppid:0      flags:0x00000004
+[ 1088.528800] Call trace:
+[ 1088.532334]  __switch_to+0xd8/0x140
+[ 1088.536928]  __schedule+0x374/0xd50
+[ 1088.541510]  schedule+0x60/0x100
+[ 1088.545842]  schedule_timeout+0x1a8/0x1c0
+[ 1088.550938]  wait_for_completion+0xc8/0x170
+[ 1088.556193]  __wait_rcu_gp+0x160/0x200
+[ 1088.560971]  synchronize_rcu+0x9c/0xb0
+[ 1088.565718]  rcu_sync_enter+0x60/0x128
+[ 1088.570454]  percpu_down_write+0x34/0x220
+[ 1088.575431]  cgroup_procs_write_start+0x88/0x1a0
+[ 1088.581026]  __cgroup_procs_write+0x74/0x1e8
+[ 1088.586252]  cgroup_procs_write+0x24/0x48
+[ 1088.591222]  cgroup_file_write+0xb0/0x1c8
+[ 1088.596186]  kernfs_fop_write_iter+0x128/0x1e0
+[ 1088.601592]  vfs_write+0x1d4/0x3b0
+[ 1088.605909]  ksys_write+0x7c/0x120
+[ 1088.610175]  __arm64_sys_write+0x24/0x38
+[ 1088.614967]  invoke_syscall+0x50/0x128
+[ 1088.619551]  el0_svc_common.constprop.0+0x48/0xf0
+[ 1088.625094]  do_el0_svc+0x24/0x38
+[ 1088.629198]  el0_svc+0x38/0xc8
+[ 1088.633033]  el0t_64_sync_handler+0x120/0x130
+[ 1088.638207]  el0t_64_sync+0x190/0x198
+[ 1088.642661] Future hung task reports are suppressed, see sysctl kernel.hung_task_warnings
+[ 1139.955162] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[ 1139.962141] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=29528
+[ 1139.973290] rcu: 	(detected by 0, t=147141 jiffies, g=38269, q=11307 ncpus=4)
+[ 1139.981341] Task dump for CPU 1:
+[ 1139.985422] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[ 1139.997210] Call trace:
+[ 1140.000545]  __switch_to+0xd8/0x140
+[ 1140.004955]  0x0
+[ 1203.015162] rcu: INFO: rcu_preempt detected stalls on CPUs/tasks:
+[ 1203.022266] rcu: 	1-...0: (0 ticks this GP) idle=e474/1/0x4000000000000000 softirq=19622/19629 fqs=32680
+[ 1203.033739] rcu: 	(detected by 2, t=162906 jiffies, g=38269, q=11373 ncpus=4)
+[ 1203.041942] Task dump for CPU 1:
+[ 1203.046180] task:modprobe        state:R  running task     stack:0     pid:2522  ppid:255    flags:0x00000202
+[ 1203.058267] Call trace:
+[ 1203.061745]  __switch_to+0xd8/0x140
+[ 1203.066298]  0x0
