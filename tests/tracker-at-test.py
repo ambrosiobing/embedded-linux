@@ -228,7 +228,18 @@ class FakePort:
         self.sent.append(text)
         lines = self.modem.handle(text)
         if lines == ["PROMPT"]:
-            return [], "OK"
+            # This used to return ([], "OK"), answering a send prompt as
+            # if it were a result line. The pty transport cannot do that:
+            # command() there reads until OK or ERROR, and a modem sitting
+            # at "> " sends neither, so it times out. This stub said OK,
+            # 75 checks passed, and the first run over a real pty failed
+            # on the first send with "no final result for
+            # 'AT+CASEND=0,53' in 5s". A stub that is kinder than the
+            # transport it stands in for hides exactly the defect the
+            # transport would show. Now it refuses the same way.
+            raise T.AtTimeout("no final result for %r: the modem answered "
+                              "with a send prompt, which command() does "
+                              "not read. Use prompt_command." % text)
         out = [line for line in lines if line not in ("OK", "ERROR")]
         if "ERROR" in lines:
             raise T.AtError("%s -> ERROR" % text)
@@ -237,6 +248,17 @@ class FakePort:
                 self.pending.append(line)
         return [line for line in out
                 if not line.startswith("+CADATAIND")], "OK"
+
+    def prompt_command(self, text):
+        # The one command whose answer is a prompt. The fake's table says
+        # PROMPT for it, and anything else here is the stub and the pty
+        # test disagreeing about what the modem said, which the shared
+        # table exists to prevent.
+        self.sent.append(text)
+        lines = self.modem.handle(text)
+        if lines != ["PROMPT"]:
+            raise T.AtError("%s -> %s, expected a send prompt"
+                            % (text, lines))
 
     def send_raw(self, payload, timeout=10.0):
         self.pending.extend(self.modem.take_datagram(payload))

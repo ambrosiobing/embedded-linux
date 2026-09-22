@@ -328,6 +328,27 @@ class AtPort:
             if collect and line.startswith(collect):
                 return lines, ""
 
+    def prompt_command(self, text):
+        """Write a command whose answer is a `>` prompt, and return at once.
+
+        AT+CASEND is the one command in this program's table that does not
+        end in a result line: the modem answers with a bare `> `, takes the
+        payload, and only then says OK. Sending it through command() waits
+        for a final result that cannot arrive before the payload has been
+        written, which is a five second timeout with the modem sitting at
+        its prompt, and then the socket close that follows is swallowed as
+        payload by a modem still waiting for the bytes it was promised.
+
+        That is exactly what the first run against a pty reported, in CI
+        on Monday 21 September 2026: "no final result for 'AT+CASEND=0,53'
+        in 5s", then "close failed" on the CACLOSE behind it. The design
+        document had the prompt drawn in its sequence diagram all along;
+        the code had the wrong primitive. send_raw owns the prompt, the
+        payload and the result, so the caller writes the line and hands
+        over.
+        """
+        self._write(text.encode("ascii") + b"\r\n")
+
     def send_raw(self, payload, timeout=10.0):
         """Write bytes after the modem's `>` prompt and wait for its result.
 
@@ -784,9 +805,12 @@ class Tracker:
             # server recognise the duplicate and answer it once rather
             # than recording the same position four times.
             for attempt, delay in enumerate(self.retransmit_schedule(), 1):
-                self.port.command(
-                    self.modem["udp_send"].format(length=len(datagram)),
-                    timeout=self.at_timeout, collect="+CASEND")
+                # Not command(): CASEND answers with a prompt, not a
+                # result line, and send_raw waits for exactly that. See
+                # prompt_command for what happened when this was
+                # command() with collect="+CASEND".
+                self.port.prompt_command(
+                    self.modem["udp_send"].format(length=len(datagram)))
                 self.port.send_raw(datagram, timeout=30.0)
                 if self.await_ack(message_id, delay):
                     if attempt > 1:
