@@ -249,13 +249,24 @@ check "an unknown subcommand exits 2" "$rc" "2"
 # The recipe asserts 63 bytes at build time. This checks the SOURCE the
 # recipe reads, so a bad edit is caught on a laptop rather than in a
 # build, and it uses the same comment-stripping rule.
-octets=$(sed 's/#.*//' "$DESC" | tr ' \t' '\n\n' |
+#
+# ONE destination character and -s, not '\n\n'. A duplicated destination
+# set is what SC2020 objects to, and CI treats any finding from that tool
+# as a failure. tr pads a short destination by repeating its last
+# character, so space and tab both still become a newline; -s then
+# collapses the runs.
+#
+# This laptop has no such tool installed, so the finding arrived from CI
+# rather than from here. Note also that a comment whose first word after
+# the hash is that tool's name is read by it as a DIRECTIVE, which is why
+# this paragraph never opens with it.
+octets=$(sed 's/#.*//' "$DESC" | tr -s ' \t' '\n' |
 	grep -cE '^[0-9a-fA-F][0-9a-fA-F]$' || true)
 check "hid-keyboard.desc is 63 octets" "$octets" "63"
 
-first=$(sed 's/#.*//' "$DESC" | tr ' \t' '\n\n' |
+first=$(sed 's/#.*//' "$DESC" | tr -s ' \t' '\n' |
 	grep -E '^[0-9a-fA-F][0-9a-fA-F]$' | head -n 1)
-last=$(sed 's/#.*//' "$DESC" | tr ' \t' '\n\n' |
+last=$(sed 's/#.*//' "$DESC" | tr -s ' \t' '\n' |
 	grep -E '^[0-9a-fA-F][0-9a-fA-F]$' | tail -n 1)
 check "it begins with Usage Page (Generic Desktop)" "$first" "05"
 check "it ends with End Collection" "$last" "c0"
