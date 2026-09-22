@@ -1232,3 +1232,185 @@ line each on the modular image and need no rebuild.
 filesystem was mounted read write when `mmc0` went, so it needs
 `e2fsck -f` before the next boot. The board had to be unplugged; there
 was no filesystem left to shut down.
+
+## 26. The mailbox stops answering, and that is the whole of it
+
+Tuesday 22 September 2026, later still. Entry 25 listed three cheap
+experiments. The first one was run and answered no, and on the way it
+produced the finding that reorganises everything above it.
+
+**Experiment 1: load the module immediately, not three minutes in.**
+`modprobe optee` at 44 seconds, six seconds after the login prompt.
+Identical result: `optee: probing for conduit method.` and then nothing,
+with `modprobe` wedged as a running task. So the variable is not elapsed
+time.
+
+It also settles the CPU question for good. The wedged CPU was **3** in
+the first run, **0** under `maxcpus=1`, and **1** here. Three different
+CPUs, same failure. Which CPU makes the call is irrelevant, and any
+future theory that rests on one is already refuted.
+
+**What came one second later is the finding.**
+
+```
+[   44.220381] optee: probing for conduit method.
+[   45.252490] Firmware transaction timeout
+[   45.252543] WARNING: CPU: 0 PID: 63 at drivers/firmware/raspberrypi.c:69
+             Workqueue: events dbs_work_handler
+              rpi_firmware_property_list
+              rpi_firmware_property
+              raspberrypi_fw_set_rate
+              clk_change_rate / clk_set_rate
+              _set_opp / dev_pm_opp_set_rate
+              __cpufreq_driver_target
+              od_dbs_update / dbs_work_handler
+[   45.490236] raspberrypi-clk soc:firmware:clocks:
+              Failed to change fw-clk-arm frequency: -110
+```
+
+A **healthy** CPU 0, running the ondemand governor's ordinary periodic
+work, asked the VideoCore firmware to change the ARM clock and got no
+answer. One second after the first SMC into OP-TEE.
+
+**Which reframes every SD failure of the last two days.** The Raspberry
+Pi's SD host driver does not own its own clock: `bcm2835_sdhost_set_clock`
+asks the VideoCore firmware for it, through `rpi_firmware_property`,
+through the same mailbox. Go back through every failing boot and the
+`mmc0` collapse always arrives by that route, `mmc_hw_reset` to
+`mmc_set_initial_state` to `bcm2835_sdhost_set_ios` to
+`bcm2835_sdhost_set_clock` to `rpi_firmware_property_list`, and it always
+ends in `Firmware transaction timeout`.
+
+So the card was never the problem, and neither was the controller. The
+mailbox they both depend on stops answering, and it stops answering
+within a second of the normal world's first entry into the secure world.
+Entries 20 to 25 treated the SD failures as the machine dying around a
+wedged CPU. That was close but it had the mechanism wrong: there is a
+specific shared resource, and it is the VideoCore firmware mailbox.
+
+**Why this keeps costing a filesystem, and the fix.** The mailbox dies
+while the root filesystem is mounted read write. The SD clock can then
+never be reprogrammed, every recovery attempt fails, writes die in
+flight, and ext4 takes the damage. Three runs, three rounds of damage,
+and the third ended at
+
+```
+No filesystem could mount root, tried: ext4
+Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(179,2)
+```
+
+The previous boot had replayed its journal and recovered; this one could
+not mount at all. So the next session reflashes from
+`proj20-bench-tee-modular/2026-09-22_3d77848` and adds **`ro`** to
+`cmdline.txt`. The experiment writes nothing, and a read-only root cannot
+be corrupted by an SD clock that can no longer be set. That should have
+been true from the first run of this experiment and was not.
+
+**Where the question now sits.** Not "why does a call into OP-TEE hang",
+but "what do the secure world and the VideoCore firmware share such that
+the first entry into one stops the other answering". Those are different
+questions and the second is much more specific. Candidates, none tested:
+the mailbox registers or their interrupt falling inside a region TF-A
+marks secure on this platform; the ARM clock change the governor was
+attempting at that exact moment; or the firmware and the secure world
+disagreeing about a memory window.
+
+**The next experiment is unchanged and is now sharper**, because it
+tests the mailbox directly rather than inferring it from the SD card.
+Reading `/sys/class/thermal/thermal_zone0/temp` goes through the same
+firmware mailbox, so on a read-only root:
+
+```sh
+timeout 5 cat /sys/class/thermal/thermal_zone0/temp || echo BEFORE-FAILED
+(modprobe optee &); sleep 5
+timeout 15 cat /sys/class/thermal/thermal_zone0/temp || echo AFTER-FAILED
+```
+
+A number before and `AFTER-FAILED` after proves it in one line and costs
+nothing. Worth running with the governor pinned to `performance` as well,
+since the failing transaction was a clock change and that is one `echo`
+into `scaling_governor`.
+
+## 27. Four runs, two subsystems, one mailbox
+
+Tuesday 22 September 2026, last run of the night. The card was reflashed
+from `proj20-bench-tee-modular/2026-09-22_3d77848` and booted with three
+additions to `cmdline.txt` rather than one: `modprobe.blacklist=optee` as
+before, plus `ro` and `systemd.mask=systemd-remount-fs.service`.
+
+**The read-only root worked and is the operational lesson of the day.**
+The boot printed `mounted filesystem ... ro` at 4.37 seconds and **no**
+`re-mounted ... r/w` line, where every previous boot had one at about
+seven seconds. `ro` alone would not have done it: that remount is a
+systemd unit acting on `/etc/fstab`, and masking it needs no edit to the
+ext4 partition. The run that followed wedged the board exactly as the
+previous three had, and this time the card came through untouched.
+
+**`timeout` does not exist on this image.** The experiment was written as
+`timeout 5 cat ... || echo BEFORE-FAILED`, which printed `BEFORE-FAILED`
+because the tool is missing, not because anything failed. The
+before-reading is void and the direct before-and-after demonstration was
+not obtained. Recorded rather than glossed: the one measurement this run
+was designed to produce is the one it did not produce.
+
+**What it did produce is the fourth independent sighting, one second
+apart:**
+
+```
+[   95.054249] optee: probing for conduit method.
+[   96.101721] Firmware transaction timeout
+[   96.101774] WARNING: CPU: 3 PID: 87 ... rpi_firmware_property_list
+              raspberrypi_fw_set_rate / clk_set_rate
+              __cpufreq_driver_target / dbs_work_handler
+[   96.345395] raspberrypi-clk soc:firmware:clocks:
+              Failed to change fw-clk-arm frequency: -110
+```
+
+**The case as it now stands, and why it is strong without the missing
+measurement.** Two unrelated consumers of the VideoCore firmware mailbox
+fail after the first SMC into the secure world: the SD host driver, which
+asks the firmware for its clock through `bcm2835_sdhost_set_clock`, and
+the cpufreq governor, which asks for the ARM clock through
+`raspberrypi_fw_set_rate`. The cpufreq failure is the one that matters
+for the argument, because it happens on a **healthy** CPU doing ordinary
+periodic work while a different CPU is wedged. It cannot be explained by
+"the calling CPU is stuck". Something the secure world and the VideoCore
+firmware share stops working, and both consumers hit it.
+
+Seen four times, in four separate boots, with the wedged task on CPU
+**3**, then **0**, then **1**, then **2**. All four CPUs have now taken a
+turn. Which CPU makes the call is not a variable, and neither is elapsed
+time: the hang arrives identically at 44, 95 and 197 seconds.
+
+**What is proven, what is inferred, what is unknown.**
+
+Proven: the board boots and runs indefinitely with TF-A and OP-TEE
+resident as long as nothing calls into the secure world; the first call
+never returns; within a second of it the firmware mailbox stops answering
+requests from unrelated, healthy CPUs; the SD failures are a consequence
+of that, not a cause; the card and the controller are not at fault.
+
+Inferred: that the SMC is what stops the mailbox rather than the two
+sharing a common upstream cause. The direct test is the one `timeout`
+denied us, and it is two `cat` commands on the next boot.
+
+Unknown: the mechanism. The question is not "why does a call into OP-TEE
+hang" but "what do OP-TEE and the VideoCore firmware share such that
+entering one stops the other answering". Candidates remain untested: the
+mailbox registers or their interrupt falling in a region TF-A marks
+secure on this platform; the ARM clock change the governor was attempting
+at that instant; a memory window the firmware and the secure world
+disagree about.
+
+**Next, and it is now two commands rather than a programme.** Boot the
+same card, log in, and run the before-and-after without `timeout`, which
+does not exist here, by backgrounding the read into tmpfs:
+
+```sh
+cat /sys/class/thermal/thermal_zone0/temp
+(modprobe optee &); sleep 5
+(cat /sys/class/thermal/thermal_zone0/temp > /tmp/t 2>&1 &); sleep 10; cat /tmp/t
+```
+
+A number, then an empty file, and the inference above becomes a
+measurement.
