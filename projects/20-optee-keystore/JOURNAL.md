@@ -544,3 +544,61 @@ dangling reference and also the information: the point of naming
 `xtest-report.txt` is that criterion 2 is settled by one whole command
 output and not by a summary of it. Keeping the path and creating the index
 keeps that, and turns the citation into a plan a reader can act on.
+
+## 17. Four builds, each failing one step further along, and then an image
+
+Monday 21 September 2026. The first time `./go tee` was ever run.
+
+**Software complete was a claim about code nothing had compiled.** The
+front page said it, journal entries 14 and 15 had already noted that CI
+compiles five C files and none of this project's three, and the first
+build proved the point four times in a row:
+
+| attempt | stopped at | cause |
+|---|---|---|
+| 1, four seconds | task queue | `Nothing RPROVIDES 'python3-gpiod'`: the LED daemon's binding lives in meta-python, and `kas/bench-tee.yml` named only meta-oe. Project 17 declares the same layer for the same reason in its own kas file |
+| 2, 23 minutes | TA link | `cannot find libgcc.a`. The dev kit's `gcc.mk` builds its own compiler variable from `CROSS_COMPILE`, sets `CC := false` on purpose, and locates libgcc with a bare compiler and `CFLAGS64`, which `ta_dev_kit.mk` defaults from the recipe's `CFLAGS`. Yocto puts `--sysroot` in `CC`, not `CFLAGS`. Measured: with the sysroot the compiler names an absolute path, without it the two words "libgcc.a", and the tune flags make no difference either way. One line, the same one meta-arm's `optee.inc` carries |
+| 3, three minutes | CLI link | `cannot find -lbenchkey`. `do_install` had made the unversioned symlink for the package since the recipe was written; `do_compile` never made it for itself. And a warning that was not a warning: `MAX_INPUT` redefined, because `linux/limits.h` owns that name as 255 and this file's 1 MiB won only by coming second |
+| 4, 43 minutes | nothing | `bench-tee-image-raspberrypi3-64.rootfs-20260921211144.wic.bz2`, 58 MB |
+
+The TA linked, stripped and signed on attempt 3. That was the first
+time `7b53ed98-cbfb-42ec-92b6-fe56e7682c5c.ta` existed.
+
+**What the cheap checks did before any of it.** `docs/BRINGUP.md` step
+1 says to run the fragment checks before paying for the long build, and
+they earned it: `./go ksym -f tee` refused two promptless symbols the
+fragment could not set, `DMA_SHARED_BUFFER` and `GENERIC_ALLOCATOR`. The
+fragment had explained in prose that TEE selects them, and the checker
+reads a marker on the line above, not a paragraph above the group. The
+intent was documented and never declared.
+
+Then the checker's own hint misled: its "selected by" list named three
+files for each symbol and omitted `drivers/tee/Kconfig`, the one that
+mattered, because `head -3` ran before `sort -u` and cut raw matches in
+traversal order. I concluded from that list that the two symbols were
+incidental, which is the opposite of true, and only reading the kernel
+source corrected it. The checker now deduplicates before truncating,
+says how many it is hiding, and verifies the marker's claim against the
+selectors rather than printing near it, which its header had promised
+since it was written. Proved by pointing the marker at a file that does
+not select the symbol and watching it fail.
+
+**What is still not true.** No secure world. `armstub8.bin` comes from
+the OP-TEE reference checkout, which needs `repo` installed and has
+never been built on this bench, and `docs/BRINGUP.md` gave a `repo init`
+with no `-b`, which would have taken tip rather than the 4.1.0 the
+recipes pin. Corrected before either half was built. A board booted from
+this image finds no TEE, and that is the expected intermediate state.
+
+**And what it cost the rest of the repository.** The `do_compile` fix
+was committed with `git add` of one path while the index already held
+another session's entire Project 19 tree, and `git commit` took all of
+it: 41 files under a message about libgcc. That published a recipe whose
+`inherit bundle` needs meta-rauc, which only one configuration provides,
+and BitBake halts parsing for every configuration when one recipe cannot
+inherit. No build in the repository could start until the two files
+moved under `dynamic-layers/meta-rauc/`. CI then stayed red for four
+pushes on shellcheck findings this laptop cannot see, and I pushed three
+of them without reading the first. The disk budget, the archive tiers,
+the dynamic layer and every one of those runs are in the commits between
+`c8d7043` and the image.
