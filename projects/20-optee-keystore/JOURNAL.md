@@ -963,3 +963,111 @@ from the appended line, the `.off` is cleared on reinstall, and the
 None of this touches the thing that actually matters next, which is why
 OP-TEE wedges CPU 3. It removes the traps between here and asking that
 question again.
+
+## 23. Four boots that narrow it to one function, and two experiments I designed badly
+
+Tuesday 22 September 2026, late. Entry 20 left the fault described but not
+located: something wedged CPU 3 inside OP-TEE and the SD stack died around
+it. Two more boots locate it, and the answer is narrower than anything I
+had guessed.
+
+**First, the whole boot chain, finally captured.** The earlier boots were
+caught mid-stream at the U-Boot prompt; this one has it from the first
+line. TF-A v2.6 debug, BL1 then BL2 then BL31, `rpi3: Detected: Raspberry
+Pi 3 Model B (1GB, Embest, China) [0x00a22082]`, OP-TEE loaded as image 21
+at `0x10100000` and U-Boot as image 5 at `0x11000000`, then OP-TEE 4.1.0
+printing its own memory map before handing to U-Boot 2021.10. Worth
+keeping, because that map confirms two numbers we had invented blind in
+entry 20:
+
+```
+TEE_SHMEM_START type NSEC_SHM 0x08000000 size 0x00400000
+TEE_RAM_RX  0x10100000..0x10178fff
+TEE_RAM_RW  0x10179000..0x107fffff
+TA_RAM      0x10800000..0x10ffffff
+```
+
+Secure memory is `0x10100000` for `0xf00000`, shared memory `0x08000000`
+for `0x400000`. Both `fdt rsvmem add` lines are exactly right, guessed
+from the OP-TEE platform defaults and now confirmed by the secure world
+itself.
+
+And U-Boot states the device tree problem in its own words rather than
+ours: `ERROR: Did not find a cmdline Flattened Device Tree` /
+`Could not find a valid device tree`. That is `fdt_addr_r` at
+`0x01000000` against a tree the firmware put at `0x04000000`.
+
+**The `maxcpus=1` experiment, and why my framing of it was wrong.** The
+question was whether OP-TEE wedges only when entered from a secondary
+CPU. With one CPU the board reached systemd, ran to 12.2 seconds, and
+then stopped. No stall reports, no panic, no further output, and Enter at
+the console produced nothing.
+
+That is the same wedge, and with only one CPU there is nobody left to run
+the stall detector or print anything, so it presents as sudden total
+silence. So the answer is **no**: entry from a secondary CPU is not the
+fault. I should also have predicted the shape of the failure before
+running it, because a hang on the only CPU cannot report itself, and for
+a few minutes the silence looked like a different bug rather than the
+same one.
+
+**The experiment that did locate it: leave out `/firmware/optee`.** Same
+card, same `maxcpus=1`, same `/psci` patch, same reserved memory, one
+node omitted so the `optee` driver never probes. TF-A and OP-TEE still
+boot, still hold their memory, still answer PSCI.
+
+It ran for **317 seconds**, reached `raspberrypi3-64 login:` at 14.5
+seconds, accepted a root login, and powered off cleanly with
+`All filesystems unmounted`.
+
+**Four boots, and what each one excludes:**
+
+| CPUs | TF-A and OP-TEE resident | `/firmware/optee` | Outcome |
+|---|---|---|---|
+| 4 | no | no | healthy 207 s, login, 512 MB read, clean poweroff |
+| 4 | yes | yes | CPU 3 wedged at about 20 s, RCU stalls, SD stack dies |
+| 1 | yes | yes | dead at 12.2 s, total silence |
+| 1 | yes | no | healthy 317 s, login, clean poweroff |
+
+The card is excluded. The SD controller is excluded. Having a secure
+world resident under Linux is excluded: rows three and four differ by one
+device tree node and nothing else, and row four is healthy. Which CPU
+makes the call is excluded. What is left is **the `optee` driver's calls
+into OP-TEE**, and the only stack trace in evidence names
+`optee_bus_scan`, the device enumeration that runs once at probe.
+
+**A red herring I raised and then disproved.** Both failing boots had
+`brcmfmac: brcmf_sdio_htclk: HT Avail timeout` shortly before the
+trouble, and I said out loud that it might be the trigger that walks into
+whatever OP-TEE is doing wrong. Row four has the same timeout at 13.19
+seconds and reached a login prompt one second later. It is just what this
+image does without its WiFi firmware.
+
+**Two hand-over faults of mine, both costing a card cycle or a reboot.**
+
+I put `arm_64bit=1` and `uart_2ndstage=1` on the card for the control
+boot, where they were necessary, and then restored the secure world on
+top without taking them off. That boot produced nothing at all, and
+rather than three changes from a known-good state it should have been
+one. The fix was to copy back `config.txt.optee-secure.bak`, the exact
+3041 bytes that had booted an hour earlier, and change only
+`cmdline.txt`. Which of the two lines broke it is still unknown and does
+not matter; neither belonged in that boot.
+
+And I handed over the seventeen `fdt` commands as a single paste. U-Boot's
+console has no flow control and echoes every character, so the paste
+overran it and arrived as `fdt mknoe / psci` and
+`fdt set ible arm,psci-1.0`. One line at a time, waiting for the prompt,
+works. The proper fix for next time is to put the sequence in a text file
+on the FAT partition and load it with `fatload` plus `env import -t`,
+which turns seventeen pastes into three and is reusable at every boot.
+Worth knowing: U-Boot matches `fdt` subcommands by prefix, which is why
+the mangled `fdt mknoe` still created the node.
+
+**Next.** Rebuild the kernel with `CONFIG_OPTEE=m` rather than built in.
+Today the driver probes during boot and takes the machine down before
+there is a shell to ask anything from. As a module, the board boots to a
+prompt with the secure world underneath it, and `modprobe optee` moves
+the failure to a moment of our choosing, with `dmesg`, `/proc` and a
+working console still available. Every question after this one needs
+that.
