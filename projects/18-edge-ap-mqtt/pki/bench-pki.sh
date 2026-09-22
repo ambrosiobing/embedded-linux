@@ -86,7 +86,7 @@ need_openssl() {
 # does not name what it matched cannot be argued with, and on this bench
 # that is how guards get switched off.
 refuse_inside_repo() {
-	_repo=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
+	_repo=$(CDPATH='' cd -- "$(dirname -- "$0")/../../.." && pwd)
 	_pki=$1
 	case "$_pki/" in
 	"$_repo"/*)
@@ -494,7 +494,7 @@ init | server | client | revoke | verify | list | clock-rule | gencrl | deploy)
 	*) refuse_inside_repo "$PWD/$PKI_DIR" ;;
 	esac
 	mkdir -p "$PKI_DIR"
-	PKI_DIR=$(CDPATH= cd -- "$PKI_DIR" && pwd)
+	PKI_DIR=$(CDPATH='' cd -- "$PKI_DIR" && pwd)
 	refuse_inside_repo "$PKI_DIR"
 	;;
 esac

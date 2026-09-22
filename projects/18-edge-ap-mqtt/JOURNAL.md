@@ -728,3 +728,52 @@ The test asserts both exist and that the limit is actually a bound rather
 than a formality, by checking it is under a megabyte. A limit set to the
 default and written down is worse than none, because it reads as a
 decision.
+
+---
+
+## 19. The first push went red, on the one check this laptop cannot run
+
+**What happened.** `1d189ce` pushed, and the `lint` job failed at the
+`Shell scripts` step. Fifteen shellcheck findings across five of the six
+new shell files, in two codes.
+
+This is the expected shape rather than a surprise. The authoring laptop
+has no shellcheck, by design, and `scripts/lint.py` says so in its own
+output: "no shellcheck on this host, so of its findings only SC2086,
+SC2120, SC1072/SC1073, SC2010, SC2012, SC2015, SC1087 and SC1010 are
+checked here. CI runs the real thing." Neither of the two codes below is
+in that list.
+
+**SC1007, six times.** `CDPATH= cd -- "$dir"` reads as an assignment with
+a space after the equals sign. The idiom is correct and deliberate, and
+shellcheck wants the empty value written out.
+
+The uncomfortable part is that **this repository had already converged on
+the answer**. `tests/tracker-at-test.sh` and `tests/tracker-budget-test.sh`
+carry `CDPATH='' cd`, because a previous CI run made somebody change them.
+The convention existed, in files I had read, and six new files were
+written against the older spelling anyway.
+
+**SC2115, nine times, and this one is not style.**
+
+```
+  rm -rf "$work/etc"
+      ^---------^ SC2115: Use "${var:?}" to ensure this never expands to /etc
+```
+
+If `$work` were ever empty, that line is `rm -rf /etc`. It cannot be empty
+today: it comes from `mktemp -d` under `set -eu`. But the cost of the
+guard is four characters and the cost of being wrong about "cannot" is the
+machine. All nine are now `"${work:?}/etc"`, which makes the shell abort
+rather than delete.
+
+**What this says about the division of labour, which is worth keeping.**
+The linter on this laptop is a partial shellcheck plus the checks
+shellcheck cannot make, and it passed. CI is the real gate and it caught
+fifteen things in eight seconds. That is the arrangement working rather
+than failing: the alternative is not "no findings", it is finding them on
+a board.
+
+**What would have caught SC1007 earlier and for free.** Reading the two
+sibling test files for their idiom rather than only for their structure.
+Both were open on this screen the day before.

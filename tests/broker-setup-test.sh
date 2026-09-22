@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: MIT
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 setup="$root/meta-bench/recipes-bench/bench-broker/files/bench-broker-setup"
 pki="$root/projects/18-edge-ap-mqtt/pki/bench-pki.sh"
 
@@ -67,7 +67,7 @@ run_setup() {
 }
 
 fresh_card() {
-	rm -rf "$work/card" "$work/etc"
+	rm -rf "${work:?}/card" "${work:?}/etc"
 	sh "$pki" deploy bench-ap "$work/card" >/dev/null
 }
 
@@ -88,7 +88,7 @@ echo "== a CA private key on the card stops everything =="
 # problem nobody looks for again.
 fresh_card
 cp "$BENCH_PKI_DIR/private/ca.key" "$work/card/ca.key"
-rm -rf "$work/etc"
+rm -rf "${work:?}/etc"
 run_setup "$work/card" "$work/etc"
 status_is "the run is refused" 1 "$status"
 has "and the refusal names the file" "ca.key" "$out"
@@ -103,7 +103,7 @@ else ok; fi
 for extra in index.txt serial openssl.cnf; do
 	fresh_card
 	cp "$BENCH_PKI_DIR/$extra" "$work/card/$extra"
-	rm -rf "$work/etc"
+	rm -rf "${work:?}/etc"
 	run_setup "$work/card" "$work/etc"
 	status_is "a card carrying $extra is refused" 1 "$status"
 done
@@ -115,7 +115,7 @@ echo "== a certificate and a key that are not a pair =="
 fresh_card
 sh "$pki" server other-host 10.18.0.9 >/dev/null
 cp "$BENCH_PKI_DIR/issued/other-host.key" "$work/card/bench-ap.key"
-rm -rf "$work/etc"
+rm -rf "${work:?}/etc"
 run_setup "$work/card" "$work/etc"
 status_is "a mismatched pair is refused" 1 "$status"
 has "and the refusal says they are not a pair" "not a pair" "$out"
@@ -131,7 +131,7 @@ BENCH_PKI_DIR="$stranger" sh "$pki" init >/dev/null 2>&1
 BENCH_PKI_DIR="$stranger" sh "$pki" server bench-ap 10.18.0.1 >/dev/null 2>&1
 cp "$stranger/issued/bench-ap.crt" "$work/card/bench-ap.crt"
 cp "$stranger/issued/bench-ap.key" "$work/card/bench-ap.key"
-rm -rf "$work/etc"
+rm -rf "${work:?}/etc"
 run_setup "$work/card" "$work/etc"
 status_is "a certificate from another CA is refused" 1 "$status"
 has "and the refusal explains the consequence" "no client would connect" "$out"
@@ -139,14 +139,14 @@ has "and the refusal explains the consequence" "no client would connect" "$out"
 echo "== an incomplete card =="
 fresh_card
 rm "$work/card/bench-ca.crl"
-rm -rf "$work/etc"
+rm -rf "${work:?}/etc"
 run_setup "$work/card" "$work/etc"
 status_is "a missing file is refused" 1 "$status"
 has "and it is named" "bench-ca.crl" "$out"
 
 fresh_card
 : >"$work/card/ca.crt"
-rm -rf "$work/etc"
+rm -rf "${work:?}/etc"
 run_setup "$work/card" "$work/etc"
 status_is "an empty file is refused too" 1 "$status"
 has "and named" "ca.crt" "$out"
@@ -156,7 +156,7 @@ echo "== the second boot, when the card has been emptied =="
 # taking them off, so a board that has been provisioned must not then
 # refuse to start because the card is clean.
 fresh_card
-rm -rf "$work/etc"
+rm -rf "${work:?}/etc"
 run_setup "$work/card" "$work/etc"
 status_is "first boot provisions" 0 "$status"
 run_setup "$work/absent-dir" "$work/etc"
@@ -164,7 +164,7 @@ status_is "and a later boot with no card is fine" 0 "$status"
 has "and says why it did nothing" "already complete" "$out"
 
 echo "== no card and nothing installed =="
-rm -rf "$work/etc"
+rm -rf "${work:?}/etc"
 run_setup "$work/absent-dir" "$work/etc"
 status_is "that is refused" 1 "$status"
 has "and the refusal gives the deploy command" "bench-pki.sh deploy" "$out"

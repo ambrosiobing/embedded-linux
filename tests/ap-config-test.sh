@@ -14,7 +14,7 @@
 # SPDX-License-Identifier: MIT
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 files="$root/meta-bench/recipes-bench/bench-ap/files"
 setup="$files/bench-ap-setup"
 

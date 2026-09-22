@@ -16,7 +16,7 @@
 # SPDX-License-Identifier: MIT
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 pki="$root/projects/18-edge-ap-mqtt/pki/bench-pki.sh"
 
 command -v openssl >/dev/null 2>&1 || {
