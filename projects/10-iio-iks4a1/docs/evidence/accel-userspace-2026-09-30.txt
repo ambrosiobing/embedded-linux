@@ -166,3 +166,47 @@ assumes identical means stale. At rest, with quantised output and low
 noise, two consecutive genuine samples can also be identical, so the
 unique count is a lower bound on the sensor's real output and the read
 rate estimated from it is approximate.
+
+THE BLOCK DATA UPDATE HYPOTHESIS IS WRONG. Measured the same evening:
+
+  # i2cget -y 1 0x6b 0x12
+  0x44
+  # i2cset -y 1 0x6b 0x12 0x44
+  # i2cget -y 1 0x6b 0x12
+  0x44
+
+0x44 is bit 6 and bit 2, block data update and register auto-increment,
+and it read 0x44 BEFORE the write. That is this part's reset value for
+CTRL3, so the output registers were already held still for the duration of
+every read in the capture above, and the write changed nothing.
+
+So a sample cannot have been assembled from two measurements, and the
+near-zero magnitude has a different cause.
+
+WHAT IS LEFT, in order of how much evidence there is for it.
+
+One, the capture transport rather than the sensor. The three-axis run
+earlier the same evening contains a visible block of serial corruption,
+which is direct proof that the path from this board to a file can damage
+characters. A single flipped or dropped character inside a hex field
+produces a wrong number that still parses, with nothing to mark it.
+
+Two, an I2C frame damaged on the wire. i2c-dev carries no integrity check
+of any kind, the shield is on loose jumpers, and a wrong byte is returned
+as data rather than as an error.
+
+Three, the parse or the deduplication.
+
+THE DISCRIMINATOR IS STRUCTURAL, not statistical. Go back to the raw dump
+and look at the offending line itself, the six hex bytes and not the number
+they were turned into:
+
+  well-formed, six hex bytes, really decoding near zero
+      the damage happened at or before the bus read
+  short, long, or carrying a character that is not hex
+      the damage happened in the transport or the parse, and the sensor
+      and the bus are both innocent
+
+Which is why the next capture carries a line index and a field count, so
+that a damaged line is visible as a damaged line instead of arriving as a
+plausible measurement.

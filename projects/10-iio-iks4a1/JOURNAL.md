@@ -990,3 +990,49 @@ to justify deleting. It is also the only evidence of a defect that would
 corrupt every buffered capture this project goes on to take, and at 120 Hz
 with a watermark of 64 it would corrupt them silently. The cheap test is
 one register write.
+
+---
+
+## 24. The mechanism proposed in entry 23 is wrong, and that narrows it
+
+Entry on Wednesday 30 September 2026, later the same evening.
+
+**What happened.** Entry 23 proposed that the single near-zero sample came
+from the output registers being refreshed between the low byte and the high
+byte of a read, which block data update prevents, and gave the register
+write as the test. CTRL3 at 0x12 read `0x44` before that write. Bit 6 is
+block data update and it was already set, because `0x44` is this part's
+reset value for the register. The write changed nothing and the mechanism
+cannot be the cause.
+
+**Why the disproof is worth as much as the hypothesis was.** The reason for
+naming a specific mechanism rather than listing three possibilities is that
+a mechanism can be tested in one command, and this one was, and it is now
+out. A list of possibilities cannot be tested at all, which is why the
+previous entry declined to leave the fault as one.
+
+**What is left, ordered by evidence rather than by plausibility.** The
+leading candidate is not the sensor and not the bus: it is the path from
+the board to the file. The three-axis run earlier the same evening contains
+a block of visible serial corruption, so that path has already been
+observed damaging characters on this bench. A flipped character inside a
+hex field yields a number that still parses. Behind that, an I2C frame
+damaged on the wire, which `i2c-dev` cannot detect because it carries no
+integrity check and hands a wrong byte back as data. Behind that, the parse
+or the deduplication.
+
+**The next test is structural and not statistical.** Read the offending
+line of the raw dump, the six hex bytes rather than the number they became.
+Six well-formed bytes that genuinely decode near zero put the damage at or
+before the bus read. A short line, a long line or a character that is not
+hex puts it in the transport, and clears both the sensor and the bus.
+
+So the capture loop now carries a line index and a fixed field count. A
+damaged line then arrives as a damaged line, instead of arriving as a
+measurement.
+
+**The habit worth naming.** Two mechanisms were proposed from the same
+single sample, and the first was wrong for a reason that one register read
+settled in a second. Guessing at a cause is cheap when the guess is
+specific enough to be killed. It is only expensive when it is vague enough
+to survive.
