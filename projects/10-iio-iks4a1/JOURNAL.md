@@ -667,3 +667,52 @@ direct register reads, not a grid.
 **The three identity values now measured**, all stable on repeat: 0x19
 answers 0x47, 0x6a answers 0x22, 0x6b answers 0x70. The remaining four
 use different identity registers and are not yet read.
+
+---
+
+## 17. The distribution kernel has none of the drivers, and that is the answer to a question this project had already answered
+
+Entry on Wednesday 30 September 2026.
+
+**What happened.** Before applying the overlay, the running kernel was
+asked whether it carries the four drivers the overlay names. It carries
+one.
+
+| Sensor | Address | Driver on stock Raspberry Pi OS 6.18.50 |
+|---|---|---|
+| LSM6DSV16X | 0x6b | absent |
+| LIS2MDL | 0x1e | absent |
+| LPS22DF | 0x5d | absent |
+| SHT40AD1B | 0x44 | present, `sht4x`, hwmon rather than IIO |
+
+There is no `drivers/iio/magnetometer` directory at all. The pressure
+directory holds `bmp280` and `ms5637`. The inertial directory holds
+`bno055` and `inv_mpu6050`. `modules.builtin` lists none of them either,
+so they are not compiled in. The capture is in
+`docs/evidence/drivers-rpios-2026-09-30.txt`.
+
+**What that means for the overlay.** It compiled cleanly with `dtc`, and
+applying it would create four nodes of which three bind to nothing. That
+is exactly the outcome this overlay's own header comment warns about: a
+node naming a compatible the kernel does not know is not an error, the
+node is created, nothing binds, and the part is invisible with no message
+anywhere.
+
+**What it means for the project.** Step 1 of the bring-up is complete and
+step 2 cannot run here. The verdict its own table calls
+`no-driver-in-image` is the true one, reached before wasting a reboot on
+it.
+
+**What it vindicates.** `kas/bench-iio.yml` and the kernel fragment
+`meta-bench/recipes-kernel/linux/files/iio.cfg` exist to turn these four
+drivers on. Until today that was a precaution written from reading. It is
+now a requirement with a measurement behind it, and the project's decision
+to build its own image rather than lean on a distribution is no longer a
+matter of taste.
+
+**The useful experiment that remains on this card.** Applying the overlay
+anyway binds the SHT40AD1B and leaves the other three unbound, which
+demonstrates both halves at once: that the overlay and `dtc` path works on
+this host, and what a silent non-binding looks like from the outside. One
+reboot buys evidence for the working case and the failing case together,
+which is worth more than skipping it.
