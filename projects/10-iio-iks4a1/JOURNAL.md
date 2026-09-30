@@ -1160,3 +1160,68 @@ loop speed, because each sample costs a process, a syscall and a bus
 transaction, and the ceiling that imposes is below the frequency of a
 household appliance. The comparison the project exists to make now has a
 measured slow end and a reason to build the fast one.
+
+---
+
+## 26. A spectrum with no time base, and two clocks instead of one
+
+Entry on Wednesday 30 September 2026, last of the day.
+
+**What happened.** An FFT of both 4000-sample captures, Hann windowed with
+the mean removed. The shaver puts a clear tone into the board at 0.0270
+cycles per sample and the quiet record has no tone at all.
+
+| | quiet strongest bin | shaver strongest bin | shaver peak |
+|---|---|---|---|
+| X | 0.0285, 0.044 mg | 0.0270 | 1.100 mg |
+| Y | 0.0415, 0.040 mg | 0.0270 | 1.333 mg |
+| Z | 0.0258, 0.051 mg | 0.0270 | 4.788 mg |
+
+**The tone is real.** All three axes peak in the same bin, one part in two
+thousand, where the quiet record's strongest bins are scattered and reach
+only 0.05 mg. The shaver puts one forcing frequency into the board, which
+is what a motor does, and the amplitudes follow the compliance measured in
+entry 25: most responsive normal to the board's plane.
+
+**The output rate is 120 Hz and it does not scale that axis.** CTRL1 reads
+0x06, which is 120 Hz. But this record is indexed by poll, not by sensor
+sample, and the loop's rate is unmeasured, jittery and unlocked from the
+sensor's oscillator. There are two clocks here and the axis belongs to the
+wrong one. That is why the answer to "relabel it in hertz" is that nobody
+can, from this file.
+
+**Aliasing is not suspected, it is measured.** The shaver record sits 10.4,
+10.5 and 8.1 times above the quiet one in the top half of the band, and
+over a quarter of the X axis AC energy is up there with no structure in it.
+A narrowband source cannot lift an entire half-band uniformly. That is real
+vibration arriving at frequencies it never had.
+
+**A prediction, written before the test.** Under the 120 Hz assumption the
+tone is near 3.2 Hz, far below any mechanism in a foil shaver. The reading
+that fits is a beat between a mechanical line near 117 to 123 Hz and the
+sensor's own 120 Hz sampling, and a one percent change in motor speed would
+move that beat by about a hertz, which is the wandering already noticed.
+Changing the output rate to 240 Hz and leaving the loop alone separates the
+two: a genuine 3.2 Hz signal keeps its position in cycles per sample, and a
+beat against the sensor's rate cannot.
+
+**The deeper finding, and it is the project's own thesis arriving from an
+unexpected direction.** There are two sampling stages in this measurement.
+The sensor decimates to its output rate with a filter in front of it. Then
+the loop resamples those registers at an unlocked rate with no filter at
+all, and none is possible, because the second stage is a program asking
+rather than a part delivering. Every fold and every beat above comes from
+that second stage, and no amount of loop tightening removes it, because it
+is not a speed problem.
+
+The FIFO removes the stage rather than speeding it up. Samples are taken on
+the sensor's clock, uniformly, and read out in bursts afterwards. This
+project has argued for buffered acquisition since it was written, on
+grounds of interrupt count and CPU. Tonight it turns out the stronger
+argument is one the documents never made: **without it there is no valid
+frequency axis at all.**
+
+**The habit worth naming.** The prediction above is written down with its
+falsifier before the command is run, because entry 24 is what happens when
+a mechanism is proposed and tested in the wrong order. One register read
+killed that one in a second. This one has its register read waiting for it.
