@@ -1646,3 +1646,43 @@ been an attempt to infer from outside what the secure world would simply
 have told us. Change the UART first, confirm an ordinary boot and login
 before anything else is touched, and keep the byte-for-byte backup of the
 working `config.txt` and `cmdline.txt` as always.
+
+---
+
+## 30. The card was reused, and the evidence does not depend on it
+
+Entry on Wednesday 30 September 2026.
+
+**What happened.** The 16 GB card carrying this project's image was
+repurposed for Raspberry Pi OS, so that Project 10 could have a Pi 3B+ to
+scan an I2C bus on. Joseph confirmed a copy exists and that the card was
+disposable.
+
+**Why that costs nothing here.** The card is an artefact, not a source. It
+is regenerated with one command:
+
+```sh
+kas build kas/bench-tee.yml
+```
+
+The evidence this project rests on is already off the card and in the
+repository: `docs/evidence/boot-console-2026-09-22.txt` is a captured
+console log, and entries 27 to 29 hold the four runs, the measurement that
+could not be taken and the reason no observer survives. None of that needs
+the card to exist. A rebuild costs build time and nothing else.
+
+**What was identified from the card while it was still readable**, because
+it is the fingerprint of a bench image and worth writing down once: a FAT16
+partition labelled `boot` at 130 MB beside an ext4 partition labelled
+`root` at 572 MB, carrying `armstub8.bin`, `uboot.env` and a
+`config.txt.bench-orig`. The first two partition labels and those three
+files together appear in only two configurations in this repository,
+`kas/bench-tee.yml` and `kas/bench-rpi3-ab.yml`, and two partitions rather
+than four rules out the A/B card. A Raspberry Pi OS card looks nothing like
+it: FAT32 labelled `bootfs` and a root filesystem several times the size.
+
+**Why that fingerprint is worth keeping.** A card found in a drawer with no
+label is otherwise identified by flashing over it, which is the one test
+that destroys the answer. `lsblk -f` plus a read only mount and a directory
+listing settles it in under a minute and changes nothing. That sequence is
+now in `docs/CARD.md`.
