@@ -102,9 +102,36 @@ echo 'dtparam=i2c_arm=on' | sudo tee -a /mnt/boot/config.txt
 tail -n 5 /mnt/boot/config.txt                          # confirm it is on its own line
 ```
 
-The read-back is not ceremony. An append joins the previous line when the
-file does not end in a newline, and a `dtparam` glued to the end of another
-directive is ignored without complaint.
+The read-back is not ceremony, and it checks two different things.
+
+An append joins the previous line when the file does not end in a newline,
+and a `dtparam` glued to the end of another directive is ignored without
+complaint.
+
+**Worse, and easier to miss: `config.txt` is divided into conditional
+sections.** A Raspberry Pi OS `config.txt` ends with per-model blocks such
+as `[pi4]`, `[pi5]` and `[all]`, and every directive belongs to whichever
+section header precedes it. An appended line therefore inherits the last
+section in the file. If that is `[all]` the setting applies to every board
+and all is well. If the file happens to end inside `[pi5]`, the same line
+applies only to a Pi 5 and does nothing at all on a Pi 3B+, with no error
+anywhere.
+
+So `tail -n 5 config.txt` is read for the section header above the new
+line, not only for the line itself:
+
+```
+[all]
+dtparam=i2c_arm=on        <- applies to every board, correct
+```
+
+```
+[pi5]
+dtparam=i2c_arm=on        <- applies to a Pi 5 only, silently wrong here
+```
+
+When the tail shows the wrong section, append `[all]` on its own line
+before the directive rather than moving the directive.
 
 **Confirm the credentials are on the card** while it is still in the reader:
 
