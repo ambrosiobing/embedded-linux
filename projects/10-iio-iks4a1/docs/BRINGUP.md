@@ -19,6 +19,7 @@ Power off, shield off.
 | Jumpers are short | 400 kHz over 20 cm of loose wire is the documented limit, and the failure is intermittent rather than clean |
 | The magnetometer is where it will stay | Hard-iron calibration is valid for one physical arrangement. Moving the shield afterwards invalidates it |
 | The USB/TTL cable is on pins 8, 10 and 6, red lead not connected | The console is how a board that does not boot gets diagnosed |
+| **CN5 pin 1 is the end nearest CN9**, so pin 9 is SDA and pin 10 is SCL at the far end | CN9 runs D0 to D7 and CN5 continues D8 to D15 in line with it. Counting CN5 from the far end instead puts SDA on D9 and SCL on D8, neither of which is on the shield's I2C bus, and step 1 then returns a completely empty grid with nothing wrong in software |
 
 **Which Arduino pin carries INT1 is not settled by this repository.** It
 depends on the shield's solder-bridge defaults. ST's user manual UM3239 has
