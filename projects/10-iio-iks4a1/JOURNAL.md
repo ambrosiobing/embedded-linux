@@ -939,3 +939,54 @@ spaced, with no timestamps, through three processes per sample. The
 hardware FIFO and the watermark interrupt on the wire already run to
 GPIO24 exist to take all 120 with a timestamp on each. Tonight measured
 the floor that the rest of this project is a comparison against.
+
+---
+
+## 23. The burst read outruns the sensor, and finds a torn sample
+
+Entry on Wednesday 30 September 2026.
+
+**What happened.** Reading all six output bytes in one `i2ctransfer`
+instead of three separate `i2cget` calls took the loop from about five
+samples a second to about 180.
+
+2905 reads yielded 1905 unique samples. That third of duplicates is itself
+the measurement: the loop is now reading faster than the part is producing
+at 120 Hz, so **no sensor sample is being missed.** The previous capture
+was aliased and this one is complete, which is a change of kind and not
+only of degree.
+
+| Axis | mean | min | max |
+|---|---|---|---|
+| X | -0.008 g | -0.066 g | +0.098 g |
+| Y | +0.013 g | -0.112 g | +0.065 g |
+| Z | +1.006 g | +0.013 g | +1.133 g |
+| magnitude | 1.006 g | 0.018 g | 1.134 g |
+
+Magnitude 1.006 g, confirming the two g scale again on better statistics.
+Resting noise is now a few tens of milli-g, where the sparse capture had
+suggested hundreds. Those earlier extremes were single samples of
+transients, not noise, which is what the previous entry warned they were.
+
+**One sample is not physics.** Near index 1660 the magnitude falls to
+0.018 g. That is free fall, and a board on a desk is not in free fall. The
+magnitude is the discriminator: real motion adds to one or more axes and
+leaves the magnitude near or above one g, whereas only genuine free fall
+or a corrupted read drives all three to zero together, and genuine free
+fall would last hundreds of samples at this rate rather than one.
+
+**A testable mechanism.** Block data update is off by default on this
+family, so the output registers can be refreshed between the reading of a
+low byte and its high byte and one sample can be assembled from two
+measurements. That produces a single wild value among correct ones, which
+is the shape observed. CTRL3 at 0x12 carries the bit. If the artefact
+disappears from a recapture with it set, the diagnosis is proven. If it
+survives, the cause is elsewhere and worth finding before these numbers
+are used for anything.
+
+**Why this belongs in the journal rather than being cleaned out of the
+data.** A single bad sample in nineteen hundred is easy to delete and easy
+to justify deleting. It is also the only evidence of a defect that would
+corrupt every buffered capture this project goes on to take, and at 120 Hz
+with a watermark of 64 it would corrupt them silently. The cheap test is
+one register write.

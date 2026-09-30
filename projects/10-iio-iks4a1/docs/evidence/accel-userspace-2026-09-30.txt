@@ -112,3 +112,57 @@ part was configured for 120 samples a second and delivered five, unevenly,
 with no timestamps. The hardware FIFO and the watermark interrupt on
 GPIO24 exist to take every one of the 120 with a timestamp attached, and
 they need the drivers this kernel does not carry.
+
+BURST READ. Six bytes in one transaction instead of three transactions.
+
+  i2ctransfer -y 1 w1@0x6b 0x28 r6
+
+2905 reads produced 1905 unique samples after dropping consecutive
+identical copies. That ratio is the measurement: about a third of the
+reads returned a sample the part had not yet replaced, so the loop is now
+running FASTER than the 120 Hz output rate, at roughly 180 reads a second.
+
+Against the previous loop of three separate i2cget calls with a 0.2 s
+sleep, which managed about five samples a second, that is about a
+thirty-fold improvement, and it changes the kind of data rather than only
+the quantity: at 180 reads against a 120 Hz output rate, no sensor sample
+is missed. The earlier capture was aliased. This one is complete.
+
+  Axis   mean       min       max
+  X     -0.008 g   -0.066 g   +0.098 g
+  Y     +0.013 g   -0.112 g   +0.065 g
+  Z     +1.006 g   +0.013 g   +1.133 g
+  |a|    1.006 g    0.018 g    1.134 g
+
+Magnitude 1.006 g, confirming the two g scale again and on better
+statistics than the aliased capture's 1.009 g. Resting noise on X and Y is
+now a few tens of milli-g rather than the hundreds the sparse capture
+suggested, because those earlier extremes were single samples of
+transients rather than noise.
+
+THE ANOMALY IS NOT PHYSICS. One sample near index 1660 has Z at 0.013 g
+and a magnitude of 0.018 g. That is free fall, and a board resting on a
+desk is not in free fall.
+
+The discriminator is the magnitude. A tap, a lift or any real motion adds
+to one or more axes and leaves the magnitude near or above one g. Only two
+things drive all three axes to zero together: genuine free fall, which
+would last hundreds of samples at this rate rather than one, and a
+corrupted read.
+
+THE LIKELY MECHANISM, and it is testable. Block data update is off by
+default on this family. With it off, the output registers may be refreshed
+between the reading of a low byte and its high byte, so one sample can be
+assembled from two different measurements. The result is a single wild
+value surrounded by correct ones, which is exactly the shape here.
+
+CTRL3 at 0x12 carries the block data update bit. Setting it makes the
+output registers hold still for the duration of a read. If the artefact
+disappears from a recapture, the diagnosis is proven; if it survives, the
+cause is elsewhere and worth finding before any of these numbers are used.
+
+A CAVEAT ON THE DEDUPLICATION. Dropping consecutive identical reads
+assumes identical means stale. At rest, with quantised output and low
+noise, two consecutive genuine samples can also be identical, so the
+unique count is a lower bound on the sensor's real output and the read
+rate estimated from it is approximate.
