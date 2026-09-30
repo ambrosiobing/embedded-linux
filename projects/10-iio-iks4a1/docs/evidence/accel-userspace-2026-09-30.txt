@@ -70,3 +70,45 @@ twice during bring-up", and this is consistent with that. The readings
 before and after the corruption are self-consistent, so the values stand,
 but a capture intended as evidence should be taken over ssh rather than
 over this cable.
+
+CHARACTERISED. A capture of about 38 seconds at 0.2 s intervals, plotted
+as three axes in g, with summary statistics.
+
+  Axis   mean       min       max
+  X     -0.001 g   -0.15 g   +0.25 g
+  Y     +0.013 g   -0.67 g   +0.17 g
+  Z     +1.007 g   +0.55 g   +1.21 g
+  |a|    1.009 g
+
+THE MAGNITUDE IS THE ACCEPTANCE CRITERION. The vector magnitude of a
+stationary accelerometer must be one g, and it came out at 1.009 g, an
+error of nine parts in a thousand. That is inside a MEMS part's normal
+sensitivity tolerance and it needs no reference instrument, which is why
+gravity is the right acceptance test for a bench with no calibration rig.
+
+IT ALSO VALIDATES THE SCALE ASSUMPTION. The plot is titled "assumed two g
+full scale, 16384 counts per g", and that assumption is now checked rather
+than assumed: a wrong full-scale setting would have produced a magnitude
+of about half a g or about two g, not 1.009. The register map and the
+full-scale default are confirmed together by one number.
+
+Note that the mean of the per-sample magnitudes, 1.009 g, is slightly
+above the magnitude of the mean vector, 1.007 g. That is expected: noise
+and the two disturbances add to the magnitude in both directions, and
+averaging magnitudes cannot cancel them the way averaging components can.
+
+TWO EVENTS ARE VISIBLE. A single sharp knock at about 24.5 s, seen as Y
+falling to -0.67 g and Z dipping to 0.55 g in the same sample, and a burst
+of oscillation between about 28 and 31 s on X, with Z reaching 1.21 g.
+
+WHY THE EXTREMES ARE NOT THE PEAKS. At five samples a second, a knock
+lasting a few milliseconds is caught by at most one sample and usually by
+none. The -0.67 g on Y is one sample of a transient, not its maximum, and
+the true peak of a tap on a desk is several g. So the min and max columns
+above describe this capture rather than the events in it.
+
+That is the clearest statement yet of what this project exists to fix. The
+part was configured for 120 samples a second and delivered five, unevenly,
+with no timestamps. The hardware FIFO and the watermark interrupt on
+GPIO24 exist to take every one of the 120 with a timestamp attached, and
+they need the drivers this kernel does not carry.

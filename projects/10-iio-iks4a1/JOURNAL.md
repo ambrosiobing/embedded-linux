@@ -897,3 +897,45 @@ through the capture and recovered. Project 1 recorded that this Renkforce
 PL2303HXA dropped its USB connection twice during bring-up, and this is
 consistent. Readings either side are self-consistent so the values stand,
 but evidence captures belong over ssh rather than over this cable.
+
+---
+
+## 22. One g, to nine parts in a thousand
+
+Entry on Wednesday 30 September 2026. The capture was plotted and reduced.
+
+| Axis | mean | min | max |
+|---|---|---|---|
+| X | -0.001 g | -0.15 g | +0.25 g |
+| Y | +0.013 g | -0.67 g | +0.17 g |
+| Z | +1.007 g | +0.55 g | +1.21 g |
+| magnitude | 1.009 g | | |
+
+**The magnitude is the result.** A stationary accelerometer must report a
+vector magnitude of one g, and it reports 1.009. Nine parts in a thousand,
+inside a MEMS part's ordinary sensitivity tolerance, from a chip with no
+driver read by a shell loop. Gravity is the right acceptance test for a
+bench with no calibration rig precisely because it is free, always
+present, and known.
+
+**It also checks the assumption the plot was drawn under.** The axes were
+scaled assuming a two g full scale at 16384 counts per g. A wrong
+full-scale setting would have produced a magnitude near half a g or near
+two g. One number confirms the register map and the full-scale default
+together.
+
+**Two events are visible**: a single knock at about 24.5 seconds, and a
+burst of oscillation between 28 and 31 seconds.
+
+**And the extremes in that table are not the peaks of those events.** At
+five samples a second a knock lasting a few milliseconds is caught by at
+most one sample and usually by none. The -0.67 g on Y is one sample of a
+transient rather than its maximum, and a real desk tap peaks several g
+higher. The min and max columns describe the capture, not the events.
+
+**That is the sharpest statement of this project's subject so far.** The
+part was configured for 120 samples a second and delivered five, unevenly
+spaced, with no timestamps, through three processes per sample. The
+hardware FIFO and the watermark interrupt on the wire already run to
+GPIO24 exist to take all 120 with a timestamp on each. Tonight measured
+the floor that the rest of this project is a comparison against.
