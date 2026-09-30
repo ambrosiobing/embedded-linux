@@ -371,3 +371,50 @@ an empty one say different things: absent reads as not thought about, empty
 with an index reads as a plan with its captures named. The rows in the
 acceptance table stay at "not started", because creating the index proves
 nothing about the shield.
+
+---
+
+## 10. The INT1 pin has a claimed answer, and a claim is not a measurement
+
+Entry on Wednesday 30 September 2026. First entry written with the shield
+wired to a board.
+
+**What happened.** The five jumpers of the wiring table are in: 3V3 to Pi
+header pin 1, GND to pin 6, SDA to pin 3, SCL to pin 5, and INT1 to pin 18
+which is GPIO24. Four of those are fixed by the Arduino standard and need
+no evidence. The fifth is the one `docs/BRINGUP.md` step 0 refuses to
+guess, and an answer for it has now arrived.
+
+**The claim.** LSM6DSV16X INT1 is on CN9 pin 6, which is Arduino D5, and
+INT2 is on CN9 pin 5, which is D4. The reasoning given is that UM3239 puts
+both on the D0 to D7 header rather than on CN5 or CN6.
+
+**What is solid in it, and what is not.**
+
+The header arithmetic is solid and can be checked without the board in
+hand. On a Nucleo-144 in the Arduino Uno R3 arrangement, CN9 carries D0 to
+D7 and CN5 carries D8 to D15, so counting from the end away from CN5 puts
+D5 at CN9 pin 6. That part is a property of the connector standard.
+
+Which shield signal lands on D5 is not solid, because it is a property of
+this shield's solder-bridge defaults, which is the exact reason step 0
+declines to take it from a table. The claim has the right shape and the
+right source, and it still has not been measured on this board.
+
+**What was done.** The pin is recorded here as **claimed, not measured**,
+and the acceptance rows that depend on the interrupt stay at "not started"
+until continuity is checked between the LSM6DSV16X INT1 pad and CN9 pin 6.
+That check is a minute with a multimeter and it converts this entry from a
+claim into an observation.
+
+**Why that and not the alternative.** The alternative is to treat the table
+as settled and move on. The cost of being wrong is not a failed boot, which
+would announce itself. It is an interrupt that never fires, a FIFO
+watermark path that silently falls back to nothing, and two thirds of this
+project quietly becoming a compile test while looking finished. That is the
+failure mode this repository treats as the expensive one, and it is
+detectable for the price of one continuity test before it costs an evening.
+
+**What does not depend on it.** The bus scan of step 1 uses SDA and SCL
+only. It can be run now, and it decides whether the wiring is right at all,
+which is the question worth answering first.
