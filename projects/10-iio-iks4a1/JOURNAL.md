@@ -558,3 +558,61 @@ from this board. The reading that closes it is the driver's own: once the
 corrected overlay is applied, the `name` file of the registered IIO device
 states which part the kernel matched, and that is a match made by code
 rather than by a person reading a table.
+
+---
+
+## 15. The manual closed every open question, and opened one
+
+Entry on Wednesday 30 September 2026. ST's UM3239 Rev 5 and DB5091 Rev 4
+were read after the bus had already been measured, which is the right
+order: the readings were taken blind and then checked.
+
+**INT1 is settled, and the whole wiring table with it.** UM3239 Table 4
+tabulates the Arduino R3 UNO connectors of this board. CN9 pin 6 is
+LSM6DSV16X INT1, which is exactly what was claimed and wired. CN5 pin 9
+and pin 10 are I2C SDA and SCL, CN6 pin 4 is 3.3 V, CN6 pins 6 and 7 are
+ground. Every one of the five wires is now confirmed by the manufacturer
+rather than inferred, and the entry 10 caveat is discharged.
+
+The table also shows the trap that was waiting: **the other IMU's INT1 is
+on CN8 pin 6.** Two connectors, both pin 6, two different chips. Wiring
+the wrong one gives a driver waiting on a line that another part drives.
+
+**Every address is a factory default.** UM3239 Table 1 lists the solder
+bridge that sets each sensor's address, and all seven measured addresses
+are the bold default: LIS2DUXS12 at 33h, LIS2MDL 3Ch, STTS22H 71h,
+SHT40AD1B 89h, LPS22DF BBh, LSM6DSO16IS D5h, LSM6DSV16X D7h. Nothing on
+this shield has been modified.
+
+**Entry 13 was right, and entry 14's doubt is discharged without lifting
+anything.** DB5091 lists the seven sensors on the main board of the kit,
+the X-NUCLEO-IQS4A1. The detachable board on top is the STEVAL-MKE001A1
+and it carries the Qvar swipe electrodes, which are not I2C devices. So
+the shield does carry both inertial units, the daughter board contributes
+nothing to this bus, and the volume that lists a single LSM6 part on the
+IKS4A1 is wrong. Joseph was also right to refuse the lift-and-rescan test
+I proposed: the board does not detach by hand, and the answer was in a
+document.
+
+**Mode 1 is confirmed by observation rather than by inspecting jumpers.**
+UM3239 section 3.2 says Mode 1 puts every sensor on the host bus, with J4
+and J5 at 1-2 and 11-12, while the sensor-hub modes move the
+environmental parts behind an IMU. Six parts answering on every scan is
+that proof.
+
+**The question the manual opened.** Across three scans with nothing
+touched, 0x19 answered once. The other six answered every time. The
+LIS2DUXS12 is therefore present and intermittent under `i2cdetect`, which
+is a different state from absent and a different state from working.
+DB5091 notes that the LIS2DUXS12, the LSM6DSV16X and the LPS22DF are MIPI
+I3C capable, and an I3C-capable part can sit in a state where it does not
+answer a plain I2C probe. That is a hypothesis and not a reading. The
+reading that would settle it is a direct register access rather than a
+scan, because `i2cdetect` probes with a transaction the part may decline
+while still being perfectly addressable.
+
+**A second blocker cleared the same evening.** The serial console came up
+through `picocom` inside WSL, on the Renkforce PL2303HXA that the Windows
+driver refuses, attached with `usbipd`. Project 1's bring-up document
+predicted exactly that route and Project 2 cannot proceed without it. The
+boot log is captured.

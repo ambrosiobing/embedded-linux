@@ -66,3 +66,46 @@ The mapping above is read from two registers and from the shield's known
 population. The authoritative confirmation is the driver's own probe once
 the corrected overlay is applied: the name file under the registered IIO
 device states which part the kernel matched.
+
+Second and third scans, same session, nothing changed on the bench.
+
+Second scan gained a seventh address at 0x19:
+
+10: -- -- -- -- -- -- -- -- -- 19 -- -- -- -- 1e --
+
+Third scan lost it again:
+
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- 1e --
+
+The other six answered on all three. So the LIS2DUXS12 at 0x19 is
+intermittent under i2cdetect, present on one scan in three, and the other
+six are stable.
+
+Checked against UM3239 Rev 5 Table 1, every address is this board's
+default solder-bridge setting:
+
+  0x19  LIS2DUXS12    SB20, ADD 33h
+  0x1e  LIS2MDL       ADD 3Ch
+  0x38  STTS22H       ADD 71h
+  0x44  SHT40AD1B     ADD 89h
+  0x5d  LPS22DF       SB29, ADD BBh
+  0x6a  LSM6DSO16IS   SB35, ADD D5h
+  0x6b  LSM6DSV16X    SB15, ADD D7h
+
+DB5091 Rev 4 lists exactly these seven sensors on the main board of the
+kit, the X-NUCLEO-IQS4A1. The detachable board on top, the
+STEVAL-MKE001A1, carries the Qvar swipe electrodes and puts nothing on
+this bus. The DIL24 socket is empty.
+
+UM3239 Rev 5 Table 4, Arduino R3 UNO connectors, confirms the wiring:
+
+  CN5 pin 7   GND
+  CN5 pin 9   I2C SDA
+  CN5 pin 10  I2C SCL
+  CN6 pin 4   3.3 V
+  CN6 pin 6   GND
+  CN8 pin 6   LSM6DSO16IS INT1
+  CN9 pin 5   LSM6DSV16X INT2
+  CN9 pin 6   LSM6DSV16X INT1
+  CN9 pin 7   LPS22DF INT1
+  CN9 pin 8   LSM6DSO16IS INT2

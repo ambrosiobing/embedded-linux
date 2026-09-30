@@ -21,21 +21,33 @@
  * check that the st_lsm6dsx driver in the running kernel lists a matching
  * compatible, rather than assuming one.
  *
- * The LIS2DUXS12 is not here either, and for a different reason: it is
- * not on this shield. Nothing answered at 0x18 or 0x19 on Wednesday
- * 30 September 2026. An earlier version of this comment said it answered
- * on the bus, which was an expectation rather than a reading.
+ * The LIS2DUXS12 has no node either, and it is the awkward one: it
+ * answers at 0x19 on some scans and not others. An intermediate version
+ * of this comment concluded from a single scan that it was not on the
+ * shield at all. It is, and the intermittency is the finding.
  *
- * MEASURED ADDRESSES, Wednesday 30 September 2026
+ * ADDRESSES, measured Wednesday 30 September 2026 and confirmed against
+ * UM3239 Rev 5 Table 1, whose defaults these all are:
  *
- *   0x1e  LIS2MDL       magnetometer
- *   0x38  STTS22H       temperature, no node here
- *   0x44  SHT40         humidity, hwmon rather than IIO
- *   0x5d  LPS22DF       pressure, SA0 high
- *   0x6a  LSM6DSO16IS   WHO_AM_I 0x22, ISPU part, no node here
- *   0x6b  LSM6DSV16X    WHO_AM_I 0x70, fusion part, bound below
+ *   0x19  LIS2DUXS12    ADD 33h, intermittent on i2cdetect, no node here
+ *   0x1e  LIS2MDL       ADD 3Ch, bound below
+ *   0x38  STTS22H       ADD 71h, no node here
+ *   0x44  SHT40AD1B     ADD 89h, hwmon rather than IIO, bound below
+ *   0x5d  LPS22DF       ADD BBh, bound below
+ *   0x6a  LSM6DSO16IS   ADD D5h, WHO_AM_I 0x22, ISPU part, no node here
+ *   0x6b  LSM6DSV16X    ADD D7h, WHO_AM_I 0x70, fusion part, bound below
  *
- * The capture is in the project's docs/evidence directory.
+ * All seven sit on the main board of the kit, the X-NUCLEO-IQS4A1. The
+ * detachable board on top of it, the STEVAL-MKE001A1, carries the Qvar
+ * swipe electrodes and puts nothing on this bus (DB5091 Rev 4). The DIL24
+ * socket is empty.
+ *
+ * Six of the seven answering every time is also the proof that the shield
+ * is in Mode 1, the standard I2C mode, with J4 and J5 at 1-2 and 11-12.
+ * In the sensor-hub modes the environmental parts move behind an IMU and
+ * leave this bus entirely.
+ *
+ * The captures are in the project's docs/evidence directory.
  *
  * SPDX-License-Identifier: MIT
  */
@@ -86,8 +98,9 @@
 			 * st,drdy-int-pin selects which of the chip's two
 			 * interrupt pins the driver uses for data-ready and
 			 * FIFO watermark events. 1 means INT1, which is the
-			 * pin claimed to reach CN9 pin 6 and wired to GPIO24.
-			 * That claim is not yet confirmed by continuity.
+			 * pin UM3239 Rev 5 Table 4 puts on CN9 pin 6, and that
+			 * is the pin wired to GPIO24. The other IMU's INT1 is
+			 * on CN8 pin 6, so the two are easy to confuse.
 			 * Getting this wrong gives a
 			 * device that probes, reads fine through sysfs, and
 			 * never fills a buffer, because the interrupt the

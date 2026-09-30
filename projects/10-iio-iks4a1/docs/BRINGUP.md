@@ -21,11 +21,28 @@ Power off, shield off.
 | The USB/TTL cable is on pins 8, 10 and **9**, red lead not connected | The console is how a board that does not boot gets diagnosed. Its ground is pin 9 and not pin 6, because the wiring table already puts the shield's ground on pin 6 and one header pin takes one jumper socket. Pin 9 is the nearest of the eight grounds and sits beside pins 8 and 10 |
 | **CN5 pin 1 is the end nearest CN9**, so pin 9 is SDA and pin 10 is SCL at the far end | CN9 runs D0 to D7 and CN5 continues D8 to D15 in line with it. Counting CN5 from the far end instead puts SDA on D9 and SCL on D8, neither of which is on the shield's I2C bus, and step 1 then returns a completely empty grid with nothing wrong in software |
 
-**Which Arduino pin carries INT1 is not settled by this repository.** It
-depends on the shield's solder-bridge defaults. ST's user manual UM3239 has
-the table; a multimeter between the IMU's INT1 pad and the D pins settles
-it. Write what you measured into the journal as an observation, not as a
-guess, and only then wire it to GPIO24.
+**Which Arduino pin carries INT1 is settled**, by UM3239 Rev 5 Table 4,
+which tabulates the Arduino R3 UNO connectors of this board:
+
+| Connector | Pin | Signal |
+|---|---|---|
+| CN5 | 7 | GND |
+| CN5 | 9 | I2C SDA |
+| CN5 | 10 | I2C SCL |
+| CN6 | 4 | 3.3 V |
+| CN6 | 6 and 7 | GND |
+| CN8 | 6 | LSM6DSO16IS INT1 |
+| CN9 | 5 | LSM6DSV16X INT2 |
+| **CN9** | **6** | **LSM6DSV16X INT1** |
+| CN9 | 7 | LPS22DF INT1 |
+| CN9 | 8 | LSM6DSO16IS INT2 |
+
+So the wire to GPIO24 belongs on **CN9 pin 6**, and the whole wiring table
+of this project is confirmed by the manual rather than inferred.
+
+Note that the two IMUs have their INT1 lines on different connectors: the
+LSM6DSV16X on CN9 pin 6 and the LSM6DSO16IS on CN8 pin 6. Wiring the wrong
+one gives a driver waiting on a line the other chip drives.
 
 ## 1. The bus before the drivers
 
@@ -35,16 +52,33 @@ Flash, boot, and ask what is there before asking whether anything works.
 i2cdetect -y 1
 ```
 
-Expect `6a`, `1e`, `5d`, `44` and `38`, and **a second LSM6 class part at
-`6b`**. Anything missing here is wiring or bus speed, and no amount of
-driver work will fix it.
+Expect seven addresses. Anything missing here is wiring or bus speed, and
+no amount of driver work will fix it.
 
-Measured on Wednesday 30 September 2026, in
-`docs/evidence/i2cdetect-2026-09-30.txt`: those six answered and nothing
-else did. In particular **nothing answers at `18` or `19`**, so the
-LIS2DUXS12 this project's overlay comment expects on the bus is not on
-this shield. The second part at `6b` is not described anywhere in this
-project and its identity is still open.
+| Address | Part | UM3239 Table 1 default |
+|---|---|---|
+| `19` | LIS2DUXS12 | SB20, ADD 33h |
+| `1e` | LIS2MDL | ADD 3Ch |
+| `38` | STTS22H | ADD 71h |
+| `44` | SHT40AD1B | ADD 89h |
+| `5d` | LPS22DF | SB29, ADD BBh |
+| `6a` | **LSM6DSO16IS** | SB35, ADD D5h |
+| `6b` | **LSM6DSV16X** | SB15, ADD D7h |
+
+Measured on Wednesday 30 September 2026 and captured in
+`docs/evidence/i2cdetect-2026-09-30.txt`. Every one of the seven matches
+the default solder-bridge address in UM3239 Rev 5 Table 1, so this board
+carries its factory configuration.
+
+**Seven answering is also how you know the shield is in Mode 1**, the
+standard I2C mode where every sensor sits on the host bus. UM3239 section
+3.2 sets that with J4 at 1-2 and 11-12 and J5 at 1-2 and 11-12. In the
+sensor-hub modes the environmental parts move behind an IMU and disappear
+from this grid, which reads exactly like a wiring fault.
+
+An earlier revision of this section said nothing answers at `18` or `19`.
+That was written from one scan in which the LIS2DUXS12 had not yet
+responded, and it was wrong.
 
 If the grid is empty or ragged, drop the bus to 100 kHz before suspecting
 anything else: edit `dtparam=i2c_arm_baudrate=100000` in `config.txt` and
