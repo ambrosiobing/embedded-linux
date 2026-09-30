@@ -74,6 +74,12 @@ libiio object model. Read it first.
 [docs/BRINGUP.md](docs/BRINGUP.md) is the board work in order, from the
 first `i2cdetect` to the orientation test.
 
+[docs/TIMELINE.md](docs/TIMELINE.md) is Wednesday 30 September 2026 minute
+by minute, the day this project met hardware: every finding, correction and
+withdrawn conclusion in the order it happened, timed by commit rather than
+by memory. The [journal](JOURNAL.md) holds the reasoning; the timeline
+holds the sequence, and what the day cost at each stage.
+
 ## The sensor inventory
 
 The specification asks for an honest list of which sensors of the shield

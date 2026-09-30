@@ -552,12 +552,67 @@ the LSM6DSO16IS on the IKS5A1 instead. The other lists both on the IKS4A1.
 Two addresses answering two different WHO_AM_I values decides it: both are
 on this shield, and the inventory line that names one is wrong.
 
+> **Withdrawn the same evening, Wednesday 30 September 2026, and restored
+> to the record on the same date after being deleted rather than
+> superseded.** Photographs of the bench show a second board, marked
+> STEVAL-SMKE and seated on the shield, and the X-NUCLEO-IKS4A1 carries a
+> DIL24 socket for exactly that purpose. Two addresses on the bus
+> therefore did not establish that both parts are on the shield. Entry 14
+> has the state of the question and entry 15 closes it. The paragraph
+> above is left standing because it records what was concluded and when.
+
 **The honest limit of this reading.** WHO_AM_I values map to parts through
 their data sheets, and the mapping above is taken from them rather than
 from this board. The reading that closes it is the driver's own: once the
 corrected overlay is applied, the `name` file of the registered IIO device
 states which part the kernel matched, and that is a match made by code
 rather than by a person reading a table.
+
+---
+
+## 14. Two boards were on the bus, and only one of them was being described
+
+Entry on Wednesday 30 September 2026, later the same evening. Deleted when
+entry 15 settled the question, and restored on the same date: a conclusion
+that was withdrawn is part of the record, and entry 15 refers to this one
+by number.
+
+**What happened.** Photographs of the wired bench showed what the register
+reads could not: a second board is seated on the X-NUCLEO-IKS4A1. Its
+silkscreen reads STEVAL-SMKE and the shield underneath carries a socket
+marked DIL24, which is the position ST provides for adding a further MEMS
+part.
+
+**What that costs.** Entry 13 concluded that the shield carries two
+inertial units because two addresses answered with two different WHO_AM_I
+values. That inference assumed every address on the bus belonged to the
+shield. With a daughter board present the assumption does not hold, and
+the conclusion is withdrawn rather than defended.
+
+**What survives it, and why.** The overlay change does not depend on the
+question at all. 0x6b answers 0x70 and 0x6a answers 0x22, and a driver
+that requires 0x70 must be pointed at 0x6b whichever board the part is
+soldered to. WHO_AM_I is a property of the chip, not of the board carrying
+it. So `lsm6dsv16x@6b` is right either way, and that is the change that
+would otherwise have cost an evening of debugging a probe failure.
+
+**What is now open.** Which board owns 0x6a, which owns 0x6b, and
+therefore what the X-NUCLEO-IKS4A1's own population actually is. The
+inventory lines in both volumes stay untouched until that is known.
+
+**The test that was proposed, and refused.** Power down, lift the daughter
+board off, power up, rescan. It was refused on the bench because the two
+boards are one assembly and separating them risks the assembly for a
+question a document can answer. That refusal was right, and entry 15 is
+the document answering it. A test that is cheap in commands is not cheap
+if it puts the hardware at risk.
+
+**The habit worth naming.** Two readings were taken and both were correct,
+and the conclusion drawn from them was still wrong, because it rested on
+an unstated assumption about what was physically present. A bus scan
+enumerates a bus, not a board. The photograph was the instrument that
+caught it, which is an argument for photographing a bench before reasoning
+about it rather than after.
 
 ---
 
