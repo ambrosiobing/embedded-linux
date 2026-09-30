@@ -1658,8 +1658,8 @@ repurposed for Raspberry Pi OS, so that Project 10 could have a Pi 3B+ to
 scan an I2C bus on. Joseph confirmed a copy exists and that the card was
 disposable.
 
-**Why that costs nothing here.** The card is an artefact, not a source. It
-is regenerated with one command:
+**Why that costs nothing here.** The card is an artefact, not a source. One command
+rebuilds it:
 
 ```sh
 kas build kas/bench-tee.yml
