@@ -452,3 +452,55 @@ written and false beside its neighbour. The check that would have caught it
 is reading every pin used by one project in one list, which is what the
 wiring table is for and what step 0 should have deferred to instead of
 restating.
+
+---
+
+## 12. The bus answered, and it corrects three documents
+
+Entry on Wednesday 30 September 2026. **First hardware evidence in this
+project.** Until now every claim here was reasoning; this is a reading.
+
+**What happened.** The shield was wired to a Raspberry Pi 3B+ on the four
+bus wires, Raspberry Pi OS trixie was written to a card, and `i2cdetect -y
+1` was run. Six devices answered. The capture is in
+`docs/evidence/i2cdetect-2026-09-30.txt`.
+
+| Address | Part | Status against what was written here |
+|---|---|---|
+| 0x1e | LIS2MDL | expected, present |
+| 0x38 | STTS22H | expected, present |
+| 0x44 | SHT40 | expected, present |
+| 0x5d | LPS22DF | expected at 5d rather than 5c, and 5d is what answered |
+| 0x6a | an LSM6 class part | expected, present |
+| 0x6b | a second LSM6 class part | **not described anywhere in this project** |
+
+**Three corrections fall out of it.**
+
+**There is a second inertial measurement unit.** Nothing in this project,
+its overlay or its design mentions an address 0x6b. The overlay binds one
+IMU at 0x6a and stops. Which two parts these are is the next measurement,
+not a guess: the shield's two candidates are named differently in the two
+volumes this bench keeps, and their `WHO_AM_I` registers separate them.
+
+**The LIS2DUXS12 did not answer.** Nothing is at 0x18 or 0x19. The
+overlay's own comment states that the STTS22H and the LIS2DUXS12 "answer
+on the bus and have no node", and half of that sentence is now known to be
+false. The STTS22H does answer. The LIS2DUXS12 does not, on this board.
+
+**The pressure sensor address is settled.** `docs/BRINGUP.md` expected
+0x5d and the kit volume's map said 0x5c. 5d answered, so the SA0 pin is
+high on this shield and the overlay's `lps22df@5d` node is correct as
+written.
+
+**What this does not tell us.** Nothing about INT1, which this scan does
+not use and which is still a claim rather than a continuity measurement.
+Nothing about whether the drivers bind. And nothing about which of the two
+LSM6 class parts is at which address.
+
+**Two things about the host that cost time and are worth keeping.**
+`dtparam=i2c_arm=on` enables the controller and does not create
+`/dev/i2c-1`. The `i2c-dev` module is what creates it, and hand-editing
+`config.txt` skips the half that `raspi-config` does silently. And a line
+appended to `config.txt` inherits whatever conditional section the file
+ended in, so it is read back for the section header above it as much as
+for the line itself. Both are now in `docs/CARD.md`.

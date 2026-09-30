@@ -1,0 +1,39 @@
+First bus scan of the X-NUCLEO-IKS4A1 wired to a Raspberry Pi 3B+.
+Wednesday 30 September 2026.
+
+Host:    Raspberry Pi 3B+, hostname eplepi
+Kernel:  6.18.50+rpt-rpi-v8 aarch64, Raspberry Pi OS (Debian trixie)
+Bus:     i2c-1, header pins 3 (GPIO2, SDA1) and 5 (GPIO3, SCL1)
+Wiring:  shield CN6 pin 4 to header pin 1 (3V3)
+         shield CN6 pin 6 or 7 to header pin 6 (GND)
+         shield CN5 pin 9  (D14) to header pin 3
+         shield CN5 pin 10 (D15) to header pin 5
+         shield INT1 to header pin 18 (GPIO24), claimed CN9 pin 6 (D5),
+         not used by this scan and not yet verified by continuity
+
+Enabled with dtparam=i2c_arm=on in /boot/firmware/config.txt line 55,
+then modprobe i2c-dev. The parameter alone is not enough: it enables the
+controller, and the module is what creates /dev/i2c-1.
+
+root@eplepi:~# i2cdetect -y 1
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                         -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- 1e --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- 38 -- -- -- -- -- -- --
+40: -- -- -- -- 44 -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- 5d -- --
+60: -- -- -- -- -- -- -- -- -- -- 6a 6b -- -- -- --
+70: -- -- -- -- -- -- -- --
+
+Six devices answered.
+
+0x1e  LIS2MDL      magnetometer
+0x38  STTS22H      temperature
+0x44  SHT40        humidity and temperature
+0x5d  LPS22DF      pressure, the SA0-high address
+0x6a  LSM6 class   first inertial measurement unit
+0x6b  LSM6 class   second inertial measurement unit
+
+Not present: nothing answered at 0x18 or 0x19, where a LIS2DUXS12 would
+be expected.

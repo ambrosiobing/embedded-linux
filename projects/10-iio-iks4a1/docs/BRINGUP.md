@@ -35,9 +35,16 @@ Flash, boot, and ask what is there before asking whether anything works.
 i2cdetect -y 1
 ```
 
-Expect `6a`, `1e`, `5d`, `44`, and the STTS22H and LIS2DUXS12 answering
-too. Anything missing here is wiring or bus speed, and no amount of driver
-work will fix it.
+Expect `6a`, `1e`, `5d`, `44` and `38`, and **a second LSM6 class part at
+`6b`**. Anything missing here is wiring or bus speed, and no amount of
+driver work will fix it.
+
+Measured on Wednesday 30 September 2026, in
+`docs/evidence/i2cdetect-2026-09-30.txt`: those six answered and nothing
+else did. In particular **nothing answers at `18` or `19`**, so the
+LIS2DUXS12 this project's overlay comment expects on the bus is not on
+this shield. The second part at `6b` is not described anywhere in this
+project and its identity is still open.
 
 If the grid is empty or ragged, drop the bus to 100 kHz before suspecting
 anything else: edit `dtparam=i2c_arm_baudrate=100000` in `config.txt` and
