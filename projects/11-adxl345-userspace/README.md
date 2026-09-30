@@ -155,9 +155,14 @@ it.
 ## Where this differs from the original plan
 
 The project was scoped around a VL53L8CX time-of-flight sensor on an
-X-NUCLEO-53L8A1. That shield is not on this bench, and the part that
-is, an ADXL345, is better suited to the project for two reasons that came
-out of reading rather than preference.
+X-NUCLEO-53L8A1. It is built on an ADXL345 instead, for two reasons that
+came out of reading rather than preference.
+
+An earlier version of this section gave a third reason, that the shield
+was not on the bench. That was wrong and was corrected on Wednesday 30
+September 2026: the X-NUCLEO-53L8A1 is here. The choice never rested on
+it. Both reasons below hold with the shield sitting on the desk, and the
+first is the one that decides it.
 
 Its register map is public in its datasheet, so there is no vendor blob
 and no licence-gated download. The original could not have reached even

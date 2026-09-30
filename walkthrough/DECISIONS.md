@@ -3320,10 +3320,20 @@ that prints the device, and have the operator read it from there.
 
 ## 108. A project is re-targeted to hardware on the bench, not deferred to hardware that is not
 
-**Context.** Three of the twenty projects are specified around parts that
-are not on this bench: Project 10 wants an X-NUCLEO-IKS4A1, Project 11 a
-VL53L8CX on an X-NUCLEO-53L8A1, and Project 17 a STWIN.box. The
-specification was written from a catalogue rather than from the drawer.
+**Context.** Three of the twenty projects were believed to be specified
+around parts that are not on this bench: Project 10 wants an
+X-NUCLEO-IKS4A1, Project 11 a VL53L8CX on an X-NUCLEO-53L8A1, and Project
+17 a STWIN.box.
+
+> **Corrected on Wednesday 30 September 2026.** All three boards are on
+> the bench. The belief came from an inventory note that was incomplete,
+> and the note was trusted over the drawer for nine days. The decision
+> below is unchanged, because the parts were never its reason: see the
+> "Why" paragraph, which turns entirely on the licence gate, and entry 12
+> of Project 11's journal, which re-examines it without the false
+> premise. What does change is the sentence under "Rejected": Projects 10
+> and 17 are not deferred for want of hardware, and the inventory note
+> itself was the defect.
 
 **Decision.** Project 11 was re-targeted to the ADXL345 that is on the
 bench, keeping every one of its teaching points: i2c-dev and I2C_RDWR, a

@@ -14,8 +14,16 @@ All entries are Monday 21 September 2026 unless noted.
 ## 1. The part decided the project, and it is the part on the bench
 
 **What happened.** The specification names an X-NUCLEO-53L8A1 with a
-VL53L8CX. The bench has a DFRobot SEN0032, an ADXL345, and that is the
-only loose sensor on it. So the project is built on the ADXL345.
+VL53L8CX. The project is built on a DFRobot SEN0032, an ADXL345, instead.
+
+> **Corrected on Wednesday 30 September 2026.** As written on Monday 21
+> September 2026 this entry said the ADXL345 was the only loose sensor on
+> the bench and that the X-NUCLEO-53L8A1 was not here. Both statements
+> were false: the shield is on the bench, and so are the X-NUCLEO-IKS4A1,
+> the X-NUCLEO-IKS5A1 and the STWIN.box. The entry is left standing
+> because it records what was believed at the time. The two reasons below
+> were the real grounds for the choice and are untouched by the
+> correction. Entry 12 re-examines the decision without the false premise.
 
 The choice is better than a substitution, for two reasons found while
 reading rather than assumed:
@@ -497,3 +505,54 @@ stale: "43 assertions" when there are 113, one suite listed when there
 are three, and no mention of the register comparison or the documents. A
 table that counts things is a claim that ages every time the thing it
 counts changes, which is the third time this project has had to fix one.
+
+---
+
+## 12. The premise was wrong and the decision survives it
+
+Entry on Wednesday 30 September 2026.
+
+**What happened.** Joseph said plainly that the X-NUCLEO-53L8A1 is on the
+bench, along with the X-NUCLEO-IKS4A1, the X-NUCLEO-IKS5A1 and the
+STWIN.box. Entry 1 of this journal, decision 108 in the walkthrough, and
+the first journal entries of Projects 16 and 18 all rest on the opposite
+belief. It came from an inventory note that was wrong, and it went
+unchallenged for nine days because it was never checked against the
+drawer, only against itself.
+
+**What this does not change.** Nothing in the library. Not one line of
+`libadxl`, not a test, not a packaging rule. The re-target to the ADXL345
+had three stated grounds and only one of them is now false.
+
+| Ground | Status |
+|---|---|
+| The X-NUCLEO-53L8A1 is not on the bench | **False.** It is here |
+| The VL53L8CX register map is closed, so the driver needs ST's licence-gated STSW-IMG040, and the specified CMake links that library into the test binary as well as the real one | **Holds.** Nothing about owning the shield opens the register map |
+| Project 5 drives the same chip from inside the kernel, so one part answers this project's opening question on hardware rather than by analogy | **Holds.** It is a property of the pairing, not of the parts drawer |
+
+**Why the second ground is the one that decides it.** This project's
+distinguishing property is that every line compiles and every test runs
+with nothing plugged in, which is what lets continuous integration
+exercise it. A licence-gated vendor library inside the test binary takes
+that away. Owning the shield does not restore it, because the gate is on
+the download and its terms, not on the hardware. So the decision stands
+on ground two alone, and ground three makes it the better project rather
+than merely the possible one.
+
+**What does change.** Three things, none of them in this directory.
+
+1. The shield is available, so the VL53L8CX port is a real option again
+   for a project that wants it. It is not this one.
+2. Projects 10 and 17 were described as specified around absent hardware.
+   They are not. Their own READMEs never claimed it, so only the journals
+   and the decisions log needed the correction.
+3. The habit that Projects 16 and 18 recorded, checking the inventory
+   before the design, was the right habit applied to a wrong inventory.
+   The lesson survives with one addition: an inventory note is a claim
+   like any other, and the drawer outranks it.
+
+**What was done.** Entry 1 keeps its text with a dated correction beside
+the false sentence. The README's "Where this differs from the original
+plan" section drops the parts reason and keeps the two that hold.
+Decision 108 and the two journals are corrected the same way, in place,
+without rewriting what was decided or why.

@@ -62,9 +62,16 @@ outside the tree had to be consulted to find out what the project is.
 ## 2. The parts were checked before the design, and the inventory was wrong
 
 **What happened.** Project 16's first journal entry records the habit this
-repository learned the hard way: three projects were specified around
-hardware that is not on the bench, and each was found out after its design
-was written. So the inventory was checked first.
+repository learned at some cost: three projects were specified around
+hardware believed not to be on the bench, and each was found out after its
+design was written. So the inventory was checked first.
+
+> **Corrected on Wednesday 30 September 2026.** That belief was wrong.
+> The X-NUCLEO-IKS4A1, the X-NUCLEO-IKS5A1, the X-NUCLEO-53L8A1 and the
+> STWIN.box are all on the bench, so Projects 10 and 17 do not lack their
+> hardware and never did. The sentence below that sets this project apart
+> from them is therefore wrong about them, not about this project, whose
+> parts were and are present.
 
 Project 18 needs a board, at least one wireless station to associate with
 the access point, and something to publish MQTT. The bench has a Raspberry

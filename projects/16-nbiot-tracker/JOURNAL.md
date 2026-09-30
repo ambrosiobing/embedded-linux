@@ -14,10 +14,18 @@ All entries are Monday 21 September 2026 unless noted.
 ## 1. The parts were checked before the design, for once
 
 **What happened.** Three projects in this repository were specified around
-hardware that is not on the bench: Project 10 wants an X-NUCLEO-IKS4A1,
-Project 17 a STWIN.box, and Project 11 wanted a VL53L8CX until it was
-re-targeted to the ADXL345 on Monday 21 September 2026. Each was found out
-after its design was written.
+hardware believed at the time not to be on the bench: Project 10 wants an
+X-NUCLEO-IKS4A1, Project 17 a STWIN.box, and Project 11 wanted a VL53L8CX
+until it was re-targeted to the ADXL345 on Monday 21 September 2026. Each
+was found out after its design was written.
+
+> **Corrected on Wednesday 30 September 2026.** The belief was wrong. All
+> three boards are on the bench, and so is the X-NUCLEO-IKS5A1. The
+> inventory note this entry trusted was incomplete and was never checked
+> against the drawer. The habit below, reading the inventory before the
+> design, is still the right habit; what it needed was a better
+> inventory. Project 11's re-target survives the correction on its other
+> grounds, which are set out in entry 12 of its own journal.
 
 **What was done.** The inventory was read first this time. Project 16 needs
 a Cat-M or NB-IoT modem and the bench has two: a SIM7070G Cat-M/NB-IoT/GPRS
