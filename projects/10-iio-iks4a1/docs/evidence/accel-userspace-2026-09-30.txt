@@ -448,3 +448,53 @@ own folding, and 126.7 minus 116.6 is 10.1 Hz:
   predicted position if it is a beat: 0.0797 cyc/sample, 10.1 Hz
 
 A factor of three away from 0.0270, so the two outcomes are not close.
+
+THE 240 Hz PAIR. Both captures timed: 31.653 s and 31.501 s for 4000
+samples, so the record is 31.6 seconds long and the sample rate is 126.7,
+NOT the 240 of the output-rate register. Treating the file as 240 Hz makes
+every frequency too high by a factor of 1.894 and the record half as long
+as the clock says it was.
+
+  Nyquist                63.35 Hz, not 120
+  record length          31.6 s, not 16.7
+
+QUIET AT 240 Hz: AC rms 0.51 / 0.51 / 0.68 mg, no tones, bias unmoved,
+magnitude 1.0067 g, duplicate fraction 0.0 percent.
+
+SHAVER AT 240 Hz, and the test fails to decide. The 120 Hz record's tone is
+a narrow cluster, 0.0267 to 0.0280 on all three axes. The 240 Hz record
+spreads from 0.052 to 0.117 with several comparable peaks:
+
+  X  0.0785 (9.95 Hz, 2.1 mg)   0.0798 (10.10 Hz, 2.1 mg)
+  Y  0.0905 (11.47 Hz, 2.4 mg)  0.1028 (13.02 Hz, 2.1 mg)
+  Z  0.0905 (11.47 Hz, 9.0 mg)  0.0520 ( 6.59 Hz, 8.6 mg)
+
+Neither predicted outcome. And the comparison is void anyway, because the
+excitation changed with it: AC rms went from 4.7, 3.9, 10.7 mg to 15.6,
+28.5, 58.5, three to seven times stronger and continuous rather than
+intermittent.
+
+WHAT THE RUN DOES ESTABLISH. Raising the output rate made the measurement
+worse, for an exact reason. At 120 Hz the part passes nothing above 60 Hz
+and the loop can represent 63.35, so the part's own anti-alias filter was
+serving as the loop's. At 240 Hz the part passes to 120 Hz and everything
+from 63.35 up folds into the band unopposed.
+
+  Z energy above 0.25 cyc/sample    3.9 % at 120 Hz, 9.8 % at 240 Hz
+  peak over AC rms on Z             0.45 at 120 Hz, 0.15 at 240 Hz
+
+RULE: for a polled capture, set the output rate at or just below the poll
+rate. The part's filter is the only protection the second sampling stage
+can have.
+
+THE NEXT TEST IS PRESENCE AND ABSENCE, NOT POSITION. Every available output
+rate is 120 Hz times a power of two, so 120 is a harmonic of all of them
+and a line near 117 or 123 Hz beats to the same 3.4 Hz at every setting.
+Lowering the rate to 30 Hz puts the part's filter near 15 Hz: a real 3.42 Hz
+vibration passes and a 117 Hz line is rejected before it can alias.
+
+  tone survives at 3.42 Hz    real vibration
+  tone disappears             a beat from a line near 120 Hz
+
+And hold the shaver the same way for both captures this time, full run,
+same pressure, or the result is void again.

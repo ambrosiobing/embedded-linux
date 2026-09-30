@@ -1285,3 +1285,72 @@ over-claim: a plausible mechanism promoted to a measured fact because the
 number supporting it was real. The number was real. The inference from it
 was not tested. Being careful about one claim in an entry is not being
 careful about the entry.
+
+---
+
+## 28. The test was inconclusive, and the reason is how it was specified
+
+Entry on Wednesday 30 September 2026, last of the day.
+
+**The prediction, and what came back.** Entry 27 predicted that the tone at
+0.0270 cycles per sample either stays, meaning a real 3.42 Hz vibration, or
+moves to 0.0797, meaning a beat. At 240 Hz output it did neither cleanly.
+The sharp line of the 120 Hz record, a narrow cluster from 0.0267 to 0.0280
+on all three axes, became a spread from 0.052 to 0.117 with several
+comparable peaks and no dominant one.
+
+**The test cannot decide, because two things changed.** The excitation was
+not held constant.
+
+| | X | Y | Z |
+|---|---|---|---|
+| AC rms, 120 Hz record | 4.7 mg | 3.9 mg | 10.7 mg |
+| AC rms, 240 Hz record | 15.6 mg | 28.5 mg | 58.5 mg |
+
+Between three and seven times stronger, and continuous where the first was
+intermittent. The output rate changed and so did the shaver. That is not a
+comparison, and the instruction that produced it was mine: "roughly the
+same portion of the run" is not a control, and one line of this bench's own
+method says a comparison differs in one variable or it is not one.
+
+**What the run produced instead, which is worth more than the test was.**
+Raising the output rate made the measurement worse, and the mechanism is
+exact.
+
+The part band-limits before it decimates. At 120 Hz output it passes
+nothing above 60 Hz, and the loop at 126.7 can represent 63.35, so the
+second sampling stage folds almost nothing: **the sensor's own anti-alias
+filter was acting as the loop's anti-alias filter.** At 240 Hz output the
+part passes up to 120 Hz, and everything between 63.35 and 120 folds down
+into the band with nothing to stop it.
+
+| | share of Z energy above 0.25 cyc/sample | peak over rms |
+|---|---|---|
+| 120 Hz output | 3.9 % | 0.45 |
+| 240 Hz output | 9.8 % | 0.15 |
+
+So the 120 Hz setting was accidentally near-ideal for this loop, and the
+rule that follows is worth more than the beat question: **for a polled
+capture, set the output rate at or just below the poll rate**, and let the
+part's filter protect the stage that cannot have one.
+
+**Why the ODR ladder cannot settle the beat, and what can.** The available
+rates are all 120 Hz times a power of two, so 120 is a harmonic of every
+one of them and a line near 117 or 123 Hz beats to the same 3.4 Hz at every
+setting. Moving the rate cannot move that beat.
+
+Lowering it far enough removes it instead. At 30 Hz output the part's
+filter cuts near 15 Hz: a real 3.42 Hz vibration passes, and a 117 Hz line
+is rejected before decimation, so it never reaches the decimator to alias.
+
+  the tone survives at 3.42 Hz    it is real
+  the tone disappears             it was a beat from a line near 120 Hz
+
+That is a cleaner instrument than moving a peak, because the two outcomes
+are presence and absence rather than two positions to argue about.
+
+**The habit worth naming.** The prediction was written before the command,
+with its falsifier, which is what entry 26 said to do. It still produced
+nothing, because the care went into the prediction and not into the
+protocol. Stating what will count as a refutation is worthless if the run
+that follows changes two things at once.
