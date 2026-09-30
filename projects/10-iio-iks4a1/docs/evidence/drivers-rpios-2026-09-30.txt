@@ -39,3 +39,28 @@ This is the measurement behind kas/bench-iio.yml and the kernel fragment
 meta-bench/recipes-kernel/linux/files/iio.cfg, which turn those drivers
 on. Before today that fragment was a precaution. It is now a requirement
 with evidence.
+
+Completing the survey: the accelerometer directory.
+
+root@eplepi:~# ls /lib/modules/$(uname -r)/kernel/drivers/iio/accel/
+adxl355_core.ko.xz  adxl355_i2c.ko.xz
+
+Only the ADXL355. There is no lis2dux12, so the LIS2DUXS12 at 0x19 has no
+driver either, and there is no adxl345_i2c, so the DFRobot SEN0032 that
+Project 5 is built around has no in-tree driver on this kernel.
+
+Full picture for the seven parts on this shield plus the loose sensor:
+
+  LSM6DSV16X    0x6b   no driver
+  LSM6DSO16IS   0x6a   no driver
+  LIS2DUXS12    0x19   no driver
+  LIS2MDL       0x1e   no driver
+  LPS22DF       0x5d   no driver
+  STTS22H       0x38   no driver
+  SHT40AD1B     0x44   sht4x, hwmon, bound and working
+  ADXL345       0x53   no driver (Project 5's part, not wired here)
+
+One of eight. Every motion sensor on this bench is unreachable through
+the kernel on a stock distribution image, which is a finding for Project 5
+as well as this one: its comparison against an in-tree driver needs the
+project's own image, not just its own module.
