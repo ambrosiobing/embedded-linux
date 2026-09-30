@@ -18,7 +18,7 @@ Power off, shield off.
 | No pull-ups added on the Pi side | The 4k7 pull-ups are on the shield. Two sets on one bus is a slower rise time, not a safer one, and at 400 kHz it looks like NACKs from a driver bug |
 | Jumpers are short | 400 kHz over 20 cm of loose wire is the documented limit, and the failure is intermittent rather than clean |
 | The magnetometer is where it will stay | Hard-iron calibration is valid for one physical arrangement. Moving the shield afterwards invalidates it |
-| The USB/TTL cable is on pins 8, 10 and 6, red lead not connected | The console is how a board that does not boot gets diagnosed |
+| The USB/TTL cable is on pins 8, 10 and **9**, red lead not connected | The console is how a board that does not boot gets diagnosed. Its ground is pin 9 and not pin 6, because the wiring table already puts the shield's ground on pin 6 and one header pin takes one jumper socket. Pin 9 is the nearest of the eight grounds and sits beside pins 8 and 10 |
 | **CN5 pin 1 is the end nearest CN9**, so pin 9 is SDA and pin 10 is SCL at the far end | CN9 runs D0 to D7 and CN5 continues D8 to D15 in line with it. Counting CN5 from the far end instead puts SDA on D9 and SCL on D8, neither of which is on the shield's I2C bus, and step 1 then returns a completely empty grid with nothing wrong in software |
 
 **Which Arduino pin carries INT1 is not settled by this repository.** It

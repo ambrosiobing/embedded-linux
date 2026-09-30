@@ -418,3 +418,37 @@ detectable for the price of one continuity test before it costs an evening.
 **What does not depend on it.** The bus scan of step 1 uses SDA and SCL
 only. It can be run now, and it decides whether the wiring is right at all,
 which is the question worth answering first.
+
+---
+
+## 11. Two wires were sent to one pin, and the board found it
+
+Entry on Wednesday 30 September 2026.
+
+**What happened.** The shield went on, the console cable came out, and pin
+6 was already full. The wiring table in `README.md` puts the shield's
+ground on Pi header pin 6. Step 0 of `docs/BRINGUP.md` says the USB/TTL
+cable sits on pins 8, 10 and 6. One header pin takes one jumper socket, so
+the two instructions cannot both be followed.
+
+**What was done.** Step 0 now sends the console ground to **pin 9**. The
+40-pin header has eight grounds, at pins 6, 9, 14, 20, 25, 30, 34 and 39,
+all the same net, so the choice is mechanical rather than electrical. Pin 9
+is the one that sits beside pins 8 and 10, which keeps the three console
+leads together.
+
+**Why that and not the alternative.** The alternative is to move the
+shield's ground and leave the console where the document had it. That is
+worse for two reasons. The shield's four bus wires are a block at pins 1,
+3, 5 and 6, and splitting them costs the visual check that the block is
+seated correctly. And the console is the wire most often removed and
+refitted, so it should be the one that moves.
+
+**What this says about the documents.** Both were right in isolation and
+wrong together, which is the failure mode of a pin table that lives in two
+files. Neither review caught it because each was read on its own. The
+repository already knows this shape: a claim that is true where it is
+written and false beside its neighbour. The check that would have caught it
+is reading every pin used by one project in one list, which is what the
+wiring table is for and what step 0 should have deferred to instead of
+restating.
