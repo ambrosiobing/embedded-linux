@@ -76,3 +76,43 @@ a mainline driver bound by this project's own device tree overlay.
 One sensor of four, on a kernel that carries one driver of four. The
 number is small and the path is complete: flying leads, a bus, an address,
 an overlay, a driver, a device, a reading.
+
+6. THE BREATH TEST. The reading responds to the world.
+
+One-second loop, breathed on from a few centimetres at about sample 4.
+Values are thousandths: millidegrees Celsius and milli-percent RH.
+
+   temp    humidity
+  22229    59034     settling from a previous disturbance
+  22213    57173
+  22205    55910     floor before the breath
+  22256    57146     breath arrives
+  22344    61577
+  22406    64045
+  22382    64625     humidity peak
+  22403    61632
+  22382    59004
+  22392    56883
+  22384    55790
+  22392    55489
+  22392    55140
+  22366    55042
+  22366    54722     still falling at the end of the capture
+
+Humidity: floor 55.910 percent, peak 64.625 percent, a rise of 8.7
+percentage points in about three seconds, decaying back past the starting
+floor over the following twelve and still falling when the capture ended.
+
+Temperature: floor 22.205 degrees, peak 22.406 degrees, a rise of 0.201
+degrees, and it does not decay to the floor within the capture.
+
+That asymmetry is the result. Breath is both warm and wet, and the
+humidity channel moves by nearly nine percent while the temperature
+channel moves by two tenths of a degree. A sensor returning a constant, or
+returning noise, would do neither.
+
+NOTE ON THE CAPTURE. Every line appears twice. The pairs are identical
+rather than merely close, and the loop prints once per iteration with a
+one-second sleep, so the most likely cause is two copies of the loop
+running at once from a duplicated paste. It does not affect the values.
+Worth knowing before a capture like this is used as timing evidence.

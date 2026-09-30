@@ -807,3 +807,39 @@ this project exists to make, which needs all of that.
 with evidence. Step 2 attempted, and its outcome measured: one of four.
 Steps 3 to 8 require the project's own image, for a reason that is now a
 capture rather than an assumption.
+
+---
+
+## 20. The reading responds to the world
+
+Entry on Wednesday 30 September 2026. Acceptance test for the one bound
+sensor, and the last of the evening.
+
+**What happened.** A one-second sampling loop, breathed on from a few
+centimetres.
+
+| Channel | Floor | Peak | Change |
+|---|---|---|---|
+| Humidity | 55.910 percent | 64.625 percent | 8.7 percentage points |
+| Temperature | 22.205 degrees | 22.406 degrees | 0.201 degrees |
+
+Humidity rose in about three seconds and decayed back past its starting
+floor over the following twelve, still falling when the capture ended.
+Temperature rose a fifth of a degree and did not return within the
+capture.
+
+**Why the asymmetry is the finding rather than the absolute values.**
+Breath is both warm and wet. A working humidity channel must move far more
+than the temperature channel on that stimulus, and it moved by nearly nine
+percent against two tenths of a degree. A sensor stuck at a constant would
+show neither, and a sensor returning noise would show both equally and
+without a decay curve. The shape is the evidence.
+
+This is the first acceptance criterion in this project met on hardware.
+
+**One artefact worth writing down.** Every line of the capture appears
+twice, in identical pairs, on a loop that prints once per iteration with a
+one-second sleep. The likeliest cause is two copies of the loop running
+from a duplicated paste into the serial console. It does not affect the
+values and it would quietly halve any rate computed from such a capture,
+so it is named here before a log like this is used as timing evidence.
