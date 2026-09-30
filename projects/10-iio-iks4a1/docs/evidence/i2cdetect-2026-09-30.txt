@@ -37,3 +37,32 @@ Six devices answered.
 
 Not present: nothing answered at 0x18 or 0x19, where a LIS2DUXS12 would
 be expected.
+
+Identity registers, same session, same board.
+
+root@eplepi:~# i2cget -y 1 0x6a 0x0f
+0x22
+root@eplepi:~# i2cget -y 1 0x6b 0x0f
+0x70
+
+Register 0x0f is WHO_AM_I across the ST LSM6 family.
+
+0x22 is the value reported by the LSM6DSO16IS, the part carrying the
+in-sensor processing unit. 0x70 is the value reported by the LSM6DSV16X,
+the part carrying sensor fusion.
+
+So on this shield:
+
+  0x6a  LSM6DSO16IS   ISPU part
+  0x6b  LSM6DSV16X    fusion part, and the one whose INT1 is claimed to
+                      reach CN9 pin 6
+
+This is the reverse of what bench-iks4a1-overlay.dts assumes, which binds
+st,lsm6dsv16x at 0x6a. The driver checks WHO_AM_I during probe, so that
+node would have found 0x22 where it expected 0x70 and refused to bind,
+with the part appearing on the bus and absent from IIO.
+
+The mapping above is read from two registers and from the shield's known
+population. The authoritative confirmation is the driver's own probe once
+the corrected overlay is applied: the name file under the registered IIO
+device states which part the kernel matched.

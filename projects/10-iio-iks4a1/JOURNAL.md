@@ -504,3 +504,57 @@ LSM6 class parts is at which address.
 appended to `config.txt` inherits whatever conditional section the file
 ended in, so it is read back for the section header above it as much as
 for the line itself. Both are now in `docs/CARD.md`.
+
+---
+
+## 13. The two inertial units are the other way round
+
+Entry on Wednesday 30 September 2026, minutes after entry 12.
+
+**What happened.** Register 0x0f is WHO_AM_I across the ST LSM6 family, so
+both addresses were asked who they are.
+
+```
+i2cget -y 1 0x6a 0x0f   ->  0x22
+i2cget -y 1 0x6b 0x0f   ->  0x70
+```
+
+0x22 is the LSM6DSO16IS, the part with the in-sensor processing unit. 0x70
+is the LSM6DSV16X, the part with sensor fusion. So the shield carries both,
+and **the fusion part is at 0x6b while the processing part is at 0x6a.**
+
+**Why that matters more than a label.** `bench-iks4a1-overlay.dts` bound
+`st,lsm6dsv16x` at 0x6a. The driver reads WHO_AM_I during probe, so that
+node would have found 0x22 where it required 0x70 and refused to bind. The
+symptom is the one this project's own bring-up table calls
+`bound-no-device`: the part answers `i2cdetect` perfectly, `dmesg` carries
+a probe failure that nobody reads unless they suspect one, and the device
+never appears under IIO. Every later step, the buffers, the triggers, the
+FIFO watermark and the fusion filter, is built on a device that is not
+there.
+
+**What was done.** The IMU node moved to 0x6b. The header comment now
+carries the measured address map, so the next reader does not have to
+rediscover it. The interrupt property stays on that node, which is correct
+for a second reason: the claimed INT1 belongs to the LSM6DSV16X, and the
+LSM6DSV16X is the node that moved.
+
+**What was deliberately not done.** No node was added for the LSM6DSO16IS
+at 0x6a. This overlay's own rule says why: a node naming a compatible the
+kernel does not know is created, binds to nothing, and leaves the part
+invisible with no message anywhere. Whether `st_lsm6dsx` in the running
+kernel lists a matching compatible is a question to answer before writing
+the node, not while writing it.
+
+**What this settles beyond this project.** Two volumes on this bench
+disagreed about the X-NUCLEO-IKS4A1. One lists a single LSM6 part and puts
+the LSM6DSO16IS on the IKS5A1 instead. The other lists both on the IKS4A1.
+Two addresses answering two different WHO_AM_I values decides it: both are
+on this shield, and the inventory line that names one is wrong.
+
+**The honest limit of this reading.** WHO_AM_I values map to parts through
+their data sheets, and the mapping above is taken from them rather than
+from this board. The reading that closes it is the driver's own: once the
+corrected overlay is applied, the `name` file of the registered IIO device
+states which part the kernel matched, and that is a match made by code
+rather than by a person reading a table.

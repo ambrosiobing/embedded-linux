@@ -12,11 +12,30 @@
  *
  * WHAT IS NOT HERE, AND WHY
  *
- * The STTS22H and the LIS2DUXS12 answer on the bus and have no node. A
- * node naming a compatible string the kernel does not know is not an
- * error: the node is created, nothing binds to it, and the part is
- * invisible with no message anywhere. Leaving them out and listing them
- * in the inventory table is the honest version of the same outcome.
+ * The STTS22H answers on the bus and has no node. So does a second LSM6
+ * class part at 0x6a, the LSM6DSO16IS. A node naming a compatible string
+ * the kernel does not know is not an error: the node is created, nothing
+ * binds to it, and the part is invisible with no message anywhere.
+ * Leaving them out and listing them in the inventory table is the honest
+ * version of the same outcome. Before adding a node for the LSM6DSO16IS,
+ * check that the st_lsm6dsx driver in the running kernel lists a matching
+ * compatible, rather than assuming one.
+ *
+ * The LIS2DUXS12 is not here either, and for a different reason: it is
+ * not on this shield. Nothing answered at 0x18 or 0x19 on Wednesday
+ * 30 September 2026. An earlier version of this comment said it answered
+ * on the bus, which was an expectation rather than a reading.
+ *
+ * MEASURED ADDRESSES, Wednesday 30 September 2026
+ *
+ *   0x1e  LIS2MDL       magnetometer
+ *   0x38  STTS22H       temperature, no node here
+ *   0x44  SHT40         humidity, hwmon rather than IIO
+ *   0x5d  LPS22DF       pressure, SA0 high
+ *   0x6a  LSM6DSO16IS   WHO_AM_I 0x22, ISPU part, no node here
+ *   0x6b  LSM6DSV16X    WHO_AM_I 0x70, fusion part, bound below
+ *
+ * The capture is in the project's docs/evidence directory.
  *
  * SPDX-License-Identifier: MIT
  */
@@ -49,7 +68,15 @@
 			status = "okay";
 
 			/*
-			 * The IMU. One chip, one hardware FIFO, one interrupt
+			 * The IMU, at 0x6b and NOT at 0x6a. This overlay
+			 * assumed 0x6a until the bus was read: 0x6a answers
+			 * WHO_AM_I 0x22, which is the LSM6DSO16IS, and 0x6b
+			 * answers 0x70, which is this part. The driver checks
+			 * WHO_AM_I during probe, so the old node found the
+			 * wrong value and would have refused to bind, leaving
+			 * the part on the bus and absent from IIO.
+			 *
+			 * One chip, one hardware FIFO, one interrupt
 			 * line, and TWO IIO devices: st_lsm6dsx registers
 			 * lsm6dsv16x_accel and lsm6dsv16x_gyro separately.
 			 * They share the FIFO, so enabling both at different
@@ -59,15 +86,17 @@
 			 * st,drdy-int-pin selects which of the chip's two
 			 * interrupt pins the driver uses for data-ready and
 			 * FIFO watermark events. 1 means INT1, which is the
-			 * pin wired to GPIO24. Getting this wrong gives a
+			 * pin claimed to reach CN9 pin 6 and wired to GPIO24.
+			 * That claim is not yet confirmed by continuity.
+			 * Getting this wrong gives a
 			 * device that probes, reads fine through sysfs, and
 			 * never fills a buffer, because the interrupt the
 			 * driver waits on is on a pin nothing is connected
 			 * to.
 			 */
-			imu: lsm6dsv16x@6a {
+			imu: lsm6dsv16x@6b {
 				compatible = "st,lsm6dsv16x";
-				reg = <0x6a>;
+				reg = <0x6b>;
 				interrupt-parent = <&gpio>;
 				interrupts = <24 1>;	/* GPIO24, rising edge */
 				st,drdy-int-pin = <1>;
