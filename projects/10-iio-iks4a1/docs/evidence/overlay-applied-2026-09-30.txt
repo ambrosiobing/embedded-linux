@@ -61,3 +61,18 @@ The sharpest part: the binding that SUCCEEDED was also silent. dmesg
 carries no line for the sht4x either. So dmesg cannot distinguish the
 three failures from the one success, and the only question that separates
 them is whether a device appeared.
+
+5. THE FIRST SENSOR READING OF THIS PROJECT.
+
+root@eplepi:~# cat /sys/class/hwmon/hwmon1/temp1_input /sys/class/hwmon/hwmon1/humidity1_input
+22112
+53968
+
+hwmon reports thousandths, so 22.112 degrees Celsius and 53.968 percent
+relative humidity. Both are plausible indoor values, which is the whole
+claim being made: one part of this shield is delivering real data through
+a mainline driver bound by this project's own device tree overlay.
+
+One sensor of four, on a kernel that carries one driver of four. The
+number is small and the path is complete: flying leads, a bus, an address,
+an overlay, a driver, a device, a reading.

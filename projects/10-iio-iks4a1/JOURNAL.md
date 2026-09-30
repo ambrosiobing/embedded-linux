@@ -774,3 +774,36 @@ Project 1 predicted, which unblocks Project 2. A corrected bench
 inventory. And four corrections to this project's own documents, every one
 of them found by a measurement contradicting something that had been
 written from reading.
+
+---
+
+## 19. A number, at last
+
+Entry on Wednesday 30 September 2026.
+
+```
+/sys/class/hwmon/hwmon1/temp1_input      22112
+/sys/class/hwmon/hwmon1/humidity1_input  53968
+```
+
+22.112 degrees Celsius and 53.968 percent relative humidity, from the
+SHT40AD1B at 0x44, through the `sht4x` hwmon driver, bound by a node in
+this project's own overlay.
+
+**Why one sensor of four is still worth recording as a milestone.** Every
+link in the path is now exercised at least once: five flying leads to a
+Pi header, a bus that enumerates, an address confirmed against the
+manufacturer's table, an overlay compiled and applied, a driver that
+bound, a device that appeared, and a value that is neither zero nor
+absurd. Before today the whole of that was written and none of it had been
+run.
+
+**What it does not claim.** Nothing about the three parts with no driver.
+Nothing about buffers, triggers, the hardware FIFO or the interrupt on
+GPIO24, which is still an unexercised wire. Nothing about the comparison
+this project exists to make, which needs all of that.
+
+**The honest description of where project 10 stands.** Step 1 complete
+with evidence. Step 2 attempted, and its outcome measured: one of four.
+Steps 3 to 8 require the project's own image, for a reason that is now a
+capture rather than an assumption.
