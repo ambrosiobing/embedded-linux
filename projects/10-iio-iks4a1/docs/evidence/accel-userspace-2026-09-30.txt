@@ -368,3 +368,83 @@ stage: samples are taken on the sensor's own clock, uniformly, and read out
 in bursts afterwards. It is reachable over i2c-dev without any kernel
 driver, and it is the only route to a spectrum that means anything in
 hertz.
+
+THE LOOP RATE, MEASURED AT LAST. Timing the capture itself rather than a
+stripped-down imitation of it:
+
+  4000 samples in 31.653 s = 126.4 reads per second
+  4000 samples in 31.501 s = 127.0 reads per second
+
+Half a percent apart, so the captures are comparable and the loop is far
+steadier than the 3 percent spread of a 200-sample timing suggested.
+
+A FIRST TIMING WAS WRONG, AND WRONG IN A WAY WORTH NAMING. Timing this
+
+  i2ctransfer ... >/dev/null
+
+gave 185 reads a second, and the loop that writes the file is this
+
+  r=$(i2ctransfer ...) ; echo "$i $r"
+
+which forks a subshell, pipes the output back and reads it on every
+sample. 185 is the speed of a loop that throws the data away. Timing an
+imitation of the thing measures the imitation. The captures run at 126.7.
+
+That also settles a contradiction: the very first burst capture, 1905
+unique out of 2905, implied 183 reads a second, and it used a tight loop
+with no command substitution. Both numbers are right and they describe
+different loops.
+
+SO THE FREQUENCY AXIS IS NOW IN HERTZ. Multiply cycles per sample by
+126.7. The peak at 0.0270 is 3.42 Hz, and the axis runs to 63.35 Hz.
+
+THE NOISE FLOOR SCALES AS THE SQUARE ROOT OF BANDWIDTH, TO ONE PERCENT.
+Doubling the output rate from 120 Hz to 240 Hz doubles the measurement
+bandwidth, so white noise should rise by the square root of two, 1.414.
+
+  axis   120 Hz     240 Hz    ratio
+  X      0.36 mg    0.51 mg   1.417
+  Y      0.36 mg    0.51 mg   1.420
+  Z      0.47 mg    0.68 mg   1.432
+
+That is four independent things confirmed by one comparison: the noise is
+white, the rate change actually took effect in the part, the floor is the
+sensor's own noise rather than anything on the bench, and the whole chain
+from register to number is quantitatively trustworthy. A prediction from
+first principles landing within one percent is worth more than any number
+taken on its own.
+
+The bias is unmoved across the change: X -5.1 against -5.3, Y +13.1 against
++13.5, Z +1006.6 against +1006.7 mg, magnitude 1.0067 against 1.0068 g.
+
+The duplicate fraction is 0.0 percent at 240 Hz, exactly as it must be when
+the loop at 126.7 is slower than the part at 240: samples are skipped, not
+repeated.
+
+A CLAIM MADE EARLIER TONIGHT IS WITHDRAWN. The record above says the
+shaver's broadband rise of about ten times in the top half of the band is
+folded content, and states it as measured rather than suspected. It is not
+established. At 120 Hz output the part band-limits to 60 Hz and the loop at
+126.7 can represent 63.35 Hz, so the second sampling stage adds almost no
+folding at that setting. The rise is equally consistent with the shaver
+genuinely exciting the board across the whole band, which a mechanism
+rattling against a circuit board does. Aliasing in the part's own
+decimation remains possible. Neither is shown.
+
+THE BEAT TEST, ARITHMETIC DONE BEFORE THE DATA ARRIVES. The loop rate is
+unchanged at 126.7, so:
+
+  the tone stays at 0.0270 cyc/sample, 3.42 Hz
+      it is a real mechanical vibration and the beat idea is wrong
+
+  the tone moves anywhere else
+      it is an artefact of sampling, whatever else it may be
+
+And if the beat reading is right, the position is predictable rather than
+merely different. A line near 116.6 or 123.4 Hz gives 3.42 Hz against the
+120 Hz sampling. At 240 Hz both branches land at 116.6 Hz after the part's
+own folding, and 126.7 minus 116.6 is 10.1 Hz:
+
+  predicted position if it is a beat: 0.0797 cyc/sample, 10.1 Hz
+
+A factor of three away from 0.0270, so the two outcomes are not close.

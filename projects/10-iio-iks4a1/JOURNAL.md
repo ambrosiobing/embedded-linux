@@ -1225,3 +1225,63 @@ frequency axis at all.**
 falsifier before the command is run, because entry 24 is what happens when
 a mechanism is proposed and tested in the wrong order. One register read
 killed that one in a second. This one has its register read waiting for it.
+
+---
+
+## 27. The noise floor scales as the square root of bandwidth, to one percent
+
+Entry on Wednesday 30 September 2026, later still.
+
+**The loop rate is measured rather than inferred.** 4000 samples in 31.653
+seconds and again in 31.501, so 126.4 and 127.0 reads a second, half a
+percent apart. Every frequency in entry 26 multiplies by 126.7: the tone at
+0.0270 cycles per sample is **3.42 Hz** and the axis runs to 63.35 Hz.
+
+**The first attempt to time it measured the wrong loop.** Timing
+`i2ctransfer ... >/dev/null` gave 185 reads a second, while the loop that
+writes the file wraps the command in a substitution and forks a subshell on
+every sample. 185 is the speed of a loop that throws the data away. Timing
+an imitation of the thing measures the imitation.
+
+It also resolves a contradiction that had been sitting unexamined: the
+first burst capture implied 183 reads a second from its duplicate fraction,
+and the 4000-sample captures implied 120 or below. Both were right. They
+are different loops.
+
+**And then the result of the evening.** Doubling the output rate doubles
+the measurement bandwidth, so white noise should rise by the square root of
+two.
+
+| axis | 120 Hz | 240 Hz | ratio | predicted |
+|---|---|---|---|---|
+| X | 0.36 mg | 0.51 mg | 1.417 | 1.414 |
+| Y | 0.36 mg | 0.51 mg | 1.420 | 1.414 |
+| Z | 0.47 mg | 0.68 mg | 1.432 | 1.414 |
+
+One comparison confirms four separate things: the noise is white, the rate
+change reached the part, the floor is the sensor's own noise and not
+anything on this bench, and the chain from register to number is
+quantitatively sound. A prediction from first principles landing inside one
+percent is worth more than any number taken alone, and this project had not
+produced one until now.
+
+The bias is unmoved across the change and the duplicate fraction is 0.0
+percent at 240 Hz, which is what it must be when a 126.7 Hz loop reads a
+240 Hz part: samples skipped, not repeated.
+
+**A claim from entry 26 is withdrawn.** It says the shaver's tenfold
+broadband rise in the top half of the band is folded content, measured
+rather than suspected. That is not established. At 120 Hz the part
+band-limits to 60 Hz and the loop can represent 63.35 Hz, so the second
+sampling stage adds almost no folding at that setting. The rise is equally
+consistent with the shaver genuinely exciting the board broadband, which a
+mechanism rattling against a circuit board does. Aliasing inside the part's
+own decimation is still possible. Neither is shown, and the sentence should
+not have said measured.
+
+**The habit worth naming, again.** Entry 26 was written with care, with its
+prediction and falsifier stated in advance, and it still contains an
+over-claim: a plausible mechanism promoted to a measured fact because the
+number supporting it was real. The number was real. The inference from it
+was not tested. Being careful about one claim in an entry is not being
+careful about the entry.
