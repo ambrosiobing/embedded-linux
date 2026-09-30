@@ -616,3 +616,54 @@ through `picocom` inside WSL, on the Renkforce PL2303HXA that the Windows
 driver refuses, attached with `usbipd`. Project 1's bring-up document
 predicted exactly that route and Project 2 cannot proceed without it. The
 boot log is captured.
+
+---
+
+## 16. A bus scan is not an inventory
+
+Entry on Wednesday 30 September 2026, closing the question entry 15
+opened.
+
+**What happened.** Two commands separated the two explanations for the
+part that came and went.
+
+```
+i2cget -y 1 0x19 0x0f   ->  0x47
+i2cdetect -y -r 1       ->  0x19 present, 0x44 absent
+```
+
+0x47 is the LIS2DUXS12 identity register. It answers a direct register
+read, repeatably. The part was never intermittent.
+
+**What was intermittent was the question being asked.** `i2cdetect`
+chooses a probe transaction per address, and the two it uses are not
+equivalent:
+
+| Probe | Sees | Misses |
+|---|---|---|
+| default, SMBus quick-write | 0x44 | 0x19, on most runs |
+| `-r`, SMBus read-byte | 0x19 | 0x44 |
+| both together | all seven | nothing |
+
+The SHT40AD1B at 0x44 is command-based and has no register map, so a bare
+read-byte is not a transaction it answers. The LIS2DUXS12 at 0x19
+declines a zero-length write. Neither part was ever missing, and neither
+probe mode ever enumerated this board.
+
+**Why this matters more than the detail.** Step 1 of `docs/BRINGUP.md`
+says a missing address is wiring or bus speed and that no driver work will
+fix it. That is now known to be incomplete: a missing address can also be
+a probe that the part declines. Three times in one evening a correct
+reading produced a wrong conclusion, and each time the fault was in what
+the reading was assumed to mean rather than in the reading.
+
+**What this vindicates.** `iio-probe`, the inventory tool this project
+specifies, exists precisely because `ls /sys/bus/iio/devices` cannot
+distinguish five different failures. The same argument applies one layer
+down: a scan enumerates what answers one kind of probe, and an inventory
+needs a per-part question. The honest enumeration of this shield is seven
+direct register reads, not a grid.
+
+**The three identity values now measured**, all stable on repeat: 0x19
+answers 0x47, 0x6a answers 0x22, 0x6b answers 0x70. The remaining four
+use different identity registers and are not yet read.

@@ -80,6 +80,34 @@ An earlier revision of this section said nothing answers at `18` or `19`.
 That was written from one scan in which the LIS2DUXS12 had not yet
 responded, and it was wrong.
 
+**One scan does not enumerate this board, and two do.** `i2cdetect`
+probes each address with one transaction, and the two it offers are not
+equivalent. Measured on Wednesday 30 September 2026:
+
+```sh
+i2cdetect -y 1      # default, SMBus quick-write: sees 0x44, misses 0x19
+i2cdetect -y -r 1   # SMBus read-byte:            sees 0x19, misses 0x44
+```
+
+The SHT40AD1B at 0x44 is command-based with no register map, so a bare
+read-byte is not a transaction it answers. The LIS2DUXS12 at 0x19 declines
+a zero-length write. Both parts are present and working in both cases.
+
+So **a missing address is not only wiring or bus speed**, which is what an
+earlier version of this section said. It can also be a part declining the
+probe. The way to tell is a direct register read, which is a question the
+part will answer:
+
+```sh
+i2cget -y 1 0x19 0x0f   # LIS2DUXS12 identity, expect 0x47
+i2cget -y 1 0x6a 0x0f   # LSM6DSO16IS identity, expect 0x22
+i2cget -y 1 0x6b 0x0f   # LSM6DSV16X identity, expect 0x70
+```
+
+The identity register differs per part, so take it from each data sheet
+rather than assuming 0x0f everywhere. The SHT40AD1B has no such register
+at all and is read by command.
+
 If the grid is empty or ragged, drop the bus to 100 kHz before suspecting
 anything else: edit `dtparam=i2c_arm_baudrate=100000` in `config.txt` and
 reboot. A bus that works at 100 and not at 400 is a wire length problem

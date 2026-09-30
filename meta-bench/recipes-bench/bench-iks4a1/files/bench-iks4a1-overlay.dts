@@ -21,18 +21,19 @@
  * check that the st_lsm6dsx driver in the running kernel lists a matching
  * compatible, rather than assuming one.
  *
- * The LIS2DUXS12 has no node either, and it is the awkward one: it
- * answers at 0x19 on some scans and not others. An intermediate version
- * of this comment concluded from a single scan that it was not on the
- * shield at all. It is, and the intermittency is the finding.
+ * The LIS2DUXS12 has no node either. It looked intermittent on the bus
+ * and was not: it declines the zero-length write that i2cdetect probes
+ * with by default, and answers both "i2cdetect -r" and a direct register
+ * read. An intermediate version of this comment concluded from one scan
+ * that it was not on the shield at all.
  *
  * ADDRESSES, measured Wednesday 30 September 2026 and confirmed against
  * UM3239 Rev 5 Table 1, whose defaults these all are:
  *
- *   0x19  LIS2DUXS12    ADD 33h, intermittent on i2cdetect, no node here
+ *   0x19  LIS2DUXS12    ADD 33h, needs i2cdetect -r, no node here
  *   0x1e  LIS2MDL       ADD 3Ch, bound below
  *   0x38  STTS22H       ADD 71h, no node here
- *   0x44  SHT40AD1B     ADD 89h, hwmon rather than IIO, bound below
+ *   0x44  SHT40AD1B     ADD 89h, hwmon not IIO, vanishes under -r, bound below
  *   0x5d  LPS22DF       ADD BBh, bound below
  *   0x6a  LSM6DSO16IS   ADD D5h, WHO_AM_I 0x22, ISPU part, no node here
  *   0x6b  LSM6DSV16X    ADD D7h, WHO_AM_I 0x70, fusion part, bound below
