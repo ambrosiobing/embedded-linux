@@ -843,3 +843,57 @@ one-second sleep. The likeliest cause is two copies of the loop running
 from a duplicated paste into the serial console. It does not affect the
 values and it would quietly halve any rate computed from such a capture,
 so it is named here before a log like this is used as timing evidence.
+
+---
+
+## 21. Gravity, through a chip the kernel cannot see
+
+Entry on Wednesday 30 September 2026.
+
+**What happened.** The LSM6DSV16X at 0x6b was started and read entirely
+from user space, through `i2c-dev`, on a kernel that has no driver for it
+and where `/sys/bus/iio` does not exist.
+
+```
+i2cset -y 1 0x6b 0x10 0x06      CTRL1: 120 Hz, high performance
+i2cget -y 1 0x6b 0x10   -> 0x06 accepted
+i2cget -y 1 0x6b 0x2c w -> 0x4078
+```
+
+0x4078 is 16504 counts. At the default two g full scale, 0.061 mg per
+count, that is **1.007 g** on the axis normal to a board lying flat.
+Gravity, to within a percent, from a part with no driver.
+
+At rest the triple reads X about minus 5 mg, Y about plus 13 mg, Z about
+1.006 g: a board not quite level plus the part's zero-g offset. Under a
+tap, X and Y swing by several hundred counts and return. Signal when
+disturbed, the resting triple when not.
+
+**What this settles about the register map.** It was taken from the LSM6
+family convention and is now confirmed by measurement rather than
+assumption: WHO_AM_I at 0x0f, CTRL1 at 0x10 which reads back what was
+written, and little-endian output words at 0x28, 0x2a and 0x2c. The
+gravity check is what confirms it, because a wrong map does not produce
+one g on exactly one axis.
+
+**Why this is the more interesting of tonight's two working sensors.** The
+humidity sensor works because this kernel happens to carry its driver. The
+accelerometer works because it does not need one. Its device tree node
+binds to nothing, the IIO subsystem is absent, and eight bytes of i2c-dev
+traffic deliver correct three-axis acceleration anyway. That is the
+argument Project 11 opens with, demonstrated on hardware instead of
+asserted: not every sensor needs a kernel driver.
+
+**What it is not.** Roughly five samples a second, from three separate
+processes per sample and a sleep, against a part configured for 120. No
+timestamps. Nothing here touches the hardware FIFO, the watermark
+interrupt on GPIO24, or any buffered path. Those are what this project
+exists to compare and they need the drivers this kernel does not carry.
+The gap between five hertz of shell and a timestamped buffered stream is
+the whole subject of Project 10, and tonight measured the bottom of it.
+
+**One artefact.** The serial console emitted binary garbage partway
+through the capture and recovered. Project 1 recorded that this Renkforce
+PL2303HXA dropped its USB connection twice during bring-up, and this is
+consistent. Readings either side are self-consistent so the values stand,
+but evidence captures belong over ssh rather than over this cable.
