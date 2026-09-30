@@ -210,3 +210,93 @@ they were turned into:
 Which is why the next capture carries a line index and a field count, so
 that a damaged line is visible as a damaged line instead of arriving as a
 plausible measurement.
+
+A CONTROLLED PAIR: QUIET AND SHAVER. 4000 reads each, same six-byte burst
+from 0x28, same two g scale. Both written to a file on the board and
+copied off with scp, so nothing in this pair traversed a terminal. The raw
+captures are accel-burst-raw-2026-09-30.txt (quiet) and the b file
+(shaver), and the numbers below are recomputed from them rather than
+copied from the plot.
+
+  STRUCTURAL CHECK        quiet      shaver
+  lines                    4000        4000
+  malformed lines             0           0
+  read errors                 0           0
+
+  QUIET            mean        rms       min        max      p-p
+  X            -5.3 mg    0.36 mg   -6.5 mg    -4.1 mg   2.4 mg
+  Y           +13.5 mg    0.36 mg  +12.2 mg   +14.8 mg   2.6 mg
+  Z          +1.0067 g    0.47 mg  1.0051 g   1.0085 g   3.4 mg
+  |a|         1.0068 g              1.0052 g  1.0086 g
+
+  SHAVER           mean        rms       min        max      p-p
+  X            -5.4 mg    4.69 mg  -147.2 mg  +93.0 mg  240.1 mg
+  Y           +13.2 mg    3.87 mg   -48.6 mg  +75.3 mg  123.9 mg
+  Z          +1.0068 g   10.66 mg   0.7561 g  1.1782 g  422.1 mg
+  |a|         1.0069 g              0.7703 g  1.1833 g
+
+  samples with |a| below 0.5 g: none, in either file
+
+THE NOISE FLOOR IS THE PART'S OWN. 0.36 mg on X and Y, 0.47 mg on Z, which
+is about six counts. The data sheet gives a noise density of the order of
+70 ug per root hertz, and over a bandwidth of about 60 Hz that is roughly
+0.5 mg, so the measured floor is the sensor and nothing on this bench is
+adding to it. Worth confirming against the data sheet figure for the mode
+actually configured rather than resting on the order of magnitude.
+
+THE EARLIER CAPTURE'S NOISE WAS NOT NOISE. The burst capture recorded above
+reports X and Y extremes near 0.1 g and was read as a noise floor of a few
+tens of milli-g. Against 0.36 mg measured here that is a factor of some
+hundreds. Those extremes were the bench being disturbed during the
+capture. A quiet run is not a formality: without one, every later number
+is compared against a floor that was never measured.
+
+THE ANOMALY DID NOT REPRODUCE. No sample below 0.5 g in 8000, no malformed
+line, no read error. At the one in 1905 that the earlier capture appeared
+to show, the expectation over 8000 samples is about four, and the chance of
+seeing none is about one and a half percent. So the near-zero sample did
+not come from a process running at that rate. The one thing that changed is
+the path: this pair was written to a file on the board and copied as a
+file. That is not proof, and a fault seen once and not since is not closed,
+but the evidence now points at the terminal path and away from the bus.
+
+THE DUPLICATE FRACTION FELL, AND THAT IS NOT AN IMPROVEMENT. 1.4 percent
+quiet and 0.4 percent shaver, against 34 percent before. The arithmetic
+that turned 34 percent into a read rate only works when the reads are
+faster than the sensor: below that rate, samples are skipped rather than
+repeated and the duplicate fraction sits near zero whatever the rate is.
+So a near-zero duplicate fraction means the loop is at or below 120 Hz and
+says nothing further. This loop is slower than the tight one, because it
+pays for a command substitution and a redirect on every sample. The read
+rate has to be timed rather than inferred.
+
+THE WAVEFORM IS NOT THE SHAVER'S WAVEFORM. At or below 120 reads a second
+the highest frequency that can be represented is 60 Hz, and a mains-driven
+shaver vibrates at around 100 Hz. Whatever is above 60 Hz and survives the
+sensor's own filter arrives folded down to a frequency that was never
+present. The oscillation packets in the plot are that artefact. The RMS
+figures survive it and are a lower bound, because the part band-limits
+before it samples and the energy above its bandwidth is removed rather than
+folded. Reading a frequency off this plot would be reading an artefact.
+
+WHAT SURVIVES THE SAMPLING LIMIT, AND IS WORTH HAVING.
+
+  Detection. 0.47 mg quiet against 10.66 mg on Z under the shaver is a
+  factor of 23, so vibration well below what a hand feels is separable from
+  the floor. That is enough for a running-or-not verdict and not enough for
+  a spectrum.
+
+  Direction. Z responds two and a half times as much as X and Y. The board
+  lies flat, Z is normal to it, and a PCB on header pins is far more
+  compliant out of plane than in it. That is the mechanics of the mounting,
+  not a property of the sensor.
+
+  Calibration. |a| is 1.0068 g in both runs where the true value is
+  1.0000 g, so the sensitivity is 0.68 percent high. That is one number,
+  it is inside the part's tolerance, and it is what a calibration step
+  would null out.
+
+  Repeatability. The three means agree between two independent runs to
+  better than half a milli-g. That is what proves the shaver added
+  acceleration without tilting the board, and it is also a stability figure
+  for the bias in its own right.

@@ -1036,3 +1036,72 @@ single sample, and the first was wrong for a reason that one register read
 settled in a second. Guessing at a cause is cheap when the guess is
 specific enough to be killed. It is only expensive when it is vague enough
 to survive.
+
+---
+
+## 25. A quiet run, and what it says about every number before it
+
+Entry on Wednesday 30 September 2026, later the same evening.
+
+**What happened.** Two captures of 4000 reads each, identical in every
+respect except one: a shaver held against the board in the second. Both
+written to a file on the board and copied off with `scp`, so nothing in
+this pair passed through a terminal.
+
+| | quiet | shaver |
+|---|---|---|
+| X mean, rms | -5.3 mg, 0.36 mg | -5.4 mg, 4.69 mg |
+| Y mean, rms | +13.5 mg, 0.36 mg | +13.2 mg, 3.87 mg |
+| Z mean, rms | +1.0067 g, 0.47 mg | +1.0068 g, 10.66 mg |
+| magnitude | 1.0068 g | 1.0069 g |
+| malformed lines, read errors | 0, 0 | 0, 0 |
+
+**The quiet run is the more valuable of the two.** The floor is 0.36 mg on
+X and Y, about six counts, which is the part's own noise and not anything
+this bench is adding. The previous entry read X and Y extremes near 0.1 g
+as a noise floor of a few tens of milli-g. Against 0.36 mg that is out by a
+factor of some hundreds, and those extremes were the bench being disturbed
+during the capture rather than the sensor being noisy. Every figure taken
+before this one was compared against a floor that had never been measured.
+
+**The near-zero sample did not reproduce.** None below 0.5 g in 8000, no
+malformed line, no read error. At the one in 1905 that entry 23 appeared to
+show, about four would be expected and the chance of none is around one and
+a half percent. The one thing that changed is that this pair was written to
+a file and copied as a file. That is not proof and the fault is not closed,
+but the evidence now points at the terminal path and away from the bus,
+which is where entry 24 put it on quite different grounds.
+
+**The duplicate fraction fell, and that is a loss rather than a gain.** 1.4
+percent against 34 percent. The arithmetic that turned 34 percent into a
+read rate only holds when the reads outrun the sensor: below that, samples
+are skipped rather than repeated and the fraction sits near zero whatever
+the rate. So this says the loop is at or under 120 Hz and nothing more.
+Writing each sample through a command substitution and a redirect costs
+what the tight loop did not pay. The rate has to be timed, not inferred.
+
+**The waveform in the plot is not the shaver's waveform.** At or below 120
+reads a second nothing above 60 Hz can be represented, and a mains-driven
+shaver runs near 100 Hz. The oscillation packets are folded artefacts of a
+frequency that was never present. The RMS figures survive, as a lower
+bound, because the part band-limits before it samples.
+
+**What survives, and is worth keeping.** Vibration is separable from the
+floor by a factor of 23 on Z, which is a running-or-not verdict and not a
+spectrum. Z responds two and a half times as much as X and Y, which is a
+PCB on header pins being more compliant out of plane than in it, and is
+mechanics rather than sensor. The magnitude is 1.0068 g where truth is
+1.0000 g, so sensitivity is 0.68 percent high, inside tolerance, and that
+is the number a calibration step nulls. The three means agree between two
+independent runs to under half a milli-g, which is both the proof that the
+shaver added acceleration without tilting the board and a bias stability
+figure in its own right.
+
+**And this is the measurement that earns the buffered path.** The case for
+FIFO and hardware timestamps has been an assertion in this project's
+documents since it was written. It is now a demonstrated need: the shaver's
+actual frequency content cannot be recovered from user-space polling at any
+loop speed, because each sample costs a process, a syscall and a bus
+transaction, and the ceiling that imposes is below the frequency of a
+household appliance. The comparison the project exists to make now has a
+measured slow end and a reason to build the fast one.
