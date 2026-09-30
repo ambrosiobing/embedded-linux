@@ -716,3 +716,61 @@ demonstrates both halves at once: that the overlay and `dtc` path works on
 this host, and what a silent non-binding looks like from the outside. One
 reboot buys evidence for the working case and the failing case together,
 which is worth more than skipping it.
+
+---
+
+## 18. The overlay applied, bound nothing, and said nothing
+
+Entry on Wednesday 30 September 2026. The last measurement of the evening,
+and the one worth keeping.
+
+**What happened.** The overlay was compiled on the board with `dtc`,
+installed, added to `config.txt` under `[all]`, and the board rebooted
+cleanly. All four nodes are in the live device tree:
+
+```
+/proc/device-tree/soc/i2c@7e804000/
+  lis2mdl@1e  lps22df@5d  lsm6dsv16x@6b  sht4x@44
+```
+
+`/sys/bus/iio/devices/` does not exist. Not empty, absent: nothing pulled
+the IIO core in, because none of the three ST drivers is in this kernel.
+And `dmesg` filtered for every part name, the overlay name and the word
+overlay returns **nothing at all**.
+
+**One of the four did bind.** The SHT40AD1B at 0x44 is now `hwmon1`,
+beside the Pi's own `cpu_thermal` and `rpi_volt`. It is the only part with
+a driver in this kernel, and it is hwmon rather than IIO, exactly as this
+overlay's comment said it would be. So the board now has one working
+sensor and three described ones.
+
+**Why this is worth a journal entry rather than a shrug.** The header
+comment of `bench-iks4a1-overlay.dts` has said from the day it was written
+that a node naming a compatible the kernel does not know is not an error:
+the node is created, nothing binds, the part is invisible, and no message
+appears anywhere. That was reasoning. It is now a capture, in
+`docs/evidence/overlay-applied-2026-09-30.txt`.
+
+**The shape of the trap, and it is sharper than expected.** An engineer
+who checks `dmesg` sees a clean boot with no errors. An engineer who
+checks the device tree sees four sensors correctly described. The result
+is one sensor working out of four, and neither view contains a hint.
+
+The sharpest part is that **the success was as silent as the failures**.
+`dmesg` has no line for the sht4x that bound either. So the log cannot
+separate the working part from the three broken ones, and the only
+question that can is whether a device appeared. Only a third question, whether
+anything bound, distinguishes them, and that is precisely the question
+`iio-probe` was written to ask.
+
+**What this closes.** Step 1 of the bring-up is complete with evidence.
+Step 2 cannot run on a stock distribution kernel and the reason is
+measured rather than assumed. The remaining steps need the project's own
+image, which is a fresh evening rather than a next command.
+
+**What the evening produced, beyond this project.** The card procedure in
+`docs/CARD.md`. The serial console working through the WSL route that
+Project 1 predicted, which unblocks Project 2. A corrected bench
+inventory. And four corrections to this project's own documents, every one
+of them found by a measurement contradicting something that had been
+written from reading.

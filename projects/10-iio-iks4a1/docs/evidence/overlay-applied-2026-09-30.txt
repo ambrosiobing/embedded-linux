@@ -1,0 +1,63 @@
+What a silent non-binding looks like from the outside.
+Wednesday 30 September 2026.
+
+Host:   Raspberry Pi 3 Model B Plus Rev 1.3, hostname eplepi
+Kernel: 6.18.50+rpt-rpi-v8, stock Raspberry Pi OS (Debian trixie)
+
+The overlay of this project, with the IMU node corrected to 0x6b, was
+compiled on the board and applied.
+
+  dtc -@ -I dts -O dtb -o /boot/firmware/overlays/bench-iks4a1.dtbo \
+      /root/bench-iks4a1.dts
+  printf '\n[all]\ndtoverlay=bench-iks4a1\n' >> /boot/firmware/config.txt
+  reboot
+
+1. THE OVERLAY APPLIED. All four nodes exist in the live device tree.
+
+root@eplepi:~# ls /proc/device-tree/soc/i2c@7e804000/
+'#address-cells'   clocks       interrupts   lps22df@5d      name      pinctrl-0
+ clock-frequency   compatible   lis2mdl@1e   lsm6dsv16x@6b   phandle   pinctrl-names
+ reg  '#size-cells'  sht4x@44   status
+
+So the source, the dtc compile and the firmware load are all correct.
+
+2. THE IIO SUBSYSTEM IS NOT THERE AT ALL.
+
+root@eplepi:~# ls /sys/bus/iio/devices/
+ls: cannot access '/sys/bus/iio/devices/': No such file or directory
+
+Absent rather than empty. Nothing pulled the IIO core in, because none of
+the three ST drivers exists in this kernel.
+
+3. ONE OF THE FOUR BOUND, SILENTLY.
+
+root@eplepi:~# for h in /sys/class/hwmon/hwmon*; do echo "$h -> $(cat $h/name)"; done
+/sys/class/hwmon/hwmon0 -> cpu_thermal
+/sys/class/hwmon/hwmon1 -> sht4x
+/sys/class/hwmon/hwmon2 -> rpi_volt
+
+The SHT40AD1B at 0x44 bound to the sht4x hwmon driver and appears as
+hwmon1. cpu_thermal and rpi_volt are the Pi's own. The other three nodes
+bound to nothing.
+
+4. THE KERNEL SAID NOTHING ABOUT ANY OF IT.
+
+root@eplepi:~# dmesg | grep -iE "lsm6|lis2|lps22|sht4x|bench-iks4a1|overlay"
+(no output)
+
+Not one line. Three device tree nodes name compatible strings this kernel
+has never heard of, and nothing anywhere records that fact.
+
+THE POINT. This is the failure the overlay's own header comment describes
+and it is now demonstrated rather than predicted: a node naming a
+compatible the kernel does not know is not an error. The node is created,
+nothing binds to it, the part is invisible, and no message is printed.
+
+An engineer reading only dmesg sees a clean boot. An engineer reading only
+the device tree sees four sensors. Both are looking at a result where one
+sensor in four works.
+
+The sharpest part: the binding that SUCCEEDED was also silent. dmesg
+carries no line for the sht4x either. So dmesg cannot distinguish the
+three failures from the one success, and the only question that separates
+them is whether a device appeared.
