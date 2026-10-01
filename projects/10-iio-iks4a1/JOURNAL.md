@@ -1598,3 +1598,49 @@ two percent effect sits at the edge of resolvable, and these stretches
 carry tap tails besides. Unrefuted and unconfirmed is the honest verdict,
 and it is worth writing down as such rather than claiming the prediction
 held.
+
+---
+
+## 33. The first program to reach the board would not start, and the repository was right
+
+Entry on Thursday 1 October 2026.
+
+**What happened.** `iio-probe` was copied to the Pi, made executable, and
+answered `cannot execute: required file not found`. The file was plainly
+there. The message is about the **interpreter**, not the script: the first
+line is `#!/bin/sh` followed by a carriage return, so the kernel looks for
+a program called `/bin/sh<CR>` and does not find one.
+
+**The repository is not at fault and that is the useful part.** The
+committed blob begins `#!/bin/sh` and ends the line with a bare newline.
+The working tree copy ends it with carriage return and newline. The
+`.gitattributes` in this repository already says `* text=auto eol=lf`,
+which is the correct instruction, and `core.autocrlf` is `true` on this
+machine, which is the usual Windows default. The attribute was added after
+these files were checked out and nothing has re-checked them out since, so
+the working tree still carries the conversion the attribute exists to
+prevent.
+
+Thirty-one tracked files with a shebang are in this state, across eleven
+recipes and five projects.
+
+**What that implies about the two delivery routes, which is the finding.**
+A Yocto build fetches from git and would have shipped a working script.
+Copying from the working tree ships a broken one. The two paths disagree,
+the repository is right, and the failure only appears on the path that was
+never the designed one. Anyone debugging this from the error message alone
+would look at the Pi, the permissions, the shell and the script, in that
+order, and all four are fine.
+
+**The immediate fix is one command on the board** and the durable one is to
+refresh the working tree so it matches what is committed. The second is
+worth doing before any other program from this repository is copied to any
+board, because every one of the thirty-one will fail the same way and the
+message will not say so.
+
+**The habit worth naming.** The error named the thing that was missing and
+it was still misleading, because the thing that was missing was invisible:
+a character with no printed form, in a file that displays correctly in
+every editor. `od -c` on the first line settles it in one command, and it
+is worth reaching for whenever a file that looks right behaves as though it
+is absent.
