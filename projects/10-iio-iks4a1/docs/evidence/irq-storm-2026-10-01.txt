@@ -1,0 +1,66 @@
+The interrupt storm that disabled IRQ 185
+=========================================
+
+Thursday 1 October 2026, first attempt at criterion 4.
+
+    iio-rate fifo lsm6dsv16x_accel 480 1
+    [42640.612867] Disabling IRQ #185
+    --- interrupts 100001  (10000.10/s)
+    --- samples/s  0
+
+The kernel's spurious-interrupt watchdog disabled the line after 100001
+interrupts, almost all of them unhandled. The second run then reported
+zero interrupts, because there was no longer an interrupt to count.
+
+WHAT IS NOT WRONG, established before guessing at what is.
+
+    INT1_CTRL  0x0d = 0x08     bit 3, INT1_FIFO_TH
+    INT2_CTRL  0x0e = 0x00
+    PIN_CTRL   0x03 = 0x00
+    handler    st_lsm6dsx_handler_thread
+    gpio-24    in, lo, IRQ
+
+The part IS driving INT1, on the FIFO threshold, which is what the driver
+should set for a watermark. The overlay's st,drdy-int-pin = 1 took effect.
+Nothing is routed to INT2. The kernel's handler is the driver's own.
+
+And the wire reaches it. A disconnected or undriven pin floats and storms
+whenever anything disturbs it; this line was quiet for eleven hours and
+stormed only while the buffer was enabled, which is only when the part
+drives it. So Wednesday's wiring to CN9 pin 6 is confirmed a third time,
+now by the behaviour of the signal rather than by a table or a node.
+
+THE ARITHMETIC IS THE WHOLE DIAGNOSIS. 10000 interrupts a second against
+a 480 Hz output rate is about twenty edges for every sample the part
+produces. The sensor cannot generate that. Something is multiplying real
+edges into many.
+
+The leading candidate is the wire. The interrupt line is a loose jumper of
+the same length as the I2C pair, unterminated, with no series resistance,
+running beside two lines that switch at 400 kHz. A slow or ringing edge on
+such a wire crosses the input threshold several times, and an edge-
+triggered input counts every crossing. The driver's handler services the
+first, finds data, returns IRQ_HANDLED, and the rest find an empty FIFO and
+return IRQ_NONE. That is exactly the ratio the kernel saw.
+
+THE PROJECT ALREADY KNEW THIS AND ONLY WROTE IT DOWN FOR I2C. BRINGUP step
+0 says jumpers must be short, because 400 kHz over 20 cm of loose wire is
+the documented limit and the failure is intermittent rather than clean.
+The same physics applies to an interrupt line and nobody said so. A data
+line that rings gives a corrupted byte; an interrupt line that rings gives
+a storm, and the storm is louder and easier to diagnose.
+
+THE TEST, stated before it is run. At a watermark of 64 the part asserts
+INT1 at 480/64 = 7.5 times a second instead of 480. If ringing is
+multiplying each real edge by about twenty, that is 150 spurious
+interrupts a second rather than 10000, which is far below the watchdog's
+threshold and should simply work.
+
+  watermark 64 runs clean      the edge RATE was the problem, so the
+                               line rings and a shorter wire or a series
+                               resistor is the fix
+  watermark 64 storms too      the multiplication is not rate-dependent
+                               and the cause is elsewhere
+
+Either way criterion 4's interesting case is the one that can be measured
+first, which is a convenient accident rather than a plan.
