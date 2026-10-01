@@ -32,8 +32,7 @@ SUT=$ROOT/meta-bench/recipes-bench/bench-iio/files/ahrs.py
 # and exits non-zero. Journal entry 7 of Project 10 records that exact
 # trap and this file repeated it on its first run.
 PY=""
-for _cand in ${BENCH_PYTHON:-} python3 python; do
-	[ -n "$_cand" ] || continue
+for _cand in "${BENCH_PYTHON:-python3}" python3 python; do
 	if "$_cand" -c "import math, sys" >/dev/null 2>&1; then
 		PY=$_cand
 		break
@@ -197,9 +196,11 @@ contains "and the result is unaffected by them" "$out" "roll    +0.000 deg"
 printf 'nonsense\nmore nonsense\n' >"$WORK/junk.txt"
 status=0
 out=$(run junk.txt) || status=$?
-[ "$status" -ne 0 ] &&
-	ok "a capture with no usable samples is a refusal" ||
+if [ "$status" -ne 0 ]; then
+	ok "a capture with no usable samples is a refusal"
+else
 	no "a capture with no usable samples is a refusal"
+fi
 contains "and it names the file" "$out" "junk.txt"
 
 # -------------------------------------------- the two routes must agree
