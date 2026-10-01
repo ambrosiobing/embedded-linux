@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """ahrs - orientation from an accelerometer, a gyroscope and a magnetometer.
 
-Importable as a module and runnable as a self check:
+Importable as a module, runnable as a self check, and runnable against a
+real capture:
 
-    python3 -m ahrs --selftest
+    python3 ahrs.py --selftest
+    python3 ahrs.py --capture FILE --scale 16384 --rate 126.4
+
+The self check uses synthetic rotations whose answers are known from the
+geometry. The capture mode uses recorded gravity, which is the only one of
+the two that can be wrong about this bench.
 
 WHICH FILTER, AND WHY NOT THE ONE THE SPECIFICATION NAMES
 
@@ -287,13 +293,142 @@ def selftest() -> int:
     return 1 if failures else 0
 
 
+def read_capture(path, lsb_per_g):
+    """Samples from a burst-read capture: an index, then six hex bytes.
+
+    The format is the one the i2ctransfer loop in Project 10's BRINGUP
+    produces: OUTX_L, OUTX_H, OUTY_L, OUTY_H, OUTZ_L, OUTZ_H, little-endian
+    and signed.
+
+    A line that is not an index plus exactly six bytes is damaged, and is
+    counted and skipped rather than repaired. Interpolating across it would
+    put a number into an orientation result that no sensor produced.
+    """
+    samples = []
+    skipped = 0
+    with open(path) as handle:
+        for line in handle:
+            fields = line.split()
+            if len(fields) != 7:
+                skipped += 1
+                continue
+            try:
+                raw = [int(x, 16) for x in fields[1:7]]
+            except ValueError:
+                skipped += 1
+                continue
+            vector = []
+            for i in (0, 2, 4):
+                word = raw[i] | (raw[i + 1] << 8)
+                if word >= 32768:
+                    word -= 65536
+                vector.append(word / lsb_per_g)
+            samples.append(tuple(vector))
+    return samples, skipped
+
+
+def direct_tilt(accel):
+    """Roll and pitch straight from gravity, with no filter involved.
+
+    This exists to be disagreed with. The filter's answer and this one come
+    from the same samples by different routes, so a gap between them is a
+    fault in the filter rather than in the bench, and agreement is worth
+    more than either number alone.
+    """
+    ax, ay, az = accel
+    roll = math.degrees(math.atan2(ay, az))
+    pitch = math.degrees(math.atan2(-ax, math.sqrt(ay * ay + az * az)))
+    return roll, pitch
+
+
+def run_capture(path, lsb_per_g, rate, beta, settle):
+    """Pitch and roll from a capture file, with no gyroscope.
+
+    These captures carry the accelerometer alone, so the gyroscope term is
+    zero on every update. That is not a limitation being hidden. With no
+    angular rate the filter reduces to its accelerometer correction, which
+    is exactly the path a static orientation check should exercise. It
+    would be the wrong instrument for a moving test and is the right one
+    for this.
+    """
+    samples, skipped = read_capture(path, lsb_per_g)
+    if not samples:
+        print("no usable samples in %s" % path, file=sys.stderr)
+        return 1
+    if len(samples) <= settle:
+        print("%d samples is not more than the settling window of %d"
+              % (len(samples), settle), file=sys.stderr)
+        return 1
+
+    filt = Ahrs(beta=beta)
+    dt = 1.0 / rate
+    rolls, pitches = [], []
+    for n, accel in enumerate(samples):
+        roll, pitch, _ = filt.update((0.0, 0.0, 0.0), accel, dt)
+        if n >= settle:
+            rolls.append(roll)
+            pitches.append(pitch)
+
+    mean_accel = tuple(sum(s[i] for s in samples) / len(samples)
+                       for i in range(3))
+    magnitude = math.sqrt(sum(v * v for v in mean_accel))
+    ref_roll, ref_pitch = direct_tilt(mean_accel)
+    mean_roll = sum(rolls) / len(rolls)
+    mean_pitch = sum(pitches) / len(pitches)
+
+    print("capture            %s" % path)
+    print("samples            %d used, %d damaged and skipped"
+          % (len(samples), skipped))
+    print("scale              %g LSB per g" % lsb_per_g)
+    print("rate               %g Hz, so dt is %.6f s" % (rate, dt))
+    print("filter             beta %g, gyroscope zero, %d samples settling"
+          % (beta, settle))
+    print()
+    print("mean acceleration  X %+.4f  Y %+.4f  Z %+.4f g"
+          % mean_accel)
+    print("magnitude          %.4f g" % magnitude)
+    if abs(magnitude - 1.0) > 0.05:
+        print("                   WARNING: more than 50 mg from one g, so")
+        print("                   the board was not still or the scale is wrong")
+    print()
+    print("filter   roll  %+8.3f deg   pitch %+8.3f deg" % (mean_roll, mean_pitch))
+    print("direct   roll  %+8.3f deg   pitch %+8.3f deg" % (ref_roll, ref_pitch))
+    print("spread   roll  %8.3f deg   pitch %8.3f deg"
+          % (max(rolls) - min(rolls), max(pitches) - min(pitches)))
+    print("gap      roll  %8.3f deg   pitch %8.3f deg"
+          % (abs(mean_roll - ref_roll), abs(mean_pitch - ref_pitch)))
+    print()
+    print("The gap is the filter against trigonometry on the same samples.")
+    print("A large one is the filter, not the bench, and the usual cause is")
+    print("too few samples for beta to converge rather than a wrong sign.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--selftest", action="store_true",
                         help="check the filter against known rotations")
+    parser.add_argument("--capture", metavar="FILE",
+                        help="pitch and roll from a burst-read capture file")
+    parser.add_argument("--scale", type=float, default=16384.0,
+                        metavar="LSB_PER_G",
+                        help="16384 at two g full scale, 4096 at eight g "
+                             "(default: %(default)g)")
+    parser.add_argument("--rate", type=float, default=126.4, metavar="HZ",
+                        help="the capture loop's MEASURED sample rate, not "
+                             "the sensor's output rate (default: %(default)g)")
+    parser.add_argument("--beta", type=float, default=0.5,
+                        help="filter gain; higher converges sooner from rest "
+                             "(default: %(default)g)")
+    parser.add_argument("--settle", type=int, default=1000, metavar="N",
+                        help="samples to discard while the filter converges "
+                             "from level (default: %(default)d)")
     args = parser.parse_args()
     if args.selftest:
         return selftest()
+    if args.capture:
+        return run_capture(args.capture, args.scale, args.rate,
+                           args.beta, args.settle)
     parser.print_help()
     return 2
 

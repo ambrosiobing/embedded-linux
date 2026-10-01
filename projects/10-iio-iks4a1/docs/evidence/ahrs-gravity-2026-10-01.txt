@@ -1,0 +1,67 @@
+Acceptance criterion 8: the AHRS against real gravity
+=====================================================
+
+Thursday 1 October 2026. The filter has been checked against synthetic
+rotations since 16 September 2026 and had never seen a real measurement,
+because ahrs.py had no way to read one. It has one now: --capture.
+
+    python3 ahrs.py --capture FILE --scale 16384 --rate 126.4
+
+THE GYROSCOPE IS ZERO ON EVERY UPDATE, and that is a choice rather than a
+gap. These captures carry the accelerometer alone, and with no angular
+rate the Madgwick update reduces to its accelerometer correction, which is
+exactly the path a static orientation check should exercise. It would be
+the wrong instrument for a moving test.
+
+LEVEL, from the quiet capture of Wednesday 30 September 2026
+------------------------------------------------------------
+
+    mean acceleration  X -0.0053  Y +0.0135  Z +1.0067 g
+    magnitude          1.0068 g
+    samples            4000 used, 0 damaged
+
+    filter   roll  +0.770 deg   pitch +0.302 deg
+    direct   roll  +0.770 deg   pitch +0.302 deg
+    gap            0.000 deg          0.000 deg
+
+PASS against the criterion's first half: both within 2 degrees of zero.
+
+The bench itself is 0.83 degrees off level, which is the first time that
+has been measured rather than assumed.
+
+THE CROSS-CHECK IS THE POINT, not the pass. "direct" is roll and pitch
+computed straight from the mean gravity vector by trigonometry, with no
+filter involved at all. The two routes use the same samples and share no
+code, so agreement to a thousandth of a degree says the filter's sign
+conventions and frame handedness are right on real data. That is the
+property the project's own notes say published Madgwick implementations
+most often get wrong, and it had never been tested here.
+
+BETA SETS THE NOISE AND DOES NOT BIAS THE ANSWER
+------------------------------------------------
+
+    beta    step beta*dt    roll spread    pitch spread    gap
+    0.5       0.227 deg      0.767 deg      0.762 deg     0.006 deg
+    0.1       0.045 deg      0.252 deg      0.255 deg     0.000 deg
+    0.02      0.009 deg      0.095 deg      0.096 deg     0.001 deg
+
+Twenty-five times the gain costs eight times the output spread and moves
+the answer by six thousandths of a degree. The spread falls more slowly
+than the gain, roughly as its square root, which is what a low-pass whose
+bandwidth follows beta does to white input noise.
+
+So the classic Madgwick trade is measured on this bench rather than
+asserted: beta buys convergence speed and is paid for in output noise, and
+it does not buy or cost accuracy.
+
+At beta 0.02 the spread is 0.095 degrees. The sensor's own 0.36 mg noise on
+a one g vector is 0.02 degrees, so the filter is still five times above
+what the accelerometer alone would allow, and lowering beta further would
+close some of that at the cost of a slower response.
+
+WHAT IS STILL OPEN
+------------------
+
+The criterion's second half: within 3 degrees after a 90 degree rotation
+about each axis. That needs two captures that do not exist yet, with the
+board turned onto each edge. Nothing in software stands in the way.
