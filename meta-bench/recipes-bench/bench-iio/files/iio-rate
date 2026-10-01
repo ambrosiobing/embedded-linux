@@ -245,6 +245,18 @@ do_fifo() {
 	note "watermark  $watermark via $(basename "$(dirname "$wm_attr")")/$(basename "$wm_attr")"
 
 	echo "$hz" >"$dev/sampling_frequency"
+
+	# THE LENGTH BEFORE THE WATERMARK. The IIO core requires the
+	# watermark to be no larger than the buffer length and rejects
+	# the write otherwise. capture() sets the length and runs after
+	# this, so on a freshly loaded driver the length is still at its
+	# default and a watermark of 64 is refused with EIO.
+	#
+	# This worked the first time only because an earlier aborted run
+	# had left the length at 256. Reloading the driver reset it and
+	# the ordering fault appeared, which is the usual shape of such a
+	# fault: invisible on a dirty system and plain on a clean one.
+	echo "${BENCH_IIO_BUFLEN:-256}" >"$dev/buffer/length"
 	echo "$watermark" >"$wm_attr"
 	# shellcheck disable=SC2064
 	trap "buffer_off '$dev'" EXIT INT TERM
