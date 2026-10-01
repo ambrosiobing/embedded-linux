@@ -2953,3 +2953,56 @@ expected against measured and exiting 3 above a ratio of 2. It exited 3 on
 the edge-triggered baseline and 0 on the level-triggered run, with no human
 dividing anything. The experiment that found this fix was scored by a
 program written before anybody knew there was a fix to find.
+
+## 54. Criterion 4 is met, and the clause that could not be was restated
+
+*Thursday 1 October 2026, 23:45.* Joseph ruled on the contrast clause and
+criterion 4 closes. Eight of nine.
+
+The clause asked for more than 400 interrupts per second at watermark 1. His
+reasoning, kept because it is better than a verdict:
+
+> A contrast that can be satisfied only by the broken setup is not a
+> criterion.
+
+400 assumes one interrupt per sample, which is edge semantics. A
+level-triggered line coalesces, so watermark 1 reads 15.60 per second,
+4684 samples over 156 interrupts, 30 samples each. That is the handler
+draining the FIFO, not batching failing. The only way to reach 400 is to go
+back to rising edge, which is the configuration that gave 326.90 per second
+at watermark 64 against an expected 7.5.
+
+Restated to a same-configuration ratio: **at the same output data rate and
+the same trigger type, watermark 64 produces at least 5 times fewer
+interrupts than watermark 1.** Measured 6.8 times. The absolute halves are
+untouched, because 8 interrupts per second and 3 per cent reader CPU do not
+depend on how the interrupt is requested.
+
+**The reader-CPU contrast was offered and rejected, and the reason is worth
+keeping.** 1.50 per cent at watermark 1 against 0.60 at 64 is real and
+survives both trigger types, and it is *a second view of the reader-CPU half
+the criterion already has* rather than a substitute for the interrupt claim.
+A criterion with two clauses measuring the same quantity looks like two
+pieces of evidence and is one.
+
+### Where the four rows live
+
+`/var/lib/bench/iio/rates.csv` carried the whole experiment in four lines, and
+they are now in `docs/evidence/irq-level-vs-edge-2026-10-01.txt` verbatim
+rather than paraphrased. That file was written from the CSV rather than from
+the console output, which matters: the console output was read by a person
+who already believed the conclusion.
+
+### Two criteria restated in one evening, by the same person, for the same reason
+
+Criterion 8's ninety-degree clauses measured the fixture. Criterion 4's
+contrast clause measured the trigger type. Both were numbers written from an
+assumption about how the measurement would be made, and in both cases the
+measurement, once taken properly, contradicted the assumption rather than the
+hardware.
+
+That is now three criteria of nine whose wording has been corrected by
+measurement: 4, 8 and the 416 Hz in 4's first half. **A criterion written
+before the first measurement is a hypothesis about what will be easy to
+measure**, and this project would have been better off writing the acceptance
+table after the first week than before it.

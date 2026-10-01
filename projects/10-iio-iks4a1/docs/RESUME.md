@@ -94,7 +94,7 @@ the repository does not. Journal entry 33 has the reason.
 | 1 | met, Thursday 1 October 2026 | nothing. Five `working` rows, six IIO devices, no `not-bound` |
 | 2 | met | nothing. Met twice, on two inventories of the same image a day apart |
 | 3 | met, Thursday 1 October 2026 | nothing. 3.341 us on the hrtimer trigger |
-| 4 | half met | the interrupt line. CPU is measured; interrupt counts are not measurable here |
+| 4 | met, Thursday 1 October 2026 | nothing. `interrupts = <24 4>` level high instead of `<24 1>` edge: 2.30/s against a limit of 8, 0.60 percent CPU against 3, and a 6.8 times contrast against watermark 1 |
 | 5 | met, Thursday 1 October 2026 | nothing. 1000 samples each way, identical columns, on `lis2mdl` rather than the accelerometer because IRQ 185 delivers nothing |
 | 6, 7 | met | nothing |
 | 8 | criterion defective | a decision about restating it, not more measurement |

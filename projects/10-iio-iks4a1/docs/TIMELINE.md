@@ -339,6 +339,7 @@ throughput.
 | 23:28 | `iio-rate`'s criterion 4 check runs on hardware for the first time: 43.6x, FAIL, exit 3 | `fd15464` |
 | 23:35 | **`interrupts = <24 4>` instead of `<24 1>`.** 3269 interrupts become 23, samples unchanged. Criterion 4's first threshold is met | |
 | 23:40 | And its contrast clause cannot be: a level line coalesces, so watermark 1 gives 15.60/s where the criterion wants 400 | |
+| 23:45 | **Criterion 4 met.** The contrast clause is restated as a same-configuration ratio and the measured 6.8 times clears it. Eight of nine | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile

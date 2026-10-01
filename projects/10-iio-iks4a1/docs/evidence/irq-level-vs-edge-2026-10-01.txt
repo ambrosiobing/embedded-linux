@@ -1,0 +1,113 @@
+Criterion 4: the interrupt request, edge against level
+Thursday 1 October 2026, 23:28 to 23:36 CEST
+
+ONE WORD IN THE DEVICE TREE
+
+    interrupts = <24 1>;    GPIO24, IRQ_TYPE_EDGE_RISING
+    interrupts = <24 4>;    GPIO24, IRQ_TYPE_LEVEL_HIGH
+
+Same wire, same Pi header pin 18, same shield CN9 pin 6, same eight minutes.
+Nothing else changed: no wire was shortened, no resistor was added, the board
+was not reseated.
+
+THE FOUR ROWS, verbatim from /var/lib/bench/iio/rates.csv
+
+  timestamp                 path device            s/s samples s irqs  irq/s cpu
+  2026-10-01T23:28:28+02:00 fifo lsm6dsv16x_accel  424  4672  11 3270 297.27 0.45
+  2026-10-01T23:29:15+02:00 fifo lsm6dsv16x_accel  467  4672  10 3269 326.90 0.50
+  2026-10-01T23:32:46+02:00 fifo lsm6dsv16x_accel  460  4608  10   23   2.30 0.60
+  2026-10-01T23:35:36+02:00 fifo lsm6dsv16x_accel  468  4684  10  156  15.60 1.50
+
+  rows 1 and 2   edge,  watermark 64
+  row 3          level, watermark 64
+  row 4          level, watermark 1
+
+/proc/interrupts confirms the change took, in its own words:
+
+    185:  ...  pinctrl-bcm2835  24 Edge      lsm6dsx
+    185:  ...  pinctrl-bcm2835  24 Level     lsm6dsx
+
+THE RESULT
+
+                    edge            level
+  interrupts        3269              23
+  per second      326.90            2.30
+  samples      4672 (73 x 64)  4608 (72 x 64)
+  reader cpu      0.50 %          0.60 %
+
+A 142-fold reduction with sample delivery unchanged. Both sample counts are
+exact multiples of the watermark, so the FIFO is batching correctly in both
+cases, and the 3246 edges that disappeared were never carrying data.
+
+WHY
+
+INT1 is push-pull and stays asserted while the FIFO is above its watermark.
+An edge-triggered request counts every transition in the bounce train that a
+long unterminated wire produces around a fast transition. A level-sensitive
+request asks whether the line is high when it looks, and a ring that settles
+before the handler runs is invisible to it.
+
+The wire was never the fault. The request was.
+
+WHAT THE EARLIER MEASUREMENTS GOT RIGHT, AND WHAT THEY DID NOT ASK
+
+The control of the same evening, with the wire unplugged at CN9 pin 6, gave
+0.00 interrupts per second and ZERO samples. That was correct and nothing
+here touches it: the edges were real and they arrived down the wire rather
+than being picked up by the GPIO pin.
+
+What nothing asked is whether a real edge and a USEFUL edge are the same
+thing. A ring is real. It is on the wire. It is not information, and the way
+to stop counting it was never to make the wire quieter.
+
+THE CLUE THAT WAS PRINTED ON THE FIRST DAY AND NEVER INTERROGATED
+
+The spurious factor was never constant: 23 to 51 on Thursday morning, then
+30.1, 32.7 and 43.6 across the evening's runs. A reflection on a fixed length
+of wire into a fixed impedance has no reason to vary by a factor of two
+between runs at the same rate and watermark. A bounce train sampled by an
+edge detector does, because whether a given ring crosses the threshold again
+depends on where it is when the detector re-arms.
+
+That number was read for four days as noise in the measurement. It was a
+statement about the mechanism.
+
+CRITERION 4, AND WHY ITS CONTRAST CLAUSE WAS RESTATED
+
+  fewer than 8 interrupts per second at watermark 64    2.30     MET
+  under 3 per cent reader CPU                           0.60 %   MET
+  more than 400 per second at watermark 1              15.60     cannot be met
+
+The third clause assumes one interrupt per sample, which is edge semantics. A
+level-triggered line coalesces: row 4 is 4684 samples over 156 interrupts, 30
+samples each, the handler draining the FIFO rather than batching failing.
+
+The only way to reach 400 is to go back to rising edge, which is the
+configuration that produced 326.90 per second at watermark 64 against an
+expected 7.5. A contrast that can be satisfied only by the broken setup is
+not a criterion.
+
+Restated the same day, by Joseph, to a same-configuration ratio:
+
+    at the same output data rate and the same trigger type, watermark 64
+    produces at least 5 times fewer interrupts than watermark 1
+
+Measured 15.60 / 2.30 = 6.8 times, which clears it, and it still tests what
+the clause was for: that batching reduces interrupt load. The absolute halves
+are unchanged because they do not depend on edge semantics.
+
+The reader-CPU contrast, 1.50 per cent at watermark 1 against 0.60 at 64, is
+real and survives both trigger types. It was considered as a replacement and
+rejected: it is a second view of the reader-CPU half the criterion already
+has, not a substitute for the interrupt claim.
+
+WHAT THIS DOES NOT SHOW
+
+  - that the wire is good. It shows the wire is adequate for a level-
+    sensitive request. A shorter jumper might still be worth having and is no
+    longer on the critical path for anything
+  - anything about the LSM6DSO16IS at 0x6a, whose INT1 is on CN8 pin 6 and
+    is not wired to the Pi at all
+  - any measurement of edge timing. These are interrupt COUNTS; the ts sd
+    column stays 0.124 us from driver-interpolated timestamps throughout and
+    is not a latency measurement in any of the four rows
