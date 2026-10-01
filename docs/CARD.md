@@ -155,6 +155,46 @@ With the credentials written, the board is on the network and `ssh` reaches
 it. The serial console is the tool for a board that does not boot, not the
 tool for a board that has not been tried yet.
 
+## 4. Keeping a copy of a card before it is reused
+
+This bench has one card, so every project that wants it takes it from
+another one. A card written by Imager and then left alone can be made again
+from the same image file. A card that has been worked on cannot.
+
+    sudo ./go card-archive 10-iio-iks4a1 /dev/sdX
+    ./go card-archive list
+
+The reader is on the WSL side for this, attached with `usbipd`, and nothing
+on the card may be mounted: a filesystem being written to images
+inconsistently. The program refuses rather than guessing, and the four
+refusals are worth knowing before the card is in the reader, because each
+one is a mistake that reads like something else:
+
+- the disk carrying the running root filesystem, which is the laptop
+- any device with a mounted filesystem on it
+- anything larger than 128 GB, which is a system disk and not a card
+- anything with no `config.txt` on its first partition, which is not a
+  Raspberry Pi card at all
+
+It reads the card twice. The first pass writes the image, the second reads
+the card again and compares, because a hash of what was just written proves
+only that the gzip stream is complete. Fifteen minutes becomes thirty, and
+`BENCH_CARD_SKIP_VERIFY=1` turns the second pass off and says so in the
+`PROVENANCE.txt` rather than leaving an unverified archive looking verified.
+
+**This is not `./go archive`, and the difference is the rebuild line.**
+`./go archive` keeps a built image whose provenance ends in one `git
+checkout` and one `kas build`. A card image has no such line: what is on it
+was done by hand and the `PROVENANCE.txt` says so. The store keeps them
+side by side, with `-card` on the directory name, because they are put back
+by different tools.
+
+The result is a `.img.gz`, which Raspberry Pi Imager reads without
+unpacking. Choose Operating System, then Use custom. **Do not let Imager
+apply its OS customisation to a card image**: the hostname, the user and the
+ssh keys are already inside it, and the customisation rewrites them on first
+boot.
+
 ## What this document is for
 
 Three of the traps above cost real time on Wednesday 30 September 2026 and

@@ -296,6 +296,54 @@ lands on theory from two directions at once: four times the sample rate
 costs four times the CPU, and batching by 64 halves it at identical
 throughput.
 
+## Afternoon and evening: the board comes back, and two criteria close
+
+| Time | Event | Commit |
+|---|---|---|
+| 16:48 | The Pi 3B+ and the USB TTL console are back on the bench. Six addresses answer `i2cdetect` | |
+| 16:55 | `st_sensors` and `st_magn` unpacked, built and loaded. **Three IIO devices**, the LIS2MDL among them | |
+| 17:12 | `iio-trigger` refused with `Permission denied`, from a lost exec bit rather than from anything on the board | |
+| 17:19 | `iio-trig-hrtimer` was not loaded, so the hrtimer directory did not exist | |
+| 17:31 | **Criterion 3 met.** 3.341 us, 1003 samples in 10 s, 0 interrupts, 0.40 percent CPU, on the one path the bench's interrupt fault cannot reach | `af2be18` |
+| 17:58 | `st_pressure` built as a target added to a Makefile that already worked, and the LPS22DF bound | |
+| 18:04 | **Criterion 1 met.** Four `working` rows where the morning had one, four IIO devices, two triggers | |
+| 18:20 | `scripts/card-archive.sh` and its 52 assertions, because for this project the card is the build output | |
+
+**The aha at 16:55 is how little the second driver cost.** `st_sensors`,
+`st_magn` and `st_pressure` are siblings in one subtree, so one Makefile
+naming all the targets built all six modules against one `Module.symvers`.
+The morning had spent hours getting the first one to link; the LPS22DF at
+17:58 was four lines and a `grep` for its compatible string.
+
+**Two faults at 17:12 and 17:19 that were not on the board.** A lost exec
+bit read as a permission problem with the sysfs interface, and a missing
+`iio-trig-hrtimer` read as a kernel without hrtimer triggers. Both were the
+host side of the bench, and both were diagnosed by asking the system what
+it held rather than reading the refusal at face value.
+
+**`insmod` answered `File exists`, which is a success worded like a
+failure.** What settled it was `ls /sys/bus/iio/devices`, the state rather
+than the report. The same lesson as Project 2's three identical `dd`
+successes, reached from a different direction.
+
+**And criterion 2, already met, got evidence it could not have had in the
+morning.** It was marked met on an inventory reporting four
+`no-driver-in-image` rows. The same unedited program now reports four
+`working` and none missing. The inventory tracked the image because it reads
+the system rather than a table, which is the property the criterion is
+about, and one run alone could not have shown it. Both runs are cited.
+
+**The card image at 18:20 is a gap that had been open all along.** The
+finished projects archive with `./go archive`, which keeps the output of a
+build: a `.wic.bz2` with a `.bmap`, a `.manifest`, a lock file and a rebuild
+line that is one checkout and one `kas build`. Project 10's card is none of
+that, so for this project the card is not a copy of the artefact, it is the
+artefact, and it existed in one copy in one reader. The first draft of the
+archiver carried `conv=noerror,sync`, where `noerror` would have turned a
+failing sector into silent zeros that the verification reads twice and
+agrees with, and `sync` would have padded the image past the size of the
+card it came from.
+
 ## What Thursday cost, and where
 
 | Activity | Rough share | Produced |
@@ -338,10 +386,9 @@ and six of the eight by a measurement that cost a single command.
 
 **Build, each the same procedure as `st_lsm6dsx`.**
 
-- `st_sensors` plus `st_magn`, which gives the LIS2MDL a device and unblocks
-  criterion 3.
-- `st_pressure`, which completes criterion 1.
-- `iiod` and libiio, neither yet on the board, for criterion 5.
+- `iiod` and libiio, neither yet on the board, for criterion 5. The only
+  item left in this group: `st_sensors`, `st_magn` and `st_pressure` were
+  all built on Thursday 1 October 2026, which closed criteria 3 and 1.
 
 **Decisions that are Joseph's, not this file's.**
 

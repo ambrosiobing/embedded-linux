@@ -45,6 +45,9 @@
 #   ./go archive [CFG]    keep a flashable copy of the image just built
 #   ./go archive list     what has been kept, with board and commit
 #   ./go archive available   what the build tree still holds, before it goes
+#
+#   sudo ./go card-archive PROJECT /dev/sdX   keep a copy of a whole card
+#   ./go card-archive list    what card images have been kept
 #   ./go flash /dev/sdX [IMAGE]   write an image to a card
 #   ./go ksym         check the fragment names real symbols, before a build
 #   ./go kconfig      check that the kernel fragment reached the .config
@@ -101,6 +104,7 @@ armstub)    shift; exec sh ./scripts/optee-armstub.sh "$@" ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;
 archive)    shift; exec sh ./scripts/archive.sh "$@" ;;
+card-archive) shift; exec sh ./scripts/card-archive.sh "$@" ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
 ksym)       shift; exec sh ./scripts/check-kernel-symbols.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;

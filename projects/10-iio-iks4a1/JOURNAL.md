@@ -2023,3 +2023,76 @@ because it reads the system rather than a table, which is the property the
 criterion is actually about, and the morning run alone could not have shown
 that. Both files are cited now, and the README says why there are two.
 
+## 41. The card is the build output, and it existed in one copy
+
+*Thursday 1 October 2026, evening.* Asked to put a flash image of the card
+on the skyhorizon desktop the way the finished projects do. The finished
+projects do it with `./go archive`, and that turned out to be the wrong
+tool for a reason worth writing down.
+
+`archive.sh` keeps the OUTPUT OF A BUILD: a `.wic.bz2` BitBake wrote, with
+a `.bmap`, a `.manifest` and a kas lock file beside it, and a rebuild line
+that is one `git checkout` and one `kas build`. Everything it stores can be
+made again from a commit. What it is really saving is the three hours.
+
+Project 10's card is none of that. Raspberry Pi OS written by Imager, then
+changed by hand on the board: a `linux-source-6.18` tree unpacked into
+`/usr/src`, four out-of-tree ST drivers compiled against it, modules loaded
+by `insmod` rather than by any recipe, programs placed by hand, and
+measurements accumulating under `/var/lib/bench`. No commit here describes
+it and no command here rebuilds it.
+
+**So for this project the card is not a copy of the artefact, it is the
+artefact**, and it existed in exactly one place, in one reader, on one
+bench. That is the same position Project 2 was in on Saturday 19 September
+2026, when the only board that booted was the only project whose work
+existed nowhere but inside a WSL virtual disk.
+
+`scripts/card-archive.sh` stores it with the same layout, the same stamp
+and the same `PROVENANCE.txt` fields as the Yocto side, so the two sort and
+read together, and with a `-card` suffix on the directory because the two
+are put back by different tools. `tests/card-archive-test.sh` exercises it
+with a regular file as the source, so it needs no card, no reader, no
+`usbipd` and no root: 52 assertions.
+
+### conv=noerror,sync was in the first draft and had to come out
+
+Both halves were wrong, and both were wrong silently.
+
+`noerror` turns an unreadable block into zeros and carries on. A card with
+a failing sector would be archived as a card with a hole in it, and nothing
+would say so. Worse: the verification reads the source a second time the
+same way, gets the same zeros, and AGREES. The check would pass on a
+corrupt archive. A read error has to be a refusal, because the one moment
+the operator can act on it is before the card is reused.
+
+`sync` pads the final short read out to the block size. A card is rarely a
+whole multiple of 4 MiB, so the archive would be a few megabytes larger
+than the card it came from, and `dd` writing it back reports a failure on
+the last block. The operator then has to decide whether a restore that
+ended in an error worked.
+
+**And the archive is compared against the card, not against itself.**
+Decompressing what was written proves the gzip stream is complete; it does
+not prove it is a copy of anything. So the source is read a second time and
+hashed, and the two are compared. It costs a second full pass and it is on
+by default, because Project 2 recorded `dd` reporting complete success
+three times while the bytes went to three different places.
+
+### The test proved itself by failing, and failed to report it
+
+`conv=sync` was put back on purpose to watch the round-trip assertion
+catch it. The assertion never ran. The program refused first, which is
+correct, and the suite was running the archive as a bare command
+substitution under `set -eu`, so the whole file stopped at that line and
+printed ten green `ok` lines with no tally and no `FAILED`.
+
+A suite whose output on a real defect is a short green list is worse than
+no suite, because a short green list reads as a pass. It now has a
+`must_succeed` beside its `refuses`, which reports the refusal, prints the
+program's own output and exits with the tally. Re-running the broken
+version then gives `10 passed, 1 failed` and the reason.
+
+That is the second time today a test has been found to be shaped so that it
+could not report the thing it was written for. Entry 37 was a test
+asserting the bug; this one was a test that could not speak.
