@@ -327,8 +327,44 @@ before() {
 capture_line=$(at "rt-capture start")
 toggle_line=$(at "^rt-toggle ")
 cyclic_line=$(at "^cyclictest ")
-check "capture is armed before the toggler" \
-	"$(before "$capture_line" "$toggle_line")" "yes"
+sleep_line=$(at "^sleep 2$")
+
+# THE OBVIOUS CHECK HERE WAS RACY AND FAILED ABOUT ONE RUN IN TWELVE.
+#
+# It compared the line numbers of "rt-capture start" and "rt-toggle" in
+# the call log. rt-run backgrounds the capture, so the parent returns
+# immediately and the stub writes its line whenever the scheduler gets to
+# it. On real hardware the ordering is guaranteed by the two second sleep
+# rt-run performs between arming the capture and starting the toggler.
+# This suite stubs sleep out, to keep itself fast, and then asserted the
+# ordering that only the sleep provided.
+#
+# So the test removed the mechanism and checked for the result. It passed
+# most of the time because a forked stub usually wins a race against the
+# parent's next two commands, and that is not a property anything
+# guarantees.
+#
+# What is asserted instead is the thing that actually makes the ordering
+# true, and both halves are written by the parent shell in order, so
+# neither depends on when a child is scheduled:
+#
+#   rt-run NOTES that the capture is armed, before it does anything else
+#   rt-run SLEEPS before invoking the toggler
+#
+# A rt-run that stopped waiting would fail the second of those, which is
+# the regression worth catching. One that stopped arming the capture first
+# would fail the first.
+#
+# The sleep is matched as "sleep 2" exactly. rt-run performs one sleep
+# and this suite invokes it several times, so the call log accumulates
+# and a count of sleeps measures how many runs have happened rather than
+# anything about the protocol.
+
+contains "the capture is armed, and rt-run says so before the toggler runs" \
+	"$out" "rt-capture armed"
+check "and rt-run waits before starting the toggler" \
+	"$(before "$sleep_line" "$toggle_line")" "yes"
+contains "and the wait is the documented two seconds" "$calls" "sleep 2"
 check "cyclictest runs after the toggler" \
 	"$(before "$toggle_line" "$cyclic_line")" "yes"
 
