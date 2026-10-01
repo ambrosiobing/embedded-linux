@@ -189,7 +189,7 @@ int main(int argc, char **argv)
         }
         ret = iio_device_attr_write_double(dev, "sampling_frequency", rate);
         if (ret < 0) {
-            char avail[256];
+            char avail[256] = "";
             ssize_t n;
 
             fprintf(stderr, "cannot set %g Hz on %s: %s\n", rate, device_name,
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
         hz = rate;
         fprintf(stderr, "rate set to %g Hz\n", hz);
     } else if (has_rate && hz == 0.0) {
-        char avail[256];
+        char avail[256] = "";
         double first = 0.0;
         ssize_t n;
         int ret;
