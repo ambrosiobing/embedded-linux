@@ -1820,3 +1820,51 @@ watchdog's threshold looked like a count because it was printed in the
 column where counts go. The tell was there to be seen: 100001 is a round
 number with a one on the end, which is what a limit looks like and what a
 measurement almost never does.
+
+---
+
+## 37. The test was not catching the bug, it was asserting it
+
+Entry on Thursday 1 October 2026, after the push.
+
+**CI failed on both of the day's pushes**, and not where I expected. I had
+predicted shellcheck, found an unquoted expansion one line past its
+exemption, fixed it, and that was a real defect and not the cause. The
+failing step was Tests, seven assertions in `tests/iio-probe-test.sh`:
+
+    FAILED  '0x6a,LSM6DSV16X,...,no-driver-in-image' not in output
+    FAILED  '0x3c,STTS22H,none,none,absent' not in output
+    FAILED  '0x44,SHT40,sht4x,hwmon,...,working' not in output
+
+Those are the exact errors corrected in the program after the bus was read
+on Wednesday. The test expected the wrong address map, so correcting the
+program broke the test.
+
+**Which means the suite was defending the bug.** Twenty-five assertions
+passed for two weeks while stating that the fusion IMU sits at `0x6a`. The
+overlay bound that address for a day, the probe would have refused in
+silence, and the whole time there was a green suite behind it. A fixture
+that encodes a wrong fact does not merely fail to catch the error. It
+makes correcting it look like a regression.
+
+**And `0x3c` was never an address this bus could carry.** It is the
+eight-bit form of the magnetometer's `0x1e`. A seven-bit table held an
+eight-bit value and nothing noticed, because the only thing checking it was
+a fixture built from the same misunderstanding.
+
+**This is the third version of the same lesson today** and the sharpest.
+Entry 36 recorded that a test built from synthetic sysfs directories can
+check what a program writes and never what the kernel would make of it.
+This is worse: a test built from synthetic directories can also check that
+a program writes something false, and pass.
+
+**`iio-rate` has no test file at all.** That is the plainest explanation for
+the three defects found in it this morning, and it is a better one than any
+argument about what tests can and cannot see.
+
+**What the acceptance table should say about this.** Criteria 6 and 7 are
+marked met on a laptop, because they are properties of the programs. They
+are. But criterion 7's 25 assertions were asserting a wrong address map at
+the moment they were recorded as met, and nothing in the table distinguishes
+an assertion that checks a program's logic from one that pins its data to a
+fiction.
