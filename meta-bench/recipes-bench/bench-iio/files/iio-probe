@@ -58,13 +58,23 @@ note() {
 # should be present and what is.
 #
 # Fields: address, part, expected driver, subsystem, note
+# Every address below was measured on Wednesday 30 September 2026 and
+# cross-checked against UM3239 Rev 5 Table 1, where all seven are the
+# default solder-bridge addresses. Three entries were wrong before that:
+# the LSM6DSV16X was listed at 0x6a, which is the OTHER inertial unit on
+# this shield; the STTS22H was listed at 0x3c, which is the eight-bit form
+# of the magnetometer's address and not a seven-bit address at all; and
+# the LSM6DSO16IS was missing. The overlay was corrected for the first of
+# those in 7a97811 and this table was not, so a measurement fixed one file
+# and left its twin wrong for a day.
 PARTS="
-0x6a|LSM6DSV16X|st_lsm6dsx|iio|IMU, two devices, one hardware FIFO
+0x19|LIS2DUXS12|none|none|answers only i2cdetect -r, driver may be absent
 0x1e|LIS2MDL|st_magn|iio|magnetometer, no FIFO
+0x38|STTS22H|none|none|no mainline driver, expected unsupported
+0x44|SHT40AD1B|sht4x|hwmon|humidity, NOT an IIO device
 0x5d|LPS22DF|st_pressure|iio|pressure, recent driver addition
-0x44|SHT40|sht4x|hwmon|humidity, NOT an IIO device
-0x3c|STTS22H|none|none|no mainline driver, expected unsupported
-0x19|LIS2DUXS12|none|none|driver may be absent from this kernel
+0x6a|LSM6DSO16IS|st_lsm6dsx|iio|ISPU part, confirm the compatible exists
+0x6b|LSM6DSV16X|st_lsm6dsx|iio|IMU, two devices, one hardware FIFO
 "
 
 # ------------------------------------------------------- what answers
