@@ -67,14 +67,37 @@ note() {
 # the LSM6DSO16IS was missing. The overlay was corrected for the first of
 # those in 7a97811 and this table was not, so a measurement fixed one file
 # and left its twin wrong for a day.
+# Fields are address, part, driver, subsystem, device-tree compatible,
+# which tree that driver lives in, and a note.
+#
+# THE COMPATIBLE AND THE TREE WERE ADDED ON THURSDAY 1 OCTOBER 2026 TO STOP
+# THIS TABLE REPEATING A TWO-DAY MISTAKE.
+#
+# 0x19 and 0x38 carried driver=none, and driver=none was wired straight to
+# "unsupported". Both parts are supported. Both were simply never declared:
+# ST's own shield overlay instantiates lis2duxs12@19 and stts22h@38, and
+# this repository's overlay declares neither. 0x6a sat in the same state,
+# recorded first as not-bound and then as unsupported, and a device-tree
+# node turned it into two working IIO devices without a line of driver code
+# being written.
+#
+# "unsupported" is now reserved for a part no driver is known for. A part
+# whose driver exists and whose address nothing claims is "undeclared", and
+# that word points at the overlay, which is where the fix always was.
+#
+# The tree column is a static fact and is not probed. st,stts22h lives in
+# ST's IIO tree rather than in mainline, so on a mainline image no node can
+# help it: the node would be created, nothing would bind, and the part would
+# go silent rather than absent. That is a different answer from "this image
+# was built without the module" and it deserves a different word.
 PARTS="
-0x19|LIS2DUXS12|none|none|answers only i2cdetect -r, driver may be absent
-0x1e|LIS2MDL|st_magn|iio|magnetometer, no FIFO
-0x38|STTS22H|none|none|no mainline driver, expected unsupported
-0x44|SHT40AD1B|sht4x|hwmon|humidity, NOT an IIO device
-0x5d|LPS22DF|st_pressure|iio|pressure, recent driver addition
-0x6a|LSM6DSO16IS|st_lsm6dsx|iio|ISPU part, confirm the compatible exists
-0x6b|LSM6DSV16X|st_lsm6dsx|iio|IMU, two devices, one hardware FIFO
+0x19|LIS2DUXS12|st_lis2duxs12|iio|st,lis2duxs12|mainline|answers only i2cdetect -r, no node in the overlay
+0x1e|LIS2MDL|st_magn|iio|st,lis2mdl|mainline|magnetometer, no FIFO
+0x38|STTS22H|stts22h|iio|st,stts22h|out-of-tree|driver is in ST's IIO tree, a node alone will not help
+0x44|SHT40AD1B|sht4x|hwmon|sensirion,sht4x|mainline|humidity, NOT an IIO device
+0x5d|LPS22DF|st_pressure|iio|st,lps22df|mainline|pressure, recent driver addition
+0x6a|LSM6DSO16IS|st_lsm6dsx|iio|st,lsm6dso16is|mainline|ISPU part, compatible confirmed Thursday 1 October 2026
+0x6b|LSM6DSV16X|st_lsm6dsx|iio|st,lsm6dsv16x|mainline|IMU, two devices, one hardware FIFO
 "
 
 # ------------------------------------------------------- what answers
@@ -144,6 +167,31 @@ i2c_dir() {
 
 bound_at() {
 	[ -e "$(i2c_dir "$1")/driver" ]
+}
+
+# Whether anything has created an I2C client at this address at all.
+#
+# This is the observation that separates "the driver did not match" from
+# "nothing ever asked". I2C does not probe blind: a client comes from a
+# device-tree node, from board info, or from a write to new_device. No
+# client means no node, and no node means the overlay, not the image.
+client_at() {
+	[ -d "$(i2c_dir "$1")" ]
+}
+
+# Whether this kernel knows the compatible, asked of modules.alias rather
+# than of a source tree.
+#
+# Asked of /usr/src it would be wrong here: only selected directories were
+# ever extracted from linux-source-6.18 on this card, so a missing file
+# means a missing extraction. modules.alias is written by depmod from the
+# modules actually installed, which is the question worth asking.
+compat_known() {
+	_c=$1
+	[ "$_c" = none ] && return 1
+	_alias=$ROOT/lib/modules/$(uname -r)/modules.alias
+	[ -f "$_alias" ] || return 1
+	grep -q "$_c" "$_alias" 2>/dev/null
 }
 
 iio_devices_at() {
@@ -222,7 +270,7 @@ else
 		ADDRESS PART DRIVER SUBSYS BUS MODULE DEVICES
 fi
 
-printf '%s\n' "$PARTS" | while IFS='|' read -r addr part driver subsys why; do
+printf '%s\n' "$PARTS" | while IFS='|' read -r addr part driver subsys compat tree why; do
 	[ -n "$addr" ] || continue
 
 	bus_state=$(answers "$addr")
@@ -242,6 +290,10 @@ printf '%s\n' "$PARTS" | while IFS='|' read -r addr part driver subsys why; do
 
 	# The status column is the judgement, and it is deliberately the only
 	# place a judgement is made. Everything left of it is observation.
+	# The order below is the order the questions are worth asking in, and
+	# it changed on Thursday 1 October 2026. It used to begin with
+	# driver=none meaning unsupported, which answered a question about the
+	# part with a fact about this table.
 	if [ "$driver" = none ]; then
 		status="unsupported"
 	elif [ -n "$devices" ]; then
@@ -251,10 +303,20 @@ printf '%s\n' "$PARTS" | while IFS='|' read -r addr part driver subsys why; do
 		# the driver matched and then failed to register a device, which
 		# means a probe error and a line in dmesg.
 		status="bound-no-device"
-	elif [ "$mod_state" = missing ]; then
+	elif [ "$tree" = out-of-tree ] && ! compat_known "$compat"; then
+		# Asked before the image question, because "built without the
+		# module" is the wrong answer for a driver no mainline image
+		# could have had.
+		status="out-of-tree"
+	elif [ "$mod_state" = missing ] && ! compat_known "$compat"; then
 		status="no-driver-in-image"
 	elif [ "$bus_state" = absent ]; then
 		status="not-on-bus"
+	elif ! client_at "$addr"; then
+		# The driver is here, the part is here, and nothing has ever
+		# introduced them. This is the row 0x6a sat in for two days
+		# under two different and both wrong names.
+		status="undeclared"
 	else
 		status="not-bound"
 	fi
@@ -296,5 +358,10 @@ if [ "$machine_readable" = no ]; then
 	echo "    bound-no-device     the driver matched and registered"
 	echo "                        nothing: look in dmesg for its probe"
 	echo "    not-on-bus          nothing answered at that address"
-	echo "    unsupported         no mainline driver, recorded on purpose"
+	echo "    undeclared          the driver is here and nothing created a"
+	echo "                        client at this address: add a node to the"
+	echo "                        overlay, no driver work is needed"
+	echo "    out-of-tree         the driver is not in mainline, so a node"
+	echo "                        alone would bind nothing and say nothing"
+	echo "    unsupported         no driver is known for this part at all"
 fi

@@ -133,6 +133,13 @@ i2c_client() {
 	printf '%s/sys/bus/i2c/devices/1-00%s' "$WORK" "$(printf '%s' "$1" | sed 's/^0x//')"
 }
 
+# A client with no driver link: the node exists and nothing matched it.
+# bind_driver makes both at once, so the two states need separate
+# helpers to be told apart.
+add_client() {
+	mkdir -p "$(i2c_client "$1")"
+}
+
 bind_driver() {
 	mkdir -p "$(i2c_client "$1")/driver"
 }
@@ -206,11 +213,23 @@ contains "the CSV has a header" "$(run -m | head -1)" "address,part,driver"
 contains "a part on the bus with no module reads no-driver-in-image" \
 	"$(run -m)" "0x6b,LSM6DSV16X,st_lsm6dsx,iio,present,missing,,no-driver-in-image"
 
-# Installed but nothing bound: the driver is there and nothing matched it,
-# which points at the overlay rather than at the image. Telling those two
-# apart is the reason this program is not three lines of shell.
+# Installed, and nothing has created a client at the address at all. The
+# driver is here, the part is here, and nothing ever introduced them.
+#
+# THIS STATE HAD NO WORD OF ITS OWN UNTIL THURSDAY 1 OCTOBER 2026. 0x6a
+# sat in it for two days, reported first as not-bound and then as
+# unsupported, and what fixed it was a device-tree node and not one line
+# of driver code.
 echo st_lsm6dsx >"$WORK/installed"
-contains "installed but unbound reads not-bound" \
+contains "installed with no client at all reads undeclared" \
+	"$(run -m)" "0x6b,LSM6DSV16X,st_lsm6dsx,iio,present,installed,,undeclared"
+
+# A client exists and no driver claimed it. The node is there and the
+# match failed, which is a different fault with a different fix from no
+# node at all, and telling those two apart is the reason this program is
+# not three lines of shell.
+add_client 0x6b
+contains "installed with a client but no driver reads not-bound" \
 	"$(run -m)" "0x6b,LSM6DSV16X,st_lsm6dsx,iio,present,installed,,not-bound"
 
 # Bound and registered nothing. Rare, and its own fault: the driver
@@ -230,13 +249,33 @@ contains "a bound driver with devices reads working" "$out" ",working"
 contains "and names the devices it created" "$out" "lsm6dsv16x_accel"
 contains "both devices of the one chip are listed" "$out" "lsm6dsv16x_gyro"
 
-# A part with no mainline driver is unsupported, not broken, and says so.
-contains "driver=none reads unsupported" \
-	"$(run -m)" "0x19,LIS2DUXS12,none,none,present,none,,unsupported"
+# A supported part whose driver is not in this image. It was recorded as
+# unsupported until Thursday 1 October 2026, which was wrong twice over:
+# st,lis2duxs12 is in mainline, and ST's own shield overlay instantiates
+# lis2duxs12@19, so SB20 being closed is the expected strap rather than
+# an unknown device.
+contains "a mainline driver absent from the image reads no-driver-in-image" \
+	"$(run -m)" "0x19,LIS2DUXS12,st_lis2duxs12,iio,present,missing,,no-driver-in-image"
+
+# A driver no mainline image could have carried. st,stts22h lives in ST's
+# IIO tree, so a device-tree node would be created, nothing would bind to
+# it, and the part would go silent rather than absent. The fix is to
+# vendor the driver, not to edit the overlay.
+contains "a driver outside mainline reads out-of-tree" \
+	"$(run -m)" "0x38,STTS22H,stts22h,iio,absent,missing,,out-of-tree"
+
+# And the verdict does not depend on whether the part answers. A driver
+# that is not in the tree is not in the tree whether the chip is on the
+# bus or not, which is why out-of-tree is asked before the bus question.
+
+# NOTE: no row exercises unsupported any more, because no part on this
+# shield is one. The branch is kept for a part nobody has a driver for,
+# and it is untested rather than unreachable. Said here so a future reader
+# counting assertions does not conclude it was deleted.
 
 # Nothing at the address at all.
-contains "a part that does not answer reads not-on-bus" \
-	"$(run -m)" "0x38,STTS22H,none,none,absent"
+contains "a part that does not answer reads absent on the bus" \
+	"$(run -m)" "0x38,STTS22H,stts22h,iio,absent"
 
 # ------------------------------------------------- hwmon is not IIO
 #
@@ -272,7 +311,7 @@ esac
 
 write_scan UU
 contains "an address claimed by a driver is reported as claimed" \
-	"$(run -m)" "0x38,STTS22H,none,none,claimed"
+	"$(run -m)" "0x38,STTS22H,stts22h,iio,claimed"
 
 # ------------------------------------------------------------ evidence
 
