@@ -205,3 +205,18 @@ SO CRITERION 4 SPLITS CLEANLY ALONG WHAT THE WIRING TOUCHES.
 The honest reading is that this project can measure what batching costs
 the reader and cannot yet measure what it saves the interrupt controller.
 The second needs the interrupt line fixed, not more runs.
+
+THE PROGRAM'S OWN ROWS, recovered before the board was unplugged and kept
+in iio-rates-2026-10-01.csv. Five runs:
+
+  09:46:59  0 samples      100001 irqs  10000.10/s  0.70%   aborted, watchdog
+  09:47:27  0 samples           0 irqs      0.00/s  0.00%   line disabled
+  10:04:01  4672 samples     1715 irqs    171.50/s  0.80%   480 Hz, wm 64
+  10:08:06  1169 samples    38168 irqs   3816.80/s  0.40%   120 Hz, wm 1
+  10:08:28  1152 samples      959 irqs     95.90/s  0.20%   120 Hz, wm 64
+
+The first two rows are in the file and are not measurements: the first is
+the aborted run whose count is the watchdog's threshold, the second is the
+run that followed with the line already disabled. They are kept because a
+results file that silently omits its failures is worse than one that
+carries them labelled.
