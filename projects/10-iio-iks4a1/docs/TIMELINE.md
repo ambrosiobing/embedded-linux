@@ -447,8 +447,12 @@ and six of the eight by a measurement that cost a single command.
 
 - Whether to restate criterion 8 so it tests the filter rather than the
   fixture. A wording is proposed in the evidence.
-- Whether to edit criterion 4's rate from 416 Hz, which this part does not
-  offer, to 480, which preserves both its thresholds.
+- ~~Criterion 4's rate.~~ **Settled Thursday 1 October 2026: the criterion
+  names 416 Hz or 480 Hz, whichever the part under test offers.** Both meet
+  its arithmetic at watermark 64 and at watermark 1. 416 Hz is the classic ST
+  ladder and may belong to the LSM6DSO16IS at `0x6a`, which had no driver
+  bound until that evening; whether that part offers it is unverified, and
+  its INT1 on CN8 pin 6 is not wired.
 - Whether to refresh the working tree so its 31 shebang files match what is
   committed. Every one of them fails the same way when copied to a board.
 - 49 commits sit unpushed on `main`.

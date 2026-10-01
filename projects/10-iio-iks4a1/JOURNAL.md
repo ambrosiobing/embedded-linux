@@ -2516,3 +2516,49 @@ goes, then with a few hundred ohms in series at the CN9 pin 6 end. If those
 move the number the cause is the wire; if they do not it is a connector or the
 shield. One capture on a scope at CN9 pin 6 would answer it outright, and
 there is no scope on this bench.
+
+## 48. Criterion 4 names both rates, and 416 Hz may not have been a mistake
+
+*Thursday 1 October 2026.* Joseph settled the wording: the criterion names
+**416 Hz or 480 Hz**, whichever the part under test offers.
+
+Both satisfy its own arithmetic, which is the only thing that was ever at
+risk. At watermark 64, 416/64 = 6.5 and 480/64 = 7.5 interrupts per second,
+both under the limit of 8. At watermark 1, 416 and 480 per second, both over
+the floor of 400. The thresholds were never rate-specific; one number in the
+prose was.
+
+**And 416 Hz looks less like an error than it did this morning.** It is the
+classic ST IMU ladder, 12.5/26/52/104/208/416/833, which the LSM6DSV16X does
+not use. For three days the entry in the journal read as a criterion written
+from the wrong datasheet. The shield carries a second IMU, and `0x6a` only
+started producing `lsm6dso16is_accel` and `lsm6dso16is_gyro` a few hours
+earlier, after two days of being recorded as unbound and then as unsupported.
+
+So the likelier story is that the criterion was written for a part that was on
+the board the whole time and had no driver attached to it. **Which is worth
+noticing as a pattern rather than a coincidence**: the same undeclared device
+produced a wrong inventory row, an open backlog question, and what looked like
+a wrong number in an acceptance criterion. One missing device-tree node, three
+symptoms, none of which pointed at each other.
+
+### What is not claimed here
+
+That the LSM6DSO16IS offers 416 Hz. It is the classic ladder and that part
+usually carries it, and this project has already recorded twice that a family
+is not a part. One command answers it on the board:
+
+    cat /sys/bus/iio/devices/iio:device3/sampling_frequency_available
+
+Until that is read, 416 Hz in the criterion is a rate the criterion permits,
+not a rate anything here has been measured at.
+
+And its FIFO half would need wiring that does not exist. UM3239 Rev 5 Table 4
+puts the LSM6DSO16IS INT1 on **CN8 pin 6** and its INT2 on CN9 pin 8, while the
+only interrupt wire on this bench runs from CN9 pin 6, the LSM6DSV16X INT1, to
+Pi header pin 18. Measuring the second IMU's watermark interrupts needs a
+second jumper to a free GPIO and an overlay entry declaring it, on top of the
+device-tree node that `0x6a` already needs to bind at boot.
+
+Recorded as a route rather than a plan. The first thing criterion 4 needs is
+still the 30 times storm on the wire that already exists.
