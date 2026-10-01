@@ -201,19 +201,51 @@ do_fifo() {
 	watermark=$3
 	dev=$(device_path "$name")
 
-	[ -w "$dev/buffer/hwfifo_watermark" ] ||
-		die "$name has no hwfifo_watermark.
-       This device has no hardware FIFO, so there is no third path to
-       measure on it. The magnetometer is one such: that is why the
-       trigger path is demonstrated there and the FIFO path here."
+	# THERE ARE TWO CONVENTIONS FOR A HARDWARE WATERMARK and this
+	# program knew only one, which made it tell a part with a 4.5 kB
+	# FIFO that it had none.
+	#
+	# hwfifo_watermark is an optional interface that a handful of
+	# drivers expose directly. The standard one is buffer/watermark,
+	# backed by .set_watermark in the driver's iio_buffer_setup_ops,
+	# which the IIO core clamps to the hardware FIFO size. st_lsm6dsx
+	# uses the second, so testing only for the first and concluding
+	# "no hardware FIFO" was wrong about hardware that has one.
+	#
+	# And the deeper point, which the old check got backwards: the
+	# NAME of an attribute does not establish that a watermark is
+	# served by hardware. The interrupt rate does. A hardware FIFO at
+	# rate R and watermark W interrupts R/W times a second; a software
+	# buffer interrupts R times whatever the attribute is called. This
+	# program already counts interrupts, so the proof is in the result
+	# rather than in the probe, and the check below only has to find a
+	# writable attribute.
+	wm_attr=""
+	for candidate in \
+		"$dev/buffer/hwfifo_watermark" \
+		"$dev/buffer/watermark" \
+		"$dev/buffer0/watermark"; do
+		if [ -w "$candidate" ]; then
+			wm_attr="$candidate"
+			break
+		fi
+	done
+
+	[ -n "$wm_attr" ] ||
+		die "$name exposes no writable watermark attribute.
+       Looked for buffer/hwfifo_watermark, buffer/watermark and
+       buffer0/watermark. Without one there is no way to batch, so
+       there is no third path to measure on this device. The
+       magnetometer is one such: that is why the trigger path is
+       demonstrated there and the FIFO path here."
 
 	note "path       hardware FIFO"
 	note "device     $name at $(basename "$dev")"
 	note "rate       ${hz} Hz"
-	note "watermark  $watermark"
+	note "watermark  $watermark via $(basename "$(dirname "$wm_attr")")/$(basename "$wm_attr")"
 
 	echo "$hz" >"$dev/sampling_frequency"
-	echo "$watermark" >"$dev/buffer/hwfifo_watermark"
+	echo "$watermark" >"$wm_attr"
 	# shellcheck disable=SC2064
 	trap "buffer_off '$dev'" EXIT INT TERM
 
