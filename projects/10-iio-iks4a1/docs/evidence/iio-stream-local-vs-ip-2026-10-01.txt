@@ -1,30 +1,38 @@
-CORRECTION, Thursday 1 October 2026, later the same evening
-===========================================================
+CORRECTION AND RE-CORRECTION, Thursday 1 October 2026
+=====================================================
 
-THE SECTION BELOW HEADED "WHAT WAS SUBSTITUTED" DRAWS TWO CONCLUSIONS ABOUT
-THE INTERRUPT LINE. BOTH ARE WITHDRAWN. THE MEASUREMENTS STAND.
+THIS HEADER HAS BEEN WRONG ONCE ALREADY. READ BOTH PARAGRAPHS.
 
-It reads IRQ 185 at 0 0 0 0 as the line delivering nothing, and builds on that
-a story about the fault reversing direction between morning and evening.
+The section below headed "WHAT WAS SUBSTITUTED" says the accelerometer
+timed out because the interrupt line delivered nothing, and that the
+substitution to lis2mdl followed from it. A first correction withdrew that
+and blamed an unset output data rate instead. THE FIRST CORRECTION WAS
+WRONG AND THE ORIGINAL TEXT WAS RIGHT.
 
-What the zero actually was: the accelerometer sitting in power-down, where it
-never asserts INT1. iio-stream does not set the sampling frequency and nothing
-else had. Once iio-rate left it at 480 Hz, the identical iio-stream command
-returned 1001 lines in 2.198 s. A quiet line and a dead line produce the same
-count and nothing in that observation separated them.
+What settles it, measured the same evening:
 
-What the line actually does, measured against a control the same evening: with
-the wire connected at CN9 pin 6, 225.60 interrupts per second where 7.5 are
-expected; with it unplugged, exactly 0.00 and not one count on the counter. The
-line works, carries a real storm of about thirty times, and there was no
-reversal. See irq-control-2026-10-01.txt and journal entry 47.
+  - with the wire off CN9 pin 6, iio-rate fifo gives 0 interrupts and 0
+    SAMPLES, not fewer samples. The FIFO path is entirely interrupt driven.
+  - with the wire on, the identical iio-stream commands return 201 lines in
+    0.504 s at 480 Hz and 5 lines in 0.873 s at 7.5 Hz with a four-sample
+    buffer.
+  - sampling_frequency never reads 0 on st_lsm6dsx. After rmmod and insmod
+    it reads 7.500000. The power-down premise was never checked before it
+    was published.
+  - 7.5 Hz with a four-sample buffer completes, so there is no timeout
+    defect either.
 
-Also withdrawn by this: the claim here that the substitution to lis2mdl was
-forced by the wiring. It was forced by iio-stream not configuring the device,
-which is a defect in the program and not a fact about the bench.
+Three mechanisms were proposed for one observation, in this order: power-
+down, fill time against libiio's timeout, and a rate dependence. All three
+were wrong, and what they were competing to explain was an unplugged wire
+left in place after a control experiment.
 
-Unaffected: every number in this file, and the local-against-remote comparison
-itself, which never depended on the accelerometer.
+So: the interrupt explanation in the text below stands, the substitution to
+lis2mdl was forced by the bench, and the first correction is withdrawn. See
+journal entry 51 for the full accounting.
+
+Unaffected throughout: every number in this file, and the local-against-
+remote comparison itself, which never depended on the accelerometer.
 
 Criterion 5: iio-stream through local: and through ip:
 Thursday 1 October 2026, 19:35 to 19:45 CEST

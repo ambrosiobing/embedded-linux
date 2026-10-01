@@ -89,10 +89,10 @@ static void usage(const char *argv0)
             "  -d  device name, default \"lsm6dsv16x_accel\"\n"
             "  -n  number of buffer refills, 0 for until interrupted\n"
             "  -b  samples per buffer, default 256\n"
-            "  -r  output data rate in Hz. Without it, a part found in\n"
-            "      power-down is set to the lowest rate it offers, and\n"
+            "  -r  output data rate in Hz. A device reporting a rate of\n"
+            "      0 is set to the first rate at or above 100 Hz and\n"
             "      says so, because a buffer armed on a stopped part\n"
-            "      never fills and the refill times out instead\n",
+            "      cannot fill. No device here has ever reported 0\n",
             argv0);
 }
 
@@ -142,33 +142,36 @@ int main(int argc, char **argv)
     }
 
     /*
-     * THE PART HAS TO BE RUNNING BEFORE A BUFFER IS ARMED, AND THIS
-     * PROGRAM USED TO ASSUME SOMEBODY ELSE HAD SEEN TO THAT.
+     * A BUFFER ARMED ON A STOPPED PART CANNOT FILL, AND THIS IS A GUARD
+     * RATHER THAN A FIX FOR ANYTHING OBSERVED HERE.
      *
-     * On st_lsm6dsx, sampling_frequency is the output data rate, and the
-     * LSM6DSV16X resets to power-down. Enabling every scan element and
-     * creating a buffer on a part in power-down is accepted by the kernel
-     * without complaint: the scan elements are enabled, the buffer exists,
-     * and no sample is ever produced, so the FIFO never reaches its
-     * watermark, so the interrupt never fires, so iio_buffer_refill blocks
-     * until it times out.
+     * Read the history before trusting this block, because the first
+     * version of it carried a confident account of a defect it did not
+     * cause.
      *
-     * What that looked like on Thursday 1 October 2026:
+     * On Thursday 1 October 2026 this program timed out repeatedly on an
+     * LSM6DSV16X and the cause was diagnosed, in order, as the part being
+     * in power-down, then as the buffer taking longer to fill than
+     * libiio's timeout, then as something rate-dependent. All three were
+     * wrong. The interrupt wire from the shield's CN9 pin 6 to the Pi's
+     * GPIO24 was unplugged, left that way after a control experiment, and
+     * the FIFO path is entirely interrupt driven: no interrupt gives no
+     * samples rather than fewer samples. With the wire back on, the same
+     * commands returned 201 lines in 0.504 s at 480 Hz and 5 lines in
+     * 0.873 s at 7.5 Hz with a four-sample buffer.
      *
-     *     refill failed: Connection timed out
-     *     185:  0  0  0  0  pinctrl-bcm2835  24 Edge  lsm6dsx
+     * So on st_lsm6dsx, sampling_frequency NEVER READS ZERO. After rmmod
+     * and insmod it reads 7.500000, the lowest in the ladder, because the
+     * driver initialises its cached rate rather than reporting the chip's
+     * reset state. The branch below has never fired on this bench.
      *
-     * and the zero in /proc/interrupts was then read as a broken interrupt
-     * line. It cost an evening and two wrong entries in the journal before
-     * iio-rate happened to leave the rate at 480 Hz and the identical
-     * command returned 1001 lines in 2.198 s.
-     *
-     * The defect is not that the rate was unset. It is that a program with
-     * an unstated precondition reported a timeout, which names the symptom
-     * of the symptom and points the reader at the hardware.
+     * It stays because the condition is real for a driver that does expose
+     * a stopped state, and because a refusal is cheaper than the two
+     * evenings it took to rule this out. It does NOT stay as evidence that
+     * anything here was ever in power-down.
      *
      * A device with no sampling_frequency attribute is left alone: a
-     * trigger-driven part is clocked by the trigger and this is not its
+     * trigger-driven part is clocked by its trigger and this is not its
      * precondition.
      */
     double hz = 0.0;
@@ -205,46 +208,80 @@ int main(int argc, char **argv)
         fprintf(stderr, "rate set to %g Hz\n", hz);
     } else if (has_rate && hz == 0.0) {
         char avail[256] = "";
-        double first = 0.0;
+        const char *p;
+        double pick = 0.0;
+        double highest = 0.0;
         ssize_t n;
         int ret;
 
         n = iio_device_attr_read(dev, "sampling_frequency_available",
                                  avail, sizeof(avail));
-        if (n > 0)
-            first = strtod(avail, NULL);
-
-        if (first <= 0.0) {
-            fprintf(stderr, "%s is in power-down and offers no rates to pick from.\n",
+        if (n <= 0) {
+            fprintf(stderr, "%s reports a rate of 0 and no list of rates.\n",
                     device_name);
             fprintf(stderr,
-                    "sampling_frequency reads 0 and sampling_frequency_available\n"
-                    "could not be read, so there is no rate to set and a buffer\n"
-                    "armed here would never fill. Set one by hand,\n"
-                    "writing a rate into this device's own\n"
-                    "sampling_frequency under /sys/bus/iio/devices.\n");
+                    "A buffer armed here would never fill, and there is no\n"
+                    "way to choose a rate. Set one yourself and pass -r.\n");
             iio_context_destroy(ctx);
             return 1;
         }
 
-        ret = iio_device_attr_write_double(dev, "sampling_frequency", first);
-        if (ret < 0) {
-            fprintf(stderr, "%s is in power-down and %g Hz was refused: %s\n",
-                    device_name, first, strerror(-ret));
+        /*
+         * THE FIRST RATE AT OR ABOVE 100 Hz, NOT THE LOWEST AVAILABLE.
+         *
+         * The lowest is 7.5 Hz on this part and 1.875 Hz on some of its
+         * siblings. A forgotten -r would then "succeed" and produce a
+         * stream so slow it reads as a hang, which trades a clear failure
+         * for a confusing one. 100 Hz is a round number chosen so that a
+         * default capture completes in a visible time, not a property of
+         * any sensor.
+         *
+         * If nothing reaches 100, the highest on offer is used: a part
+         * whose ceiling is below 100 is slow by construction and there is
+         * nothing better to pick.
+         */
+        for (p = avail; *p; ) {
+            char *end;
+            double v = strtod(p, &end);
+
+            if (end == p)
+                break;
+            if (v > highest)
+                highest = v;
+            if (v >= 100.0 && (pick == 0.0 || v < pick))
+                pick = v;
+            p = end;
+            while (*p == ' ' || *p == '\t' || *p == '\n')
+                p++;
+        }
+        if (pick == 0.0)
+            pick = highest;
+
+        if (pick <= 0.0) {
+            fprintf(stderr, "%s reports a rate of 0 and its list of rates\n",
+                    device_name);
+            fprintf(stderr, "could not be parsed: %s\n", avail);
             iio_context_destroy(ctx);
             return 1;
         }
-        hz = first;
+
+        ret = iio_device_attr_write_double(dev, "sampling_frequency", pick);
+        if (ret < 0) {
+            fprintf(stderr, "%s reports a rate of 0 and %g Hz was refused: %s\n",
+                    device_name, pick, strerror(-ret));
+            iio_context_destroy(ctx);
+            return 1;
+        }
+        hz = pick;
 
         /*
          * Said out loud, on stderr so stdout stays CSV. A program that
          * quietly changes the configuration of the thing it is measuring
-         * is how a capture ends up unexplainable a week later, and the
-         * lowest available rate is a safe choice rather than a right one.
+         * is how a capture becomes unexplainable a week later.
          */
         fprintf(stderr,
-                "%s was in power-down, so no buffer could have filled.\n"
-                "Rate set to %g Hz, the lowest this part offers.\n"
+                "%s reported a rate of 0, where no buffer can fill.\n"
+                "Rate set to %g Hz, the first at or above 100.\n"
                 "Choose it yourself with -r HZ; available: %s\n",
                 device_name, hz, avail);
     }

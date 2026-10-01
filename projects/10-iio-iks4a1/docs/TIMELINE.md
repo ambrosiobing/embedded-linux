@@ -331,6 +331,10 @@ throughput.
 | 21:25 | The ODR explains it. `iio-stream` sets no sampling frequency, and the part powers up in power-down. At 480 Hz the same command returns 1001 lines | |
 | 21:40 | **The control.** The wire unplugged at CN9 pin 6 gives 0.00 interrupts and 0 samples, so GPIO24 picks up nothing and the storm is real at 30 times | |
 | 21:45 | Two inferences withdrawn: the line never delivered nothing, and the fault never reversed. Both rested on a sleeping sensor | |
+| 22:30 | CI compiles `iio-stream` for the first time ever, and passes. Journal 38's gap closes | `d1c11eb` |
+| 22:50 | `0x6a` gets a device-tree node, with no interrupt property because its INT1 is on CN8 pin 6 and unwired | `022e82d` |
+| 23:20 | Three more explanations for one timeout, all wrong. The interrupt wire was still unplugged from the control experiment | |
+| 23:30 | Wire back on CN9 pin 6: 201 lines in 0.504 s at 480 Hz, 5 lines in 0.873 s at 7.5 Hz. **The first explanation was the right one** | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile

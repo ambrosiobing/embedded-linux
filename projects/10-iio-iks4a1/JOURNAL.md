@@ -2727,3 +2727,77 @@ libiio 1.x, where `iio_buffer_refill` no longer exists.
 **This change has not been compiled.** There is no C toolchain on the
 authoring laptop, so CI is its first build, which is the ordering this bench
 has agreed to and is worth stating rather than implying.
+
+## 51. One cause, three wrong mechanisms, and a withdrawal that was itself wrong
+
+*Thursday 1 October 2026, late.* The accelerometer's buffered path failed,
+and over one evening I gave it three different explanations. All three were
+wrong. The cause was a wire I had asked to be unplugged for a control
+experiment and never asked to be plugged back in.
+
+| | explanation | killed by |
+|---|---|---|
+| 1 | the interrupt line delivers nothing | iio-rate driving 2449 interrupts |
+| 2 | the part is in power-down, iio-stream sets no rate | sampling_frequency reads 7.500000 after a reload |
+| 3 | the buffer takes longer to fill than libiio's timeout | 4 samples at 7.5 Hz failing too |
+| 4 | something rate-dependent | 4 samples at 480 Hz failing too |
+
+And then the wire went back on CN9 pin 6, and every one of those commands
+worked: 201 lines in 0.504 s at 480 Hz, and 5 lines in 0.873 s at 7.5 Hz
+with a four-sample buffer.
+
+**Explanation 1 was right.** I withdrew it in journal 47 and the withdrawal
+was the error. Worse, I withdrew it on good evidence: `iio-rate` really did
+drive 2449 interrupts down that line, so the line really does work. What I
+concluded from that was "therefore the line was not the problem", and the
+correct conclusion was "therefore the line works when it is connected".
+
+### What was actually established, and when
+
+The control run is the only measurement that ever mattered here, and it
+said everything on its first printing:
+
+    wire connected      225.60 interrupts/s   4672 samples
+    wire unplugged        0.00 interrupts/s      0 samples
+
+**Zero interrupts gives zero samples, not fewer samples.** I wrote that
+sentence into the evidence file myself, three explanations ago, and then
+spent the rest of the evening proposing mechanisms that all required the
+interrupt to be working.
+
+### Two things the detour did establish, both by accident
+
+**`sampling_frequency` never reads 0 on `st_lsm6dsx`.** After `rmmod` and
+`insmod` it reads 7.500000. The driver initialises its cached rate rather
+than reporting the chip's reset state, so the power-down premise was not
+merely unproven, it was false, and it had been published in a commit message
+and a code comment before anyone looked at the attribute.
+
+**The ladder is eight rates, not nine.** The driver offers
+`7.5 15 30 60 120 240 480 960`. This project had been writing 1.875 at the
+front of it since Wednesday, from the datasheet rather than from the driver.
+
+### What the code keeps and what its comment now says
+
+The `-r` flag stays: an explicit rate is worth having and costs nothing. The
+zero-rate branch stays too, because the condition is real for a driver that
+does expose a stopped state, and the policy is now the first rate at or
+above 100 Hz rather than the lowest available, so a forgotten `-r` cannot
+"succeed" into a 1.875 Hz stream that reads as a hang.
+
+What changed most is the comment above it. The first version told a
+confident story about an evening it did not cause. It now says the branch
+has never fired on this bench, names all three wrong diagnoses, and points
+at the wire. **Code that carries a false account of why it exists is worse
+than code with no comment**, because the next reader inherits the
+conclusion without the evidence.
+
+### The thing to take from this
+
+Every one of the three wrong mechanisms was plausible, internally consistent
+and testable, and I tested each one and moved on to the next without ever
+re-establishing the baseline. The baseline had changed under me because I
+changed it, deliberately, as an experiment, and then forgot.
+
+A control is not finished when it produces its number. It is finished when
+the system is put back.
