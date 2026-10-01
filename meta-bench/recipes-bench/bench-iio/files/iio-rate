@@ -302,7 +302,7 @@ capture() {
        to put in it, which is a driver fault rather than a usage one."
 	# shellcheck disable=SC2086
 	scan_enable "$dev" $_chans
-	note "channels  $(echo $_chans | tr -s ' ')"
+	note "channels $_chans"
 
 	echo "${BENCH_IIO_BUFLEN:-256}" >"$dev/buffer/length"
 
