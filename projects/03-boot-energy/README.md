@@ -36,10 +36,14 @@ the sentence was load-bearing: it was the justification a reader was given
 for a table with an empty column.
 
 The measured column is still empty, and now for a different and smaller
-reason: **no board has been powered through the PPK2 yet.** The first
-session with the instrument is written out step by step in
-[docs/BRINGUP.md](docs/BRINGUP.md), and it starts with the one test that
-could still end the method, the logic-level self-test.
+reason: **the markers are not installed, so there is nothing for the
+instrument to timestamp.** The board itself has been powered through the
+PPK2, on Saturday 19 September 2026, with VOUT on 24-pin header pin 2 and
+the micro USB unplugged, as
+[docs/evidence/logic-selftest.txt](docs/evidence/logic-selftest.txt)
+records. The first session with the instrument is written out step by step
+in [docs/BRINGUP.md](docs/BRINGUP.md), and it starts with the one test that
+could have ended the method, the logic-level self-test, which passed.
 
 **This is Software complete on the repository's ladder**, and the
 distinction from Project 6 is worth stating because the two look alike from
@@ -63,7 +67,7 @@ happens.
 | `docs/evidence/README.md` | what each artefact is and how it is produced, empty until a board has run |
 | `measure/analyze.py` | CSV to phase times, energy, summary and plot, with the discard rules built in |
 | `measure/ppk2_boot.py` | one boot: power off, settle, record, power on, detect the marker, power off |
-| `board/boot-marker.service` | raises the marker when the startup job queue empties, without forming an ordering cycle |
+| `rootfs-overlay/etc/systemd/system/boot-marker.service` | raises the marker when the startup job queue empties, without forming an ordering cycle |
 | `board/boot-marker-led.dtsi` | the `gpio-leds` child on PA6, and why it is not yet a patch |
 | `board/units-disabled.txt` | every unit masked or disabled, with its reason and what brings it back |
 | `uboot/fragments/marker.config` | the preboot marker alone, which the baseline carries |
@@ -157,13 +161,18 @@ failure of the project.
 
 ## What has not been done
 
-- **No boot has been recorded.** The board has been powered through the PPK2 and the logic port verified, but the markers are not installed and no CSV exists.
-- **No board has been powered through the PPK2.** Project 2's system exists and boots; this project has not yet measured it.
-- `board/0001-dts-boot-marker-led.patch` is a `.dtsi` instead. A patch is a
-  diff against specific lines of a specific tree, and inventing hunk
-  headers for a tree that has never been checked out would be a
-  fabrication in the format of evidence. The file says how to generate the
-  real patch once Project 2 has a kernel tree.
+- **No boot has been recorded.** The board has been powered through the
+  PPK2 and the logic port verified, but neither marker is installed and no
+  CSV exists. That is the whole of what stands between this project and its
+  first measurement.
+- **Neither marker is installed.** D1 needs a U-Boot built with
+  `uboot/fragments/marker.config`; D0 needs the device-tree patch applied
+  and `rootfs-overlay/etc/systemd/system/boot-marker.service` enabled on
+  Project 2's rootfs.
+- `kernel/fragments/trim.cfg` holds no symbols. The list comes from
+  `localmodconfig` against an `lsmod` captured from a real reference boot,
+  and writing a plausible list in advance would be a guess in the same
+  voice as a measurement.
 - `kernel/fragments/trim.cfg` holds no symbols. The list comes from
   `localmodconfig` against an `lsmod` captured from a real reference boot,
   and writing a plausible list in advance would be a guess in the same
