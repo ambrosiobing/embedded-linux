@@ -1,6 +1,6 @@
-# Timeline: Wednesday 30 September 2026
+# Timeline: Wednesday 30 September and Thursday 1 October 2026
 
-The day project 10 met hardware, minute by minute.
+The two days project 10 met hardware, minute by minute.
 
 **What the times are.** Every time below is a real commit timestamp or a
 file modification time, not a recollection. They therefore record when a
@@ -139,7 +139,7 @@ expected at the rate it appeared to show. The difference is that this pair
 was written to a file on the board and copied off as a file, so nothing
 crossed a terminal.
 
-## What the day cost, and where
+## What Wednesday cost, and where
 
 | Activity | Rough share | Produced |
 |---|---|---|
@@ -153,7 +153,7 @@ work with no theory in it, and the half hour with the manual settled more
 than the four hours did. Neither is avoidable, and the ratio is worth
 remembering when estimating the next one.
 
-## What was wrong at the start of the day and right at the end
+## What was wrong at the start of Wednesday and right at the end
 
 1. The bench inventory, which omitted four boards that were present.
 2. The overlay's IMU address, 0x6a for a part at 0x6b.
@@ -173,3 +173,199 @@ being checked at the time.
 
 Back to the [project README](../README.md), the [journal](../JOURNAL.md)
 or the [bring-up](BRINGUP.md).
+
+# Thursday 1 October 2026
+
+## Early morning: closing out the vibration thread
+
+| Time | Event | Commit |
+|---|---|---|
+| 06:44 | The 30 Hz test refutes the beat hypothesis. The tone survives where a 117 Hz line could not, so it is real vibration and never was a sampling artefact | `e40c924` |
+| 06:48 | The duplicate fraction turns out to be an output-rate meter: 0x04 gives 30.3 Hz measured and 0x06 gives 121.3, settling the register map with no data sheet | `109f678` |
+| 06:59 | **Taping the shaver down refutes the operator reading**, and one more claim of mine with it | `73b1332` |
+| 07:18 | The tap does not ring at 3 to 6 Hz, which is the sharpest constraint of the two days | `58b1ced` |
+| 07:24 | Eight g full scale confirmed by a predicted count, and one calibration constant fits both ranges to 36 parts per million | `f93b4b3` |
+| 07:35 | There is a ring, and a two second window was hiding it | `4b482bc` |
+
+**The pivot at 06:59.** I had concluded the 3 Hz line was the hand holding
+the shaver. Taping it down made the tone four times larger and moved it
+from 2.71 to 4.87 Hz. The hand was damping the assembly, not driving it.
+The shape of the argument survived and the attribution did not.
+
+**And a second claim went with it.** The two-sources argument from the
+previous entry rested on comparing records taken at different output rates,
+which this journal had spent four entries warning against. I wrote the
+warning and then built a conclusion on exactly what it warned about.
+
+**The surprise at 07:24** was free. Gravity reads 1.00680 g at two g full
+scale and 1.00684 at eight, 36 parts per million apart across a fourfold
+change of range. So the 0.68 percent error is one sensitivity constant, not
+a per-range table, and that also disposes of local gravity and of tilt as
+explanations.
+
+**The correction at 07:35 was mine, twice over.** My ring-down windows were
+2.0 s and the taps were 1.5 s apart, so each window swallowed the next tap
+and produced a number that looked like a finding. The one clean window
+showed no ring at 3 to 6 Hz at all, which is the constraint that still
+stands.
+
+## Morning: the programs meet hardware for the first time
+
+| Time | Event | Commit |
+|---|---|---|
+| 07:43 | Project 03 audited before starting it: two contradictory claims about the PPK2, a file table pointing at a moved file, and a stale open item | `689af20` |
+| 07:46 | **`iio-probe`'s parts table carried the same 0x6a address bug the overlay shed on Wednesday**, plus a seven-bit table holding an eight-bit address, plus a missing part | `3998952` |
+| 07:53 | The first program to reach the board would not start: a carriage return in the shebang, and the repository was right all along | `ea09c15` |
+| 07:56 | **Criterion 2 met**, by a program correctly reporting that four drivers are absent | `66d8713` |
+| 08:00 | `ahrs` gains a way to read a capture, and meets real gravity at level for the first time | `d496adf` |
+| 08:33 | The ninety degree criterion measures the fixture, and roll is not a determined quantity there | `31254da` |
+
+**The aha at 07:46** is about how a fix fails to travel. Wednesday's
+measurement corrected the overlay's IMU address in commit `7a97811`. The
+identical error sat in `iio-probe`'s parts table for a day because nothing
+connects the two files, and it was found only because the program was about
+to be run for the first time.
+
+**The surprise at 07:53** is that the repository was correct and the working
+tree was not. `.gitattributes` already says `text=auto eol=lf`; it was added
+after these files were checked out and `core.autocrlf` is `true`, so 31
+tracked files with a shebang still carry a carriage return. A Yocto build
+fetches from git and ships a working script; `scp` from the working tree
+ships a broken one. The failure exists only on the path that was never the
+designed one.
+
+**The correction at 07:56 is to something said hours earlier.** Criteria 2
+through 5 had all been described here as blocked on the drivers. Only 3, 4
+and 5 were. Criterion 2 needed a shell script copied over `scp` and had been
+sitting behind an assumption rather than a dependency.
+
+**And at 08:33 an acceptance criterion was found defective rather than
+failed.** "Pitch and roll within 3 degrees after a 90 degree rotation"
+measures how squarely the board was propped, and at a pitch near 90 degrees
+roll is not determined at all. The filter itself agrees with trigonometry to
+under 2 degrees at every pose.
+
+## Morning: the drivers, and three bugs in programs that had never run
+
+| Time | Event | Commit |
+|---|---|---|
+| 09:21 | **Two IIO devices**, from a driver that was not in the image an hour earlier. `st_lsm6dsx` built out of tree against 6.18.50 | `0036ce9` |
+| 09:25 | The interrupt registered on GPIO24, and criterion 4 names a rate this part does not have | `02cc709` |
+| 09:36 | `iio-rate` called a 4.5 kB FIFO absent, from one attribute name | `80340c7` |
+| 09:44 | The buffer held a timestamp and no data, which the kernel refuses with `EIO` | `0a51073` |
+| 09:53 | The interrupt storm that disabled IRQ 185, and what it confirms about the wiring | `aa95f69` |
+| 10:01 | The watermark was written before the buffer length | `75acb9d` |
+| 10:06 | **The FIFO batches.** 467 samples a second, 0.80 percent reader CPU | `48912c7` |
+| 10:11 | **A hypothesis confirmed by a number the kernel had stopped counting.** Withdrawn | `f8546c0` |
+| 10:14 | The state the next session starts from | `3ac0b85` |
+| 10:16 | The rate rows and every capture, recovered before power down | `4f99413` |
+
+**The aha at 09:21** is how narrow the blocker turned out to be. The IIO
+subsystem was present and packaged in full, trigger and buffer directories
+included; `/sys/bus/iio` was absent only because nothing had loaded
+`industrialio`. And `linux-source-6.18` matched the running kernel exactly,
+so no tag had to be guessed and only one driver directory had to be
+unpacked.
+
+**Three bugs between 09:36 and 10:01, all in the same program, none of them
+findable by its tests.** It looked for one of two watermark conventions and
+declared the hardware absent when it found the other. It enabled a buffer
+holding a timestamp and no data channel. It wrote the watermark before the
+buffer length, which only fails on a freshly loaded driver and had worked
+once by accident on a dirty one.
+
+**And the reason all three survived is the same.** Every fixture these
+programs are tested against is a synthetic sysfs tree, where writing to
+`buffer/enable` writes to an ordinary file and no kernel is there to object.
+A test built from directories can check what a program writes and never what
+the kernel would make of it. That bears directly on criteria 6 and 7, which
+are marked met on a laptop because they are properties of the programs, and
+so were these.
+
+**The pivot at 10:11 is the worst analytical error of the two days.** The
+watermark 1 run reported 100001 interrupts and it was read as a rate. 100001
+is the kernel's spurious-interrupt threshold: the count stopped there
+because the watchdog disabled the line. On that number a multiplier was
+declared constant across a sixty-fourfold range and called confirmed "by
+something other than its own plausibility". The three usable points give
+22.9, 31.8 and 51.1.
+
+**What stands from the FIFO work** is the half the wiring could not reach.
+Spurious interrupts never wake the reader, so reader CPU is clean, and it
+lands on theory from two directions at once: four times the sample rate
+costs four times the CPU, and batching by 64 halves it at identical
+throughput.
+
+## What Thursday cost, and where
+
+| Activity | Rough share | Produced |
+|---|---|---|
+| Finishing the vibration measurements | Under an hour | Two refuted hypotheses, a cross-range calibration constant, a measured ring |
+| Fixing programs so they could run at all | About an hour | Four defects, none findable by their own tests |
+| Building and loading one driver | About half an hour | Two IIO devices, and criterion 2 met on the way |
+| Chasing the interrupt | About half an hour | A storm, a wiring confirmation, and one measurable half of criterion 4 |
+
+**The ratio worth remembering.** More time went to repairing the tools than
+to using them, and the repairs were only possible because the tools were
+being used. None of those four defects had surfaced in two weeks of unit
+tests.
+
+## What was withdrawn across the two days
+
+1. That the LIS2DUXS12 was absent, from a single probe mode.
+2. That reading two WHO_AM_I values proved both IMUs sit on the shield.
+3. That block data update explained the single free-fall sample.
+4. That the broadband rise under the shaver was measured aliasing.
+5. That the 3 Hz line was a beat against the sensor's own sampling.
+6. That the 3 Hz line was the hand holding the shaver.
+7. That 2 to 4 Hz and 12 to 25 Hz are two sources with opposing pressure
+   dependence.
+8. That the interrupt multiplier is constant.
+
+Eight withdrawals, every one killed by a measurement rather than by review,
+and six of the eight by a measurement that cost a single command.
+
+## Backlog
+
+**Bench, and nothing in software substitutes for either.**
+
+- The interrupt jumper. Spurious edges outnumber real FIFO assertions by 23
+  to 51 times, the factor is not constant, and the mechanism is not
+  identified. This is the only thing between criterion 4 and passing as
+  written.
+- The supply. Eight `Undervoltage detected` events in eleven hours, under
+  every capture taken.
+
+**Build, each the same procedure as `st_lsm6dsx`.**
+
+- `st_sensors` plus `st_magn`, which gives the LIS2MDL a device and unblocks
+  criterion 3.
+- `st_pressure`, which completes criterion 1.
+- `iiod` and libiio, neither yet on the board, for criterion 5.
+
+**Decisions that are Joseph's, not this file's.**
+
+- Whether to restate criterion 8 so it tests the filter rather than the
+  fixture. A wording is proposed in the evidence.
+- Whether to edit criterion 4's rate from 416 Hz, which this part does not
+  offer, to 480, which preserves both its thresholds.
+- Whether to refresh the working tree so its 31 shebang files match what is
+  committed. Every one of them fails the same way when copied to a board.
+- 49 commits sit unpushed on `main`.
+
+**Open questions with no owner yet.**
+
+- Whether `st_lsm6dsx` carries a compatible for the LSM6DSO16IS at `0x6a`.
+  The source is unpacked on the card and the answer is a grep.
+- The 57 Hz seen under the handheld shaver and not corroborated by the tap.
+- The single free-fall sample of Wednesday, whose only remaining physical
+  candidate is the undervoltage.
+- Volume one's inventory line for the X-NUCLEO-IKS4A1, which still omits the
+  LSM6DSO16IS although the measurement to correct it now exists.
+- The chapter 11 divergence between the book, which says VL53L8CX, and the
+  repository, which says ADXL345.
+
+---
+
+Back to the [project README](../README.md), the [journal](../JOURNAL.md),
+the [bring-up](BRINGUP.md) or the [resume note](RESUME.md).
