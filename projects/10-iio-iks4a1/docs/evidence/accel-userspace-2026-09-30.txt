@@ -587,3 +587,62 @@ structural mode of the shield on its header pins is the natural candidate,
 and a tap test settles it: strike the board once, capture, and read the
 ring-down frequency, which is a property of the assembly and needs no
 shaver at all.
+
+THE DUPLICATE FRACTION IS AN OUTPUT-RATE METER, AND IT SETTLES THE REGISTER
+MAP WITHOUT A DATA SHEET. When the loop outruns the part, the fraction of
+reads that return an unchanged sample gives the part's rate directly:
+
+  output rate = poll rate x (1 - duplicate fraction)
+
+  CTRL1   poll      duplicates   implied rate   low-nibble ladder
+  0x04    126.7 Hz     76.1 %       30.3 Hz          30 Hz
+  0x06    126.1 Hz      3.8 %      121.3 Hz         120 Hz
+
+Both within one percent. So on this part the output rate is in CTRL1 bits
+3 to 0, with the ladder 1.875, 7.5, 15, 30, 60, 120, 240, 480, 960 Hz, and
+NOT in bits 7 to 4 as on the older LSM6 parts where 0x20 is 26 Hz and 0x40
+is 104 Hz.
+
+The older map is not merely a worse fit, it is refuted: under it, 0x04 and
+0x06 both have 0000 in the upper nibble, which is power-down, and the part
+would return nothing at all. It returned 4000 samples of gravity both
+times.
+
+This is worth keeping as a technique rather than as a fact about one part.
+A loop that is faster than the sensor measures the sensor's rate for free,
+needs no documentation, and checks a register write against what the
+silicon actually did rather than against what the table said it would do.
+
+THE 12 TO 25 Hz BAND IS NOT GONE FROM THE SLOWER CAPTURES. As a share of
+each record's own Z energy:
+
+  CTRL1   Z AC rms    2 to 4 Hz share   12 to 25 Hz share
+  0x04      1.79 mg       dominant           24 %
+  0x06      6.56 mg       dominant           21 %
+  0x07     58.46 mg          minor           59 %
+
+It fell in absolute terms with everything else, because the excitation was
+between three and nine times weaker. Its share of the record barely moved.
+
+AND THE BALANCE BETWEEN THE TWO BANDS FLIPS, which is the finding. The
+ratio of low-band to mid-band energy is about 3.6 and 4.3 in the two light
+captures and about 0.31 in the firm one, an order of magnitude. Two bands
+that move in opposite directions with contact pressure are two sources, not
+one spectrum scaled up and down:
+
+  2 to 4 Hz     grows relatively with light contact    the hand
+  12 to 25 Hz   grows relatively with firm contact     the shaver
+
+That is a better argument for the operator reading than the wandering
+frequency was, because it does not depend on judging what frequency a
+mechanism ought to have. It only requires that two things respond
+differently to how hard the thing is pressed, which is observed.
+
+The percentages above are rough: a band sum under a Hann window is not
+exactly Parseval and one of them exceeds 100. The comparison between
+records at the same band is sound; the absolute shares are not.
+
+AND ONCE MORE, THE SMALLER PEAK AT 30 Hz IS NOT THE FILTER. The low-pass at
+that setting sits near 15 Hz and the tone is at 3 Hz. The peak over the
+record's own AC rms is 0.59 at 120 Hz output and 0.53 at 30 Hz, so the
+shape is preserved and the level is not. It is the grip.
