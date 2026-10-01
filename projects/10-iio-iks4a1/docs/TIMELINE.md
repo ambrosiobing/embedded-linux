@@ -324,6 +324,9 @@ throughput.
 | 19:38 | The accelerometer refuses: `refill failed: Connection timed out`, and IRQ 185 reads `0 0 0 0` where this morning it reached 100001 | |
 | 19:42 | The first remote attempt lists three hwmon devices and no IIO ones, because `iiod` enumerates at boot and the drivers arrived after it | |
 | 19:45 | **Criterion 5 met.** 1000 samples each way, identical columns, 10.044 s and 10.074 s, on `lis2mdl` because the accelerometer's path needs the interrupt | |
+| 19:55 | The backlog question is answered from the card: `st_lsm6dsx` carries `st,lsm6dso16is` in five places | |
+| 20:00 | **`0x6a` binds.** Six IIO devices, five `UU`, no `not-bound` row left. It was never a driver gap, only an undeclared device | |
+| 20:05 | The board is powered off. The two `unsupported` rows are now suspect for the same reason, and the obvious grep is not a valid test | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile
@@ -461,8 +464,19 @@ and six of the eight by a measurement that cost a single command.
 
 **Open questions with no owner yet.**
 
-- Whether `st_lsm6dsx` carries a compatible for the LSM6DSO16IS at `0x6a`.
-  The source is unpacked on the card and the answer is a grep.
+- Whether `0x19` LIS2DUXS12 and `0x38` STTS22H are genuinely unsupported or
+  merely undeclared, which is what `0x6a` turned out to be. **Not answerable
+  by grepping the unpacked source**: only selected directories were extracted
+  from `linux-source-6.18`, so a missing file means a missing extraction and
+  reading it otherwise repeats the error that kept `0x6a` closed for two days.
+  Ask `/lib/modules/$(uname -r)/modules.alias` and the module tree what this
+  kernel can bind, and the source tarball what 6.18 holds.
+- A device-tree node for `st,lsm6dso16is` at `0x6a` in the shield's overlay, so
+  the binding survives a reboot instead of needing `new_device` each time.
+- `iio-probe`'s expectation note for `0x6a` still says to confirm the
+  compatible exists, which is now satisfied. Changing it means changing
+  `tests/iio-probe-test.sh` in the same commit, since that suite asserts on
+  the table.
 - The 57 Hz seen under the handheld shaver and not corroborated by the tap.
 - The single free-fall sample of Wednesday, whose only remaining physical
   candidate is the undervoltage.

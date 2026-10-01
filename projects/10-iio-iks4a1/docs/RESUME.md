@@ -22,6 +22,7 @@ Nothing is lost that matters. The kernel source package, the headers and
 modprobe industrialio
 modprobe industrialio-triggered-buffer
 modprobe regmap-i2c
+echo lsm6dso16is 0x6a > /sys/bus/i2c/devices/i2c-1/new_device
 insmod /root/build-st/st_lsm6dsx.ko
 insmod /root/build-st/st_lsm6dsx_i2c.ko
 insmod /root/build-magn/st_sensors.ko
@@ -33,6 +34,16 @@ insmod /root/build-magn/st_pressure_i2c.ko
 modprobe iio-trig-hrtimer
 systemctl restart iiod
 ```
+
+**The `new_device` line is what binds `0x6a`, and it is not a workaround for
+a missing driver.** `st_lsm6dsx` has always carried `st,lsm6dso16is`; what is
+missing is any device-tree node declaring a device at that address, and I2C
+does not probe blind. Instantiating the client by name matches the driver's
+own I2C ID table. It is placed before the `insmod` so the driver meets a
+client already waiting, which is the order that needs no second step. The
+durable fix is a node for `st,lsm6dso16is` at `0x6a` in the shield's overlay,
+beside the ones that already declare `0x1e`, `0x5d` and `0x6b`, and it is not
+written yet.
 
 **The `systemctl restart iiod` is not optional and the reason is an ordering
 trap.** `iiod` enumerates the IIO devices once, at startup, and systemd
@@ -77,7 +88,7 @@ the repository does not. Journal entry 33 has the reason.
 
 | # | state | what it is waiting for |
 |---|---|---|
-| 1 | met, Thursday 1 October 2026 | nothing. Four `working` rows, four IIO devices |
+| 1 | met, Thursday 1 October 2026 | nothing. Five `working` rows, six IIO devices, no `not-bound` |
 | 2 | met | nothing. Met twice, on two inventories of the same image a day apart |
 | 3 | met, Thursday 1 October 2026 | nothing. 3.341 us on the hrtimer trigger |
 | 4 | half met | the interrupt line. CPU is measured; interrupt counts are not measurable here |

@@ -1,0 +1,116 @@
+Inventory with every supported part bound, and how 0x6a was closed
+Thursday 1 October 2026, about 20:00 CEST
+
+THE CHANGE
+
+  morning    one working row, four no-driver-in-image, two unsupported
+  afternoon  four working rows, one not-bound, two unsupported
+  evening    FIVE working rows, ZERO not-bound, two unsupported
+
+Six IIO devices, and five UU in i2cdetect where the morning had one.
+
+THE TRANSCRIPT
+
+    root@eplepi:~# iio-probe -v
+    --- i2c bus  1
+    --- sysfs    /sys
+
+    ADDRESS PART         DRIVER       SUBSYS   BUS       MODULE     DEVICES
+    0x19    LIS2DUXS12   none         none     absent    none       -
+            unsupported: answers only i2cdetect -r, driver may be absent
+    0x1e    LIS2MDL      st_magn      iio      claimed   loaded     lis2mdl
+            working: magnetometer, no FIFO
+    0x38    STTS22H      none         none     present   none       -
+            unsupported: no mainline driver, expected unsupported
+    0x44    SHT40AD1B    sht4x        hwmon    claimed   loaded     sht4x
+            working: humidity, NOT an IIO device
+    0x5d    LPS22DF      st_pressure  iio      claimed   loaded     lps22df
+            working: pressure, recent driver addition
+    0x6a    LSM6DSO16IS  st_lsm6dsx   iio      claimed   loaded     lsm6dso16is_gyro lsm6dso16is_accel
+            working: ISPU part, confirm the compatible exists
+    0x6b    LSM6DSV16X   st_lsm6dsx   iio      claimed   loaded     lsm6dsv16x_gyro lsm6dsv16x_accel
+            working: IMU, two devices, one hardware FIFO
+
+    --- iio devices
+      iio:device0  lsm6dsv16x_gyro
+      iio:device1  lsm6dsv16x_accel
+      iio:device2  lsm6dso16is_gyro
+      iio:device3  lsm6dso16is_accel
+      iio:device4  lis2mdl
+      iio:device5  lps22df
+
+    i2cdetect -y 1 shows UU at 0x1e, 0x44, 0x5d, 0x6a and 0x6b.
+
+HOW 0x6a WAS CLOSED, AND WHY IT WAS NEVER A DRIVER PROBLEM
+
+The question on the backlog since Wednesday 30 September 2026 was whether
+st_lsm6dsx carries a compatible for the LSM6DSO16IS. The source unpacked on
+the card answers it outright:
+
+    st_lsm6dsx_i2c.c:126    .compatible = "st,lsm6dso16is"
+    st_lsm6dsx_i2c.c:        { ST_LSM6DSO16IS_DEV_NAME, ST_LSM6DSO16IS_ID }
+    st_lsm6dsx_core.c:1448  .hw_id = ST_LSM6DSO16IS_ID
+    st_lsm6dsx.h:38         #define ST_LSM6DSO16IS_DEV_NAME "lsm6dso16is"
+    Kconfig:27              - lsm6dso16is
+
+The driver already loaded on this board could always drive that part. What
+was missing was ANY STATEMENT THAT A DEVICE IS THERE. I2C does not probe
+blind: a client is created from a device-tree node, from board info, or by
+hand. There is no device-tree node for 0x6a on this setup, so nothing was
+ever created, so nothing was ever probed.
+
+Instantiating the client by name is enough, because the driver's I2C ID table
+matches on the name:
+
+    echo lsm6dso16is 0x6a > /sys/bus/i2c/devices/i2c-1/new_device
+    [   69.692507] i2c i2c-1: new_device: Instantiated device lsm6dso16is at 0x6a
+
+and then, when st_lsm6dsx_i2c loaded, it probed the waiting client:
+
+    [  124.887693] st_lsm6dsx_i2c 1-006a: supply vdd not found, using dummy regulator
+    [  124.887942] st_lsm6dsx_i2c 1-006a: supply vddio not found, using dummy regulator
+    [  125.421081] st_lsm6dsx_i2c 1-006a: mounting matrix not found: using identity...
+
+No WHO_AM_I complaint, which is the part that matters. The driver reads the
+identity register and refuses a mismatch, so a clean probe is positive
+evidence that the part at 0x6a is an LSM6DSO16IS and not merely something
+that answers at that address. This project has twice recorded that WHO_AM_I
+names a family rather than a part; here the driver's own check is the
+discriminator.
+
+WHAT THIS CORRECTS
+
+iio-probe called 0x6a "not-bound" and its own help text for that state says
+"driver present, nothing matched it: look at the overlay, not the image".
+That verdict and that advice were both exactly right, and the overlay is
+where the gap turned out to be. The program pointed at the answer three
+times before anyone followed it.
+
+Its expectation note for the row, "confirm the compatible exists", is now
+satisfied and stale.
+
+THIS IS RUNTIME ONLY AND DOES NOT SURVIVE A REBOOT
+
+new_device creates a client that lives until the next boot. The durable form
+is a device-tree node for st,lsm6dso16is at 0x6a in the shield's overlay,
+alongside the ones that already declare 0x1e, 0x5d and 0x6b. Until that
+exists, the instantiation line belongs in the reload sequence in RESUME.md,
+which is where it has been put.
+
+THE QUESTION THIS RAISES ABOUT THE TWO REMAINING ROWS
+
+0x19 and 0x38 are marked unsupported, and that verdict was reached the same
+way 0x6a's was: nothing bound, so nothing was assumed to exist. 0x6a has just
+shown that "nothing bound" can mean "nothing was declared" rather than "no
+driver exists". The same test should be applied to both:
+
+  0x19  LIS2DUXS12, which answers only to i2cdetect -r
+  0x38  STTS22H, present on the bus
+
+Checking the unpacked source tree is NOT a valid test for this, because only
+selected directories were extracted from linux-source-6.18 with
+tar --wildcards. A missing file there means the file was not extracted, not
+that the driver does not exist, and reading it as the latter would be the
+same mistake in a new place. The image itself is the right place to ask:
+/lib/modules/$(uname -r)/modules.alias and the module tree say what this
+kernel can bind, and the source tarball says what 6.18 contains.

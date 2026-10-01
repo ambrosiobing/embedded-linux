@@ -2342,3 +2342,79 @@ source is one `curl` from the repository, the compile is one `cc` line, and
 the numbers are in the evidence file. Said here because an archive with a
 timestamp invites the assumption that it holds everything, and this one holds
 everything that cost anything.
+
+## 46. The part that was never unsupported, only undeclared
+
+*Thursday 1 October 2026, about 20:00.* `0x6a` binds. Six IIO devices, five
+`UU` in `i2cdetect` where the morning had one, and **no `not-bound` row left
+in the inventory**.
+
+The backlog question since Wednesday 30 September 2026 was whether
+`st_lsm6dsx` carries a compatible for the LSM6DSO16IS. The source on the card
+answers it five ways: `st_lsm6dsx_i2c.c:126` has
+`.compatible = "st,lsm6dso16is"`, line 161 has it in the I2C ID table,
+`st_lsm6dsx_core.c:1448` has the settings entry, `st_lsm6dsx.h:38` has the
+name, and `Kconfig:27` lists it.
+
+So the driver already loaded on that board could always have driven that part.
+**What was missing was any statement that a device is there.** I2C does not
+probe blind: a client comes from a device-tree node, from board info, or by
+hand. No node declares `0x6a`, so no client was ever created, so nothing was
+ever probed. One line fixed it:
+
+    echo lsm6dso16is 0x6a > /sys/bus/i2c/devices/i2c-1/new_device
+
+and when `st_lsm6dsx_i2c` loaded afterwards it probed the waiting client, with
+regulator and mounting-matrix notes and **no WHO_AM_I complaint**. That
+absence is the positive evidence: the driver reads the identity register and
+refuses a mismatch, so a clean probe says the part really is an LSM6DSO16IS.
+Two earlier entries recorded that WHO_AM_I names a family and not a part;
+here the driver's own check is the discriminator that a raw register read
+could not be.
+
+### The program had been pointing at this for two days
+
+`iio-probe` called `0x6a` `not-bound`, and its own help text for that state
+reads: *driver present, nothing matched it: look at the overlay, not the
+image.* That verdict was right, that advice was right, and the overlay is
+exactly where the gap was. It printed that line in the morning, in the
+afternoon and again this evening before anyone followed it.
+
+Worth sitting with, because the lesson is not about I2C. The tool had already
+done the diagnosis and the failure was in reading its output as a status
+rather than as an instruction. Three criteria were closed in between by
+building drivers, which was real work, and none of it was what this row
+needed.
+
+### What it corrects, and what it does not
+
+The row's own expectation note still reads "ISPU part, confirm the compatible
+exists", which is now satisfied and stale. Left alone tonight on purpose:
+`tests/iio-probe-test.sh` asserts on that table, so changing the note means
+changing the test in the same commit, and that is not work to start while a
+board is being packed away.
+
+And it does not survive a reboot. `new_device` creates a client that lives
+until the next boot, so the line now sits in the reload sequence in
+`RESUME.md`. The durable form is a device-tree node for `st,lsm6dso16is` at
+`0x6a` in the shield's overlay, beside the ones already declaring `0x1e`,
+`0x5d` and `0x6b`. That is not written.
+
+### The two remaining rows are now suspect, and the obvious test is invalid
+
+`0x19` LIS2DUXS12 and `0x38` STTS22H are marked `unsupported`, and that
+verdict was reached the same way `0x6a`'s was: nothing bound, so nothing was
+assumed to exist. `0x6a` has just demonstrated that "nothing bound" can mean
+"nothing was declared".
+
+**The obvious check is not available and that matters more than the question.**
+Grepping `/usr/src/linux-source-6.18` would be wrong, because only selected
+directories were ever extracted from it with `tar --wildcards`. A missing file
+there means the file was not extracted, and reading that as "no such driver
+exists" would be precisely the same error as reading `not-bound` as
+"unsupported", in a new place, on the same evening it was learned.
+
+The valid questions are different ones: `modules.alias` and the module tree in
+`/lib/modules` say what this kernel can bind, and the source tarball says what
+6.18 contains. Neither was asked before the board came off the bench, and both
+are on the backlog rather than guessed at here.
