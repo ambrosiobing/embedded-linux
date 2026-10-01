@@ -136,3 +136,72 @@ spurious watchdog in under ten seconds and disables the line. That is a
 hard limit of the bench rather than of the part, and the comparison can
 still be made at a lower rate: at 120 Hz, watermark 1 gives 120 x 23 =
 2760 a second, which the watchdog tolerates.
+
+THE 120 Hz PAIR, AND A WITHDRAWAL
+==================================
+
+    rate  wm   real int/s   measured   multiplier  samples/s   cpu
+     480   1       480.00    10000.0        20.8          -   0.70%
+     480  64         7.50      171.5        22.9        467   0.80%
+     120   1       120.00     3816.8        31.8        116   0.40%
+     120  64         1.88       95.9        51.1        115   0.20%
+
+THE FIRST ROW IS NOT A MEASUREMENT AND I USED IT AS ONE. 100001 is the
+kernel's spurious-interrupt threshold. The count did not reach 100001
+because that is how many arrived in ten seconds; it stopped there because
+the watchdog disabled the line. The run was aborted, not completed, and
+10000 a second is a floor of unknown tightness.
+
+SO THE CLAIM THAT THE MULTIPLIER IS CONSTANT IS WITHDRAWN. It rested on
+20.8 and 22.9 agreeing across a sixty-fourfold change of edge rate, and
+the 20.8 was an artefact. The three usable points give 22.9, 31.8 and
+51.1, which is not a constant and therefore not a fixed ringing factor.
+
+The paragraph that claimed it said the agreement confirmed the hypothesis
+"by something other than its own plausibility". It did not. It confirmed
+it by a number that the kernel had stopped counting.
+
+WHAT REMAINS TRUE. Every measured interrupt rate is far above the FIFO's
+real assertion rate, by factors of twenty to fifty, so spurious edges
+dominate in every configuration. That much is solid in all four rows and
+does not depend on the multiplier being constant.
+
+What is not established is the mechanism. A simple ringing model predicts
+a fixed multiplier and the data refuses it. The multiplier grows as the
+assertion rate falls, which is the opposite of what a per-edge effect
+does, and suggests a component that is roughly independent of how often
+the part asserts. Nothing here identifies it.
+
+AND THE CLEAN RESULT IS THE ONE THAT WAS NOT CONTAMINATED.
+
+Reader CPU is unaffected by spurious interrupts, because they are
+dismissed by the primary handler and never wake the reader. It behaves
+exactly as it should in both dimensions:
+
+    against sample rate, at watermark 64
+        480 Hz  0.80 %      four times the samples
+        120 Hz  0.20 %      four times the CPU
+
+    against batching, at 120 Hz and identical throughput
+        watermark  1  0.40 %
+        watermark 64  0.20 %      half the CPU for the same data
+
+Throughput is consistent across all of it: 467, 116 and 115 samples a
+second against 480 and 120 expected, which is 96 to 97 percent everywhere,
+the shortfall being the samples still in the FIFO when the buffer closes.
+
+SO CRITERION 4 SPLITS CLEANLY ALONG WHAT THE WIRING TOUCHES.
+
+    reader CPU under 3 percent          MET, 0.80 and 0.20 percent, and
+                                        the batching benefit measured at
+                                        exactly 2x on identical throughput
+
+    interrupt counts                    NOT MEASURABLE on this bench.
+                                        Spurious edges outnumber real
+                                        assertions by twenty to fifty
+                                        times and the mechanism is not
+                                        characterised.
+
+The honest reading is that this project can measure what batching costs
+the reader and cannot yet measure what it saves the interrupt controller.
+The second needs the interrupt line fixed, not more runs.

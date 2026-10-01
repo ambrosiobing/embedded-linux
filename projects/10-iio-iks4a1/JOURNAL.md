@@ -1757,3 +1757,66 @@ ranges to 36 parts per million. But it is the first physical candidate for
 Wednesday's single free-fall sample, which was left as a corrupted read
 with no mechanism, and it should be fixed before criterion 4 measures
 interrupt rates on a board that browns out twice an hour.
+
+---
+
+## 36. The FIFO batches, and I confirmed a hypothesis with a number the kernel had stopped counting
+
+Entry on Thursday 1 October 2026.
+
+**The buffered path runs.** 467 samples a second at 480 Hz with a watermark
+of 64, 0.80 percent reader CPU, and timestamps the program correctly refuses
+to call a latency measurement.
+
+**And then I got the analysis wrong in a way worth keeping.** The watermark
+1 run reported 100001 interrupts and I treated that as a rate of 10000 a
+second. 100001 is the kernel's spurious-interrupt threshold. The count did
+not reach it because that many arrived; it stopped there because the
+watchdog disabled the line. The run was aborted, not completed.
+
+On that number I wrote that the multiplier was constant across a
+sixty-fourfold change of edge rate, 20.8 against 22.9, and that this
+confirmed the ringing hypothesis "by something other than its own
+plausibility". It did not. It confirmed it by an artefact of the thing that
+had gone wrong.
+
+| rate | watermark | real assertions/s | measured | multiplier |
+|---|---|---|---|---|
+| 480 | 1 | 480 | capped | not a measurement |
+| 480 | 64 | 7.5 | 171.5 | 22.9 |
+| 120 | 1 | 120 | 3816.8 | 31.8 |
+| 120 | 64 | 1.88 | 95.9 | 51.1 |
+
+22.9, 31.8 and 51.1. Not a constant, so not a fixed per-edge effect, and
+the multiplier **grows as the assertion rate falls**, which is the opposite
+of what ringing does. The mechanism is not identified and the record should
+not pretend it is.
+
+**What survives is that spurious edges dominate everywhere**, by twenty to
+fifty times, in all four configurations. That does not depend on the
+multiplier being constant and is the part that matters for the criterion.
+
+**And the clean result is the one the wiring could not touch.** Spurious
+interrupts are dismissed by the primary handler and never wake the reader,
+so reader CPU is uncontaminated, and it behaves exactly as it should in
+both dimensions at once:
+
+- four times the sample rate costs four times the CPU, 0.20 percent at
+  120 Hz against 0.80 at 480
+- batching by 64 halves it at identical throughput, 0.40 against 0.20
+
+Throughput is 96 to 97 percent of nominal in every run, the shortfall being
+the samples still in the FIFO when the buffer closes.
+
+**So criterion 4 splits along what the wiring touches.** What batching costs
+the reader is measured, cleanly, and is the first result in this project to
+come out exactly as theory says in two independent directions. What batching
+saves the interrupt controller is not measurable here, and more runs will
+not fix it.
+
+**The habit worth naming, and it is the second time today.** A number that
+arrives from a failure is not a measurement of the thing that failed. The
+watchdog's threshold looked like a count because it was printed in the
+column where counts go. The tell was there to be seen: 100001 is a round
+number with a one on the end, which is what a limit looks like and what a
+measurement almost never does.
