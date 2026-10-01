@@ -2188,3 +2188,81 @@ true by truncation.
 37 asserted the bug. Journal 41 could not report a failure. This one gave
 credit to the wrong line. The common cause is writing the assertion from
 what the code does rather than from what would have to break.
+
+## 43. A complete archive the same size as a 42 per cent one
+
+*Thursday 1 October 2026, evening.* Two numbers, and they are the reason
+the `.partial` naming of journal 42 is not merely tidy.
+
+| | bytes | what it was |
+|---|---|---|
+| Attempt 2, killed at 42 per cent | 1,546,649,600 | less than half a card |
+| Attempt 3, complete | 1,562,322,561 | the whole card |
+
+**One per cent apart.** The finished archive is barely larger than the
+fragment, because the written data on a Raspberry Pi OS card sits near the
+front and the remaining 58 per cent is unwritten ext4 free space, which is
+zeros, which gzip collapses to almost nothing.
+
+So for a card image, **file size carries no information about
+completeness.** Not "little", none that can be acted on. A directory
+listing of a half-read card and a listing of a finished one are the same
+listing to within a rounding error, and `du -h` prints `1.5G` for both.
+
+This also kills the reasoning I used at the time. When the first partial
+appeared I argued that 1.55 GB "is not even a suspicious size, a 14.6 GB
+card whose rootfs is largely unwritten compresses to about that, so the
+number argues for completeness rather than against it". That was right about
+the compression and wrong about what follows from it: the number argues for
+nothing in either direction. Only `PROVENANCE.txt` and `SHA256SUMS` carry
+that information, which is exactly why they are written last and why they,
+not the image, are now the definition of a finished archive.
+
+## 44. The link was being told to save power
+
+Three attempts at the same seventeen minute read.
+
+| Attempt | Reached | Elapsed | Rate | Ended by |
+|---|---|---|---|---|
+| 1 | 6,677,331,968 bytes, 42 per cent | 448 s | 15 MB/s | the link dropped |
+| 2 | 7,860,125,696 bytes, 50 per cent | 496 s | 16 MB/s | the link dropped |
+| 3 | 15,728,640,000 bytes, all of it | 828 s | 19 MB/s | finished |
+
+**Neither failure printed an I/O error**, which is what separated a dying
+card from a dying link and was the only diagnostic that distinguished them.
+`usbipd list` showed the reader still under `Connected` with its state back
+to `Shared`, so the device was never lost to Windows, only to WSL.
+
+Between attempt 2 and attempt 3, one setting changed: USB selective suspend
+disabled in the active Windows power plan, with `powercfg`, plus clearing
+*Allow the computer to turn off this device to save power* on every USB hub
+in Device Manager.
+
+**The rate is the corroboration, not just the completion.** 15 and 16 MB/s
+became 19. A link being periodically told to power down is slower before it
+is cut, so the throughput moved for the same reason the read survived. One
+observation would have been a coincidence; the two together are a
+mechanism.
+
+**`--auto-attach` is worth having and does not solve this.** It re-attaches
+the reader within seconds of it reappearing, which it did. It cannot rescue
+a read already in flight, because the file descriptor dies with the device
+and `dd` has already failed by the time the device is back. Resumability
+would have solved it; that is a different program, and it was not needed in
+the end.
+
+### Two smaller facts worth not rediscovering
+
+**The reader does not keep its device letter.** Same reader, same port,
+same laptop: `/dev/sdf`, then `/dev/sde` forty minutes later. The archiver
+refused `no such source` twice before anyone noticed the attachment had
+gone, and both refusals were correct and cost nothing. Every hand-over now
+re-reads the letter with `lsblk` instead of reusing the one from the last
+command.
+
+**Tailing the wrong log looks exactly like a program that has stopped.**
+`card-archive-2026-10-01.log` had been complete for twenty minutes while it
+was being watched for progress that was going to `card-verify-2026-10-01.log`,
+and the verify had not in fact been started. A finished log is
+indistinguishable from a stalled one, which is the same shape as the two
+entries above: the absence of new information read as information.

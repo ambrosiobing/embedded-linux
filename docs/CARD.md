@@ -186,6 +186,43 @@ The device letter is read fresh every time. The same reader on the same
 laptop came back as `sdf` and then as `sde` within the hour, because a
 usbipd re-attach does not reclaim the letter it had.
 
+**Turn off USB power saving before a long read, or it will not finish.**
+Two attempts died at 448 and 496 seconds against a pass needing 828, both
+without an I/O error, with `usbipd list` still showing the reader under
+Connected and its state back to `Shared`. The device was never lost to
+Windows, only to WSL. One setting fixed it:
+
+    powercfg /setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+    powercfg /setactive SCHEME_CURRENT
+
+plus clearing **Allow the computer to turn off this device to save power**
+on every USB Root Hub and Generic USB Hub in Device Manager. The throughput
+is the corroboration: 15 and 16 MB/s on the attempts that died, 19 MB/s on
+the one that finished. A link being periodically told to power down is
+slower before it is cut.
+
+`usbipd attach --wsl --busid <BUSID> --auto-attach` is worth running anyway,
+because it re-attaches within seconds of the device reappearing. It cannot
+rescue a read in flight: the file descriptor dies with the device and `dd`
+has already failed by the time it is back.
+
+**The size of a card image says nothing about whether it is complete.** A
+run killed at 42 per cent produced 1,546,649,600 bytes and the finished one
+produced 1,562,322,561, one per cent apart, because the written data is near
+the front of the card and the rest is unwritten ext4 free space that gzip
+collapses to nothing. `du -h` prints `1.5G` for both. That is why the
+records are the definition above and not the image.
+
+When a run has been left with the end-to-end comparison skipped, it can be
+settled later without re-archiving:
+
+    sudo scripts/card-archive.sh verify <store dir> /dev/sdX
+
+It checks that the stored image still hashes to its own record, which tells a
+damaged archive apart from a changed card, and then that the card hashes to
+the same value. The result is appended to `PROVENANCE.txt` with the date and
+a statement that it was not part of the original run.
+
 The reader is on the WSL side for this, attached with `usbipd`, and nothing
 on the card may be mounted: a filesystem being written to images
 inconsistently. The program refuses rather than guessing, and the four

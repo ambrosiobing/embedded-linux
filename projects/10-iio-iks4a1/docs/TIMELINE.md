@@ -313,6 +313,10 @@ throughput.
 | 19:05 | `.dd.log` read through `tr` shows a progress figure and no I/O error, so the card is healthy and the terminal was the cause | |
 | 19:12 | The reader re-attaches as `/dev/sde` where it was `/dev/sdf`, and the archiver refuses `no such source` twice before anyone notices | |
 | 19:20 | The image is written as `.partial` and renamed only after the comparison, and the runbook stops telling anyone to run it in a foreground shell | |
+| 17:34 | A second attempt dies at 496 s, 50 per cent, again with no I/O error, and `usbipd list` shows the reader still Connected with its state back to `Shared` | |
+| 17:45 | USB selective suspend disabled in the power plan and on every hub, and `--auto-attach` started | |
+| 18:08 | **The card is archived.** 15,728,640,000 bytes in 828 s at 19 MB/s, 1.5 GB compressed, `sha256sum -c` says `OK` | `9cd6302` |
+| 18:30 | `card-archive.sh verify` pays the comparison debt that `BENCH_CARD_SKIP_VERIFY` creates, appending a dated result rather than rewriting the record | `ae3f284` |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile
@@ -345,6 +349,21 @@ it was looking for `PROVENANCE.txt` and `SHA256SUMS` rather than for the
 image, and 1.55 GB is not even a suspicious size for that card. The image is
 now written as `.partial` and renamed only after it has been compared
 against the card, so the failure mode cannot recur in that shape.
+
+**The finished archive is one per cent larger than the fragment that died
+at 42 per cent**, 1,562,322,561 bytes against 1,546,649,600, because the
+written data sits near the front of the card and the rest is unwritten ext4
+free space that gzip collapses to nothing. `du -h` prints `1.5G` for both.
+So the size of a card image says nothing about whether it is complete, which
+is a better argument for the `.partial` naming than the one written into the
+code, and it also retires the reasoning used at the time that 1.55 GB was a
+plausible size for a finished archive. It was. So is half of one.
+
+**The transport was being told to save power.** 448 s, then 496 s, then 828 s
+and done, with 15, 16 and 19 MB/s across the three. A link periodically told
+to power down is slower before it is cut, so the rate moved for the same
+reason the read survived, and two observations that agree are a mechanism
+where one would have been a coincidence.
 
 **The card image at 18:20 is a gap that had been open all along.** The
 finished projects archive with `./go archive`, which keeps the output of a
