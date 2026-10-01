@@ -327,6 +327,10 @@ throughput.
 | 19:55 | The backlog question is answered from the card: `st_lsm6dsx` carries `st,lsm6dso16is` in five places | |
 | 20:00 | **`0x6a` binds.** Six IIO devices, five `UU`, no `not-bound` row left. It was never a driver gap, only an undeclared device | |
 | 20:05 | The board is powered off. The two `unsupported` rows are now suspect for the same reason, and the obvious grep is not a valid test | |
+| 21:10 | The board is back on. `iio-stream` still times out on the accelerometer, `iio-rate fifo` does not: 2449 interrupts where the other saw zero | |
+| 21:25 | The ODR explains it. `iio-stream` sets no sampling frequency, and the part powers up in power-down. At 480 Hz the same command returns 1001 lines | |
+| 21:40 | **The control.** The wire unplugged at CN9 pin 6 gives 0.00 interrupts and 0 samples, so GPIO24 picks up nothing and the storm is real at 30 times | |
+| 21:45 | Two inferences withdrawn: the line never delivered nothing, and the fault never reversed. Both rested on a sleeping sensor | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile

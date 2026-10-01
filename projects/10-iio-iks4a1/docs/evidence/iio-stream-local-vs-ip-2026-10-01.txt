@@ -1,3 +1,31 @@
+CORRECTION, Thursday 1 October 2026, later the same evening
+===========================================================
+
+THE SECTION BELOW HEADED "WHAT WAS SUBSTITUTED" DRAWS TWO CONCLUSIONS ABOUT
+THE INTERRUPT LINE. BOTH ARE WITHDRAWN. THE MEASUREMENTS STAND.
+
+It reads IRQ 185 at 0 0 0 0 as the line delivering nothing, and builds on that
+a story about the fault reversing direction between morning and evening.
+
+What the zero actually was: the accelerometer sitting in power-down, where it
+never asserts INT1. iio-stream does not set the sampling frequency and nothing
+else had. Once iio-rate left it at 480 Hz, the identical iio-stream command
+returned 1001 lines in 2.198 s. A quiet line and a dead line produce the same
+count and nothing in that observation separated them.
+
+What the line actually does, measured against a control the same evening: with
+the wire connected at CN9 pin 6, 225.60 interrupts per second where 7.5 are
+expected; with it unplugged, exactly 0.00 and not one count on the counter. The
+line works, carries a real storm of about thirty times, and there was no
+reversal. See irq-control-2026-10-01.txt and journal entry 47.
+
+Also withdrawn by this: the claim here that the substitution to lis2mdl was
+forced by the wiring. It was forced by iio-stream not configuring the device,
+which is a defect in the program and not a fact about the bench.
+
+Unaffected: every number in this file, and the local-against-remote comparison
+itself, which never depended on the accelerometer.
+
 Criterion 5: iio-stream through local: and through ip:
 Thursday 1 October 2026, 19:35 to 19:45 CEST
 

@@ -1,0 +1,100 @@
+The interrupt line, measured against its own absence
+Thursday 1 October 2026, late evening CEST
+
+THE EXPERIMENT THAT SHOULD HAVE BEEN FIRST
+
+Three runs of one command, differing only in whether the wire is plugged in
+at the shield end.
+
+  run  green wire at CN9 pin 6   interrupts/s   samples in 10 s   reader cpu
+  A    connected                 244.90         4672              0.90 %
+  B    connected                 225.60         4672              0.80 %
+  C    DISCONNECTED, dangling      0.00            0              0.00 %
+
+    cd /root && iio-rate fifo lsm6dsv16x_accel 480 64 -d 10
+
+In run C the Pi end stayed on header pin 18 and the shield end was unplugged
+from CN9 pin 6 and left touching nothing. /proc/interrupts did not advance by
+a single count: 1286 1289 1276 1278 before and after.
+
+WHAT THE CONTROL ESTABLISHES
+
+  1. GPIO24 PICKS UP NOTHING ON ITS OWN. An unconnected input on this header,
+     beside a 400 kHz I2C bus, produces exactly zero edges in ten seconds.
+     Every edge counted in runs A and B arrived down the wire.
+
+  2. THE FIFO PATH IS ENTIRELY INTERRUPT DRIVEN. Zero interrupts gives zero
+     samples, not fewer samples. So every sample ever collected through this
+     path depended on a real edge, and the sample count can never distinguish
+     a healthy line from a noisy one.
+
+  3. THE STORM IS REAL AND IT IS ON THIS PATH. At 480 Hz with watermark 64
+     the expected rate is 480/64 = 7.5 interrupts per second. Measured 225.60.
+     That is 30.1 times too many, against a floor now known to be zero rather
+     than assumed.
+
+CRITERION 4, WHERE IT ACTUALLY STANDS
+
+  reader CPU        0.80 % at 480 Hz, watermark 64      limit 3 %     PASSES
+  interrupts        225.60/s                            limit 8/s     FAILS
+  samples           4672 of 4800, 97.3 %                              as before
+
+The CPU half has never been in doubt. The interrupt half fails by a factor of
+thirty, and for the first time that number sits on a measurement with a
+control rather than on a comparison between two runs that both had the fault
+in them.
+
+TWO INFERENCES OF MINE THAT THIS KILLS
+
+FIRST: "the interrupt line delivers nothing". Written Thursday 1 October 2026
+in the evening after iio-stream timed out on the accelerometer with IRQ 185
+reading 0 0 0 0. The zero was real and the inference was wrong. The
+accelerometer was in power-down, where it never asserts INT1, because
+iio-stream does not set the sampling frequency and nothing else had. A quiet
+line and a dead line produce the same count, and nothing in that observation
+separated them.
+
+SECOND: "the fault has reversed direction". Built on the first. It claimed
+100001 edges in the morning and zero in the evening were the same wire
+failing two opposite ways, and concluded that a wire which both rings and
+goes open is a connection problem rather than a threshold problem. The
+premise was an artefact: the evening zero was a powered-down sensor, not an
+open wire. There was no reversal. One continuous fault, measured twice with
+the sensor running and once with it asleep.
+
+The conclusion that came out of it, that the wire wants shortening or series
+resistance, happens to survive, but it survives on run C rather than on that
+reasoning, and an argument that reaches a right answer from a false premise is
+worth less than no argument.
+
+THE SEPARATE DEFECT THIS UNCOVERED
+
+iio-stream does not configure the device. It opens a buffer on whatever the
+part is already set to, and the LSM6DSV16X powers up in power-down, so on a
+freshly loaded driver the buffer never fills and the refill times out:
+
+    root@eplepi:~# ./iio-stream -d lsm6dsv16x_accel -n 10 -b 100
+    refill failed: Connection timed out
+
+After iio-rate had left sampling_frequency at 480, the identical command
+returned 1001 lines in 2.198 s. The precondition is real, unstated, and it is
+what sent criterion 5 to the magnetometer. The substitution was not forced by
+the wiring after all.
+
+WHAT IS STILL NOT KNOWN
+
+The mechanism. Thirty extra edges per real assertion is a number, not a cause.
+Reflection on an unterminated line, contact bounce at either connector, and
+coupling from the adjacent SCL wire all produce it, and this measurement does
+not separate them. What it does rule out is pickup by the GPIO pin itself,
+which run C puts at zero.
+
+The next measurements, in order of cost:
+
+  - the same run with the wire as short as it will physically go
+  - the same run with a few hundred ohms in series at the CN9 pin 6 end
+  - if those move the number, the cause is on the wire; if they do not, it is
+    at one of the two connectors or in the shield
+
+A scope on CN9 pin 6 would answer it in one capture, and there is no scope on
+this bench.

@@ -2418,3 +2418,101 @@ The valid questions are different ones: `modules.alias` and the module tree in
 `/lib/modules` say what this kernel can bind, and the source tarball says what
 6.18 contains. Neither was asked before the board came off the bench, and both
 are on the backlog rather than guessed at here.
+
+## 47. The control, and two of my inferences it kills
+
+*Thursday 1 October 2026, late evening.* One command, three times, differing
+only in whether the wire was plugged in at the shield end.
+
+| run | green wire at CN9 pin 6 | interrupts/s | samples in 10 s |
+|---|---|---|---|
+| A | connected | 244.90 | 4672 |
+| B | connected | 225.60 | 4672 |
+| **C** | **disconnected** | **0.00** | **0** |
+
+In run C the Pi end stayed on header pin 18 and the shield end hung in air.
+`/proc/interrupts` did not advance one count.
+
+**That is the first measurement of this fault with a floor under it**, and it
+should have been the first measurement of it at all. Everything before it
+compared two runs that both had the fault in them.
+
+Three things fall out:
+
+**GPIO24 picks up nothing on its own.** An unconnected input on this header,
+beside a 400 kHz bus, gives exactly zero edges in ten seconds. So the hundreds
+counted in A and B are not an antenna effect, they arrive down the wire.
+
+**The FIFO path is entirely interrupt driven.** No interrupts gives no
+samples, not fewer samples. So the sample count can never distinguish a
+healthy line from a noisy one, and reading 4672 as reassurance would have been
+a mistake.
+
+**The storm is real and it is thirty times.** 7.5 per second expected at 480 Hz
+with watermark 64, 225.60 measured, against a floor now known rather than
+assumed.
+
+### What it kills, both mine
+
+**"The interrupt line delivers nothing."** Written a few hours earlier when
+`iio-stream` timed out on the accelerometer with IRQ 185 at `0 0 0 0`. The zero
+was real and the inference was wrong. The part was in power-down, where it
+never asserts INT1, because `iio-stream` does not set the sampling frequency
+and nothing else had. **A quiet line and a dead line produce the same count**,
+and nothing in that observation separated them. The separating experiment is
+run C, which I did not think to do until the numbers stopped making sense.
+
+**"The fault has reversed direction."** Built on the first, and worse for
+being more interesting. It said 100001 edges in the morning and zero in the
+evening were one wire failing two opposite ways, and concluded that something
+which both rings and goes open is a connection problem rather than a threshold
+problem. The premise was an artefact of a sleeping sensor. There was no
+reversal. One continuous fault, measured twice awake and once asleep.
+
+The conclusion survives, because run C points the same way. But it survives on
+run C and not on that reasoning, and **an argument that reaches a right answer
+from a false premise is worth less than no argument**, because it will be
+trusted the next time it is wrong. Two entries ago I wrote that confirming a
+hypothesis with a number the kernel had stopped counting was the worst
+analytical error of the two days. This is the same error with the sign
+flipped: a number the sensor had never started producing.
+
+### The wiring slip that made it visible
+
+Joseph noticed mid-session that the jumper had gone back onto header **pin 16,
+GPIO23**, rather than **pin 18, GPIO24**, one position along the same row. I
+took that at face value and built an explanation on it: a floating GPIO24
+picking up noise, which would have explained 244.90/s neatly.
+
+Run C refutes it. A floating GPIO24 reads zero. So the line was electrically
+complete in runs A and B whatever the pin label said, and my floating-input
+story lasted about four minutes before its own control destroyed it. Worth
+recording as the third wrong explanation of the same observation in one
+evening, all three of them plausible and two of them mine.
+
+### The defect it uncovered on the way
+
+`iio-stream` does not configure the device. It opens a buffer on whatever the
+part is already set to, and the LSM6DSV16X powers up in power-down, so on a
+freshly loaded driver the buffer never fills and the refill times out. Once
+`iio-rate` had left `sampling_frequency` at 480, the identical command
+returned 1001 lines in 2.198 s.
+
+That precondition is real, unstated, and it is what sent criterion 5 to the
+magnetometer. **The substitution was never forced by the wiring.** Criterion 5
+is unaffected, since the local-against-remote comparison never depended on
+which sensor it used, but the reason recorded against it was wrong and is
+corrected in the row and in the evidence file.
+
+### What is still unknown
+
+The mechanism. Thirty extra edges per real assertion is a number, not a cause.
+Reflection on an unterminated line, contact bounce at either connector and
+coupling from the adjacent SCL wire all produce it. Ruled out: pickup by the
+GPIO pin, at zero.
+
+Next, in order of cost: the same run with the wire as short as it physically
+goes, then with a few hundred ohms in series at the CN9 pin 6 end. If those
+move the number the cause is the wire; if they do not it is a connector or the
+shield. One capture on a scope at CN9 pin 6 would answer it outright, and
+there is no scope on this bench.
