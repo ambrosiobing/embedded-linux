@@ -341,6 +341,22 @@ def direct_tilt(accel):
     return roll, pitch
 
 
+def gravity_from(roll_deg, pitch_deg):
+    """The unit gravity vector a roll and pitch imply, in the sensor frame.
+
+    The exact inverse of direct_tilt, and the reason it exists is that two
+    orientations can be compared this way at any pose. Euler angles cannot:
+    roll is ill-conditioned near a pitch of ninety degrees and wraps at a
+    hundred and eighty, so differencing them reports the parameterisation
+    rather than the orientation.
+    """
+    r = math.radians(roll_deg)
+    p = math.radians(pitch_deg)
+    return (-math.sin(p),
+            math.sin(r) * math.cos(p),
+            math.cos(r) * math.cos(p))
+
+
 def run_capture(path, lsb_per_g, rate, beta, settle):
     """Pitch and roll from a capture file, with no gyroscope.
 
@@ -362,19 +378,29 @@ def run_capture(path, lsb_per_g, rate, beta, settle):
 
     filt = Ahrs(beta=beta)
     dt = 1.0 / rate
-    rolls, pitches = [], []
-    for n, accel in enumerate(samples):
-        roll, pitch, _ = filt.update((0.0, 0.0, 0.0), accel, dt)
-        if n >= settle:
-            rolls.append(roll)
-            pitches.append(pitch)
+    errors = []
 
     mean_accel = tuple(sum(s[i] for s in samples) / len(samples)
                        for i in range(3))
     magnitude = math.sqrt(sum(v * v for v in mean_accel))
+    measured_dir = vec_normalise(mean_accel)
     ref_roll, ref_pitch = direct_tilt(mean_accel)
-    mean_roll = sum(rolls) / len(rolls)
-    mean_pitch = sum(pitches) / len(pitches)
+
+    for n, accel in enumerate(samples):
+        roll, pitch, _ = filt.update((0.0, 0.0, 0.0), accel, dt)
+        if n >= settle:
+            # The orientation error, and NOT a difference of angles. Roll
+            # wraps at a hundred and eighty degrees and is ill-conditioned
+            # near a pitch of ninety, so averaging or differencing roll
+            # reports the parameterisation. The angle between two gravity
+            # directions is the same quantity at every pose.
+            guess = gravity_from(roll, pitch)
+            dot = sum(a * b for a, b in zip(guess, measured_dir))
+            errors.append(math.degrees(math.acos(max(-1.0, min(1.0, dot)))))
+
+    # The converged estimate, not a mean of angles, for the same reason.
+    final_roll, final_pitch, _ = to_euler(filt.q)
+    mean_roll, mean_pitch = final_roll, final_pitch
 
     print("capture            %s" % path)
     print("samples            %d used, %d damaged and skipped"
@@ -391,16 +417,20 @@ def run_capture(path, lsb_per_g, rate, beta, settle):
         print("                   WARNING: more than 50 mg from one g, so")
         print("                   the board was not still or the scale is wrong")
     print()
-    print("filter   roll  %+8.3f deg   pitch %+8.3f deg" % (mean_roll, mean_pitch))
-    print("direct   roll  %+8.3f deg   pitch %+8.3f deg" % (ref_roll, ref_pitch))
-    print("spread   roll  %8.3f deg   pitch %8.3f deg"
-          % (max(rolls) - min(rolls), max(pitches) - min(pitches)))
-    print("gap      roll  %8.3f deg   pitch %8.3f deg"
-          % (abs(mean_roll - ref_roll), abs(mean_pitch - ref_pitch)))
+    print("filter   roll  %+8.3f deg   pitch %+8.3f deg  (converged, not a mean)"
+          % (mean_roll, mean_pitch))
+    print("direct   roll  %+8.3f deg   pitch %+8.3f deg  (trigonometry)"
+          % (ref_roll, ref_pitch))
     print()
-    print("The gap is the filter against trigonometry on the same samples.")
-    print("A large one is the filter, not the bench, and the usual cause is")
-    print("too few samples for beta to converge rather than a wrong sign.")
+    print("orientation error   %.3f deg final, %.3f mean, %.3f worst"
+          % (errors[-1], sum(errors) / len(errors), max(errors)))
+    print()
+    print("The orientation error is the angle between the gravity direction")
+    print("the filter's own roll and pitch imply and the one measured. It is")
+    print("the filter against trigonometry on the same samples, and unlike a")
+    print("difference of Euler angles it means the same thing at every pose:")
+    print("roll wraps at 180 degrees and goes ill-conditioned near a pitch of")
+    print("90, where a small orientation error becomes a large roll figure.")
     return 0
 
 

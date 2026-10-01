@@ -65,3 +65,76 @@ WHAT IS STILL OPEN
 The criterion's second half: within 3 degrees after a 90 degree rotation
 about each axis. That needs two captures that do not exist yet, with the
 board turned onto each edge. Nothing in software stands in the way.
+
+THE NINETY DEGREE POSES, and a defect in the criterion
+======================================================
+
+Four captures, Thursday 1 October 2026, 2000 samples each at 126 Hz.
+
+  file          measured mean              magnitude   off the intended axis
+  roll90        Y +1.0025, Z -0.0771 g      1.0055 g        4.4 deg
+  roll90b       Y +1.0055, Z -0.0299 g      1.0059 g        2.2 deg
+  pitch90       X +0.9738, Y +0.1076 g      0.9960 g       12.1 deg
+  pitch90b      X +0.9919, Z -0.1004 g      0.9970 g        6.8 deg
+
+Magnitude stays between 0.996 and 1.007 g in every pose, so no axis is
+swapped or inverted and the board was still enough to be read.
+
+WHAT THE FILTER DID, against trigonometry on the same samples:
+
+  file                      converged           orientation error
+  flat                      roll +0.77, pitch +0.32     0.015 deg
+  roll90                    roll +94.40, pitch +0.10    0.091 deg
+  roll90b                   roll +91.33, pitch +0.32    0.381 deg
+  pitch90                   roll +148.73, pitch -77.93  0.072 deg
+  pitch90b                  roll +177.24, pitch -82.43  1.778 deg
+
+Under two degrees at every pose and under half a degree in four of five.
+
+TWO FAULTS IN THE ANALYSIS, BOTH MINE, FOUND BEFORE THE RESULT WAS USED.
+
+The first run of this comparison reported the filter disagreeing with
+trigonometry by 16 and 25 degrees in the pitch poses. Both numbers were
+artefacts.
+
+One: --capture averaged roll and pitch arithmetically across the settled
+window. Roll wraps at plus and minus 180 degrees, and the pitch poses
+converge to +148 and +177, so the mean of values straddling that wrap is a
+number no sample ever held.
+
+Two: it then reported a difference of Euler angles as the filter's error.
+Near a pitch of ninety degrees roll is ill-conditioned, and a small
+orientation error becomes a large roll figure. Multiplying the reported
+gaps by the cosine of the pitch brings 16.5 and 25.0 degrees back to 3.4
+and 2.5, which is the size of the error the well-conditioned poses show.
+
+Both are fixed: the program now reports the converged estimate rather than
+a mean of angles, and an orientation error defined as the angle between the
+gravity direction the filter's roll and pitch imply and the one measured.
+That quantity has no singularity and means the same thing at every pose.
+
+AND THE CRITERION AS WRITTEN CANNOT BE MET, for two separate reasons.
+
+It asks for pitch and roll "within 3 degrees after a 90 degree rotation
+about each axis". That measures the FIXTURE and not the filter. A board
+propped on a free edge sits 2 to 12 degrees off the axis, as these four
+captures show, and the filter reporting that honestly is the filter being
+right. Meeting the criterion as written needs a machinist square or a
+known-flat block, not better software.
+
+And at the pitch pose it is ill-posed as well as impractical. With pitch
+near minus ninety degrees, roll is not a determined quantity: the two
+rotations very nearly share an axis, so "roll within 3 degrees" asks for a
+tolerance on a number the geometry does not fix.
+
+WHAT THE DATA DOES ESTABLISH, which is what the criterion was reaching for:
+the filter's orientation agrees with trigonometry on the same samples to
+better than two degrees at every pose tested, including both ninety degree
+rotations, with no shared code between the two routes.
+
+A restatement that tests the filter rather than the bench would be: the
+orientation error against the measured gravity direction stays below 3
+degrees at level and at a rotation near ninety degrees about each axis.
+That is the number above, it is already met, and it is not changed by how
+squarely the board was propped. Whether to amend the criterion is not a
+decision this file makes.
