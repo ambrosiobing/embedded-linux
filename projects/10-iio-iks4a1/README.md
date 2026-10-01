@@ -34,8 +34,14 @@ the orientation filter against rotations whose answers come from geometry.
 `iio-probe`, `iio-decode`, `iio-stream.c` and `ahrs.py` all read on their
 own, and `docs/DESIGN.md` is the architecture.
 
-**If you want to run it, you need the shield.** An X-NUCLEO-IKS4A1, five
-jumper wires and a Raspberry Pi 3B+.
+**It has been run.** An X-NUCLEO-IKS4A1 was wired to a Raspberry Pi 3B+ on
+Wednesday 30 September 2026 and measured through Thursday 1 October 2026.
+[docs/TIMELINE.md](docs/TIMELINE.md) is those two days in order and
+[docs/RESUME.md](docs/RESUME.md) is the state the next session starts from.
+
+To repeat it you need the shield, eight jumper wires, a Raspberry Pi 3B+ and
+a USB to TTL cable for the console. The wiring is in
+[docs/BRINGUP.md](docs/BRINGUP.md), confirmed three independent ways.
 
 ## What this project adds to the repository
 
@@ -148,9 +154,16 @@ every time rather than leaving the reader to remember.
 | 9 | The user-space polling baseline is measured, with a quiet noise floor and a vibration case above it | `i2ctransfer` loop, both captures in `docs/evidence` | **met**, Wednesday 30 September 2026. Floor 0.36 mg on X and Y and 0.47 mg on Z; a shaver against the board raises Z to 10.66 mg rms, a factor of 23. Magnitude 1.0068 g against a true 1.0000 g, so sensitivity is 0.68 percent high |
 
 Criteria 6 and 7 are met on a laptop because they are properties of the
-programs rather than of the board. Everything else needs the shield, and
-the rows say so rather than being left blank in a way that reads like a
-gap.
+programs rather than of the board. That distinction is narrower than it
+reads: three defects in `iio-rate` and one in `iio-probe` were also
+properties of the programs, sat in the same files, and were invisible to
+every assertion made against a synthetic sysfs tree. Journal entry 37 has
+the detail.
+
+Criteria 2 and 9 are met **on the shield**, and criterion 8's level half
+is too. What is left needing hardware is 3 and 5, and the half of 4 the
+interrupt wiring prevents. The rows say which rather than being left blank
+in a way that reads like a gap.
 
 ## What is tested without hardware
 
@@ -176,9 +189,14 @@ handedness, and a wrong sign there gives an orientation that is mirrored
 rather than obviously broken. The substitution is stated in the file's own
 header and the cost is a noisier yaw.
 
-**The live reader is not written.** `ahrs` is importable and has a
-selftest; reading three devices through libiio at 104 Hz and printing yaw,
-pitch and roll needs the shield to be worth writing against.
+**The live reader is not written.** `ahrs` is importable, has a selftest,
+and since Thursday 1 October 2026 reads a recorded capture through
+`--capture`, which is how its filter first met real gravity. Reading three
+devices live through libiio at 104 Hz still needs two drivers that are not
+built yet: `st_magn` for the magnetometer and `st_pressure` for the
+barometer. The IMU has one, built out of tree, and
+[docs/RESUME.md](docs/RESUME.md) carries the procedure for the other
+two.
 
 **`iiod` is installed and not enabled.** It exposes every device with no
 authentication. Starting it is a decision taken on a bench with a known
