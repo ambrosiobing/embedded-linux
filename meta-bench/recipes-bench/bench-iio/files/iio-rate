@@ -261,7 +261,37 @@ capture() {
 	hz=$4
 	ts_source=$5
 
-	scan_enable "$dev" in_timestamp
+	# EVERY scan element, not only the timestamp.
+	#
+	# A buffer holding a timestamp and no data channel is not a buffer
+	# the IIO core will enable. It rejects the configuration with EIO,
+	# which arrives as "echo: I/O error" from the line that enables the
+	# buffer and says nothing whatever about the cause.
+	#
+	# This line read "scan_enable $dev in_timestamp" until Thursday 1
+	# October 2026, when the program met hardware for the first time.
+	# The omission could not surface before: every fixture this program
+	# is tested against is a synthetic sysfs tree, where writing to
+	# buffer/enable is writing to an ordinary file and no kernel is
+	# there to object. A test built from directories can check what a
+	# program writes and never what the kernel would make of it.
+	#
+	# Discovering the channels rather than naming them also keeps this
+	# correct for the magnetometer, whose elements are in_magn_* and
+	# share no name with the accelerometer's.
+	_chans=""
+	for _f in "$dev"/scan_elements/*_en; do
+		[ -e "$_f" ] || continue
+		_n=$(basename "$_f")
+		_chans="$_chans ${_n%_en}"
+	done
+	[ -n "$_chans" ] || die "no scan elements on $(basename "$dev").
+       A device with a buffer and no scan_elements directory has nothing
+       to put in it, which is a driver fault rather than a usage one."
+	# shellcheck disable=SC2086
+	scan_enable "$dev" $_chans
+	note "channels  $(echo $_chans | tr -s ' ')"
+
 	echo "${BENCH_IIO_BUFLEN:-256}" >"$dev/buffer/length"
 
 	irq_before=$(irq_count_of "${BENCH_IIO_IRQ:-lsm6}")
