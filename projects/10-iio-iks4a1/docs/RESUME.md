@@ -75,3 +75,34 @@ full-scale ranges to 36 parts per million.
 
 And `0x70` does not name the part: the plain LSM6DSV and the LSM6DSV16X
 share that WHO_AM_I. UM3239 Table 1 names it.
+
+## The card is archived, and where
+
+Thursday 1 October 2026, 19:04. The whole card is kept as a flashable image
+on the win11 skyhorizon demo laptop, outside the WSL virtual disk:
+
+    C:\Users\skyhorizon\Desktop\embedded-linux-bench\images\
+        proj10-iio-iks4a1-card\2026-10-01_9cd6302\
+
+1,562,322,561 bytes compressed, from 15,728,640,000 on the card,
+decompressing to sha256
+`35cc6c221846efa9fe04764892c698cad35b9a63c292fcd23c78a0458925f6f9`. Both the
+stored image and the card were read again and hashed to that value, so this
+is a verified copy, and `PROVENANCE.txt` beside it records the comparison
+with its date and the fact that it was done after the archive rather than
+during it.
+
+**Why that matters for this project in particular.** Nothing in this
+repository rebuilds that card. The `linux-source-6.18` tree under `/usr/src`,
+the four out-of-tree ST drivers built against it, the programs placed by hand
+and the measurements under `/var/lib/bench` are in no recipe here. Restoring
+it is Raspberry Pi Imager reading the `.img.gz` directly, about seventeen
+minutes, and the provenance carries the warning not to let Imager apply its
+OS customisation, which would rewrite the hostname, the user and the ssh keys
+already inside the image.
+
+**The card was deliberately not reused afterwards.** Criterion 5 needs `iiod`
+and libiio on this system, and criterion 4's interrupt half needs the shield
+back on the board, so the work continues on the card rather than on a restore
+of it. The archive exists so that the next project wanting the card costs
+seventeen minutes instead of an afternoon.

@@ -317,6 +317,8 @@ throughput.
 | 17:45 | USB selective suspend disabled in the power plan and on every hub, and `--auto-attach` started | |
 | 18:08 | **The card is archived.** 15,728,640,000 bytes in 828 s at 19 MB/s, 1.5 GB compressed, `sha256sum -c` says `OK` | `9cd6302` |
 | 18:30 | `card-archive.sh verify` pays the comparison debt that `BENCH_CARD_SKIP_VERIFY` creates, appending a dated result rather than rewriting the record | `ae3f284` |
+| 19:04 | **The comparison passes.** The stored image and the card both hash to `35cc6c22`, so the archive is a proven copy and not an assumed one | `968e7be` |
+| 19:10 | The card is NOT wiped. It keeps this system, because criteria 4 and 5 are still open on it and the archive makes reusing it a choice rather than a risk | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile
@@ -364,6 +366,13 @@ and done, with 15, 16 and 19 MB/s across the three. A link periodically told
 to power down is slower before it is cut, so the rate moved for the same
 reason the read survived, and two observations that agree are a mechanism
 where one would have been a coincidence.
+
+**The exercise ends where it should have started.** The card is a proven
+copy on a Windows desktop, outside the WSL virtual disk, with a record that
+states what was checked and when. And the card itself stays as it is,
+because the archive turned reusing it from something that would have cost an
+afternoon of work into something reversible in seventeen minutes. That is
+the only thing a backup is for, and it was not available at 17:00.
 
 **The card image at 18:20 is a gap that had been open all along.** The
 finished projects archive with `./go archive`, which keeps the output of a
