@@ -707,3 +707,59 @@ So the output-rate meter stood in for a verification that silently did not
 happen. That is a better argument for it than the convenience of not
 needing a data sheet: it measures the part's behaviour, where a readback
 only reports a register, and it still works when the readback does not.
+
+THE TAP TEST, Thursday 1 October 2026. Shaver removed, 0x06, four taps at
+0.92, 2.46, 3.97 and 5.46 s. Poll 126.85 Hz, 4.9 percent duplicates.
+
+QUIET FLOOR BETWEEN TAPS: 0.42 / 0.37 / 0.58 mg, matching every other still
+capture, and NO 2.7 to 4.9 Hz hump. That line needs the shaver running.
+
+CLIPPING. Raw Z reaches 32764 against a rail of 32767, with four samples
+within two percent of it. So the tap peak is not measured, only bounded
+below at about two g, and the shape of those four samples is not data.
+
+A RING-DOWN SEARCH, AND THE FIRST VERSION OF IT WAS WRONG. Taking 256
+samples after each tap and looking for 3 to 6 Hz gave 1.21, 1.53, 26.83 and
+0.08 mg. The 26.83 is an artefact of the window: the taps are 1.5 s apart
+and a 2.0 s window contains the NEXT tap. Only the fourth window, after the
+last tap, contains one impulse and nothing else.
+
+  tap 4, clean window      0.08 mg in 3 to 6 Hz
+  a quiet stretch          0.06 mg, the floor
+  taped shaver running    28.28 mg at 4.96 Hz
+
+SO A TAP DOES NOT RING THE ASSEMBLY AT 3 TO 6 Hz. At 126.85 Hz a 5 Hz
+oscillation is 25 samples per cycle, so unlike the 57 Hz question this
+absence is a real measurement and not a sampling limit. An impulse reaching
+two g produces nothing above the noise in a band where the running shaver
+produces 28 mg.
+
+THAT IS A CONSTRAINT, NOT A CONCLUSION. It sits awkwardly beside the taped
+result, and both are sound:
+
+  the frequency moves with the mounting, 2.71 Hz held to 4.87 Hz taped
+      which is what a resonance does
+
+  an impulse does not excite it
+      which is what a resonance does not do
+
+A lightly damped mode would do both. Something that needs continuous
+driving does the first and not the second. A self-excited contact
+oscillation, where the shaver rattles or sticks and slips against the board
+and the rate depends on contact stiffness, would fit both, and so would a
+heavily damped mode that an impulse cannot sustain. Nothing here chooses
+between them and the record should not pretend otherwise.
+
+FULL SCALE FOR THE NEXT TAP CAPTURE, AND WHAT IT COSTS. Moving from two g
+to eight g makes one count 0.244 mg instead of 0.061. The measured noise
+floor is 0.36 mg, which is 5.9 counts at two g and 1.5 at eight, and
+quantisation noise of one count spread over root twelve is 0.07 mg. Added
+in quadrature that is 0.367 against 0.360, about two percent.
+
+So four times the headroom for two percent of the noise floor, which is a
+good trade for an impulse measurement and a bad one for a noise floor.
+
+Verify the change by the raw counts rather than the scaled value: gravity
+should fall from about 16500 counts to about 4125, a factor of four. A
+decoder still dividing by 16384 would otherwise report a quarter g and
+look like a wiring fault.

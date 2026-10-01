@@ -1483,3 +1483,59 @@ pattern in both is the same: a mechanism that explained the data was
 promoted to the mechanism that produced it, without the alternative being
 tried. The cheap test is not the one that confirms the story. It is the one
 that would look different if the story were wrong.
+
+---
+
+## 31. The tap does not ring, and that is the sharpest constraint of the day
+
+Entry on Thursday 1 October 2026.
+
+**What the tap test settles.** Shaver removed, four taps, and between them a
+floor of 0.42, 0.37 and 0.58 mg with **no 2.7 to 4.9 Hz hump at all**. That
+line needs the shaver running. It is not the board sitting there.
+
+**A ring-down search, and the first version of it was mine and wrong.**
+Taking 256 samples after each tap and looking in 3 to 6 Hz gave 1.21, 1.53,
+26.83 and 0.08 mg. The 26.83 is an artefact of my own window: the taps are
+1.5 s apart and a 2.0 s window swallows the next one. Only the fourth
+window holds a single impulse and nothing else.
+
+| | 3 to 6 Hz |
+|---|---|
+| tap 4, the one clean window | 0.08 mg |
+| a quiet stretch, the floor | 0.06 mg |
+| taped shaver running | 28.28 mg at 4.96 Hz |
+
+**So a two g impulse does not excite the thing the shaver excites.** At
+126.85 Hz a 5 Hz oscillation is 25 samples per cycle, so unlike the 57 Hz
+question this absence is a measurement rather than a sampling limit.
+
+**And that is a constraint rather than an answer.** It sits awkwardly beside
+yesterday's taped result, and both are sound:
+
+- the frequency moves with the mounting, 2.71 Hz held and 4.87 Hz taped,
+  which is what a resonance does
+- an impulse does not excite it, which is what a resonance does not do
+
+A lightly damped mode would do both. A self-excited contact oscillation,
+where the shaver rattles or sticks and slips against the board at a rate
+set by the contact stiffness, would do the first and not the second, and so
+would a mode damped heavily enough that an impulse cannot sustain it.
+Nothing here chooses between them.
+
+Three readings of this line have now been proposed and two are dead: a
+sampling beat, and the operator. The third is still standing only because
+it has not yet been tested properly.
+
+**The clipping is worth naming.** Raw Z reaches 32764 against a rail of
+32767. The tap peak is not measured, only bounded below at about two g, and
+those four samples are not data. Moving to eight g full scale costs about
+two percent of the noise floor, by the arithmetic in the evidence file, and
+buys four times the headroom, which is a good trade for an impulse and a
+bad one for a floor.
+
+**The habit worth naming.** My ring-down windows overlapped the next tap and
+produced a number that looked like a finding. It was caught by checking the
+tap spacing against the window length, which takes one line of arithmetic
+and was not done first. Every analysis window is a claim about what is
+inside it.
