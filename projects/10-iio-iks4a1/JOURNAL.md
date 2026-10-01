@@ -1982,3 +1982,44 @@ them, and the reason given at the time was that a hard-coded `in_accel_`
 list would silently read nothing on the magnetometer. The channels line of
 this run reads `in_magn_x in_magn_y in_magn_z in_timestamp`. First run on a
 device with different channel names, and it found them.
+
+## 40. Criterion 1, and four parts where the morning had one
+
+*Thursday 1 October 2026, late afternoon.* `st_pressure` built into
+`/root/build-magn` beside `st_sensors` and `st_magn`, which already shared
+one `Module.symvers` there, and the LPS22DF bound. `iio-probe -v` now
+returns four `working` rows where this morning it returned one:
+
+    0x1e  LIS2MDL      st_magn      iio   claimed  loaded  lis2mdl
+    0x44  SHT40AD1B    sht4x        hwmon claimed  loaded  sht4x
+    0x5d  LPS22DF      st_pressure  iio   claimed  loaded  lps22df
+    0x6b  LSM6DSV16X   st_lsm6dsx   iio   claimed  loaded  lsm6dsv16x_gyro lsm6dsv16x_accel
+
+Four IIO devices, two triggers, `0x19` and `0x38` still `unsupported` and
+`0x6a` still `not-bound`. Criterion 1 is met, recorded in
+`docs/evidence/inventory-complete-2026-10-01.txt`.
+
+**The six modules were one build, not three.** `st_sensors`, `st_magn` and
+`st_pressure` are siblings in the same subtree of the kernel source, so one
+Makefile naming all the targets produced all six `.ko` files against one
+`Module.symvers`. The first two had been built that way in the morning and
+the third was a target added to a list, not a new build. The afternoon's
+work was four lines and a `grep` for the compatible string, after the
+morning had spent hours getting the first one to link.
+
+**`insmod` reported `File exists` and that was the right answer.** The
+module was already loaded, which is a success indistinguishable in its
+wording from a failure. The thing that settled it was `ls
+/sys/bus/iio/devices`, which is the state rather than the report. This is
+the same lesson as the `dd` entry in Project 2, arriving by a different
+route: ask the system what it holds, not the tool what it did.
+
+**And the criterion that was already met got better evidence than it had.**
+Criterion 2 asks that the inventory list every sensor with its driver and
+its status. It was marked met in the morning on a run reporting four
+`no-driver-in-image` rows. The afternoon run of the same unedited program
+reports four `working` and none missing. The inventory tracked the image
+because it reads the system rather than a table, which is the property the
+criterion is actually about, and the morning run alone could not have shown
+that. Both files are cited now, and the README says why there are two.
+

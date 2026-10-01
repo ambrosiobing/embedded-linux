@@ -1,0 +1,62 @@
+Acceptance criteria 1 and 2: the shield, fully bound
+====================================================
+
+Thursday 1 October 2026, after st_sensors, st_magn and st_pressure were
+built out of tree alongside st_lsm6dsx. Raspberry Pi 3B+, stock Raspberry
+Pi OS 6.18.50.
+
+ADDRESS PART         DRIVER       SUBSYS   BUS       MODULE     DEVICES
+0x19    LIS2DUXS12   none         none     present   none       -
+        unsupported: answers only i2cdetect -r, driver may be absent
+0x1e    LIS2MDL      st_magn      iio      claimed   loaded     lis2mdl
+        working: magnetometer, no FIFO
+0x38    STTS22H      none         none     present   none       -
+        unsupported: no mainline driver, expected unsupported
+0x44    SHT40AD1B    sht4x        hwmon    claimed   loaded     sht4x
+        working: humidity, NOT an IIO device
+0x5d    LPS22DF      st_pressure  iio      claimed   loaded     lps22df
+        working: pressure, recent driver addition
+0x6a    LSM6DSO16IS  st_lsm6dsx   iio      present   loaded     -
+        not-bound: ISPU part, confirm the compatible exists
+0x6b    LSM6DSV16X   st_lsm6dsx   iio      claimed   loaded     lsm6dsv16x_gyro lsm6dsv16x_accel
+        working: IMU, two devices, one hardware FIFO
+
+    iio:device0  lsm6dsv16x_gyro
+    iio:device1  lsm6dsv16x_accel
+    iio:device2  lis2mdl
+    iio:device3  lps22df
+    trigger0     t100
+    trigger1     iio-rate-t
+
+CRITERION 1 IS MET. Every address answers, the four parts the overlay
+binds all report the expected name, and the SHT40AD1B appears through
+hwmon. Four addresses now read UU where this morning one did.
+
+CRITERION 2 WAS ALREADY MET AND THIS IS THE SAME PROGRAM SAYING SOMETHING
+DIFFERENT, which is the point of it. On Thursday morning the same command
+reported four rows of no-driver-in-image. There are none now. The
+inventory did not change because the program changed; it changed because
+the image did, and the program said so both times without being edited.
+
+THE TWO unsupported ROWS ARE CORRECT AND DELIBERATE. Neither the STTS22H
+nor the LIS2DUXS12 has a mainline driver. An inventory that quietly
+dropped them, or that called them failures, would be worse than one that
+names them and says why. A part with no driver is a finding.
+
+0x6a IS STILL not-bound AND THAT IS THE DISTINCTION CRITERION 7 EXISTS TO
+MAKE. The driver is loaded. The part is on the bus. The overlay declares
+no node for it, so nothing matched. That is a different fault from 0x1e
+this morning, where a node existed and the driver did not, and from 0x38,
+where no driver exists anywhere. Three causes, three verdicts, all three
+visible in one table.
+
+WHAT IS STILL OPEN AT 0x6a. Whether st_lsm6dsx carries a compatible for
+the LSM6DSO16IS can now be answered from the source unpacked on this card
+rather than guessed. If it does, a node in the overlay would bind a fifth
+part and a third IIO device pair.
+
+THE TRIGGERS ARE LISTED TOO. t100 is the hrtimer trigger criterion 3 was
+measured on; iio-rate-t is the one iio-rate creates for its own trigger
+runs. Both are visible to the IIO core, which is what iio-trigger checks
+and what distinguishes a real trigger from a configfs directory that
+merely looks like one.
