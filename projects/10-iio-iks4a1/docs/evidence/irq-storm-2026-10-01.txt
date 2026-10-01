@@ -64,3 +64,75 @@ threshold and should simply work.
 
 Either way criterion 4's interesting case is the one that can be measured
 first, which is a convenient accident rather than a plan.
+
+THE RESULT, and the prediction was right by a hair
+===================================================
+
+    iio-rate fifo lsm6dsv16x_accel 480 64
+
+    samples/s   467        4672 in 10 s against 4800 expected, 97.3 %
+    interrupts  171.5/s    1715 in 10 s
+    reader cpu  0.80 %
+    ts sd       0.124 us, driver-interpolated, not a latency measurement
+
+IT RAN. The watermark 64 case does not storm, which was the prediction.
+
+AND THE RINGING IS NOW MEASURED RATHER THAN SUPPOSED. At 480 Hz with a
+watermark of 64 the FIFO threshold fires 7.5 times a second. The kernel
+counted 171.5.
+
+    171.5 / 7.5 = 22.9 interrupts for every real assertion
+
+The prediction written before the run was "about twenty".
+
+THE SAME FACTOR APPEARS AT AN EDGE RATE SIXTY-FOUR TIMES HIGHER. The
+watermark 1 run produced 10000 interrupts a second against a real 480.
+
+    10000 / 480 = 20.8
+
+20.8 and 22.9, from two runs whose real edge rates differ by a factor of
+64. A multiplier that holds across that range is a property of the wire
+and not of the sensor, the driver or the load. That is the ringing
+hypothesis confirmed by something other than its own plausibility.
+
+AND THE COMPARISON THE CRITERION EXISTS TO MAKE SURVIVES INTACT, because
+the multiplication is common to both measurements and cancels in the
+ratio:
+
+    measured   10000 / 171.5 = 58.3
+    theory     watermark 64 against watermark 1 = 64
+    agreement  91 percent
+
+So batching by 64 reduces the interrupt rate by about 58 times on this
+bench. The number that is contaminated is the absolute rate; the ratio,
+which is the actual claim, is not.
+
+CRITERION 4 AS WRITTEN, honestly assessed.
+
+  "fewer than 8 interrupts per second at watermark 64"
+      measured 171.5, so it FAILS as written.
+      The FIFO asserts 7.5 times a second, under the limit. The other
+      164 are the wire. The criterion measures the bench's wiring and
+      not the sensor's batching, in the same way criterion 8 measured
+      the fixture and not the filter.
+
+  "more than 400 per second at watermark 1"
+      the real rate is 480 and the observed 10000, so it passes on
+      either number, for the wrong reason in one case.
+
+  "under 3 percent reader CPU"
+      0.80 percent, PASSES, and this one is unaffected by the ringing
+      because the spurious interrupts are serviced by the primary
+      handler and never reach the reader.
+
+WHAT WOULD MAKE THE ABSOLUTE NUMBER HONEST. A shorter interrupt jumper, a
+series resistor of a few hundred ohms at the shield end, or both. The
+project's own BRINGUP already says this about the I2C pair and never said
+it about the interrupt line.
+
+AND WATERMARK 1 CANNOT BE RUN ON THIS WIRING AT 480 Hz. 480 real
+assertions a second times 23 is 11000 interrupts a second, which trips the
+spurious watchdog in under ten seconds and disables the line. That is a
+hard limit of the bench rather than of the part, and the comparison can
+still be made at a lower rate: at 120 Hz, watermark 1 gives 120 x 23 =
+2760 a second, which the watchdog tolerates.
