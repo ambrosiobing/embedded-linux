@@ -1868,3 +1868,61 @@ are. But criterion 7's 25 assertions were asserting a wrong address map at
 the moment they were recorded as met, and nothing in the table distinguishes
 an assertion that checks a program's logic from one that pins its data to a
 fiction.
+
+---
+
+## 38. The one program nothing compiles, read instead of run
+
+Entry on Thursday 1 October 2026.
+
+**`iio-stream.c` is compiled by nothing but a full Yocto image build.** CI
+compiles six C programs by name and not this one, because it needs
+`libiio` and the runner has none. It has no test file either. That is 253
+lines with 33 library calls which nothing on either laptop, and nothing in
+CI, would notice had stopped compiling. Criterion 5 is measured with it.
+
+So it was read, since it cannot be run. Three findings, one of them a
+defect.
+
+**The defect: an unparseable count becomes an unbounded run.**
+
+```c
+case 'n': refills = (unsigned int)strtoul(optarg, NULL, 10); break;
+```
+
+No end pointer, no `errno`. `-n 4O` with a letter O returns 0, and 0 is
+the documented value for "until interrupted". So a typo in the one
+argument that bounds the run does not fail, does not warn, and produces
+the opposite of what was asked for. `-b` has the same shape and fails
+later and more loudly, at `iio_device_create_buffer`, which is the better
+of the two outcomes and still not an error message about the argument.
+
+This is the class of fault this project exists to find: not a crash, a
+plausible behaviour that is not the requested one.
+
+**An unstated assumption: the convert-and-widen pair is little-endian
+only.** `iio_channel_convert` writes exactly the channel's storage width
+into a zero-filled `int64_t`, and `widen` then reads the low bytes back
+through a pointer of that width. On a little-endian host those are the
+bytes convert wrote. On a big-endian one they are not. Every target here
+is little-endian, so this is correct today and silently wrong the day it
+is not, and the comment that explains the scratch does not say so.
+
+**And the usage text omits the default.** It says `-n` takes a count and
+that 0 means until interrupted, and does not say that leaving it out gives
+40. A reader has to find that in the source.
+
+**What is not wrong, and is worth recording because it was checked.** The
+scan walk looked suspicious and is right: `p` starts at the first sample
+of channel 0, which is offset into the first scan, so the loop appears to
+run one scan short. It does not. The iteration count is the ceiling of
+`(end - base0) / step`, which is exactly the number of scans whenever that
+offset is smaller than a step, and it always is.
+
+**None of the three is fixed here.** Changing C that nothing compiles is
+the same mistake as adding the untested `--capture` was this morning, one
+step further along: at least that could be run. The fix belongs with a way
+to compile it, and the recipe warns that `libiio` 1.0 removed
+`iio_buffer_refill` entirely, so this is 0.x code that a current
+`libiio-dev` may refuse outright. That is a port, not an afternoon, and it
+is now written down rather than discovered again by the next reader.

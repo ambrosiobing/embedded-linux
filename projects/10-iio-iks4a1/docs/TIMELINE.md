@@ -353,6 +353,19 @@ and six of the eight by a measurement that cost a single command.
   committed. Every one of them fails the same way when copied to a board.
 - 49 commits sit unpushed on `main`.
 
+**Known gaps in the programs, recorded rather than invisible.**
+
+- `iio-stream.c` is compiled by nothing but a full Yocto image build. CI
+  compiles six C programs by name and not this one, and it has no test
+  file. Criterion 5 is measured with it. Journal entry 38 is the review
+  that stood in for running it, and names one defect: an unparseable `-n`
+  returns zero, which is the documented value for "until interrupted", so
+  a typo in the one bounding argument silently produces an unbounded run.
+- Compiling it in CI needs `libiio-dev` on the runner, and the recipe
+  warns that `libiio` 1.0 removed `iio_buffer_refill`, so a current
+  package may refuse this 0.x code outright. That is a port rather than a
+  CI line, and whether CI should go red until it is done is Joseph's call.
+
 **Open questions with no owner yet.**
 
 - Whether `st_lsm6dsx` carries a compatible for the LSM6DSO16IS at `0x6a`.
