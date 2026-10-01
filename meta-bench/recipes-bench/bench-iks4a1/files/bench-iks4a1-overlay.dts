@@ -93,6 +93,24 @@
  *   0x6a  LSM6DSO16IS   ADD D5h, WHO_AM_I 0x22, ISPU part, bound below
  *   0x6b  LSM6DSV16X    ADD D7h, WHO_AM_I 0x70, fusion part, bound below
  *
+ * CORROBORATED INDEPENDENTLY, Thursday 1 October 2026, by ST's own Arduino
+ * examples at github.com/stm32duino/X-NUCLEO-IKS4A1. Its HelloWorld sketch
+ * is this address map: the LSM6DSV16X at its default address, the
+ * LSM6DSO16IS forced to LSM6DSO16IS_I2C_ADD_L which is 0x6a, and
+ * LIS2DUXS12, STTS22H, LIS2MDL, LPS22DF and SHT40 all constructed. That
+ * sketch EXPECTS 0x19 AND 0x38 ON THE BUS, which is the second
+ * independent reason this overlay does not call them unsupported.
+ *
+ * The sketches also enable every part except the humidity sensor before
+ * the first read, and do not treat an unenabled part as a wiring fault.
+ * That is the same rule as iio-stream's: a part still in power-down
+ * produces no samples and the absence is not a bus problem.
+ *
+ * Two things in that tree not to copy. HelloWorld calls GetHumidity with
+ * no begin() and no Enable(). And no sketch there wires INT1 at all, so
+ * none of them is evidence about the CN9 pin 6 interrupt, in either
+ * direction.
+ *
  * All seven sit on the main board of the kit, the X-NUCLEO-IQS4A1. The
  * detachable board on top of it, the STEVAL-MKE001A1, carries the Qvar
  * swipe electrodes and puts nothing on this bus (DB5091 Rev 4). The DIL24

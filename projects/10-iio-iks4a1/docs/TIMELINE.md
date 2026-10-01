@@ -340,6 +340,10 @@ throughput.
 | 23:35 | **`interrupts = <24 4>` instead of `<24 1>`.** 3269 interrupts become 23, samples unchanged. Criterion 4's first threshold is met | |
 | 23:40 | And its contrast clause cannot be: a level line coalesces, so watermark 1 gives 15.60/s where the criterion wants 400 | |
 | 23:45 | **Criterion 4 met.** The contrast clause is restated as a same-configuration ratio and the measured 6.8 times clears it. Eight of nine | |
+| 00:05 | Criterion 8 re-measured by hand. Two captures score identically: the overlay bound the driver, which keeps the part in power-down, and `-f` reads a frozen register | |
+| 00:15 | `CTRL1` reads `0x00`, is set to `0x06` for 120 Hz, and the reads move. The level clause passes on live data: roll +0.348, pitch +0.283 | |
+| 00:30 | The ninety pose repeats at 3.3 degrees from two braced holds against a tolerance of 3. The brace leans; the measurement does not | |
+| 00:35 | Stopped there by agreement. A number to decide on in daylight rather than an argument to continue | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile

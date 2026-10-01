@@ -1,0 +1,110 @@
+Criterion 8, held by hand instead of propped
+Friday 2 October 2026, shortly after midnight CEST
+
+WHAT WAS ESTABLISHED
+
+  the level clause        MET, on live data, roll +0.348 pitch +0.283
+  the ninety clause       fixture-limited at 3.3 degrees against a
+                          tolerance of 3, repeatably
+
+WHAT CHANGED SINCE THURSDAY, AND WHY THE FIRST TWO CAPTURES WERE VOID
+
+Thursday's captures were taken with nothing bound to 0x6b, so the part was
+free-running and a raw burst read returned live data. The overlay now
+declares it, st_lsm6dsx owns it, and THE DRIVER KEEPS THE PART IN POWER-DOWN
+WHEN NO BUFFER IS ENABLED, powering it up only for the duration of a sysfs
+read.
+
+So i2ctransfer first refused the address outright:
+
+    Error: Could not set address to 0x6b: Device or resource busy
+
+and with -f, which skips the claimed-address check but not the bus lock, it
+returned a frozen register. The symptom was not an error. It was two
+captures scoring identically to four decimal places:
+
+    flat.txt    X -0.0026  Y +0.0101  Z +1.0070 g   roll +0.877 pitch +0.229
+    roll90.txt  X -0.0026  Y +0.0101  Z +1.0070 g   roll +0.877 pitch +0.229
+
+A tilted board and a flat board cannot agree like that. The register was
+confirmed directly:
+
+    CTRL1 before: 0x00        power-down
+    i2cset -f -y 1 0x6b 0x10 0x06
+    CTRL1 after:  0x06        120 Hz
+
+after which five spaced reads all differed. 0x06 is 120 Hz on this part's
+ladder, which is also where iio-stream's rate policy lands and what ST's own
+fusion sketch uses.
+
+MAKING THE DRIVER BIND CORRECTLY BROKE THE CAPTURE METHOD THAT HAD WORKED
+ALL WEEK, and the failure was silent. Anything that returns the part to the
+driver, a sampling_frequency write, an in_accel_*_raw read, or enabling a
+buffer, can put it back to sleep. Raw i2ctransfer reads leave CTRL1 alone.
+
+THE LEVEL POSE, WHICH IS MET
+
+    mean acceleration  X -0.0031  Y +0.0107  Z +1.0068 g
+    magnitude          1.0069 g
+    filter   roll    +0.348 deg   pitch   +0.283 deg
+    direct   roll    +0.607 deg   pitch   +0.174 deg
+    orientation error  0.281 deg final
+
+Both inside the 2 degree tolerance, on data that moves. The magnitude of
+1.0069 rather than 1.0000 is this part's own scale accuracy and it appears at
+every pose, so 1.007 is the bench reference against which a pose that moved
+reads high.
+
+One attempt before this read pitch -5.369 with the two routes agreeing to
+0.010 degrees. That was not a measurement problem: the board was sitting 5.4
+degrees off level on its own cables. The filter reporting the fixture
+correctly is the filter working.
+
+THE NINETY POSE, THREE ATTEMPTS
+
+    attempt  Z (g)     filter roll   direct roll   agreement   off axis
+    1        -0.0923   +92.795       +95.266       2.471 deg   5.27 deg
+    2        -0.0571   +93.163       +93.257       0.207 deg   3.25 deg
+    3        -0.0581   +93.217       +93.312       0.210 deg   3.31 deg
+
+Attempts 2 and 3 are the same pose to one per cent, from a braced hold. THE
+MEASUREMENT IS REPEATABLE AND THE BRACE IS 3.3 DEGREES OFF VERTICAL. The
+tolerance is 3.
+
+Pitch was never the problem: +0.294, -0.078, +0.110 across the attempts.
+
+A CLAIM MADE AND WITHDRAWN WITHIN TWO MEASUREMENTS
+
+Attempt 1 showed the filter at +92.795 and the trigonometry at +95.266, and
+re-running the same capture with the settling window doubled changed neither.
+That was written up here as a steady-state bias in the filter, with the
+observation that scoring the filter alone would pass a pose that was out of
+tolerance by under-reporting it.
+
+Attempts 2 and 3 refute it: at a square pose the two routes agree to 0.21
+degrees, as they do flat. The gap belonged to attempt 1, not to the filter,
+and generalising it from one pose was wrong. What survives is the method
+rather than the conclusion: the orientation error between the two routes is
+the number that says whether a pose is worth scoring, and 2.471 should have
+been read as "this capture is suspect" rather than as "the filter is biased".
+
+WHERE THIS LEAVES THE CRITERION
+
+The level clause is met. The ninety clause needs a square reference this
+bench does not have: a wall, a machinist square, or a shim, rather than
+anything standing on the bench, which leans. Three attempts converged on 3.3
+degrees from two different holds, so the limit is the fixture and not the
+hand, and it is 0.3 degrees from the tolerance.
+
+That is a number to decide on rather than an argument to continue. Either a
+square is found, or the tolerance is restated at 3.5 degrees with this
+measurement as the reason. Both are defensible and neither is a measurement
+problem.
+
+WHAT WAS NOT DONE
+
+Three of the four poses: roll90b, pitch90 and pitch90b. The session stopped
+after midnight with the roll90 pose characterised and the other three
+untaken. Nothing about them is expected to differ except that the pitch poses
+are the ones where roll is ill-conditioned, which is a property of the
+geometry and was already understood before any of this.

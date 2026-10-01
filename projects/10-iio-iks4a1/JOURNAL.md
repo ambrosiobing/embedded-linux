@@ -3006,3 +3006,92 @@ measurement: 4, 8 and the 416 Hz in 4's first half. **A criterion written
 before the first measurement is a hypothesis about what will be easy to
 measure**, and this project would have been better off writing the acceptance
 table after the first week than before it.
+
+## 55. The overlay broke the captures, and the symptom was two identical results
+
+*Friday 2 October 2026, after midnight.* Criterion 8 re-measured by hand.
+The level clause is met. The ninety clause reaches 3.3 degrees against a
+tolerance of 3, repeatably, and the limit is the brace.
+
+### Making the driver bind correctly broke the method that had worked all week
+
+Thursday's captures were raw burst reads with nothing bound to `0x6b`. The
+part was free-running and the reads were live. Tonight the overlay declares
+it, `st_lsm6dsx` owns it, and **the driver keeps the part in power-down when
+no buffer is enabled.**
+
+`i2ctransfer` refused the address outright, which was informative. `-f` got
+past that, which was not: it skips the claimed-address check but not the bus
+lock, and it returned a frozen register, silently.
+
+**The symptom was not an error. It was two captures scoring identically to
+four decimal places.** A flat board and a board on its edge both reporting
+`X -0.0026 Y +0.0101 Z +1.0070` and roll +0.877. `CTRL1` read `0x00`,
+confirming power-down, and `0x06` put the part at 120 Hz, after which five
+spaced reads all differed.
+
+The identical result is the only thing that caught it. Had the second pose
+differed slightly, from noise or from a stale value changing once, the
+capture would have been scored and written up.
+
+### A claim made and withdrawn within two measurements
+
+The first ninety-degree attempt gave filter +92.795 against trigonometry
++95.266, and doubling the settling window changed neither. I wrote that up as
+a steady-state bias in the filter, and added that scoring the filter alone
+would pass a pose that was out of tolerance by under-reporting it. That was
+stated to Joseph as a finding.
+
+The next two attempts refute it. At a square pose the routes agree to 0.21
+degrees, as they do flat. The gap belonged to that one capture.
+
+**What survives is the method rather than the conclusion.** The orientation
+error between the two routes is the number that says whether a capture is
+worth scoring, and 2.471 degrees should have been read as "this capture is
+suspect" and not as "the filter is biased". The project built that metric
+precisely so a bad pose would announce itself, and then I read its output as
+a statement about the filter.
+
+That is the fourth time in two days that a correct measurement has been
+attributed to the wrong cause, and the pattern in all four is the same: one
+observation, one plausible mechanism, no second measurement before writing it
+down.
+
+### Where criterion 8 stops, and why that is a result
+
+    attempt  Z (g)     filter roll   direct roll   agreement   off axis
+    1        -0.0923   +92.795       +95.266       2.471 deg   5.27 deg
+    2        -0.0571   +93.163       +93.257       0.207 deg   3.25 deg
+    3        -0.0581   +93.217       +93.312       0.210 deg   3.31 deg
+
+Two braced holds landing within one per cent of each other. The measurement
+is repeatable and **the brace is 3.3 degrees off vertical**, 0.3 from the
+tolerance. Pitch was never the problem: +0.294, -0.078, +0.110.
+
+So it is a number to decide on in daylight, not an argument to continue past
+midnight. Either a square reference is found, a wall or a shim rather than
+anything standing on a bench, or the tolerance is restated at 3.5 degrees
+with this measurement as the reason. Both are defensible.
+
+Three of the four poses were not taken, and the record says so rather than
+implying the pose was unlucky.
+
+### And a second independent source for the address map
+
+ST's own Arduino examples at github.com/stm32duino/X-NUCLEO-IKS4A1 carry the
+same address map this project measured: the LSM6DSV16X at its default
+address, the LSM6DSO16IS forced to the low address `0x6a`, and LIS2DUXS12,
+STTS22H, LIS2MDL, LPS22DF and SHT40 all constructed. **That sketch expects
+`0x19` and `0x38` on the bus**, which is a second reason, independent of the
+straps and of `modules.alias`, not to call them unsupported.
+
+The sketches also enable every part except the humidity sensor before the
+first read and do not treat an unenabled part as a wiring fault, which is the
+same rule as `iio-stream`'s. And their fusion example sets all three rates to
+120 Hz, which is where `iio-stream`'s "first rate at or above 100" policy
+independently lands on this part's ladder.
+
+Two things in that tree not to copy, recorded so nobody does: `HelloWorld`
+calls `GetHumidity` with no `begin()` and no `Enable()`, and no sketch there
+wires INT1 at all, so none of them is evidence about the CN9 pin 6 interrupt
+in either direction.

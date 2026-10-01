@@ -165,3 +165,28 @@ and libiio on this system, and criterion 4's interrupt half needs the shield
 back on the board, so the work continues on the card rather than on a restore
 of it. The archive exists so that the next project wanting the card costs
 seventeen minutes instead of an afternoon.
+
+## Raw register captures need the part woken first
+
+Friday 2 October 2026. Since the overlay declares `0x6b`, `st_lsm6dsx` owns
+it and **keeps the part in power-down when no buffer is enabled**. A raw
+burst read then returns a frozen register, and `i2ctransfer` refuses the
+address entirely without `-f`.
+
+    i2cget -f -y 1 0x6b 0x10        CTRL1. 0x00 is power-down
+    i2cset -f -y 1 0x6b 0x10 0x06   120 Hz on this part's ladder
+    for i in $(seq 1 800); do echo "$i $(i2ctransfer -f -y 1 w1@0x6b 0x28 r6)"; done > pose.txt
+    python3 ahrs.py --capture pose.txt --settle 200
+
+**The failure is silent and the symptom is two captures scoring identically.**
+Not an error, not an empty file: the same mean acceleration to four decimal
+places from two different poses. Check `CTRL1` before trusting any capture,
+and check that two poses differ before trusting either.
+
+Anything that hands the part back to the driver, a `sampling_frequency`
+write, an `in_accel_*_raw` read, or enabling a buffer, can return it to
+power-down. Raw `i2ctransfer` reads leave `CTRL1` alone.
+
+`-f` skips the claimed-address check, not the bus lock: the kernel's I2C core
+still serialises transactions, so a read cannot corrupt a driver transfer.
+It can, however, read a register the driver is about to change.
