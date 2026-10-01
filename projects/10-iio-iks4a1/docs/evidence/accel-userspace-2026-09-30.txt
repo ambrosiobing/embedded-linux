@@ -763,3 +763,36 @@ Verify the change by the raw counts rather than the scaled value: gravity
 should fall from about 16500 counts to about 4125, a factor of four. A
 decoder still dividing by 16384 would otherwise report a quarter g and
 look like a wiring fault.
+
+EIGHT G FULL SCALE CONFIRMED BY WHAT THE PART DID, Thursday 1 October 2026.
+
+  # i2cset -y 1 0x6b 0x17 0x02
+  # i2ctransfer -y 1 w1@0x6b 0x2c r2
+  0x1c 0x10
+
+0x101c is 4124 counts. At 4096 LSB per g that is 1.00684 g.
+
+Three things at once. The full-scale field is in CTRL8 at 0x17 with 0x02
+selecting eight g, which was written here from memory and is now measured
+rather than recalled. The scale is 4096 LSB per g. And the check needed no
+data sheet: the prediction was a count, the part returned that count, and a
+wrong register or a wrong bit position would have left gravity at about
+16500.
+
+AND THE CALIBRATION ERROR IS COMMON TO BOTH RANGES, which is new. Gravity
+reads 1.00680 g at two g full scale and 1.00684 g at eight g, a difference
+of 36 parts per million across a fourfold change of range.
+
+So the 0.68 percent by which this part reads high is not a per-range gain
+error. It is one sensitivity error in the part, and a single correction
+factor of 0.99324 nulls it at every range rather than needing a constant
+per setting. That is worth knowing before anyone writes a calibration
+table with four rows in it.
+
+It also rules out the local value of gravity as the explanation, which
+would have been worth about 40 parts per million here and not 6800, and
+rules out tilt, which lowers a Z reading rather than raising it.
+
+AND THE DECODER MUST CHANGE WITH THE REGISTER. Anything still dividing by
+16384 will report a quarter of a g from now on and read exactly like a
+wiring fault. The scale and the full-scale write belong in the same edit.
