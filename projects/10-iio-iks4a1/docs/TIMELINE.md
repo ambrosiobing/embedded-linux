@@ -445,8 +445,12 @@ and six of the eight by a measurement that cost a single command.
 
 **Decisions that are Joseph's, not this file's.**
 
-- Whether to restate criterion 8 so it tests the filter rather than the
-  fixture. A wording is proposed in the evidence.
+- ~~Whether to restate criterion 8.~~ **Settled Thursday 1 October 2026: no
+  restatement.** The criterion is meetable as written and `roll90b` already
+  met it, at roll +91.33 and pitch +0.32 from a pose 2.2 degrees off axis.
+  The verdict moves from defective to not met, pending four poses held by
+  hand rather than propped. The proposed restatement is neither adopted nor
+  withdrawn.
 - ~~Criterion 4's rate.~~ **Settled Thursday 1 October 2026: the criterion
   names 416 Hz or 480 Hz, whichever the part under test offers.** Both meet
   its arithmetic at watermark 64 and at watermark 1. 416 Hz is the classic ST

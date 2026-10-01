@@ -2562,3 +2562,78 @@ device-tree node that `0x6a` already needs to bind at boot.
 
 Recorded as a route rather than a plan. The first thing criterion 4 needs is
 still the 30 times storm on the wire that already exists.
+
+## 49. Criterion 8 was not defective, and the data had said so for a day
+
+*Thursday 1 October 2026.* Asked whether to restate criterion 8 or leave it
+marked defective, Joseph answered neither: *i can wobble it within 3 degrees.*
+
+He is right, and the project's own captures already proved it. **`roll90b`
+passes.** Held 2.2 degrees off axis, it reads roll +91.33 and pitch +0.32,
+both inside the 3 degree tolerance. One of the four poses met the criterion
+as written and nobody noticed, because the verdict had been reached from the
+other three.
+
+| pose | off axis | roll | pitch |
+|---|---|---|---|
+| flat | | +0.77 | +0.32 |
+| roll90 | 4.4 deg | +94.40 | +0.10 |
+| **roll90b** | **2.2 deg** | **+91.33** | **+0.32** |
+| pitch90 | 12.1 deg | +148.73 | -77.93 |
+| pitch90b | 6.8 deg | +177.24 | -82.43 |
+
+So "a board propped on a free edge sits 2 to 12 degrees off the axis" was a
+description of the worst poses presented as a property of the method. The best
+one is inside tolerance. The fixture was never the limit; the propping was.
+
+### And the ill-conditioning argument was right in mechanism and wrong in size
+
+The second reason given for calling the criterion defective was that roll is
+ill-conditioned near a pitch of 90 degrees, so a tolerance on it is a tolerance
+on a number the geometry does not fix. The mechanism is real: at exactly 90,
+gravity lies along the roll axis and roll is unobservable.
+
+But the size was never checked against this bench's own noise floor, which is
+**0.36 mg on X and Y**, measured on Wednesday 30 September 2026. At an angle
+d away from exact 90 the horizontal component is sin(d) g, so the roll
+uncertainty is about noise over sin(d):
+
+    d = 3 deg    0.052 g      0.40 deg
+    d = 1 deg    0.0175 g     1.18 deg
+    d = 0.5 deg  0.0087 g     2.37 deg
+    d = 0.2 deg  0.0035 g     5.9 deg
+
+**Roll exceeds a 3 degree tolerance only inside about 0.4 degrees of exact
+90**, which no hand-held pose will reach. The argument blocks a 0.1 degree
+criterion and says nothing about a 3 degree one.
+
+That is the second time today an objection of mine has been right about a
+mechanism and wrong about whether it matters, the first being the interrupt
+line. Both had the same shape: a real effect, named correctly, with no
+arithmetic put against the actual numbers on this bench. **A mechanism without
+a magnitude is a hypothesis wearing a conclusion's clothes**, and it is
+more persuasive than a wrong number because it cannot be checked at a glance.
+
+### The verdict changes, the count does not
+
+Criterion 8 moves from **criterion defective** to **not met, re-measurement
+pending**. Project 10 still reads seven of nine, but the eighth is now an
+honest "we have not taken this measurement properly" rather than "this
+criterion cannot be satisfied", and those are very different statements about
+whose fault it is.
+
+The restatement proposed in the evidence is not adopted and not withdrawn. It
+remains a better criterion in one respect, since orientation error against
+measured gravity does not care how squarely the board was held, and it is no
+longer needed to make this one passable.
+
+### What the re-measurement needs
+
+Four poses held by hand rather than propped: flat, 90 about roll each way, 90
+about pitch each way. The pose-quality check is already printed beside each
+capture, the gravity magnitude, which reads 1.0055 and 1.0059 g on the two
+good poses and 0.9960 on the worst. A pose whose magnitude is within a few mg
+of 1 g and whose off-axis figure is under 3 degrees is a pose worth scoring.
+
+The board is dismantled, so this waits for the next bench session, alongside
+the two wire experiments criterion 4 needs.
