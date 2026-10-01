@@ -1354,3 +1354,68 @@ with its falsifier, which is what entry 26 said to do. It still produced
 nothing, because the care went into the prediction and not into the
 protocol. Stating what will count as a refutation is worthless if the run
 that follows changes two things at once.
+
+---
+
+## 29. The tone is real, the hypothesis is dead, and the strongest line is probably the operator
+
+Entry on Thursday 1 October 2026.
+
+**The test worked, and it refuted me.** Two captures back to back, same
+grip, output rate the only deliberate change. At 30 Hz output the part
+band-limits near 15 Hz, so a mechanical line near 117 or 123 Hz is rejected
+before the decimator and cannot alias to anything at all.
+
+The tone is still there.
+
+| output rate | poll clock | unique | Z AC rms | Z peak |
+|---|---|---|---|---|
+| 120 Hz | 126.1 Hz | 3848/4000 | 6.56 mg | 2.71 Hz, 3.85 mg |
+| 30 Hz | 126.7 Hz | 957/4000 | 1.79 mg | 2.98 Hz, 0.94 mg |
+
+So it is a real low-frequency vibration of the board and never was a
+sampling artefact. Entry 26 proposed the beat, entry 27 predicted where it
+would move, entry 28 explained why moving it could not work, and this one
+closes it the other way: the idea was wrong.
+
+**It survives normalisation too, which is the part that makes it stick.**
+The excitation was weaker again in the second run, by a factor of nearly
+four. The tone scaled with it: peak over record AC rms is 0.59 at 120 Hz
+output and 0.53 at 30 Hz. The spectral shape held while the level moved.
+That is the comparison entry 28's run could not make, and it works here
+only because the ratio is taken **inside** each record instead of between
+two of them. When an experiment cannot hold a variable still, the next best
+thing is a quantity that does not care about it.
+
+**Neither file is at the rate in its name.** Both have a poll clock near
+126.4, measured. Reading the 30 Hz file as though it were sampled at 30
+makes every frequency 4.2 times too low and the record 133 seconds instead
+of 31.6. The filename records what the sensor was told; only the stopwatch
+records what the file is.
+
+**And the finding worth more than the one we went looking for.** The tone
+sits between 2.7 and 3.4 Hz across every capture and wanders from one to
+the next. That is far too slow for a motor or a cutter. A quantity that
+wanders between runs of the same apparatus is usually the part of the
+apparatus that is not bolted down, and here that is the hand. A hand
+pressing an object against a surface modulates the contact force at a few
+hertz.
+
+**The strongest line in this spectrum is most likely the person holding the
+shaver**, and this project has spent an evening characterising it. The test
+is free: tape or clamp the shaver to the board so no hand touches it, and
+capture again. If the tone weakens sharply or moves, it was the grip.
+
+**A correction carried over from the earlier reading.** The advice to raise
+the output rate to resolve the 12 to 25 Hz band is backwards for this
+setup. At 120 Hz the part band-limits to 60 Hz and the loop represents
+63.35, so that band is resolved with no folding, and the 120 Hz record does
+show it at 0.299 mg and 18.71 Hz. Raising the rate only lets content above
+the loop's Nyquist fold in. For this loop, 120 Hz output is the right
+setting, and it is the one that was accidentally chosen first.
+
+**The habit worth naming.** A hypothesis was proposed, predicted, defended,
+redesigned and finally killed by a test built around presence and absence
+rather than position. Four entries on something that turned out to be
+wrong, and the cost was right: the alternative was carrying it as an
+unexamined doubt behind every number this project goes on to produce.

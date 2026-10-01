@@ -498,3 +498,92 @@ vibration passes and a 117 Hz line is rejected before it can alias.
 
 And hold the shaver the same way for both captures this time, full run,
 same pressure, or the result is void again.
+
+THE MATCHED PAIR, Thursday 1 October 2026. Two captures back to back, same
+grip, output rate the only deliberate change. Both timed: 31.717 s and
+31.559 s for 4000 samples, so BOTH files have a poll clock near 126.4
+samples a second. Neither file is at the rate in its name. The name is the
+sensor's output rate; the file's sample clock is the loop.
+
+Reading the 30 Hz file as though it were sampled at 30 makes every
+frequency 4.2 times too low and the record 133 s instead of 31.6.
+
+  file                  poll clock   unique/4000   Z AC rms
+  120 Hz output         126.1 Hz      3848         6.56 mg
+   30 Hz output         126.7 Hz       957         1.79 mg
+
+Z PEAKS, BOTH ON THEIR OWN MEASURED CLOCK:
+
+  120 Hz output   2.71 Hz, 3.85 mg, cluster from 2.65 to 2.84
+   30 Hz output   2.98 Hz, 0.94 mg, cluster from 2.88 to 3.07
+
+THE TONE SURVIVES, AND THE BEAT HYPOTHESIS IS DEAD. At 30 Hz output the
+part band-limits near 15 Hz, so a mechanical line near 117 or 123 Hz is
+rejected before the decimator and cannot alias to anything. The tone is
+still there. It is a real low-frequency vibration of the board and it was
+never a sampling artefact.
+
+AND IT SURVIVES NORMALISATION, which matters because the excitation was
+weaker again in the second run: Z AC rms 6.56 against 1.79 mg. The tone
+scales with it almost exactly.
+
+  peak over record AC rms    0.59 at 120 Hz output, 0.53 at 30 Hz output
+
+The spectral shape held while the overall level changed by a factor of
+nearly four. That is the comparison the earlier 240 Hz run could not make,
+and it works here only because the ratio is taken inside each record
+rather than between them.
+
+WHAT THE TONE PROBABLY IS, AND IT IS NOT THE SHAVER'S MECHANISM. Between
+2.7 and 3.4 Hz across every run, wandering from one capture to the next.
+That is far too slow for a motor or a cutter, and a quantity that wanders
+between runs of the same apparatus is usually the part of the apparatus
+that is not bolted down. The hand holding the shaver against the board
+modulates the contact force at a few hertz. The strongest line in this
+spectrum is most likely the operator.
+
+That is testable and the test is free: tape or clamp the shaver to the
+board so no hand touches it, and capture again. If the tone weakens sharply
+or moves, it was the grip. If it holds at the same frequency and relative
+strength, it belongs to the machine.
+
+A CORRECTION TO THE ADVICE TO RAISE THE OUTPUT RATE. 208 and 416 Hz are not
+rates this part offers; the ladder here is 120, 240, 480, 960. More
+importantly, raising it is the wrong direction. At 120 Hz output the part
+band-limits to 60 Hz and the loop can represent 63.35, so the whole 12 to
+25 Hz band is resolved with no folding, and the 120 Hz record does show it,
+0.299 mg at 18.71 Hz. At 240 Hz output the part passes to 120 Hz and
+everything above 63.35 folds in. 120 Hz output is the correct setting for a
+126 Hz loop. That 30 Hz is too low to see the 12 to 25 Hz band is the one
+part of the earlier reading that was right.
+
+THREE REFINEMENTS TO THE ABOVE.
+
+ONE, THE LINE IS NOT AT 0.0270 AND SHOULD NOT BE FORCED THERE. It is a hump
+from about 0.021 to 0.026 cycles per sample, 2.7 to 3.3 Hz, on Z in both
+shaver files and absent from both quiet ones. The 0.0270 of the 240 Hz work
+is a neighbouring bin from a different session with a different grip, not
+the same line measured again. Carrying a number forward across sessions
+because it is nearly the same is how a hump becomes a spurious constant.
+
+TWO, THE AMPLITUDE DROP AT 30 Hz IS THE EXCITATION, NOT THE FILTERING. It
+is tempting to attribute 3.85 mg falling to 0.94 mg to the part's
+anti-alias filter and the four-fold sample repetition. Neither can do it.
+The filter sits near 15 Hz and barely touches 3 Hz. The zero-order hold
+from reading each sample about four times is a hold of 31.6 ms, which at
+2.98 Hz attenuates by about 1.4 percent.
+
+What did change is the excitation: Z AC rms 6.56 against 1.79 mg, a factor
+of 3.7, against a peak ratio of 4.1. And the peak over the record's own AC
+rms is 0.59 against 0.53. The hand pressed harder in the first run. The
+mechanism matters because attributing it to the filter would imply the
+30 Hz setting suppresses a 3 Hz signal, and it does not.
+
+THREE, THE 57 Hz CONTENT IN THE 120 Hz FILE IS PROBABLY NOT AN ALIAS. At
+120 Hz output the part passes to 60 Hz and the loop at 126.1 represents to
+63.05, so the sensor's whole output band fits inside the loop's band and
+nothing folds. Content at 57 Hz is most likely content at 57 Hz. A
+structural mode of the shield on its header pins is the natural candidate,
+and a tap test settles it: strike the board once, capture, and read the
+ring-down frequency, which is a property of the assembly and needs no
+shaver at all.
