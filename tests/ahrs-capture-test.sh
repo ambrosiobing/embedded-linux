@@ -165,12 +165,14 @@ contains "naming the threshold it failed" "$out" "50 mg"
 
 out=$("$PY" "$SUT" --capture "$WORK/flat.txt" --scale 4096 --settle 1000 2>&1)
 contains "the scale flag is applied" "$out" "4096 LSB per g"
-contains "a two g capture decoded at eight g reads four times too much" 	"$out" "4.0000 g"
+contains "a two g capture decoded at eight g reads four times too much" \
+	"$out" "4.0000 g"
 contains "which the magnitude check refuses" "$out" "WARNING"
 
 hold eightg.txt "0x00 0x00 0x00 0x00 0x00 0x10"
 out=$(run eightg.txt)
-contains "and an eight g capture decoded at two g reads a quarter" 	"$out" "0.2500 g"
+contains "and an eight g capture decoded at two g reads a quarter" \
+	"$out" "0.2500 g"
 contains "which it also refuses" "$out" "WARNING"
 
 # --------------------------------------------- damaged lines are not data

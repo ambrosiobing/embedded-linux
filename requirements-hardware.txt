@@ -1,0 +1,31 @@
+# Dependencies that only mean anything with an instrument attached.
+#
+#     pip install -r requirements-hardware.txt
+#
+# THE TEST SUITE NEVER INSTALLS THIS FILE, and that is its purpose. Every
+# suite in tests/ runs against stubs, fake sysfs trees and synthesised
+# captures, so a laptop with no board installs requirements.txt alone and
+# gets a green run. Keeping these lines out of that file is what makes
+# "the suite passes" mean the same thing on a machine with hardware and a
+# machine without.
+
+# ppk2-api drives the Nordic Power Profiler Kit II, which Project 3 uses
+# to measure boot time and energy per boot.
+#
+# UNPINNED, and the reason is worth keeping rather than fixing wrongly.
+# The library has renamed its digital-channel helpers between releases and
+# projects/03-boot-energy/measure/ppk2_boot.py calls get_samples() and
+# digital_channels(). The right version is whichever one those two names
+# work in, and nothing on this bench has yet recorded a boot through the
+# instrument, so no version has been verified against them.
+#
+# The earlier copy of this instruction, in
+# projects/03-boot-energy/measure/requirements.txt, said to pin the
+# verified version and record it in the journal, and then pinned nothing
+# for a week and a half. Writing a plausible number here would make that
+# worse rather than better: an unpinned line is a known gap, and a pin
+# nobody checked is a gap that looks closed.
+#
+# Pin it the first run that produces a CSV, and say in Project 3's journal
+# which version produced it.
+ppk2-api

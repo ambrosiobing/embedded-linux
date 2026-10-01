@@ -1,9 +1,12 @@
-# Host side only. Nothing here goes on the board.
+# This project's dependencies live in the repository root, because they
+# are not only this project's: numpy and matplotlib are needed by Project
+# 8's analysis too, and three copies of an unpinned list is how they
+# drift apart.
 #
-# ppk2-api has renamed its digital-channel helpers between releases, and
-# measure/ppk2_boot.py calls get_samples() and digital_channels(). Pin the
-# version that was verified on this bench rather than tracking the tip,
-# and record in the journal which one it was.
-ppk2-api
-numpy
-matplotlib
+#     pip install -r ../../../requirements.txt            the suite
+#     pip install -r ../../../requirements-hardware.txt   the PPK2
+#
+# This file previously carried ppk2-api, numpy and matplotlib with a
+# comment instructing that the verified version be pinned, and pinned
+# none of them. The root files keep that instruction and say, for each
+# line, whether it was verified and by what.

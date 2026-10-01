@@ -1,0 +1,49 @@
+# What the test suite needs, and nothing else.
+#
+#     python3 -m venv .venv
+#     . .venv/bin/activate          # .venv\Scripts\activate on Windows
+#     pip install -r requirements.txt
+#
+# Hardware-only dependencies are in requirements-hardware.txt and are
+# deliberately NOT here, so that a machine with no board can install this
+# file and run every suite that does not need one. Installing them
+# together is how a laptop ends up carrying a driver for an instrument it
+# has never been connected to.
+#
+# CI does not use this file. It installs python3-numpy through apt,
+# because the runner is a Debian image and the distribution package is
+# what the rest of its toolchain expects. That is a second environment
+# with its own versions, which is worth knowing when a test passes here
+# and fails there.
+
+# Verified on the win11 aquamarine authoring laptop, Thursday 1 October
+# 2026, python 3.12.10. This one is not a guess: it computed the spectra,
+# the band energies and the noise floors of Project 10's captures that
+# day, and tests/rt-analyze-test.sh checks Project 8's edge-timing
+# arithmetic with it.
+numpy==2.4.3
+
+# Importable on that laptop and NOT exercised by anything there. The plot
+# paths of rt-plot, rt-matrix and boot-energy-analyze need it, and the
+# only assertion any suite makes about matplotlib on this host is
+# boot-energy-analyze-test.sh checking that a missing matplotlib is
+# refused rather than skipped. So this pin records what was present, not
+# what was proven.
+matplotlib==3.11.1
+
+# Project 4's hardware-in-the-loop runner is pytest, and that runner has
+# never been run: it needs a board, a TFTP server and a serial console.
+# Present on the laptop, unexercised.
+pytest==9.1.1
+
+# UNPINNED ON PURPOSE, and the only line here that is.
+#
+# projects/04-netboot-hil/runner/console.py imports serial. pyserial is
+# absent from every machine this repository has been checked out on, so
+# no version has been verified and writing one here would be a number
+# with nothing behind it. The file that pins ppk2-api carries the same
+# warning and then pinned nothing, which is how it reached today.
+#
+# Pin it the first time Project 4's runner talks to a board, and say in
+# that project's journal which version it was.
+pyserial

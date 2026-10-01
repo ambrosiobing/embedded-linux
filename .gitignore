@@ -54,3 +54,8 @@ __pycache__/
 # take it without comment and the history would be public.
 router.conf
 wifi.conf
+
+# A virtual environment lives in the repository root, per the standing
+# rule, and never in the repository. requirements.txt says how to make
+# one.
+.venv/
