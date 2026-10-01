@@ -55,12 +55,25 @@
  *
  * NEITHER NODE IS ADDED YET, and the reason differs for each.
  *
- * For 0x19 the condition is the one this file already states and has now
- * been honoured once: confirm "st,lis2duxs12" is in the running kernel
- * before writing a node, rather than assuming it from a version number.
- * The check is modules.alias and the module tree in /lib/modules, NOT a
- * grep of /usr/src: only selected directories were ever extracted from
- * linux-source-6.18, so a missing file there means a missing extraction.
+ * FOR 0x19 THE CHECK WAS RUN AND IT FAILED, Thursday 1 October 2026:
+ *
+ *     grep -iE "lis2duxs12|stts22h" /lib/modules/$(uname -r)/modules.alias
+ *     find /lib/modules/$(uname -r) -iname "*lis2dux*" -o -iname "*stts22*"
+ *
+ * Both returned nothing. st_lis2duxs12 is in mainline but it is NOT in this
+ * image, so a node here would be created, bind to nothing, and leave the
+ * part silent rather than absent, which is the same failure 0x38 is kept
+ * out for and for a different underlying reason. iio-probe reports the two
+ * differently now, no-driver-in-image against out-of-tree, because the fix
+ * differs: one needs an image that carries the module, the other needs the
+ * driver vendored the way st_lsm6dsx was.
+ *
+ * The check was modules.alias and the module tree, NOT a grep of /usr/src:
+ * only selected directories were ever extracted from linux-source-6.18 on
+ * that card, so a missing file there means a missing extraction, and
+ * reading it otherwise is the error that kept 0x6a closed for two days.
+ *
+ * Add the node when the module is in the image, and not before.
  *
  * For 0x38 there is a stronger reason to wait. st,stts22h lives in ST's
  * IIO tree rather than in mainline, so on a mainline-only kernel the node
@@ -72,7 +85,7 @@
  * ADDRESSES, measured Wednesday 30 September 2026 and confirmed against
  * UM3239 Rev 5 Table 1, whose defaults these all are:
  *
- *   0x19  LIS2DUXS12    ADD 33h, needs i2cdetect -r, no node here yet
+ *   0x19  LIS2DUXS12    ADD 33h, needs i2cdetect -r, driver not in image
  *   0x1e  LIS2MDL       ADD 3Ch, bound below
  *   0x38  STTS22H       ADD 71h, no node here, driver is out of mainline
  *   0x44  SHT40AD1B     ADD 89h, hwmon not IIO, vanishes under -r, bound below

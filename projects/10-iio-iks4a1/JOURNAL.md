@@ -2801,3 +2801,80 @@ changed it, deliberately, as an experiment, and then forgot.
 
 A control is not finished when it produces its number. It is finished when
 the system is put back.
+
+## 52. The tool that was right, taught to say so, and a criterion that now fails itself
+
+*Thursday 1 October 2026, late.* Three changes, and the first is the one
+that would otherwise have reopened a two-day mistake on every run.
+
+### iio-probe calls undeclared parts undeclared
+
+`PARTS` carried `driver=none` for `0x19` and `0x38`, and `driver=none` was
+wired straight to `unsupported`. Both parts are supported. ST's own shield
+overlay instantiates `lis2duxs12@19` and `stts22h@38`. The word was wrong
+twice and the table would have kept printing it.
+
+Four verdicts where there were two: `undeclared`, `out-of-tree`,
+`no-driver-in-image`, `unsupported`. The table gained the device-tree
+compatible and which tree the driver lives in, and `client_at` was added,
+which asks the question nothing had asked: **has anything ever created an
+I2C client at this address at all?** No client means no node, and no node
+means the overlay.
+
+`out-of-tree` is asked before the image question, because "built without the
+module" is the wrong answer for a driver no mainline image could carry. It
+is declared in the table rather than probed, since an absent module cannot
+distinguish "not in this image" from "not in any image".
+
+### The 0x19 check was run and it failed
+
+The condition the overlay set for adding a node, confirm the compatible is
+in the running kernel, was honoured for `0x6a` and has now been honoured for
+`0x19` with the opposite result:
+
+    grep -iE "lis2duxs12|stts22h" /lib/modules/$(uname -r)/modules.alias
+    find /lib/modules/$(uname -r) -iname "*lis2dux*" -o -iname "*stts22*"
+
+Both empty. `st_lis2duxs12` is in mainline and **not in this image**, so the
+node stays out: it would be created, bind to nothing, and leave the part
+silent rather than absent. Same failure as `0x38`, different cause, and the
+two now read differently because the fixes differ. One needs an image that
+carries the module; the other needs the driver vendored the way
+`st_lsm6dsx` was.
+
+This is the first time on this bench that a check set as a precondition has
+been run and come back negative, and the node was not written anyway. That
+is the whole value of writing the precondition down.
+
+### Criterion 4 is now arithmetic the program does itself
+
+A hardware FIFO at rate R with watermark W interrupts R/W times a second.
+`iio-rate` printed the measurement beside it and left the division to
+whoever was reading, on a bench where the two are thirty times apart. It now
+prints `expected`, prints the ratio, and **exits 3 above a ratio of 2**.
+
+Two is loose deliberately. The point is to catch a line that rings, not to
+fail a run that batched slightly differently, and the only fault this has
+ever seen is a factor of thirty.
+
+The failure message says what a healthy line reads, 0.00 per second and no
+samples with the wire unplugged, because that control is the thing that
+turned this from an argument into a measurement and the next person should
+not have to rediscover it.
+
+### The storm test needed a concurrent writer, and that needed care
+
+`iio-rate` reads `/proc/interrupts`, backgrounds `dd`, sleeps for the
+duration, and reads again. The only lever on a counter the program reads
+itself is to change the file during that sleep. A first attempt put the
+write in the `iio-decode` stub, which runs outside the window and changed
+nothing: the ratio stayed at 0.0 and the assertion failed for the wrong
+reason.
+
+The working version is a writer that increments the counter every tenth of
+a second throughout, killed afterwards. **Written as a monotonic series
+rather than one timed write on purpose:** a single write has to land after
+the first read and before the second, which is a race against setup time,
+whereas a series cannot miss, because whenever the first read happens the
+next write is larger. This suite has already shipped one flaky assertion and
+that is one more than it should have.

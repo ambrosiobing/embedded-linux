@@ -267,6 +267,75 @@ contains "and refuse to be called a latency measurement" \
 check "a row is written to the results file" \
 	"$(grep -c '^20\|^19' "$WORK/results/rates.csv" 2>/dev/null || echo 0)" "1"
 
+# ------------------------- criterion 4 is arithmetic, so it is checked here
+#
+# A hardware FIFO at rate R with watermark W interrupts R/W times a second.
+# This program printed the measurement and left the division to the reader
+# until Thursday 1 October 2026, on a bench where the two are 30 times
+# apart: 7.5 per second expected at 480 Hz over a watermark of 64, and
+# 225.60 measured.
+
+out=$(run_fifo 480 64 || true)
+contains "the expected interrupt rate is printed, not left to the reader" \
+	"$out" "expected   7.50/s from 480 Hz over a watermark of 64"
+contains "and the ratio beside it" "$out" "ratio      "
+
+# The quiet fixture never advances /proc/interrupts, so the delta is zero
+# and so is the ratio. That is the passing case and it must not exit
+# non-zero, or every other assertion in this file would be measuring the
+# wrong thing.
+status=0
+run_fifo 480 64 >/dev/null 2>&1 || status=$?
+check "a ratio inside the limit exits zero" "$status" "0"
+
+# Now a storm.
+#
+# The program reads /proc/interrupts, backgrounds dd, sleeps for the
+# duration, then reads /proc/interrupts again. The only lever on a counter
+# it reads itself is to change the file DURING that sleep, so a writer runs
+# alongside and increments it the whole time.
+#
+# Written as a loop rather than one timed write on purpose. A single write
+# has to land after the first read and before the second, which is a race
+# against setup time; a monotonic series cannot miss, because whenever the
+# first read happens the next write is larger. This suite has already
+# shipped one flaky assertion and that is one more than it should have.
+(
+	i=200
+	while [ "$i" -lt 2000 ]; do
+		printf '%s' " 185:   $i   $i   $i   $i  pinctrl-bcm2835  24 Edge  lsm6dsx" \
+			>"$WORK/proc/interrupts"
+		i=$((i + 100))
+		sleep 0.1
+	done
+) &
+bumper=$!
+
+status=0
+out=$(run_fifo 480 64) || status=$?
+kill "$bumper" 2>/dev/null || true
+wait "$bumper" 2>/dev/null || true
+
+contains "a storm is named as a failure rather than printed as a number" \
+	"$out" "FAIL  the interrupt rate is more than twice"
+contains "and it says what a healthy line reads" "$out" "0.00 and no"
+check "and the run exits non-zero" "$status" "3"
+
+# Restore the quiet stub, so anything added after this file is not run
+# against a storming fixture by accident.
+cat >"$WORK/bin/iio-decode" <<'STUB'
+#!/bin/sh
+cat <<'CSV'
+in_accel_x,in_accel_y,in_accel_z,in_timestamp
+1,2,3,1000000
+1,2,3,2000000
+1,2,3,3000000
+CSV
+STUB
+chmod +x "$WORK/bin/iio-decode"
+printf '%s' ' 185:   100   101   102   103  pinctrl-bcm2835  24 Edge  lsm6dsx' \
+	>"$WORK/proc/interrupts"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

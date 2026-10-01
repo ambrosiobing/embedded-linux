@@ -396,6 +396,40 @@ emit() {
 			note "           the configured rate. See docs/DESIGN.md."
 		fi
 	fi
+	# ------------------------------------ criterion 4, checked rather than read
+	#
+	# A hardware FIFO at rate R with watermark W interrupts R/W times a
+	# second. That is arithmetic, not a measurement, and until Thursday 1
+	# October 2026 this program printed the measurement beside it and left
+	# the division to whoever was reading.
+	#
+	# They are 30 times apart on this bench: 7.5 per second expected at
+	# 480 Hz over a watermark of 64, and 225.60 measured. A control with the
+	# interrupt wire unplugged gave 0.00 per second and ZERO SAMPLES, so the
+	# extra edges are real and arrive down the wire rather than being picked
+	# up by the GPIO.
+	#
+	# A ratio above 2 exits non-zero. Two is loose on purpose: the point is
+	# to catch a wire that rings, not to fail a run that batched slightly
+	# differently, and the one fault this has ever seen is a factor of
+	# thirty.
+	if [ "$path" = fifo ] && [ -n "${watermark:-}" ]; then
+		_expected=$(awk -v h="$hz" -v w="$watermark" 			'BEGIN { printf "%.2f", (w > 0) ? h / w : 0 }')
+		_ratio=$(awk -v m="$irq_rate" -v e="$_expected" 			'BEGIN { printf "%.1f", (e > 0) ? m / e : 0 }')
+		note "expected   ${_expected}/s from ${hz} Hz over a watermark of $watermark"
+		note "ratio      ${_ratio}x measured over expected"
+		if [ "$(awk -v r="$_ratio" 'BEGIN { print (r > 2) ? 1 : 0 }')" = 1 ]; then
+			note "FAIL  the interrupt rate is more than twice what the"
+			note "      watermark predicts, so the line is carrying edges"
+			note "      the FIFO did not ask for. Criterion 4 wants fewer"
+			note "      than 8 per second. Unplug the wire at the shield"
+			note "      and run again: a healthy line gives 0.00 and no"
+			note "      samples, which is how the edges were shown to be"
+			note "      real rather than GPIO pickup."
+			IRQ_VERDICT=fail
+		fi
+	fi
+
 	note "row        $csv"
 }
 
@@ -405,3 +439,9 @@ trigger) shift; [ $# -ge 2 ] || usage; do_trigger "$@" ;;
 fifo) shift; [ $# -ge 3 ] || usage; do_fifo "$@" ;;
 *) usage ;;
 esac
+
+# A measurement that disagrees with its own arithmetic is a failure, and
+# until this exit existed the only way to notice was to read two lines
+# and divide. 3 rather than 1 or 2, which are already the usage and
+# missing-device refusals.
+[ "${IRQ_VERDICT:-ok}" = ok ] || exit 3
