@@ -22,7 +22,6 @@ Nothing is lost that matters. The kernel source package, the headers and
 modprobe industrialio
 modprobe industrialio-triggered-buffer
 modprobe regmap-i2c
-echo lsm6dso16is 0x6a > /sys/bus/i2c/devices/i2c-1/new_device
 insmod /root/build-st/st_lsm6dsx.ko
 insmod /root/build-st/st_lsm6dsx_i2c.ko
 insmod /root/build-magn/st_sensors.ko
@@ -35,8 +34,12 @@ modprobe iio-trig-hrtimer
 systemctl restart iiod
 ```
 
-**The `new_device` line is what binds `0x6a`, and it is not a workaround for
-a missing driver.** `st_lsm6dsx` has always carried `st,lsm6dso16is`; what is
+**The `new_device` line is gone, Thursday 1 October 2026.** The overlay now
+declares `st,lsm6dso16is` at `0x6a` and it binds at boot: six IIO devices from
+the sequence above with nothing instantiated by hand. What follows is kept
+because it explains why that node was needed and what it does not do.
+
+**The old note.** `st_lsm6dsx` has always carried `st,lsm6dso16is`; what is
 missing is any device-tree node declaring a device at that address, and I2C
 does not probe blind. Instantiating the client by name matches the driver's
 own I2C ID table. It is placed before the `insmod` so the driver meets a

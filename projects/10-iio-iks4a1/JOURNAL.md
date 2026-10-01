@@ -2878,3 +2878,78 @@ the first read and before the second, which is a race against setup time,
 whereas a series cannot miss, because whenever the first read happens the
 next write is larger. This suite has already shipped one flaky assertion and
 that is one more than it should have.
+
+## 53. The wire was never the fault, the request was
+
+*Thursday 1 October 2026, 23:35.* One word in the device tree, `<24 1>` to
+`<24 4>`, rising edge to level high. Same wire, same pin, same shield, same
+ten minutes:
+
+| | edge | level |
+|---|---|---|
+| interrupts | 3269 | **23** |
+| per second | 326.90 | **2.30** |
+| ratio to expected | 43.6x | 0.3x |
+| samples | 4672 (73 x 64) | 4608 (72 x 64) |
+| reader CPU | 0.50 % | 0.60 % |
+
+**A 142-fold reduction with sample delivery unchanged**, both counts exact
+multiples of the watermark. The 3246 edges that vanished were never carrying
+data.
+
+INT1 is push-pull and stays asserted while the FIFO is above its watermark.
+An edge-triggered request counts every transition in the bounce train on a
+long unterminated wire. A level-sensitive one asks whether the line is high
+when it looks, and a ring that settles before the handler runs is invisible
+to it.
+
+**For four days this project recommended a shorter jumper or a few hundred
+ohms in series at CN9 pin 6.** That recommendation appears in the README, in
+`RESUME.md`, in three journal entries and in two evidence files. It was
+wrong. The wire was fine. What was wrong was asking the kernel to count
+edges on a line whose information is in its level.
+
+### What the measurements had already said, and what they had not
+
+The control, wire unplugged, 0.00 per second and zero samples, proved the
+edges were real and arrived down the wire rather than being picked up by the
+GPIO. That was correct and it is unaffected.
+
+What it could not say, and what nothing asked, is **whether a real edge and
+a useful edge are the same thing.** A ring is real. It is on the wire. It is
+also not information, and the way to stop counting it was never to make the
+wire quieter.
+
+The 23 to 51 times figure, and tonight's 43.6, were all measuring the same
+thing correctly and attributing it to the wrong place. The number that
+should have been suspicious is the one this project printed on its first day
+and never interrogated: **the factor was never constant.** A reflection on a
+fixed length of wire into a fixed impedance has no reason to vary by a factor
+of two between runs. A bounce train sampled by an edge detector does.
+
+### Criterion 4, half met in a new place
+
+The first threshold is now met with room to spare: 2.30 interrupts per
+second against a limit of 8, and 0.60 per cent reader CPU against 3.
+
+The contrast clause is not, and cannot be. It asks for **more than 400 per
+second at watermark 1**, and a level-sensitive line gives 15.60, because it
+coalesces: 4684 samples over 156 interrupts is 30 samples each. Batching is
+still demonstrated, 15.60 down to 2.30 per second and 1.50 down to 0.60 per
+cent CPU with the sample count unchanged, but the number 400 assumes one
+interrupt per sample, and that is a property of edge triggering rather than
+of the hardware.
+
+**So the clause can only be satisfied by the configuration that was just
+shown to be broken.** That is the same shape as criterion 8: a number
+written from an assumption rather than from a measurement, which the
+measurement then contradicts. It is a decision for Joseph and not a thing to
+be measured harder.
+
+### And the ratio check earned itself on its first real run
+
+`iio-rate` grew a criterion 4 check an hour before this experiment, printing
+expected against measured and exiting 3 above a ratio of 2. It exited 3 on
+the edge-triggered baseline and 0 on the level-triggered run, with no human
+dividing anything. The experiment that found this fix was scored by a
+program written before anybody knew there was a fix to find.

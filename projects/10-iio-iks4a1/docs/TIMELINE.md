@@ -335,6 +335,10 @@ throughput.
 | 22:50 | `0x6a` gets a device-tree node, with no interrupt property because its INT1 is on CN8 pin 6 and unwired | `022e82d` |
 | 23:20 | Three more explanations for one timeout, all wrong. The interrupt wire was still unplugged from the control experiment | |
 | 23:30 | Wire back on CN9 pin 6: 201 lines in 0.504 s at 480 Hz, 5 lines in 0.873 s at 7.5 Hz. **The first explanation was the right one** | |
+| 23:24 | The overlay gains the `0x6a` node and is compiled onto the card. Six IIO devices at boot, no `new_device` | `022e82d` |
+| 23:28 | `iio-rate`'s criterion 4 check runs on hardware for the first time: 43.6x, FAIL, exit 3 | `fd15464` |
+| 23:35 | **`interrupts = <24 4>` instead of `<24 1>`.** 3269 interrupts become 23, samples unchanged. Criterion 4's first threshold is met | |
+| 23:40 | And its contrast clause cannot be: a level line coalesces, so watermark 1 gives 15.60/s where the criterion wants 400 | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile

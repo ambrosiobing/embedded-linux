@@ -151,6 +151,41 @@
 			 * output data rates changes the FIFO packet pattern
 			 * and with it the driver's timestamp reconstruction.
 			 *
+			 * LEVEL HIGH, NOT RISING EDGE, AND THIS IS THE FIX
+			 * FOR CRITERION 4 RATHER THAN A PREFERENCE.
+			 *
+			 * This read <24 1> until Thursday 1 October 2026, and
+			 * for four days the project recorded 23 to 51 spurious
+			 * edges per real FIFO assertion and recommended a
+			 * shorter jumper or a few hundred ohms in series.
+			 * Measured either way on the same wire, same pin, same
+			 * shield, same minute:
+			 *
+			 *   <24 1> edge    3269 interrupts, 326.90/s, 4672 samples
+			 *   <24 4> level     23 interrupts,   2.30/s, 4608 samples
+			 *
+			 * A 142-fold reduction with the sample delivery
+			 * unchanged, both counts exact multiples of the
+			 * watermark. The 3246 edges that disappeared were never
+			 * carrying data.
+			 *
+			 * INT1 is push-pull and stays asserted while the FIFO
+			 * is above its watermark. An edge-triggered request
+			 * counts every transition in the bounce train on a
+			 * long unterminated wire; a level-sensitive one asks
+			 * whether the line is high when it looks, and a ring
+			 * that settles before the handler runs is invisible to
+			 * it. The wire was never the fault. The request was.
+			 *
+			 * A level request also coalesces: the handler drains
+			 * whatever is there, so 23 interrupts carried 4608
+			 * samples, about three watermark batches each. That is
+			 * why the measured rate is BELOW what watermark
+			 * arithmetic predicts rather than equal to it, and it
+			 * is also why criterion 4's contrast clause, which
+			 * wants more than 400 per second at watermark 1, reads
+			 * 15.60 instead. That clause assumes edge semantics.
+			 *
 			 * st,drdy-int-pin selects which of the chip's two
 			 * interrupt pins the driver uses for data-ready and
 			 * FIFO watermark events. 1 means INT1, which is the
@@ -167,7 +202,7 @@
 				compatible = "st,lsm6dsv16x";
 				reg = <0x6b>;
 				interrupt-parent = <&gpio>;
-				interrupts = <24 1>;	/* GPIO24, rising edge */
+				interrupts = <24 4>;	/* GPIO24, LEVEL HIGH */
 				st,drdy-int-pin = <1>;
 			};
 
