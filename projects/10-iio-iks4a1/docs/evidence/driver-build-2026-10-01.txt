@@ -155,3 +155,45 @@ the table in the source that is already unpacked, rather than guessed at.
 
 And the grid now carries TWO claimed addresses, 0x44 and 0x6b both reading
 UU, where it carried one this morning.
+
+THE INTERRUPT, AND A RATE CRITERION 4 CANNOT USE
+------------------------------------------------
+
+    185:   0  0  0  0   pinctrl-bcm2835  24  Edge   lsm6dsx
+
+The kernel registered the interrupt on GPIO24, edge-triggered, named by
+the driver. That confirms Wednesday's wiring from a third direction: the
+jumper to CN9 pin 6 was placed from UM3239 Table 4, and the kernel has now
+claimed the line the overlay said it would. Counts are zero, which is
+correct until a buffer is enabled, and is the number to watch when one is.
+
+The full buffered path is present: buffer, buffer0, scan_elements, events
+and current_timestamp_clock.
+
+    sampling_frequency_available
+    7.500 15.000 30.000 60.000 120.000 240.000 480.000 960.000
+
+CRITERION 4 NAMES 416 Hz AND THIS PART CANNOT PRODUCE IT. The ladder here
+is the power-of-two one, 7.5 through 960. 416 Hz belongs to the LSM6DSO
+and LSM6DS3 family, so the criterion was written against a different
+part's data sheet, before the shield was identified.
+
+This is the same class of defect as criterion 8: a number fixed in an
+acceptance table before the hardware it describes was known.
+
+IT IS REPAIRABLE WITHOUT WEAKENING ANYTHING, which criterion 8 was not.
+The criterion's two thresholds are fewer than 8 interrupts a second at
+watermark 64, and more than 400 at watermark 1. Those came from 416/64 =
+6.5 and 416. Substituting the nearest available rate:
+
+    480 / 64 = 7.5 interrupts a second    still under 8
+    480 / 1  = 480 interrupts a second    still over 400
+
+So 480 Hz satisfies both bounds as written, and the only edit the criterion
+needs is the rate itself. The thresholds survive, the comparison it was
+built to make survives, and nothing is being relaxed to fit a result.
+
+Worth noticing that 7.5 against a limit of 8 is a six percent margin where
+416 Hz would have given twenty. The substitution is sound but it is no
+longer comfortable, and a watermark of 64 at 480 Hz is close enough to the
+limit that an undervoltage event during the run could push it over.
