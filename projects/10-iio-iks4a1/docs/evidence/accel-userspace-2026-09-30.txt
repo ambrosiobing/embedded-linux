@@ -796,3 +796,56 @@ rules out tilt, which lowers a Z reading rather than raising it.
 AND THE DECODER MUST CHANGE WITH THE REGISTER. Anything still dividing by
 16384 will report a quarter of a g from now on and read exactly like a
 wiring fault. The scale and the full-scale write belong in the same edit.
+
+THE EIGHT G TAP SET, Thursday 1 October 2026. Five taps, 5 to 7 s apart,
+poll 125.55 Hz, decoder at 4096 LSB per g giving Z mean 1.006 g. Peaks from
+2.42 to 3.71 g and none at the rail, which confirms that the earlier two g
+set was clipped and that its peaks were never measured.
+
+THERE IS A REPEATABLE RING AND A TWO SECOND WINDOW HIDES IT. The transient
+lasts about 0.25 s, so in a 2 s window it occupies an eighth of the record
+and its amplitude is diluted accordingly. Taking only the 32 samples after
+each peak, which is 0.25 s:
+
+  tap      peak above g   zero crossings   implied   32-sample FFT peak
+  3.40 s      2.699 g        19 in 0.247 s   38.5 Hz   27.5 Hz,  75.7 mg
+  10.01 s     1.415 g        19              38.5 Hz   31.4 Hz,  49.0 mg
+  15.84 s     1.986 g        17              34.4 Hz   23.5 Hz, 101.1 mg
+  21.86 s     2.539 g        12              24.3 Hz    3.9 Hz,  74.7 mg
+  27.28 s     2.449 g        10              20.2 Hz   23.5 Hz, 107.1 mg
+
+Against a flat scatter of 0.2 to 0.3 mg reported from the 2 s windows,
+these are 49 to 107 mg. The ring was never absent. The window was wrong.
+
+THE DECAY IS THE MORE USEFUL NUMBER, and it is why the frequency is soft.
+Envelope in 32 ms blocks after the peak, tap at 3.40 s: 2.699, 1.194,
+0.189, 0.029 g. That is a time constant near 39 ms, and at about 28 Hz it
+is roughly one cycle to 1/e, so Q is around 3.
+
+A ring with Q near 3 has a fractional bandwidth near a third, so a mode
+centred at 28 Hz spreads from about 19 to 37 Hz. The spread actually
+observed across five taps is 20 to 38 Hz. **The five numbers are consistent
+with one heavily damped mode, not five modes**, and the apparent scatter is
+that mode's own bandwidth rather than measurement noise.
+
+SO THE TAP DOES NOT SUPPORT 57 Hz. The transient energy centres near 25 to
+30 Hz, not 57. The 57 Hz seen in the handheld shaver record remains
+unexplained, is not corroborated here, and is not a tap-excitable
+structural mode of this assembly.
+
+AND IT REMAINS CONSISTENT WITH THE 3 TO 5 Hz RESULT. The tap excites around
+28 Hz and nothing at 3 to 5 Hz, which is the same conclusion the two g set
+reached by a different route.
+
+THE HONEST LIMIT. At 125.55 Hz a 28 Hz oscillation is 4.5 samples per cycle
+and the whole ring is two or three cycles. The frequency is an estimate
+with a large uncertainty, the Q more so. What is solid is that a ring
+exists, that it is short, that it is repeatable across five impulses, and
+that it is nowhere near 57 Hz.
+
+THE EIGHT G NOISE COST IS NOT RESOLVABLE HERE, as predicted at two percent.
+The quiet stretches give 0.48 / 0.41 / 0.52 mg against 0.42 / 0.37 / 0.58
+at two g, which scatters in both directions. An RMS estimate from a few
+thousand samples carries about one percent of standard error, so a two
+percent effect is at the edge, and these stretches are contaminated by tap
+tails besides. The prediction stands unrefuted and untested.

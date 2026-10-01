@@ -1539,3 +1539,62 @@ produced a number that looked like a finding. It was caught by checking the
 tap spacing against the window length, which takes one line of arithmetic
 and was not done first. Every analysis window is a claim about what is
 inside it.
+
+---
+
+## 32. There is a ring, and a two second window was hiding it
+
+Entry on Thursday 1 October 2026.
+
+**Eight g full scale did its job.** Five taps, peaks from 2.42 to 3.71 g,
+none at the rail. The two g set was clipped and its peaks were never
+measured, which is now settled rather than suspected.
+
+**And the ring was never absent.** The transient lasts about 0.25 s. In a
+2 s window it occupies an eighth of the record and its amplitude is diluted
+to match, which is how a 2 s FFT reports a flat scatter of 0.2 to 0.3 mg
+where the ring itself is 49 to 107 mg.
+
+| tap | peak above g | implied from zero crossings | 32-sample FFT |
+|---|---|---|---|
+| 3.40 s | 2.699 g | 38.5 Hz | 27.5 Hz, 75.7 mg |
+| 10.01 s | 1.415 g | 38.5 Hz | 31.4 Hz, 49.0 mg |
+| 15.84 s | 1.986 g | 34.4 Hz | 23.5 Hz, 101.1 mg |
+| 21.86 s | 2.539 g | 24.3 Hz | 3.9 Hz, 74.7 mg |
+| 27.28 s | 2.449 g | 20.2 Hz | 23.5 Hz, 107.1 mg |
+
+**An analysis window is a claim about what is inside it.** That sentence
+was written in entry 31 after my own window swallowed the next tap, and the
+same mistake has now appeared from the other side: a window long enough to
+hold the ring comfortably is long enough to bury it. Matching the window to
+the thing is not a refinement, it is the measurement.
+
+**The decay is the better number, and it explains the scatter.** Envelope
+in 32 ms blocks after the first tap: 2.699, 1.194, 0.189, 0.029 g, a time
+constant near 39 ms. At about 28 Hz that is roughly one cycle to 1/e, so Q
+is near 3, and a resonance with Q near 3 has a fractional bandwidth near a
+third: 19 to 37 Hz for a 28 Hz centre.
+
+The spread observed across five taps is 20 to 38 Hz. So **the five numbers
+are one heavily damped mode, not five modes**, and what looked like scatter
+is the mode's own bandwidth.
+
+**The tap does not support 57 Hz.** Transient energy centres near 25 to
+30 Hz. The 57 Hz of the handheld shaver record is uncorroborated and is not
+a tap-excitable mode of this assembly. It joins the list of things this
+loop cannot settle.
+
+**And the limit is stated rather than glossed.** At 125.55 Hz a 28 Hz
+oscillation is 4.5 samples per cycle and the entire ring is two or three
+cycles. The frequency carries a large uncertainty and the Q a larger one.
+What is solid is that a ring exists, that it is short, that it repeats
+across five impulses, and that it is nowhere near 57 Hz.
+
+**The eight g noise cost was predicted at two percent and remains
+untested.** The quiet stretches give 0.48, 0.41 and 0.52 mg against 0.42,
+0.37 and 0.58 at two g, scattering in both directions. An RMS estimate from
+a few thousand samples carries about one percent of standard error, so a
+two percent effect sits at the edge of resolvable, and these stretches
+carry tap tails besides. Unrefuted and unconfirmed is the honest verdict,
+and it is worth writing down as such rather than claiming the prediction
+held.
