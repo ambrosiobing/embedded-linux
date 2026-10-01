@@ -5,6 +5,7 @@
 #   sudo scripts/card-archive.sh PROJECT /dev/sdX   image the card
 #   sudo scripts/card-archive.sh PROJECT card.img   image a file instead
 #   scripts/card-archive.sh list                    what the store holds
+#   sudo scripts/card-archive.sh verify DIR /dev/sdX   compare one later
 #
 # WHY THIS IS A SECOND PROGRAM AND NOT A FLAG ON archive.sh.
 #
@@ -134,6 +135,120 @@ identify() {
 		umount "$_m" 2>/dev/null || true
 	fi
 	rmdir "$_m" 2>/dev/null || true
+}
+
+# ------------------------------------------------------------------ verify
+#
+# The comparison against the card, done AFTER the fact.
+#
+# BENCH_CARD_SKIP_VERIFY exists because the comparison costs a second full
+# read, and on Thursday 1 October 2026 it was used in earnest: the usbipd
+# link to the reader was dropping at about eight minutes against a seventeen
+# minute pass, so halving the time the card had to stay attached was the
+# difference between an archive and no archive. That was the right trade and
+# it left a debt, because an archive never compared against its card has no
+# witness except the program that wrote it.
+#
+# This pays the debt without re-archiving. It checks two links of the chain:
+# that the stored image still hashes to what its own record says, and that
+# the card still hashes to the same value. The result is APPENDED to the
+# provenance, dated, and says it was not part of the original run.
+# Rewriting the original "skipped" statement would make the record describe
+# a run that did not happen.
+verify_store() {
+	dir=$1
+	src=$2
+
+	[ -d "$dir" ] || die "no such directory: $dir"
+	prov=$dir/PROVENANCE.txt
+	[ -f "$prov" ] || die "$dir has no PROVENANCE.txt.
+       An image with no record is not an archive, and there is nothing
+       here to verify against."
+	img=$(find "$dir" -maxdepth 1 -name '*.img.gz' -type f | head -1)
+	[ -n "$img" ] || die "$dir holds no .img.gz.
+       A .partial is not an archive, it is an interrupted read."
+
+	# The hash of the DECOMPRESSED contents, which is the only one a card
+	# can be compared against. The compressed hash depends on the gzip
+	# implementation and the compression level and says nothing about the
+	# card.
+	recorded=$(sed -n 's/^  \([0-9a-f]\{64\}\)  the card contents, decompressed$/\1/p' "$prov" | head -1)
+	[ -n "$recorded" ] || die "$prov records no decompressed sha256.
+       It may predate this program, or have been edited."
+
+	[ -e "$src" ] || die "no such source: $src"
+	if [ -b "$src" ]; then
+		mounted=$(grep "^$src" /proc/mounts | awk '{ print $1 " on " $2 }')
+		if [ -n "$mounted" ]; then
+			die "$src has mounted filesystems:
+$(printf '%s\n' "$mounted" | sed 's/^/       /')
+       A mounted ext4 can differ from its image by a journal replay
+       alone, so the comparison would fail for a reason that is not a
+       fault in the archive. Unmount them and verify again."
+		fi
+	fi
+
+	note "archive   $(basename "$img")"
+	note "recorded  $recorded"
+
+	note "re-reading the archive"
+	have=$(gzip -dc "$img" | sha256sum | cut -d' ' -f1)
+	if [ "$have" != "$recorded" ]; then
+		die "the stored image no longer hashes to its own record.
+       record   $recorded
+       now      $have
+       The archive has been damaged since it was written, so comparing
+       it against the card would answer the wrong question. Nothing here
+       implicates the card."
+	fi
+	note "the archive still matches its own record"
+
+	note "reading the source, a full read"
+	src_sha=$(dd if="$src" bs=4M status=none | sha256sum | cut -d' ' -f1)
+
+	if [ "$src_sha" = "$recorded" ]; then
+		append_comparison "$prov" "$src" matched "$recorded" "$src_sha"
+		note "verified, the archive is byte for byte the source"
+		note "appended to $prov"
+		return 0
+	fi
+
+	append_comparison "$prov" "$src" "DID NOT MATCH" "$recorded" "$src_sha"
+	die "the source does not match the archive.
+       archive  $recorded
+       source   $src_sha
+       Appended to $prov as a failure rather than left unsaid.
+       Either the card changed after it was archived, which is normal if
+       it has been booted since, or this archive is not of that card.
+       Do not treat it as a copy of it."
+}
+
+# Appended, never substituted. A record that is edited to look better than
+# the run it describes is worth less than no record.
+append_comparison() {
+	_prov=$1
+	_src=$2
+	_result=$3
+	_recorded=$4
+	_got=$5
+	{
+		echo
+		echo "Comparison against the card, performed after archiving"
+		echo "-----------------------------------------------------"
+		echo
+		printf 'checked    %s\n' "$(date '+%A %d %B %Y, %H:%M:%S %z')"
+		printf 'source     %s\n' "$_src"
+		printf 'checked on %s\n' "$(uname -srm)"
+		printf 'result     %s\n' "$_result"
+		printf 'archive    %s\n' "$_recorded"
+		printf 'source     %s\n' "$_got"
+		echo
+		echo "This comparison was NOT part of the original archive run,"
+		echo "which recorded the end-to-end check as skipped. It is"
+		echo "appended rather than replacing that statement, because"
+		echo "rewriting it would make this file describe a run that did"
+		echo "not happen."
+	} >>"$_prov"
 }
 
 save() {
@@ -479,6 +594,13 @@ write_provenance() {
 
 case "${1:-}" in
 list) list_store ;;
+verify)
+	shift
+	[ $# -eq 2 ] || die "usage: card-archive.sh verify DIR DEVICE
+       The directory is one stamp inside the store, the one holding
+       PROVENANCE.txt, and the device is the card to compare it against."
+	verify_store "$1" "$2"
+	;;
 "" | -h | --help)
 	sed -n '3,8p' "$0" | sed 's/^# \{0,1\}//'
 	exit 0

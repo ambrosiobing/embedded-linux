@@ -383,6 +383,68 @@ else
 	no "and the archive is still a faithful copy"
 fi
 
+
+# ------------------------------------ the comparison, paid for after the fact
+#
+# The skip-verify archive above is exactly the state this subcommand exists
+# for: a real archive whose provenance says the end-to-end check was not
+# done. On Thursday 1 October 2026 that was not hypothetical, the usbipd
+# link to the card reader was dropping at about eight minutes against a
+# seventeen minute pass, and halving the card time was the difference
+# between having an archive and having none.
+
+refuses "verify refuses a directory with no provenance" verify "$WORK" \
+	"$WORK/card.img"
+contains "and says an image with no record is not an archive" "$REFUSAL" \
+	"not an archive"
+
+refuses "verify refuses a directory that does not exist" verify \
+	"$WORK/nowhere" "$WORK/card.img"
+
+must_succeed "verify compares a skipped archive against its source" verify \
+	"$DEST2" "$WORK/card.img"
+contains "it checks the archive against its own record first" "$OUT" \
+	"the archive still matches its own record"
+contains "and then reads the source in full" "$OUT" "a full read"
+contains "and reports the comparison" "$OUT" "byte for byte"
+
+prov3=$(cat "$DEST2/PROVENANCE.txt")
+contains "the result is written into the provenance" "$prov3" \
+	"Comparison against the card, performed after archiving"
+contains "with the date spelled out" "$prov3" "$(date '+%A %d %B %Y')"
+contains "and the verdict" "$prov3" "result     matched"
+contains "and it says it was not part of the original run" "$prov3" \
+	"NOT part of the original archive run"
+
+# The original statement survives. A record edited to look better than the
+# run it describes is worth less than no record, so the append sits beside
+# the "skipped" line rather than replacing it.
+contains "and the original skipped statement is still there" "$prov3" \
+	"SKIPPED"
+
+# A source that is not the one archived must be refused, and the failure
+# recorded rather than left for the operator to remember.
+cp "$WORK/card.img" "$WORK/other.img"
+printf 'x' | dd of="$WORK/other.img" bs=1 seek=4096 conv=notrunc status=none
+refuses "verify refuses a source that is not the archived one" verify \
+	"$DEST2" "$WORK/other.img"
+contains "and says not to treat the archive as a copy of it" "$REFUSAL" \
+	"Do not treat it as a copy"
+prov4=$(cat "$DEST2/PROVENANCE.txt")
+contains "the failure is recorded too, not only printed" "$prov4" \
+	"result     DID NOT MATCH"
+
+# And a damaged archive is distinguished from a changed card, because the
+# two have nothing to do with each other and only one of them is a reason
+# to distrust the card. Done last, since it destroys the archive.
+: >"$IMG2"
+refuses "verify refuses when the stored image no longer matches its record" \
+	verify "$DEST2" "$WORK/card.img"
+contains "saying the archive was damaged" "$REFUSAL" \
+	"no longer hashes to its own record"
+contains "and that this does not implicate the card" "$REFUSAL" \
+	"implicates the card"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
