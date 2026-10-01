@@ -65,8 +65,19 @@ contains() {
 mkdir -p "$WORK/bin" "$WORK/sys/bus/iio/devices" "$WORK/sys/class/hwmon" \
 	"$WORK/sys/bus/i2c/drivers"
 
-# A grid the way i2cdetect draws one. 0x6a, 0x1e, 0x5d and 0x44 answer;
-# 0x19 answers; 0x3c does not. UU is added later for the claimed case.
+# A grid the way i2cdetect draws one, carrying the addresses MEASURED on
+# the X-NUCLEO-IKS4A1 on Wednesday 30 September 2026 and matching the
+# factory solder bridges of UM3239 Rev 5 Table 1.
+#
+# It previously put the STTS22H at 0x38 and the LSM6DSV16X at 0x6a, and
+# had no 0x6b at all. 0x38 is the eight-bit form of the magnetometer's
+# address and not a seven-bit address; 0x6a holds the OTHER inertial
+# unit on this shield. Both errors were in the program too, and this
+# file asserted them, which is why twenty-five passing assertions did
+# not prevent the overlay binding the wrong part for a day.
+#
+# 0x19, 0x1e, 0x44, 0x5d, 0x6a and 0x6b answer; 0x38 is the conditional
+# one. UU is added later for the claimed case.
 write_scan() {
 	cat >"$WORK/bin/i2cdetect" <<EOF
 #!/bin/sh
@@ -75,10 +86,10 @@ cat <<'GRID'
 00:                         -- -- -- -- -- -- -- --
 10: -- -- -- -- -- -- -- -- -- 19 -- -- -- -- 1e --
 20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-30: -- -- -- -- -- -- -- -- -- -- -- -- ${1:---} -- -- --
+30: -- -- -- -- -- -- -- -- ${1:---} -- -- -- -- -- -- --
 40: -- -- -- -- 44 -- -- -- -- -- -- -- -- -- -- --
 50: -- -- -- -- -- -- -- -- -- -- -- -- -- 5d -- --
-60: -- -- -- -- -- -- -- -- -- -- 6a -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- 6a 6b -- -- -- --
 70: -- -- -- -- -- -- -- --
 GRID
 EOF
@@ -180,39 +191,40 @@ run_status() {
 check "the inventory runs to completion" "$(run_status)" "0"
 
 out=$(run)
-for part in LSM6DSV16X LIS2MDL LPS22DF SHT40 STTS22H LIS2DUXS12; do
+for part in LSM6DSV16X LSM6DSO16IS LIS2MDL LPS22DF SHT40AD1B STTS22H \
+		LIS2DUXS12; do
 	contains "$part has a row" "$out" "$part"
 done
 
 rows=$(run -m | grep -c '^0x' || true)
-check "all six parts appear in the CSV" "$rows" "6"
+check "all seven parts appear in the CSV" "$rows" "7"
 contains "the CSV has a header" "$(run -m | head -1)" "address,part,driver"
 
 # --------------------------------------------------- the five verdicts
 
 # Nothing installed and nothing bound: the image is missing the driver.
 contains "a part on the bus with no module reads no-driver-in-image" \
-	"$(run -m)" "0x6a,LSM6DSV16X,st_lsm6dsx,iio,present,missing,,no-driver-in-image"
+	"$(run -m)" "0x6b,LSM6DSV16X,st_lsm6dsx,iio,present,missing,,no-driver-in-image"
 
 # Installed but nothing bound: the driver is there and nothing matched it,
 # which points at the overlay rather than at the image. Telling those two
 # apart is the reason this program is not three lines of shell.
 echo st_lsm6dsx >"$WORK/installed"
 contains "installed but unbound reads not-bound" \
-	"$(run -m)" "0x6a,LSM6DSV16X,st_lsm6dsx,iio,present,installed,,not-bound"
+	"$(run -m)" "0x6b,LSM6DSV16X,st_lsm6dsx,iio,present,installed,,not-bound"
 
 # Bound and registered nothing. Rare, and its own fault: the driver
 # matched and its probe failed, which puts the answer in dmesg rather than
 # in the image or the overlay.
-bind_driver 0x6a
+bind_driver 0x6b
 contains "bound but registering nothing is its own verdict" \
-	"$(run -m)" "0x6a,LSM6DSV16X,st_lsm6dsx,iio,present,installed,,bound-no-device"
+	"$(run -m)" "0x6b,LSM6DSV16X,st_lsm6dsx,iio,present,installed,,bound-no-device"
 
 # Bound, with the two devices one chip produces. One LSM6DSV16X is two IIO
 # devices sharing one FIFO, and an inventory that reported it as one would
 # be hiding the fact the whole FIFO measurement depends on.
-add_iio_device 0x6a 0 lsm6dsv16x_accel
-add_iio_device 0x6a 1 lsm6dsv16x_gyro
+add_iio_device 0x6b 0 lsm6dsv16x_accel
+add_iio_device 0x6b 1 lsm6dsv16x_gyro
 out=$(run -m)
 contains "a bound driver with devices reads working" "$out" ",working"
 contains "and names the devices it created" "$out" "lsm6dsv16x_accel"
@@ -224,7 +236,7 @@ contains "driver=none reads unsupported" \
 
 # Nothing at the address at all.
 contains "a part that does not answer reads not-on-bus" \
-	"$(run -m)" "0x3c,STTS22H,none,none,absent"
+	"$(run -m)" "0x38,STTS22H,none,none,absent"
 
 # ------------------------------------------------- hwmon is not IIO
 #
@@ -239,7 +251,7 @@ echo st_lsm6dsx >"$WORK/installed"
 echo sht4x >>"$WORK/installed"
 out=$(run -m)
 contains "the SHT40 is found under hwmon" \
-	"$out" "0x44,SHT40,sht4x,hwmon,present,installed,sht4x,working"
+	"$out" "0x44,SHT40AD1B,sht4x,hwmon,present,installed,sht4x,working"
 contains "and its subsystem column says hwmon, not iio" "$out" ",hwmon,"
 
 # The same part must NOT appear as an IIO device, because it is not one.
@@ -260,7 +272,7 @@ esac
 
 write_scan UU
 contains "an address claimed by a driver is reported as claimed" \
-	"$(run -m)" "0x3c,STTS22H,none,none,claimed"
+	"$(run -m)" "0x38,STTS22H,none,none,claimed"
 
 # ------------------------------------------------------------ evidence
 
