@@ -324,7 +324,6 @@ before() {
 	fi
 }
 
-capture_line=$(at "rt-capture start")
 toggle_line=$(at "^rt-toggle ")
 cyclic_line=$(at "^cyclictest ")
 sleep_line=$(at "^sleep 2$")

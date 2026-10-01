@@ -73,7 +73,10 @@ contains() {
 DEV=$WORK/sys/bus/iio/devices/iio:device0
 
 build_device() {
-	rm -rf "$WORK/sys" "$WORK/dev" "$WORK/proc" "$WORK/results"
+	# ${WORK:?} rather than $WORK: if WORK were ever empty this line
+	# would be "rm -rf /sys /dev /proc", and the form that refuses is
+	# the one to write in a file that runs unattended in CI.
+	rm -rf "${WORK:?}/sys" "${WORK:?}/dev" "${WORK:?}/proc" "${WORK:?}/results"
 	mkdir -p "$DEV/buffer" "$DEV/buffer0" "$DEV/scan_elements" \
 		"$WORK/dev" "$WORK/proc" "$WORK/results"
 
@@ -214,6 +217,9 @@ contains "and it says so" "$out" "no scan elements"
 # was found by reloading a module to re-arm an interrupt.
 
 len_line=$(grep -n 'buffer/length' "$SUT" | head -1 | cut -d: -f1)
+# The single quotes are deliberate: this searches the source for the
+# literal text >"$wm_attr", so the dollar must not expand.
+# shellcheck disable=SC2016
 wm_line=$(grep -n '>"\$wm_attr"' "$SUT" | head -1 | cut -d: -f1)
 if [ "$len_line" -lt "$wm_line" ]; then
 	ok "the buffer length is written before the watermark"
