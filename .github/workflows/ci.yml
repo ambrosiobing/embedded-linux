@@ -67,7 +67,7 @@ jobs:
           # against its fake bus. Without cmake that suite skips its
           # compile section and says so, which would make its own skip
           # message ("CI installs cmake and does compile it") false.
-          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev device-tree-compiler cmake
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev libiio-dev device-tree-compiler cmake
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
@@ -118,6 +118,35 @@ jobs:
             ;;
           esac
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-status/files/bench-status.c -o /tmp/bench-status $(pkg-config --libs libgpiod)
+
+      - name: Compile the libiio client
+        # Project 10's iio-stream, and until Thursday 1 October 2026 NOTHING
+        # compiled this file. Journal entry 38 of that project is titled "the
+        # one program nothing compiles, read instead of run", and it stayed
+        # true for another day: the program was first built by hand on the
+        # board and in WSL, both after the defect below had already been
+        # shipped. A C file in a repository with a CI that compiles six other
+        # C files is not covered by that CI, it is merely surrounded by it.
+        #
+        # The version check is not decoration. iio-stream.c calls
+        # iio_buffer_refill, which libiio 1.0 removed when it replaced
+        # buffers with blocks, so this source is 0.x code and says so in its
+        # own comments and in bench-iio_0.1.bb. A runner that moves to 1.x
+        # must fail here, loudly, rather than in somebody's image build.
+        run: |
+          version=$(pkg-config --modversion libiio)
+          echo "libiio $version"
+          case "$version" in
+          0.*) ;;
+          *)
+            echo "This runner has libiio $version."
+            echo "iio-stream.c is 0.x code: 1.0 replaced buffers with blocks"
+            echo "and removed iio_buffer_refill. Port the data path, or pin"
+            echo "runs-on to an image whose libiio-dev is 0.x."
+            exit 1
+            ;;
+          esac
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libiio) meta-bench/recipes-bench/bench-iio/files/iio-stream.c -o /tmp/iio-stream $(pkg-config --libs libiio)
 
       - name: Compile the modem control tool
         # Project 15's mechanism half. Same source, same -Werror: a

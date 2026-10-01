@@ -2,7 +2,7 @@
  * iio-stream - one buffer loop, printed as CSV, from a local or a remote
  * context.
  *
- *     iio-stream [-u URI] [-d DEVICE] [-n SCANS] [-b SAMPLES]
+ *     iio-stream [-u URI] [-d DEVICE] [-n SCANS] [-b SAMPLES] [-r HZ]
  *
  * The URI is the only thing that differs between reading the sensor on the
  * board and reading it from a PC across the network:
@@ -84,11 +84,15 @@ static void on_signal(int sig)
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [-u URI] [-d DEVICE] [-n SCANS] [-b SAMPLES]\n"
+            "usage: %s [-u URI] [-d DEVICE] [-n SCANS] [-b SAMPLES] [-r HZ]\n"
             "  -u  context URI, default \"local:\"\n"
             "  -d  device name, default \"lsm6dsv16x_accel\"\n"
             "  -n  number of buffer refills, 0 for until interrupted\n"
-            "  -b  samples per buffer, default 256\n",
+            "  -b  samples per buffer, default 256\n"
+            "  -r  output data rate in Hz. Without it, a part found in\n"
+            "      power-down is set to the lowest rate it offers, and\n"
+            "      says so, because a buffer armed on a stopped part\n"
+            "      never fills and the refill times out instead\n",
             argv0);
 }
 
@@ -98,14 +102,16 @@ int main(int argc, char **argv)
     const char *device_name = "lsm6dsv16x_accel";
     unsigned int refills = 40;
     unsigned int buffer_samples = 256;
+    double rate = 0.0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "u:d:n:b:h")) != -1) {
+    while ((opt = getopt(argc, argv, "u:d:n:b:r:h")) != -1) {
         switch (opt) {
         case 'u': uri = optarg; break;
         case 'd': device_name = optarg; break;
         case 'n': refills = (unsigned int)strtoul(optarg, NULL, 10); break;
         case 'b': buffer_samples = (unsigned int)strtoul(optarg, NULL, 10); break;
+        case 'r': rate = strtod(optarg, NULL); break;
         default: usage(argv[0]); return 2;
         }
     }
@@ -133,6 +139,114 @@ int main(int argc, char **argv)
         }
         iio_context_destroy(ctx);
         return 1;
+    }
+
+    /*
+     * THE PART HAS TO BE RUNNING BEFORE A BUFFER IS ARMED, AND THIS
+     * PROGRAM USED TO ASSUME SOMEBODY ELSE HAD SEEN TO THAT.
+     *
+     * On st_lsm6dsx, sampling_frequency is the output data rate, and the
+     * LSM6DSV16X resets to power-down. Enabling every scan element and
+     * creating a buffer on a part in power-down is accepted by the kernel
+     * without complaint: the scan elements are enabled, the buffer exists,
+     * and no sample is ever produced, so the FIFO never reaches its
+     * watermark, so the interrupt never fires, so iio_buffer_refill blocks
+     * until it times out.
+     *
+     * What that looked like on Thursday 1 October 2026:
+     *
+     *     refill failed: Connection timed out
+     *     185:  0  0  0  0  pinctrl-bcm2835  24 Edge  lsm6dsx
+     *
+     * and the zero in /proc/interrupts was then read as a broken interrupt
+     * line. It cost an evening and two wrong entries in the journal before
+     * iio-rate happened to leave the rate at 480 Hz and the identical
+     * command returned 1001 lines in 2.198 s.
+     *
+     * The defect is not that the rate was unset. It is that a program with
+     * an unstated precondition reported a timeout, which names the symptom
+     * of the symptom and points the reader at the hardware.
+     *
+     * A device with no sampling_frequency attribute is left alone: a
+     * trigger-driven part is clocked by the trigger and this is not its
+     * precondition.
+     */
+    double hz = 0.0;
+    bool has_rate = iio_device_find_attr(dev, "sampling_frequency") != NULL;
+
+    if (has_rate && iio_device_attr_read_double(dev, "sampling_frequency", &hz) < 0)
+        hz = 0.0;
+
+    if (rate > 0.0) {
+        int ret;
+
+        if (!has_rate) {
+            fprintf(stderr, "%s has no sampling_frequency, so -r sets nothing.\n",
+                    device_name);
+            fprintf(stderr, "It is clocked by its trigger. Drop -r.\n");
+            iio_context_destroy(ctx);
+            return 1;
+        }
+        ret = iio_device_attr_write_double(dev, "sampling_frequency", rate);
+        if (ret < 0) {
+            char avail[256];
+            ssize_t n;
+
+            fprintf(stderr, "cannot set %g Hz on %s: %s\n", rate, device_name,
+                    strerror(-ret));
+            n = iio_device_attr_read(dev, "sampling_frequency_available",
+                                     avail, sizeof(avail));
+            if (n > 0)
+                fprintf(stderr, "available: %s\n", avail);
+            iio_context_destroy(ctx);
+            return 1;
+        }
+        hz = rate;
+        fprintf(stderr, "rate set to %g Hz\n", hz);
+    } else if (has_rate && hz == 0.0) {
+        char avail[256];
+        double first = 0.0;
+        ssize_t n;
+        int ret;
+
+        n = iio_device_attr_read(dev, "sampling_frequency_available",
+                                 avail, sizeof(avail));
+        if (n > 0)
+            first = strtod(avail, NULL);
+
+        if (first <= 0.0) {
+            fprintf(stderr, "%s is in power-down and offers no rates to pick from.\n",
+                    device_name);
+            fprintf(stderr,
+                    "sampling_frequency reads 0 and sampling_frequency_available\n"
+                    "could not be read, so there is no rate to set and a buffer\n"
+                    "armed here would never fill. Set one by hand,\n"
+                    "writing a rate into this device's own\n"
+                    "sampling_frequency under /sys/bus/iio/devices.\n");
+            iio_context_destroy(ctx);
+            return 1;
+        }
+
+        ret = iio_device_attr_write_double(dev, "sampling_frequency", first);
+        if (ret < 0) {
+            fprintf(stderr, "%s is in power-down and %g Hz was refused: %s\n",
+                    device_name, first, strerror(-ret));
+            iio_context_destroy(ctx);
+            return 1;
+        }
+        hz = first;
+
+        /*
+         * Said out loud, on stderr so stdout stays CSV. A program that
+         * quietly changes the configuration of the thing it is measuring
+         * is how a capture ends up unexplainable a week later, and the
+         * lowest available rate is a safe choice rather than a right one.
+         */
+        fprintf(stderr,
+                "%s was in power-down, so no buffer could have filled.\n"
+                "Rate set to %g Hz, the lowest this part offers.\n"
+                "Choose it yourself with -r HZ; available: %s\n",
+                device_name, hz, avail);
     }
 
     /*

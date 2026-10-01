@@ -476,8 +476,13 @@ and six of the eight by a measurement that cost a single command.
 
 **Open questions with no owner yet.**
 
-- Whether `0x19` LIS2DUXS12 and `0x38` STTS22H are genuinely unsupported or
-  merely undeclared, which is what `0x6a` turned out to be. **Not answerable
+- ~~Whether `0x19` and `0x38` are unsupported or undeclared.~~ **Answered
+  Thursday 1 October 2026: undeclared.** Both are supported parts at their
+  default straps and ST's own shield overlay instantiates them. `0x19` needs
+  `st,lis2duxs12` confirmed in the running kernel first; `0x38` needs
+  `st,stts22h`, which is in ST's IIO tree and not mainline, so a node on a
+  mainline kernel would bind to nothing and say nothing. Neither node is
+  written. The remaining question is only which kernel, not which driver. **Not answerable
   by grepping the unpacked source**: only selected directories were extracted
   from `linux-source-6.18`, so a missing file means a missing extraction and
   reading it otherwise repeats the error that kept `0x6a` closed for two days.

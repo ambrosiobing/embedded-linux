@@ -2637,3 +2637,93 @@ of 1 g and whose off-axis figure is under 3 degrees is a pose worth scoring.
 
 The board is dismantled, so this waits for the next bench session, alongside
 the two wire experiments criterion 4 needs.
+
+## 50. Three addresses, one class of miss, and the program nothing compiled
+
+*Thursday 1 October 2026, late.* Joseph brought the straps, the compatibles
+and ST's own overlay, and they turn `0x6a` from a one-off into a pattern.
+
+| 7-bit | part | strap | compatible | state |
+|---|---|---|---|---|
+| `0x6a` | LSM6DSO16IS | SB35, ADD D5h | `st,lsm6dso16is`, mainline | **node added** |
+| `0x19` | LIS2DUXS12 | SB20, SA0 high, ADD 33h | `st,lis2duxs12` | node pending a check |
+| `0x38` | STTS22H | only address, ADD 71h | `st,stts22h`, **not mainline** | node deliberately not added |
+
+ST's shield overlay instantiates `lis2duxs12@19` and `stts22h@38` beside the
+four this repository already declares. **None of the three ever needed a
+driver written. All three needed a node.** The inventory called two of them
+unsupported and one not-bound, and `unsupported` was wrong twice.
+
+### The node that went in, and the two corrections to the snippet
+
+`lsm6dso16is@6a` is added, because the condition this overlay set for itself
+has been met rather than waived: confirm the compatible is in the running
+kernel rather than assuming it. Confirmed against the source on the card and
+then demonstrated by `new_device` and a clean probe.
+
+Two things in the proposed node did not survive.
+
+**`interrupts = <IRQ_TYPE_EDGE_RISING>` is one cell where the binding takes
+two**, a GPIO number and a flag, and the macro is unavailable in an overlay
+compiled without the C preprocessor. The working node above it reads
+`interrupts = <24 1>`.
+
+**More seriously, the node must have no interrupt property at all.** UM3239
+Rev 5 Table 4 puts this chip's INT1 on CN8 pin 6 and its INT2 on CN9 pin 8,
+and neither is wired. The only interrupt jumper on this bench runs from CN9
+pin 6, which is the LSM6DSV16X's INT1, to GPIO24. Pointing this node at
+GPIO24 would claim a line this chip does not drive **and** share an IRQ with a
+node that does, so it would break a part that currently works in order to
+half-enable one that does not. Without the property, the sysfs read path
+works and the buffered FIFO path does not, which is the honest state.
+
+### Why 0x38 is not getting a node tonight
+
+`st,stts22h` is in ST's IIO tree rather than in mainline. On a mainline-only
+kernel the node would be created, nothing would bind to it, and the part
+would be invisible with no message anywhere. **That is exactly the failure
+this overlay's own header warns about**, and adding the node would trade an
+honest inventory row for a silent one. The row stays as it is until either
+the driver is in the running kernel or the tree is.
+
+`0x19` waits on the lighter version of the same check, and the check is
+`modules.alias` and the module tree, **not** a grep of `/usr/src`: only
+selected directories were extracted from `linux-source-6.18`, so a missing
+file there means a missing extraction.
+
+### The ODR defect, and the gap that let it ship
+
+`iio-stream` armed a buffer on a part in power-down. The kernel accepts that
+without complaint: scan elements enabled, buffer created, no sample ever
+produced, FIFO never reaching its watermark, interrupt never firing,
+`iio_buffer_refill` blocking until it times out. The program then reported
+`refill failed: Connection timed out`, **which names the symptom of the
+symptom and points the reader at the hardware**, and that is what it did: an
+evening, two wrong journal entries and a withdrawn claim about the interrupt
+line.
+
+It now reads `sampling_frequency`, takes `-r HZ`, and when it finds a part
+stopped it sets the lowest rate the part offers and says so on stderr, loudly,
+with the available list. A device with no such attribute is left alone,
+because a trigger-driven part is clocked by its trigger and this is not its
+precondition.
+
+Setting it rather than refusing is a deliberate choice and not obviously the
+right one. A measurement program that quietly reconfigures the thing it
+measures is how a capture becomes unexplainable a week later. The compromise
+is that it never does it silently and the operator can pin the rate, and the
+alternative, a refusal, leaves the common case needing two commands where one
+would do.
+
+**And the gap underneath all of it: nothing compiled this file.** Journal
+entry 38 was titled "the one program nothing compiles, read instead of run",
+and it stayed true for another day. CI builds six C programs with `-Werror`
+and this was not among them. It was first compiled by hand on the board and
+in WSL, both times after the defect had already cost its evening. A C file in
+a repository whose CI compiles six other C files is not covered by that CI, it
+is surrounded by it. CI now builds it, with a version guard that fails on
+libiio 1.x, where `iio_buffer_refill` no longer exists.
+
+**This change has not been compiled.** There is no C toolchain on the
+authoring laptop, so CI is its first build, which is the ordering this bench
+has agreed to and is worth stating rather than implying.

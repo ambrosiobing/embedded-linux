@@ -12,14 +12,24 @@
  *
  * WHAT IS NOT HERE, AND WHY
  *
- * The STTS22H answers on the bus and has no node. So does a second LSM6
- * class part at 0x6a, the LSM6DSO16IS. A node naming a compatible string
- * the kernel does not know is not an error: the node is created, nothing
- * binds to it, and the part is invisible with no message anywhere.
- * Leaving them out and listing them in the inventory table is the honest
- * version of the same outcome. Before adding a node for the LSM6DSO16IS,
- * check that the st_lsm6dsx driver in the running kernel lists a matching
- * compatible, rather than assuming one.
+ * The STTS22H answers on the bus and has no node. A node naming a
+ * compatible string the kernel does not know is not an error: the node is
+ * created, nothing binds to it, and the part is invisible with no message
+ * anywhere. Leaving it out and listing it in the inventory table is the
+ * honest version of the same outcome.
+ *
+ * THE LSM6DSO16IS AT 0x6a NOW HAS A NODE, and the condition this comment
+ * set for adding one has been met rather than waived. It read: check that
+ * the st_lsm6dsx driver in the running kernel lists a matching compatible,
+ * rather than assuming one. Checked on Thursday 1 October 2026 against the
+ * source on the card, which carries it in five places, st_lsm6dsx_i2c.c
+ * line 126 among them, and then demonstrated by instantiating the client
+ * by hand with new_device and watching the driver probe it cleanly.
+ *
+ * That part was recorded as not-bound for two days and then as
+ * unsupported, and it was neither. It was undeclared. The verdict
+ * iio-probe printed, "driver present, nothing matched it: look at the
+ * overlay, not the image", was correct every time it appeared.
  *
  * The LIS2DUXS12 has no node either. It looked intermittent on the bus
  * and was not: it declines the zero-length write that i2cdetect probes
@@ -27,15 +37,47 @@
  * read. An intermediate version of this comment concluded from one scan
  * that it was not on the shield at all.
  *
+ * 0x19 AND 0x38 ARE UNDECLARED, NOT UNSUPPORTED, and the inventory called
+ * both of them unsupported for two days. Joseph established on Thursday 1
+ * October 2026, from UM3239 and ST's own shield overlay, that:
+ *
+ *   0x19  LIS2DUXS12  SB20 closed, SA0 high, ADD 33h; SB19 would be 0x18.
+ *                     Driver compatible "st,lis2duxs12". Seeing 0x19 means
+ *                     SB20 is closed, which is the configuration ST's
+ *                     overlay expects, not an unknown device.
+ *   0x38  STTS22H     the only address this part has on this board,
+ *                     ADD 71h, schematic ADDw 70h. Driver compatible
+ *                     "st,stts22h".
+ *
+ * ST's overlay instantiates lis2duxs12@19 and stts22h@38 alongside the
+ * four here. So neither needs a driver written; both need a node, exactly
+ * as 0x6a did.
+ *
+ * NEITHER NODE IS ADDED YET, and the reason differs for each.
+ *
+ * For 0x19 the condition is the one this file already states and has now
+ * been honoured once: confirm "st,lis2duxs12" is in the running kernel
+ * before writing a node, rather than assuming it from a version number.
+ * The check is modules.alias and the module tree in /lib/modules, NOT a
+ * grep of /usr/src: only selected directories were ever extracted from
+ * linux-source-6.18, so a missing file there means a missing extraction.
+ *
+ * For 0x38 there is a stronger reason to wait. st,stts22h lives in ST's
+ * IIO tree rather than in mainline, so on a mainline-only kernel the node
+ * would be created, nothing would bind to it, and the part would stay
+ * invisible with no message anywhere. That is precisely the outcome the
+ * second paragraph of this comment describes, and adding the node would
+ * trade an honest inventory row for a silent one.
+ *
  * ADDRESSES, measured Wednesday 30 September 2026 and confirmed against
  * UM3239 Rev 5 Table 1, whose defaults these all are:
  *
- *   0x19  LIS2DUXS12    ADD 33h, needs i2cdetect -r, no node here
+ *   0x19  LIS2DUXS12    ADD 33h, needs i2cdetect -r, no node here yet
  *   0x1e  LIS2MDL       ADD 3Ch, bound below
- *   0x38  STTS22H       ADD 71h, no node here
+ *   0x38  STTS22H       ADD 71h, no node here, driver is out of mainline
  *   0x44  SHT40AD1B     ADD 89h, hwmon not IIO, vanishes under -r, bound below
  *   0x5d  LPS22DF       ADD BBh, bound below
- *   0x6a  LSM6DSO16IS   ADD D5h, WHO_AM_I 0x22, ISPU part, no node here
+ *   0x6a  LSM6DSO16IS   ADD D5h, WHO_AM_I 0x22, ISPU part, bound below
  *   0x6b  LSM6DSV16X    ADD D7h, WHO_AM_I 0x70, fusion part, bound below
  *
  * All seven sit on the main board of the kit, the X-NUCLEO-IQS4A1. The
@@ -114,6 +156,40 @@
 				interrupt-parent = <&gpio>;
 				interrupts = <24 1>;	/* GPIO24, rising edge */
 				st,drdy-int-pin = <1>;
+			};
+
+			/*
+			 * The second IMU, the ISPU part, added Thursday 1
+			 * October 2026 once the compatible was confirmed in
+			 * the running kernel's source rather than assumed.
+			 * It gives two more IIO devices, lsm6dso16is_accel
+			 * and lsm6dso16is_gyro, and takes the inventory to
+			 * five working rows with no not-bound left.
+			 *
+			 * NO INTERRUPT PROPERTY, AND THAT IS DELIBERATE.
+			 *
+			 * UM3239 Rev 5 Table 4 puts this chip's INT1 on CN8
+			 * pin 6 and its INT2 on CN9 pin 8. Neither is wired.
+			 * The only interrupt jumper on this bench runs from
+			 * CN9 pin 6, which is the OTHER IMU's INT1, to GPIO24.
+			 *
+			 * So pointing this node at GPIO24 would be wrong twice
+			 * over: it would claim a line this chip does not
+			 * drive, and it would share an IRQ with the
+			 * LSM6DSV16X node above, which does drive it. The
+			 * result is the failure the comment on that node
+			 * describes, a device that probes, reads fine through
+			 * sysfs and never fills a buffer, except that here it
+			 * would also disturb a part that currently works.
+			 *
+			 * Without the property the driver registers the
+			 * devices and the sysfs read path works. The buffered
+			 * FIFO path does not, and cannot, until CN8 pin 6 is
+			 * wired to a free GPIO and declared here.
+			 */
+			ispu: lsm6dso16is@6a {
+				compatible = "st,lsm6dso16is";
+				reg = <0x6a>;
 			};
 
 			/*
