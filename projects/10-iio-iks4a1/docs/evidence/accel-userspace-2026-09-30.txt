@@ -646,3 +646,64 @@ AND ONCE MORE, THE SMALLER PEAK AT 30 Hz IS NOT THE FILTER. The low-pass at
 that setting sits near 15 Hz and the tone is at 3 Hz. The peak over the
 record's own AC rms is 0.59 at 120 Hz output and 0.53 at 30 Hz, so the
 shape is preserved and the level is not. It is the grip.
+
+THE TAPED PAIR, Thursday 1 October 2026. Shaver taped to the board, no hand
+touching it, at both output rates.
+
+  mount        dup%    Z rms     strongest Z      X mean    magnitude
+  hand 0x04    76.1%   1.79 mg   2.98 Hz  0.94    -5.3 mg   1.0068 g
+  hand 0x06     3.8%   6.56 mg   2.71 Hz  3.85    -5.2 mg   1.0068 g
+  taped 0x04   76.1%   5.63 mg   3.23 Hz  3.17   -34.1 mg   1.0070 g
+  taped 0x06    4.7%  24.70 mg   4.87 Hz 14.61   -33.0 mg   1.0070 g
+
+THE OPERATOR READING IS REFUTED. Taping did not remove the low-frequency
+tone. It made it nearly four times larger and moved it from 2.71 to
+4.87 Hz. A hand was damping the assembly, not driving it.
+
+The general shape of the argument survives and the attribution does not.
+The line still belongs to the part of the apparatus that is not bolted
+down, but that part is the whole board-and-shaver assembly on whatever it
+rests on, and not the hand. Taping stiffened the coupling, which raises a
+resonance and removes damping, so the frequency went up and the amplitude
+with it. That is the ordinary behaviour of a mass on a spring and it is
+what the measurement shows.
+
+A SECOND CLAIM IS WITHDRAWN, AND IT IS THE ONE I WAS PLEASED WITH. The
+record above argues that 2 to 4 Hz and 12 to 25 Hz are two sources because
+their balance flips with contact pressure, light contact favouring the low
+band and firm contact the mid. That rested on comparing the 0x07 record
+against the 0x04 and 0x06 ones, across a change of output rate which is
+already documented here as folding content from 63 to 120 Hz down into the
+band. The mid-band dominance of that record may be folded content rather
+than mechanical content, and the comparison cannot tell.
+
+Within matched output rates, where the comparison is sound, the balance
+does not flip at all. It moves the same way both times:
+
+  mount       2 to 6 Hz   12 to 25 Hz   ratio
+  hand 0x04     1.893        0.434       4.36
+  taped 0x04    6.607        1.149       5.75
+  hand 0x06     4.867        1.359       3.58
+  taped 0x06   24.591        3.941       6.24
+
+Rigid coupling raises the low band relatively, at both rates. There is no
+evidence here for two sources with opposing pressure dependence, and the
+sentence claiming it was built on exactly the cross-rate comparison this
+file spends several pages warning against.
+
+A THIRD VARIABLE MOVED, AND IT SHOULD BE NOTED RATHER THAN IGNORED. The X
+bias went from -5.3 to -34.1 mg, a tilt of about 1.6 degrees. Taping the
+shaver down changed the assembly's attitude as well as its stiffness. It
+does not affect the AC analysis, and it means these captures are not a
+single-variable comparison either.
+
+AND THE READBACK FAILED WITHOUT ANYONE NOTICING. After the write of 0x04,
+"i2cget -y 1 0x6b 0x10" returned an empty line rather than a value. The
+verification step produced nothing and the capture went ahead anyway. What
+confirmed the write was the duplicate fraction: 76.1 percent, identical to
+every other 0x04 run, which puts the rate at 30.3 Hz.
+
+So the output-rate meter stood in for a verification that silently did not
+happen. That is a better argument for it than the convenience of not
+needing a data sheet: it measures the part's behaviour, where a readback
+only reports a register, and it still works when the readback does not.

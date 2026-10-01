@@ -1419,3 +1419,67 @@ redesigned and finally killed by a test built around presence and absence
 rather than position. Four entries on something that turned out to be
 wrong, and the cost was right: the alternative was carrying it as an
 unexamined doubt behind every number this project goes on to produce.
+
+---
+
+## 30. Taping the shaver down refuted the operator reading, and one more of mine
+
+Entry on Thursday 1 October 2026.
+
+**The test was clean and it went the other way.** Shaver taped to the
+board, no hand on it, both output rates.
+
+| mount | Z AC rms | strongest Z | X bias |
+|---|---|---|---|
+| hand, 0x06 | 6.56 mg | 2.71 Hz, 3.85 mg | -5.2 mg |
+| taped, 0x06 | 24.70 mg | 4.87 Hz, 14.61 mg | -33.0 mg |
+
+Taping did not remove the low-frequency tone. It made it nearly four times
+larger and moved it up by two hertz. **The hand was damping the assembly,
+not driving it.**
+
+The shape of the argument survives and the attribution does not. The line
+still belongs to the part of the apparatus that is not bolted down, but
+that part is the whole board-and-shaver assembly on whatever it rests on.
+Taping stiffened the coupling and removed damping, so the resonance rose
+and the amplitude with it, which is a mass on a spring behaving ordinarily.
+
+**A second claim goes, and it is the one I was pleased with.** Entry 29
+argued that 2 to 4 Hz and 12 to 25 Hz are two sources because their balance
+flips with contact pressure. That rested on comparing the 0x07 record
+against the 0x04 and 0x06 ones, across a change of output rate that this
+journal has already documented as folding 63 to 120 Hz down into the band.
+The mid-band dominance of that record may be folded content, and the
+comparison cannot tell which.
+
+Within matched output rates the balance does not flip. The low to mid ratio
+is 4.36 against 5.75 at 0x04, and 3.58 against 6.24 at 0x06: rigid coupling
+raises the low band relatively, both times, same direction. There is no
+evidence here for two sources with opposing pressure dependence.
+
+I spent several entries warning against cross-rate comparisons and then
+built a conclusion on one, in the entry immediately after writing the
+warning. The warning was not wrong and it was not enough.
+
+**A third variable moved too.** The X bias went from -5.3 to -34.1 mg, a
+tilt of about 1.6 degrees. Taping changed the assembly's attitude as well
+as its stiffness, so this pair is not single-variable either, even though
+the AC analysis is unaffected.
+
+**And a verification silently did not happen.** After the write of 0x04,
+`i2cget -y 1 0x6b 0x10` returned an empty line instead of a value, and the
+capture went ahead on a readback that had produced nothing. What confirmed
+the write was the duplicate fraction: 76.1 percent, identical to every other
+0x04 run, putting the rate at 30.3 Hz.
+
+So the output-rate meter stood in for a check that failed without being
+noticed. That is a better argument for it than not needing a data sheet: it
+measures what the part does, where a readback reports only what a register
+holds, and it still works when the readback does not.
+
+**The habit worth naming.** Two hypotheses of mine died today, the beat and
+the operator, and both died to a measurement that cost one capture. The
+pattern in both is the same: a mechanism that explained the data was
+promoted to the mechanism that produced it, without the alternative being
+tried. The cheap test is not the one that confirms the story. It is the one
+that would look different if the story were wrong.
