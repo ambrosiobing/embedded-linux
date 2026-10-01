@@ -1644,3 +1644,46 @@ a character with no printed form, in a file that displays correctly in
 every editor. `od -c` on the first line settles it in one command, and it
 is worth reaching for whenever a file that looks right behaves as though it
 is absent.
+
+---
+
+## 34. Criterion 2, met by a program reporting that four drivers are absent
+
+Entry on Thursday 1 October 2026.
+
+**The first run of `iio-probe` on hardware produced a complete inventory.**
+Seven parts, seven verdicts, and every verdict is the one the last two
+days' measurements predicted: one `working` through hwmon, four
+`no-driver-in-image`, two `unsupported`.
+
+**The criterion is met by a disappointing result, and that was the design.**
+"The inventory lists every sensor on the shield with its driver and status"
+does not require the drivers to exist. It requires the program to say
+truthfully what is there, and `no-driver-in-image` is one of the five
+verdicts it was written to distinguish. The finding of Wednesday 30
+September 2026 has now arrived through the instrument built to detect it,
+rather than through a journal entry.
+
+That also corrects something I said yesterday. Criteria 2 through 5 were
+all described here as blocked on the drivers. Only 3, 4 and 5 are. Criterion
+2 needed a shell script copied over `scp`, and it had been sitting behind an
+assumption rather than behind a dependency.
+
+**And one scan now enumerates the whole board, which no scan did before.**
+Entry 16 established that the two probe modes disagree: the default sees
+0x44 and misses 0x19, and `-r` does the reverse. This scan shows all seven
+under the default mode, because 0x44 no longer gets probed at all. It reads
+`UU`: the sht4x driver has claimed it, and a claimed address is reported
+without being probed.
+
+So **binding a driver to the part that hid under one probe mode is what made
+a single scan complete.** The `UU` that reads like a fault to anyone meeting
+it for the first time is the reason the grid is now right, and the one
+driver this image happens to carry is the one that fixes the one address
+that needed fixing. That is luck rather than design, and worth writing down
+as luck.
+
+**Still open at one address.** 0x6a is listed with `st_lsm6dsx` because the
+part is an LSM6 family device. Whether that driver carries a compatible for
+the LSM6DSO16IS specifically has not been checked in any kernel, and the
+row says so rather than implying it has.

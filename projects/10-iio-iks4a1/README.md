@@ -137,8 +137,8 @@ every time rather than leaving the reader to remember.
 
 | # | Criterion | Evidence | State |
 |---|---|---|---|
-| 1 | `i2cdetect -y 1` shows the four addresses, and each IIO device reports the expected `name`; the SHT40 appears in `sensors` | `iio-probe -v` | **part met**, Wednesday 30 September 2026. All seven addresses answer and the SHT40AD1B reports through hwmon. No IIO device exists, because stock Raspberry Pi OS carries none of the eight drivers |
-| 2 | The inventory lists every sensor on the shield with its driver and status | `iio-probe -m` | **not started**, needs the shield |
+| 1 | `i2cdetect -y 1` shows the four addresses, and each IIO device reports the expected `name`; the SHT40 appears in `sensors` | `iio-probe -v` | **part met**, Wednesday 30 September 2026. All seven addresses answer in a single scan and the SHT40AD1B reports through hwmon. The IIO half cannot be met on this image: no IIO device exists, because stock Raspberry Pi OS carries none of the ST drivers. See criterion 2 |
+| 2 | The inventory lists every sensor on the shield with its driver and status | `iio-probe -v`, [inventory-2026-10-01.txt](docs/evidence/inventory-2026-10-01.txt) | **met**, Thursday 1 October 2026. Seven parts, seven verdicts: one `working` through hwmon, four `no-driver-in-image`, two `unsupported`. The `-m` CSV is still to be captured |
 | 3 | The hrtimer-triggered magnetometer buffer delivers timestamps with a standard deviation below 100 us at 100 Hz over 5 s | `iio-rate trigger lis2mdl 100` | **not started** |
 | 4 | The IMU FIFO at 416 Hz with watermark 64 produces fewer than 8 interrupts per second and under 3 percent reader CPU, against more than 400 per second at watermark 1 | `iio-rate fifo` twice | **not started** |
 | 5 | `iio-stream` produces identical CSV columns with `local:` and with `ip:`, and the sample counts over 10 s agree within 1 percent | `diff` of the two | **not started**, needs the network |

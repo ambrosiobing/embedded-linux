@@ -1,0 +1,77 @@
+Acceptance criterion 2: the inventory lists every sensor with its driver
+and status
+========================================================================
+
+Taken Thursday 1 October 2026 on the Raspberry Pi 3B+ (eplepi), stock
+Raspberry Pi OS, X-NUCLEO-IKS4A1 on I2C1, bench overlay applied.
+
+The first run of iio-probe on hardware. Console output, verbatim.
+
+--- i2c bus  1
+--- sysfs    /sys
+
+ADDRESS PART         DRIVER       SUBSYS   BUS       MODULE     DEVICES
+0x19    LIS2DUXS12   none         none     present   none       -
+        unsupported: answers only i2cdetect -r, driver may be absent
+0x1e    LIS2MDL      st_magn      iio      present   missing    -
+        no-driver-in-image: magnetometer, no FIFO
+0x38    STTS22H      none         none     present   none       -
+        unsupported: no mainline driver, expected unsupported
+0x44    SHT40AD1B    sht4x        hwmon    claimed   loaded     sht4x
+        working: humidity, NOT an IIO device
+0x5d    LPS22DF      st_pressure  iio      present   missing    -
+        no-driver-in-image: pressure, recent driver addition
+0x6a    LSM6DSO16IS  st_lsm6dsx   iio      present   missing    -
+        no-driver-in-image: ISPU part, confirm the compatible exists
+0x6b    LSM6DSV16X   st_lsm6dsx   iio      present   missing    -
+        no-driver-in-image: IMU, two devices, one hardware FIFO
+
+--- i2cdetect -y 1
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                         -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- 19 -- -- -- -- 1e --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- 38 -- -- -- -- -- -- --
+40: -- -- -- -- UU -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- 5d -- --
+60: -- -- -- -- -- -- -- -- -- -- 6a 6b -- -- -- --
+70: -- -- -- -- -- -- -- --
+
+--- iio devices
+
+(empty, and correctly so: no IIO device exists on this image)
+
+
+WHAT THIS ESTABLISHES
+---------------------
+
+Seven parts, seven verdicts, and every verdict is the one the earlier
+measurements predicted:
+
+  working             one part, the SHT40AD1B, through hwmon
+  no-driver-in-image  four parts, every IIO device on the shield
+  unsupported         two parts, recorded on purpose
+
+The "no-driver-in-image" verdict is the finding of Wednesday 30 September
+2026 arriving through the program written to detect it. Stock Raspberry Pi
+OS carries none of the ST IIO drivers, and this is the inventory saying so
+in the program's own words rather than in a journal entry.
+
+AND ONE SCAN NOW ENUMERATES THE WHOLE BOARD, which no scan did before.
+Earlier the two probe modes disagreed: the default saw 0x44 and missed
+0x19, and "-r" did the reverse. Here the default scan shows all seven,
+because 0x44 no longer needs probing at all. It reads UU, meaning the
+sht4x driver has claimed it, and a claimed address is reported without
+being probed.
+
+So binding a driver to the part that hides under one probe mode is what
+made a single scan complete. The UU that reads like an error to anyone
+meeting it for the first time is the reason this grid is right.
+
+STILL OPEN AT THIS ADDRESS
+--------------------------
+
+0x6a is listed with st_lsm6dsx on the strength of the part being an LSM6
+family device. Whether that driver carries a compatible for the
+LSM6DSO16IS specifically has not been checked in any kernel, and the note
+in the row says so. It matters only once a driver exists to check.
