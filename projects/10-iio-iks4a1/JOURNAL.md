@@ -1687,3 +1687,73 @@ as luck.
 part is an LSM6 family device. Whether that driver carries a compatible for
 the LSM6DSO16IS specifically has not been checked in any kernel, and the
 row says so rather than implying it has.
+
+---
+
+## 35. Two IIO devices, from a driver that was not in the image this morning
+
+Entry on Thursday 1 October 2026.
+
+    /sys/bus/iio/devices/iio:device0  ->  lsm6dsv16x_gyro
+    /sys/bus/iio/devices/iio:device1  ->  lsm6dsv16x_accel
+
+**One chip, one FIFO, one interrupt line, two IIO devices.** That sentence
+has been in this project's design document and in the overlay's comments
+since they were written, and nobody had seen it.
+
+**What was missing was narrower than it looked.** The IIO subsystem is
+present and packaged in full on stock Raspberry Pi OS, including the
+`trigger` and `buffer` directories criteria 3 and 4 depend on.
+`/sys/bus/iio` was absent only because nothing had loaded `industrialio`.
+Only the ST drivers and their shared framework are gone.
+
+**The compatible was checked before anything was compiled**, because an
+overlay naming a compatible the kernel lacks creates a node, binds nothing
+and logs nothing, which is this project's documented silent failure. The
+source carries `st,lsm6dsv16x` with `.wai = 0x70`, the value measured at
+`0x6b` on Wednesday, so the probe would match rather than refuse.
+
+**And one of Wednesday's inferences turns out to have been weaker than it
+read.** `ST_LSM6DSV_ID` and `ST_LSM6DSV16X_ID` share `.wai = 0x70`, so the
+plain LSM6DSV and the 16X answer the same WHO_AM_I. Reading `0x70` did not
+name the part. UM3239 Table 1 named it and the register agreed with it.
+Nothing practical changes and the record should not imply otherwise.
+
+**`insmod` earned its place by failing.** It refused with `Unknown symbol
+__devm_regmap_init_i2c`, because `depmod` has no record of out-of-tree
+modules and `insmod` resolves nothing by design. That is why it is the
+right tool here and the wrong one in general: it names what is missing
+instead of quietly satisfying it.
+
+**Four of the five verdicts, on hardware, in one run.**
+
+| address | part | verdict |
+|---|---|---|
+| 0x19, 0x38 | LIS2DUXS12, STTS22H | `unsupported` |
+| 0x1e, 0x5d | LIS2MDL, LPS22DF | `no-driver-in-image` |
+| 0x6a | LSM6DSO16IS | `not-bound` |
+| 0x44, 0x6b | SHT40AD1B, LSM6DSV16X | `working` |
+
+Criterion 7 asks that the inventory distinguish a missing driver from an
+unbound one. It has been met since 16 September by 25 assertions against
+synthetic sysfs trees. It is now demonstrated on real hardware with the two
+cases **at adjacent addresses on the same chip family**: `0x6a` has the
+driver loaded and no node, `0x1e` has a node and no driver. A unit test
+cannot produce that pairing and the shield did it by accident.
+
+**A correction to entry 18.** It recorded that binding is silent in both
+directions, because the SHT40AD1B bound and logged nothing. `st_lsm6dsx`
+logs three lines on a successful probe. So the silence is a property of the
+driver, not of the kernel, and "look in dmesg" fails only sometimes, which
+is worse than failing always: a habit that works most of the time is the
+one people keep.
+
+**And the bench has a power problem.** Eight `Undervoltage detected` events
+over about eleven hours, from `rpi_volt`, each lasting six to eight
+seconds. Every capture on Wednesday and Thursday was taken on that supply.
+Nothing in the data points at corruption, the noise floor having matched
+the part's own specification and the calibration having held across two
+ranges to 36 parts per million. But it is the first physical candidate for
+Wednesday's single free-fall sample, which was left as a corrupted read
+with no mechanism, and it should be fixed before criterion 4 measures
+interrupt rates on a board that browns out twice an hour.

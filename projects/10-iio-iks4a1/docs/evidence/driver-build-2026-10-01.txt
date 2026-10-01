@@ -1,0 +1,157 @@
+Building st_lsm6dsx out of tree against stock Raspberry Pi OS
+==============================================================
+
+Thursday 1 October 2026, on eplepi, kernel 6.18.50+rpt-rpi-v8.
+
+WHAT WAS ACTUALLY MISSING, which is narrower than it looked. The IIO
+subsystem is present and packaged in full:
+
+    industrialio.ko.xz, industrialio-configfs.ko.xz,
+    industrialio-sw-trigger.ko.xz, industrialio-gts-helper.ko.xz
+    and subdirectories accel, adc, buffer, chemical, common, health,
+    humidity, imu, light, pressure, temperature, trigger
+
+/sys/bus/iio was absent only because nothing had loaded industrialio. The
+trigger and buffer directories criteria 3 and 4 depend on are both there.
+
+What is absent is the ST drivers and their shared framework. common/ holds
+inv_sensors and ms_sensors and no st_sensors; imu/ holds bno055 and
+inv_mpu6050 and no st_lsm6dsx; there is no magnetometer directory at all.
+
+THE SOURCE MATCHES EXACTLY. linux-source-6.18 at 1:6.18.50-1+rpt1 against
+a running 6.18.50+rpt-rpi-v8, so no tag had to be guessed. Unpacked only
+the one driver directory rather than the whole tree:
+
+    tar -xvf linux-source-6.18.tar.xz \
+        --wildcards '*/drivers/iio/imu/st_lsm6dsx/*'
+
+THE CHECK BEFORE THE BUILD. The overlay names "st,lsm6dsv16x". A kernel
+that does not carry that compatible creates the node, binds nothing and
+logs nothing, which is this project's documented silent failure. So the
+compatible was looked for before anything was compiled:
+
+    st_lsm6dsx_i2c.c:122    .compatible = "st,lsm6dsv16x"
+    st_lsm6dsx_core.c:1244  .hw_id = ST_LSM6DSV16X_ID, .wai = 0x70
+
+0x70 is the value measured at 0x6b on Wednesday 30 September 2026, so the
+probe would match rather than refuse.
+
+AND THE SAME BLOCK CONFIRMS LAST NIGHT'S REGISTER WORK FROM A THIRD
+SOURCE: .bdu = { .addr = 0x12, .mask = BIT(6) }. CTRL3 at 0x12, block data
+update on bit 6, which UM3239 said, the part's reset value said, and the
+driver now says independently.
+
+A LIMIT ON WEDNESDAY'S IDENTIFICATION, noticed only here. ST_LSM6DSV_ID
+and ST_LSM6DSV16X_ID share .wai = 0x70, so the plain LSM6DSV and the
+LSM6DSV16X answer the same WHO_AM_I. The reading of 0x70 did not name the
+part. UM3239 Table 1 named it and the register agreed. Nothing practical
+changes, because the driver binds either way, and the record should not
+imply the identification rested on the register.
+
+THE OUT-OF-TREE MAKEFILE. The in-tree one is driven by
+CONFIG_IIO_ST_LSM6DSX, which this kernel does not set, so the targets are
+named directly. SPI and I3C are deliberately left out: the shield is on
+I2C, and building transports nobody is using only adds ways to fail.
+
+    obj-m += st_lsm6dsx.o
+    st_lsm6dsx-y := st_lsm6dsx_core.o st_lsm6dsx_buffer.o st_lsm6dsx_shub.o
+    obj-m += st_lsm6dsx_i2c.o
+
+    make -C /lib/modules/$(uname -r)/build M=/root/build-st modules
+
+Built clean, no warnings, in about a minute on the 3B+.
+
+LOADING, AND WHAT insmod IS FOR. The first attempt failed:
+
+    st_lsm6dsx_i2c: Unknown symbol __devm_regmap_init_i2c (err -2)
+
+regmap-i2c was not loaded, because nothing on this image had needed it.
+depmod has no record of out-of-tree modules, so nothing resolves what they
+require, and insmod does no resolution by design. That is exactly why it is
+the right tool here and the wrong one for everyday use: it names the
+missing symbol instead of quietly satisfying it. In the Yocto image the
+recipe installs these into /lib/modules, depmod wires the chain, and
+modprobe pulls regmap-i2c and industrialio in by itself.
+
+    modprobe industrialio
+    modprobe industrialio-triggered-buffer
+    modprobe regmap-i2c
+    insmod st_lsm6dsx.ko
+    insmod st_lsm6dsx_i2c.ko
+
+IT PROBED.
+
+    st_lsm6dsx_i2c 1-006b: supply vdd not found, using dummy regulator
+    st_lsm6dsx_i2c 1-006b: supply vddio not found, using dummy regulator
+    st_lsm6dsx_i2c 1-006b: mounting matrix not found: using identity...
+
+Bus 1, address 0x6b, and no error after those three, which means probe
+returned success. Neither "not found" is a fault: the overlay declares no
+regulators because the shield is fed from header pin 1 directly, and no
+mount-matrix because nothing has rotated the chip relative to the board.
+Both read like warnings and are the driver being explicit about a default.
+
+WHICH REFINES A FINDING FROM WEDNESDAY. Journal entry 18 recorded that
+binding is silent in both directions, because the SHT40AD1B bound and
+logged nothing at all. This driver logs three lines on a successful probe.
+So the silence is a property of the driver and not of the kernel, and
+"look for a message in dmesg" fails only sometimes. That is worse than
+failing always, because a habit that works most of the time is the one
+people keep.
+
+AND THE BENCH HAS A POWER PROBLEM, found in the same dmesg.
+
+    8 occurrences of "Undervoltage detected", over about eleven hours
+
+Roughly one every eighty minutes, each lasting six to eight seconds, from
+hwmon2, which is rpi_volt. The shield has been running on that supply
+through every capture taken on Wednesday and Thursday.
+
+Nothing in the data points at corruption: the noise floor matched the
+part's own specification, and the calibration held across two full-scale
+ranges to 36 parts per million. But this is the first PHYSICAL candidate
+for the single free-fall sample of Wednesday 30 September 2026, which was
+left as a corrupted read with no mechanism, and it should be fixed before
+criterion 4 measures interrupt rates on a board that browns out twice an
+hour.
+
+THE RESULT
+----------
+
+    /sys/bus/iio/devices/iio:device0  ->  lsm6dsv16x_gyro
+    /sys/bus/iio/devices/iio:device1  ->  lsm6dsv16x_accel
+
+One chip, one hardware FIFO, one interrupt line, and TWO IIO devices,
+exactly as this project's design document and the overlay comment both
+said it would be. That claim has been in the repository since it was
+written and had never been seen.
+
+iio-probe, the same program that said no-driver-in-image an hour earlier:
+
+    0x19  LIS2DUXS12   none         present  none    unsupported
+    0x1e  LIS2MDL      st_magn      present  missing no-driver-in-image
+    0x38  STTS22H      none         present  none    unsupported
+    0x44  SHT40AD1B    sht4x        claimed  loaded  working
+    0x5d  LPS22DF      st_pressure  present  missing no-driver-in-image
+    0x6a  LSM6DSO16IS  st_lsm6dsx   present  loaded  NOT-BOUND
+    0x6b  LSM6DSV16X   st_lsm6dsx   claimed  loaded  WORKING
+
+FOUR OF THE FIVE VERDICTS, ON HARDWARE, IN ONE RUN. working, not-bound,
+no-driver-in-image and unsupported, each on a different part of the same
+shield. Criterion 7 asks that the inventory distinguish a missing driver
+from an unbound one, and it has been met since 16 September 2026 by 25
+assertions against synthetic sysfs trees. It is now demonstrated on real
+hardware, with the two cases side by side at adjacent addresses.
+
+0x6a IS THE INTERESTING ONE. The driver is loaded and the part is on the
+bus, and it still reads not-bound, which is correct: the overlay declares
+no node for 0x6a, so nothing matched. That is the verdict's own definition
+arriving on hardware, and it distinguishes cleanly from 0x1e, where the
+part is present and the driver itself is absent.
+
+It is also the open question from the parts table. Whether st_lsm6dsx
+carries a compatible for the LSM6DSO16IS can now be answered by reading
+the table in the source that is already unpacked, rather than guessed at.
+
+And the grid now carries TWO claimed addresses, 0x44 and 0x6b both reading
+UU, where it carried one this morning.
