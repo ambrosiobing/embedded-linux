@@ -308,6 +308,11 @@ throughput.
 | 17:58 | `st_pressure` built as a target added to a Makefile that already worked, and the LPS22DF bound | |
 | 18:04 | **Criterion 1 met.** Four `working` rows where the morning had one, four IIO devices, two triggers | |
 | 18:20 | `scripts/card-archive.sh` and its 52 assertions, because for this project the card is the build output | |
+| 17:08 | The first archive run dies at forty-two per cent when its WSL tab is closed, leaving a 1.55 GB file with an archive's exact name and no records | |
+| 18:55 | **"now we are ready to wipe out and replace the contents of sd card".** Held, because the two record files were absent | |
+| 19:05 | `.dd.log` read through `tr` shows a progress figure and no I/O error, so the card is healthy and the terminal was the cause | |
+| 19:12 | The reader re-attaches as `/dev/sde` where it was `/dev/sdf`, and the archiver refuses `no such source` twice before anyone notices | |
+| 19:20 | The image is written as `.partial` and renamed only after the comparison, and the runbook stops telling anyone to run it in a foreground shell | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile
@@ -332,6 +337,14 @@ morning.** It was marked met on an inventory reporting four
 `working` and none missing. The inventory tracked the image because it reads
 the system rather than a table, which is the property the criterion is
 about, and one run alone could not have shown it. Both runs are cited.
+
+**The hour from 17:08 to 19:20 is the worst near miss of the two days.**
+A backup program failed in a way that left something indistinguishable from
+success, and the next instruction was to overwrite the original. What caught
+it was looking for `PROVENANCE.txt` and `SHA256SUMS` rather than for the
+image, and 1.55 GB is not even a suspicious size for that card. The image is
+now written as `.partial` and renamed only after it has been compared
+against the card, so the failure mode cannot recur in that shape.
 
 **The card image at 18:20 is a gap that had been open all along.** The
 finished projects archive with `./go archive`, which keeps the output of a

@@ -2096,3 +2096,95 @@ version then gives `10 passed, 1 failed` and the reason.
 That is the second time today a test has been found to be shaped so that it
 could not report the thing it was written for. Entry 37 was a test
 asserting the bug; this one was a test that could not speak.
+
+## 42. The backup that looked like a backup
+
+*Thursday 1 October 2026, evening.* The first real run of
+`scripts/card-archive.sh` was launched in a foreground WSL shell. The tab
+was closed while it worked. `dd` reached 6,677,331,968 of 15,728,640,000
+bytes, forty-two per cent, at a steady 15 MB/s, and died without printing
+anything.
+
+What it left behind was a 1.55 GB file called
+`10-iio-iks4a1-card-2026-10-01.img.gz`, in the right store directory, under
+the right stamp, **named exactly as a finished archive is named**. No
+`PROVENANCE.txt`. No `SHA256SUMS`.
+
+Then came the message: *now we are ready to wipe out and replace the
+contents of sd card, we go ahead.*
+
+**The only thing standing between that and the loss of the four built
+drivers was checking for the record files rather than for the image.** A
+directory listing shows a plausible multi-gigabyte `.img.gz` and nothing
+about it says incomplete. In a week it would say even less. 1.55 GB is not
+even a suspicious size: a 14.6 GB card whose rootfs is largely unwritten
+compresses to about that, so the number argues for completeness rather than
+against it.
+
+### The defect was mine and it was in the naming
+
+A program whose failure leaves something that looks like success. That is
+the same shape as journal 36, where a count that had stopped increasing was
+read as a rate, and as the `insmod File exists` of journal 40, where a
+success is worded like a failure. This one is worse than both, because the
+thing it misleads about is whether a backup exists, and the moment it
+misleads you is the moment before you destroy the original.
+
+The fix is not a line in a document. The image is now written as
+`<name>.img.gz.partial` and renamed only after the comparison against the
+card succeeds, so an interrupted run leaves a file that cannot be read as
+an archive. `.partial` is also invisible to the duplicate-image guard,
+because `*.img.gz` does not match `*.img.gz.partial`, so a killed run does
+not block its own retry.
+
+**And the definition is now written down where it was previously assumed:**
+an archive is finished when `PROVENANCE.txt` and `SHA256SUMS` are both
+present and `sha256sum -c SHA256SUMS` reports `OK`. The image file alone
+counts for nothing.
+
+### Three diagnostics, and what each one could and could not say
+
+Worth recording because two of them were inconclusive and saying so was the
+useful part.
+
+`ls -l` showed only the image, which looked like a clean partial. It was
+hiding `.dd.log`, a dotfile, and `ls -la` found it.
+
+The presence of `.dd.log` was inconclusive. The script deletes it on the
+line after the `dd` finishes, so a run killed *during* `dd` leaves it
+exactly as a failed read would. It separates nothing on its own.
+
+What separated them was the log's own last lines, read through
+`tr '\r' '\n'` because `status=progress` rewrites one line with carriage
+returns. The last entry was a progress figure at forty-two per cent with
+**no I/O error above it**. A failing sector prints one. So the card was
+healthy and the cause was the terminal, which is the difference between a
+retry and a replacement.
+
+### The reader does not keep its device letter
+
+The card came back from a usbipd re-attach as `/dev/sde` where it had been
+`/dev/sdf` forty minutes earlier, same reader, same laptop, same port. The
+re-run was handed over with the letter re-read rather than reused, which is
+the only reason it did not image whatever `sdf` had become.
+
+`/dev/sdf` had by then stopped existing at all, and the archiver refused
+with `no such source` twice before the attachment was noticed. Both
+refusals were correct and cost nothing.
+
+### And a test that credited the wrong mechanism
+
+The new assertion "the stale .partial was discarded" passed. Removing the
+`rm -f "$staging"` it was supposed to pin left it passing, because the
+write redirects onto the same path and truncates the file regardless. The
+cleanup line is a notice, not a mechanism.
+
+Removing the whole notice block did fail an assertion, the one checking that
+the run says a previous attempt died, so that part is pinned. The test now
+says in its own comment which half is load-bearing and that the discard is
+true by truncation.
+
+**Three tests in one day, each shaped so it could not do its job.** Journal
+37 asserted the bug. Journal 41 could not report a failure. This one gave
+credit to the wrong line. The common cause is writing the assertion from
+what the code does rather than from what would have to break.

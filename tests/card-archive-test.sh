@@ -292,6 +292,64 @@ contains "and saying what would have been lost" "$REFUSAL" "undescribed"
 contains "and giving the command that makes room" "$REFUSAL" "mv $DEST"
 rm -f "$DEST/some-other-card-2026-09-30.img.gz"
 
+# ------------------------------------- an interrupted run leaves no archive
+#
+# The first real run of card-archive.sh was launched in a foreground shell,
+# the tab was closed forty-two per cent into a seventeen minute read, and
+# the store was left holding a 1.55 GB file named exactly as a finished
+# archive is named, with no PROVENANCE.txt and no SHA256SUMS. That reads as
+# an archive to anybody who looks at the directory, and the card it came
+# from was about to be overwritten on the strength of it.
+#
+# So the image is written as <name>.img.gz.partial and renamed only after
+# the comparison passes. What this suite can check is that a successful run
+# leaves no .partial behind, and that a .partial from a previous death is
+# announced, discarded, and never mistaken for the image.
+#
+# WHAT IT CANNOT CHECK is the interruption itself. Killing a running dd
+# mid-pipeline from inside a test that must also work on a laptop with no
+# card is not something this file attempts, so the rename is checked by its
+# two observable ends rather than by the event between them.
+
+leftover=$(find "$DEST" -name '*.partial' | head -1)
+if [ -z "$leftover" ]; then
+	ok "a finished run leaves no .partial behind"
+else
+	no "a finished run leaves no .partial behind: $leftover"
+fi
+
+# A stale partial, exactly as a killed run leaves one.
+stale=$DEST/$PROJECT-card-$(date '+%Y-%m-%d').img.gz.partial
+dd if=/dev/urandom of="$stale" bs=1024 count=100 status=none
+
+must_succeed "a stale .partial does not block the next run" "$PROJECT" 	"$WORK/card.img"
+contains "and the run says a previous attempt died" "$OUT" 	"left by an interrupted run"
+
+# TRUE BY TRUNCATION, NOT BY THE rm IN THE SCRIPT, and the difference was
+# found by removing that rm and watching this pass anyway. The write
+# redirects onto the same path, which truncates it, so the file would go
+# even with no cleanup line at all. The property is still worth pinning,
+# because it is what the operator sees; the note above it is the part that
+# pins the script's own cleanup. Said here so the next reader does not
+# conclude from a green line that the rm is tested. This project has
+# already shipped a test that asserted a bug and a test that could not
+# report one; a test that credits the wrong mechanism is the same family.
+if [ -f "$stale" ]; then
+	no "the stale .partial is gone afterwards"
+else
+	ok "the stale .partial is gone afterwards"
+fi
+
+# The guard that refuses a second image on the same stamp must not count a
+# .partial as that second image, or a killed run would block its own retry.
+# find -name '*.img.gz' does not match '*.img.gz.partial', which is why.
+back3=$(gzip -dc "$IMG" | sha256sum | cut -d' ' -f1)
+if [ "$back3" = "$SRC_SHA" ]; then
+	ok "and the archive it wrote is the real one, not the leftover"
+else
+	no "and the archive it wrote is the real one, not the leftover"
+fi
+
 # ------------------------------------------------- the verify can be skipped
 #
 # It costs a second full read of the card, so it can be turned off. What

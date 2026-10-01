@@ -206,6 +206,29 @@ $(printf '%s\n' "$mounted" | sed 's/^/       /')
 	dest=$STORE/proj$number-${project#*-}-card/$stamp
 	out=$dest/$project-card-$day.img.gz
 
+	# THE IMAGE DOES NOT CARRY ITS FINAL NAME UNTIL IT IS VERIFIED.
+	#
+	# It is written as <name>.partial and renamed only after the
+	# comparison below succeeds. The first real run of this program, on
+	# Thursday 1 October 2026, was launched in a foreground shell, the
+	# tab was closed forty-two per cent of the way through a seventeen
+	# minute read, and the store was left holding a 1.55 GB file named
+	# exactly as a finished archive is named, with no PROVENANCE.txt and
+	# no SHA256SUMS beside it.
+	#
+	# At a glance that is an archive. A week later it is certainly an
+	# archive. The card it came from was an hour away from being
+	# overwritten on the strength of it, and what caught it was checking
+	# for the two record files rather than for the image.
+	#
+	# A program whose failure leaves something that looks like success is
+	# the shape of defect this repository keeps writing down, so the fix
+	# is not a warning in a document: an interrupted run now leaves
+	# <name>.img.gz.partial, which is not an archive and cannot be read
+	# as one. The duplicate guard below ignores it for the same reason,
+	# because *.img.gz does not match *.img.gz.partial.
+	staging=$out.partial
+
 	# A SECOND, DIFFERENT IMAGE ON THE SAME STAMP IS REFUSED.
 	#
 	# Two cards archived for the same project at the same commit on the
@@ -229,6 +252,14 @@ $(printf '%s\n' "$mounted" | sed 's/^/       /')
 	fi
 
 	mkdir -p "$dest"
+
+	# A partial from an interrupted run is not evidence of anything and
+	# the space it holds is needed by this one. Said out loud rather than
+	# removed silently, because it means a previous attempt died.
+	if [ -f "$staging" ]; then
+		note "discarding $(du -h "$staging" | cut -f1) left by an interrupted run"
+		rm -f "$staging"
+	fi
 
 	# Free space is checked against the UNCOMPRESSED size rather than
 	# against a guess at the compression ratio. A card whose free space has
@@ -276,7 +307,7 @@ $(printf '%s\n' "$mounted" | sed 's/^/       /')
 	# operator has to decide whether a restore that ended in an error
 	# worked. Without it the image is exactly the size recorded above.
 	dd if="$src" bs=4M status=progress 2>"$dest/.dd.log" |
-		"$zip" >"$out" || die "the read failed. $dest/.dd.log has what dd said."
+		"$zip" >"$staging" || die "the read failed. $dest/.dd.log has what dd said."
 	read_report=$(tail -1 "$dest/.dd.log")
 	rm -f "$dest/.dd.log"
 	note "read    $read_report"
@@ -287,8 +318,8 @@ $(printf '%s\n' "$mounted" | sed 's/^/       /')
 	# property that matters when it is read back in a year, where hashing
 	# the source would prove only that the source was read.
 	note "verifying the archive decompresses"
-	raw_sha=$(gzip -dc "$out" | sha256sum | cut -d' ' -f1)
-	gz_sha=$(sha256sum "$out" | cut -d' ' -f1)
+	raw_sha=$(gzip -dc "$staging" | sha256sum | cut -d' ' -f1)
+	gz_sha=$(sha256sum "$staging" | cut -d' ' -f1)
 
 	# And the end-to-end check, which is the only one that compares the
 	# archive against the source rather than against itself. It costs a
@@ -307,10 +338,18 @@ $(printf '%s\n' "$mounted" | sed 's/^/       /')
 			die "the archive does not match the source.
        source   $src_sha
        archive  $raw_sha
-       $out is NOT a copy of $src. Do not reuse the card."
+       It keeps the .partial name and is NOT an archive:
+       $staging
+       Left in place so it can be re-hashed rather than deleted on
+       a guess, and discarded by the next run. Do not reuse the card."
 		fi
 		note "verified, the archive is byte for byte the source"
 	fi
+
+	# Only now does it get the name an archive has. Everything above
+	# this line can fail, and everything above this line leaves a
+	# .partial rather than something that reads as a finished archive.
+	mv "$staging" "$out"
 
 	printf '%s  %s\n' "$gz_sha" "$(basename "$out")" >"$dest/SHA256SUMS"
 

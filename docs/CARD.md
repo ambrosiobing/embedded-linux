@@ -161,8 +161,30 @@ This bench has one card, so every project that wants it takes it from
 another one. A card written by Imager and then left alone can be made again
 from the same image file. A card that has been worked on cannot.
 
-    sudo ./go card-archive 10-iio-iks4a1 /dev/sdX
+    sudo -v
+    nohup sudo BENCH_IMAGE_DIR=<store> sh scripts/card-archive.sh <project> /dev/sdX > ~/card-archive.log 2>&1 &
+    tail -f ~/card-archive.log
     ./go card-archive list
+
+**Launch it with `nohup`, not in a foreground shell.** It reads the card
+twice, which on a reader giving 15 MB/s is about forty minutes for a 16 GB
+card, and a foreground run dies with its terminal. On Thursday 1 October
+2026 the first real run was killed at forty-two per cent by a closed tab,
+and the `sudo -v` is there because a backgrounded `sudo` cannot show a
+password prompt. **Do not let the laptop sleep either**, because suspending
+it drops the usbipd attachment and the card disappears mid-read.
+
+A killed run leaves `<name>.img.gz.partial`, which is not an archive and
+cannot be read as one. That naming exists because the first interrupted run
+left a 1.55 GB file with an archive's exact name and no records beside it,
+and the card was an hour from being overwritten on the strength of it.
+**An archive is finished when `PROVENANCE.txt` and `SHA256SUMS` are both
+there and `sha256sum -c SHA256SUMS` says `OK`.** Nothing less counts, and
+the image file alone counts least of all.
+
+The device letter is read fresh every time. The same reader on the same
+laptop came back as `sdf` and then as `sde` within the hour, because a
+usbipd re-attach does not reclaim the letter it had.
 
 The reader is on the WSL side for this, attached with `usbipd`, and nothing
 on the card may be mounted: a filesystem being written to images
