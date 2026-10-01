@@ -319,6 +319,11 @@ throughput.
 | 18:30 | `card-archive.sh verify` pays the comparison debt that `BENCH_CARD_SKIP_VERIFY` creates, appending a dated result rather than rewriting the record | `ae3f284` |
 | 19:04 | **The comparison passes.** The stored image and the card both hash to `35cc6c22`, so the archive is a proven copy and not an assumed one | `968e7be` |
 | 19:10 | The card is NOT wiped. It keeps this system, because criteria 4 and 5 are still open on it and the archive makes reusing it a choice rather than a risk | |
+| 19:27 | The board boots and presents no IIO devices at all. The modules were `insmod`ed and never installed, which is what `insmod` means | |
+| 19:32 | libiio 0.26-2 installed, `iio-stream.c` compiles clean against it, `iiod` listens on 30431 | |
+| 19:38 | The accelerometer refuses: `refill failed: Connection timed out`, and IRQ 185 reads `0 0 0 0` where this morning it reached 100001 | |
+| 19:42 | The first remote attempt lists three hwmon devices and no IIO ones, because `iiod` enumerates at boot and the drivers arrived after it | |
+| 19:45 | **Criterion 5 met.** 1000 samples each way, identical columns, 10.044 s and 10.074 s, on `lis2mdl` because the accelerometer's path needs the interrupt | |
 
 **The aha at 16:55 is how little the second driver cost.** `st_sensors`,
 `st_magn` and `st_pressure` are siblings in one subtree, so one Makefile

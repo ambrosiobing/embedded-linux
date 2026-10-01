@@ -2266,3 +2266,79 @@ was being watched for progress that was going to `card-verify-2026-10-01.log`,
 and the verify had not in fact been started. A finished log is
 indistinguishable from a stalled one, which is the same shape as the two
 entries above: the absence of new information read as information.
+
+## 45. Criterion 5, across the network, on the wrong sensor for the right reason
+
+*Thursday 1 October 2026, 19:45.* Identical columns, 1000 samples each way,
+10.044 s locally and 10.074 s from the laptop. The counts are equal rather
+than within the one per cent the criterion allows, and the only argument that
+differed between the two runs was `-u ip:192.168.92.154`.
+
+libiio 0.26 on both hosts, which is worth more than it looks: a difference in
+the column set would then be the program's doing rather than a library
+difference, and that is the property the criterion exists to establish. The
+`iio_buffer_refill` concern written into `bench-iio_0.1.bb` is settled for
+0.26, the last of the 0.x line, and still open for any host on 1.x.
+
+**The timestamps corroborate the wall clock.** 9,994,330 ns between
+consecutive samples locally, 9,989,105 ns remotely, 9,989,990,862 ns from
+first to last over 999 intervals. All 100 Hz to better than a part in a
+thousand, from the kernel's own clock rather than from the shell's. Two
+independent clocks agreeing is the reason to believe either.
+
+### It was measured on the magnetometer, and that is stated rather than glossed
+
+`iio-stream` defaults to `lsm6dsv16x_accel`. The accelerometer was tried
+first and answered `refill failed: Connection timed out`, and
+`/proc/interrupts` says why without ambiguity:
+
+    185:   0   0   0   0   pinctrl-bcm2835  24 Edge   lsm6dsx
+
+Zero on all four CPUs, including during the attempt. The LSM6DSV16X has a
+hardware FIFO and its own interrupt, so `st_lsm6dsx` registers a trigger of
+its own and the buffered path uses that rather than any software trigger.
+With the line delivering nothing, that path cannot complete a refill and no
+software change reaches it.
+
+So criterion 5 is met for the local-against-remote property it is about, and
+it is **not** evidence that the accelerometer streams over the network. The
+criterion names no device and `-d` exists, so the substitution is legitimate;
+what would not be legitimate is leaving it unsaid.
+
+**The fault has reversed direction, and that is the finding.** This morning
+IRQ 185 reached 100001, the kernel's spurious-interrupt threshold, and the
+watchdog disabled the line. Tonight it reads 0 and the line is silent. Same
+jumper, same shield, same pin, opposite failure. A wire that both rings and
+goes open is a connection problem, not a threshold problem, which argues for
+shortening it or adding series resistance rather than for filtering in
+software. Three entries have now circled criterion 4's wiring; this is the
+first one that constrains the mechanism.
+
+### The first remote attempt failed on an ordering trap
+
+It connected, answered, and listed three devices: `cpu_thermal`, `rpi_volt`
+and `sht4x`. All three are hwmon devices libiio surfaces through its hwmon
+backend, and not one of the four IIO devices appeared.
+
+`iiod` enumerates once, at startup. systemd had started it at boot, which was
+before any of the out-of-tree modules existed. `systemctl restart iiod` fixed
+it in two seconds.
+
+**That is guaranteed to bite the next person following RESUME.md**, because
+that document loads drivers after boot and systemd starts `iiod` at boot. The
+symptom reads as a network problem and the fault is a stale service. The
+local run was unaffected because a local context is rebuilt every time a
+program starts, which is exactly why the local half passed first and made the
+remote failure look like the network.
+
+`systemctl restart iiod` is now the last line of the reload sequence.
+
+### What the archive does not contain
+
+The card image was taken at 18:08 and this work happened between 19:30 and
+19:45, so libiio, `iiod`, the compiled `iio-stream` and `local.csv` are not in
+it. Nothing irreplaceable sits outside it: the install is one `apt-get`, the
+source is one `curl` from the repository, the compile is one `cc` line, and
+the numbers are in the evidence file. Said here because an archive with a
+timestamp invites the assumption that it holds everything, and this one holds
+everything that cost anything.

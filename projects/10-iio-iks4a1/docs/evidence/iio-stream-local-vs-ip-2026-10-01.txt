@@ -1,0 +1,155 @@
+Criterion 5: iio-stream through local: and through ip:
+Thursday 1 October 2026, 19:35 to 19:45 CEST
+
+THE RESULT
+
+                        local:              ip:192.168.92.154
+  samples               1000                1000
+  wall time             10.044 s            10.074 s
+  columns               magn_x,magn_y,magn_z,timestamp   (identical)
+  rate implied          99.56 Hz            99.27 Hz
+
+Columns identical. Counts equal, not merely within the one per cent the
+criterion allows. The only argument that differed between the two runs was
+-u ip:192.168.92.154.
+
+THE SETUP
+
+  libiio          0.26-2       on the Pi 3B+ (Debian 13 trixie, arm64)
+                  0.26-2build2 in WSL on skyhorizon (Ubuntu, amd64)
+  iiod            0.26-2, listening on TCP 30431
+  board           eplepi, 192.168.92.154, kernel 6.18.50+rpt-rpi-v8
+  device          lis2mdl, iio:device2
+  trigger         t100, hrtimer at 100 Hz, via configfs
+  buffer          100 samples per refill, 10 refills
+
+Both ends run the SAME libiio version, which matters: a difference in the
+column set would then be the program's doing rather than a library
+difference, and that is what the criterion is trying to establish.
+
+iio-stream.c was compiled from the committed source on both hosts with
+-O2 -Wall -Wextra and produced no warnings on either architecture.
+
+THE TRANSCRIPT
+
+  local, on the board:
+
+    root@eplepi:~# time ./iio-stream -d lis2mdl -n 10 -b 100 > local.csv
+    WARNING: High-speed mode not enabled
+
+    real    0m10.044s
+    user    0m0.050s
+    sys     0m0.028s
+    1001 local.csv
+    magn_x,magn_y,magn_z,timestamp
+    0.292500,-0.574500,-0.258000,1790876341459894985
+    0.292500,-0.574500,-0.258000,1790876341469889315
+    0.295500,-0.577500,-0.258000,1790876351449885847   (last line)
+
+  remote, from WSL on skyhorizon:
+
+    bing@JPTOUPM678:~$ time /tmp/iio-stream -u ip:192.168.92.154 \
+        -d lis2mdl -n 10 -b 100 > /tmp/remote.csv
+
+    real    0m10.074s
+    user    0m0.000s
+    sys     0m0.007s
+    1001 /tmp/remote.csv
+    magn_x,magn_y,magn_z,timestamp
+    0.292500,-0.579000,-0.261000,1790876702177751110
+    0.292500,-0.579000,-0.261000,1790876702187740215
+
+1001 lines is one header plus 1000 samples in each case.
+
+THE TIMESTAMPS CORROBORATE THE WALL CLOCK
+
+  local   consecutive samples   9,994,330 ns apart
+          first to last         9,989,990,862 ns over 999 intervals
+  remote  consecutive samples   9,989,105 ns apart
+
+All three are 100 Hz to better than a part in a thousand, from the kernel's
+own timestamps rather than from the shell's time builtin. Two independent
+clocks agreeing is the reason to believe either.
+
+THE DATA ROWS DIFFER AND ARE SUPPOSED TO
+
+The two captures are different ten second windows of a magnetometer sitting
+still on a bench. 0.2925 against 0.2925 on X and -0.5745 against -0.5790 on
+Y is the part not moving, and nothing here claims the samples are the same
+samples. The criterion asks for identical COLUMNS and counts within one per
+cent, which is a statement about the data path, not about the field.
+
+WHAT WAS SUBSTITUTED, AND WHY IT IS STATED HERE RATHER THAN GLOSSED
+
+iio-stream defaults to lsm6dsv16x_accel and this measurement used lis2mdl.
+That is a deliberate substitution and the criterion does not name a device,
+but the reason has to be on the record.
+
+The accelerometer was tried first and failed:
+
+    root@eplepi:~# ./iio-stream -d lsm6dsv16x_accel -n 40 -b 256
+    WARNING: High-speed mode not enabled
+    refill failed: Connection timed out
+
+The cause is the bench fault already documented against criterion 4, and
+/proc/interrupts says so without ambiguity:
+
+    185:   0   0   0   0   pinctrl-bcm2835  24 Edge   lsm6dsx
+
+Zero on all four CPUs, including during the attempt that timed out. The
+LSM6DSV16X has a hardware FIFO and its own interrupt, so st_lsm6dsx
+registers a trigger of its own and the buffered path uses that rather than
+any software trigger. With the interrupt line delivering nothing, that path
+cannot complete a refill, and no software change reaches it.
+
+The LIS2MDL has no hardware FIFO and takes a software trigger, which is why
+criterion 3 was measured on it too, and for the same reason: it is the one
+path the interrupt fault cannot reach.
+
+So criterion 5 is met for the local-versus-remote property it is about, and
+it is NOT evidence that the accelerometer streams over the network. That
+needs the jumper fixed and is the same blocker as criterion 4's second half.
+
+HOW THE FAULT HAS CHANGED CHARACTER, WHICH IS WORTH MORE THAN EITHER COUNT
+
+Thursday 1 October 2026, morning:  IRQ 185 reached 100001, the kernel's
+spurious-interrupt threshold, and the watchdog disabled the line.
+Thursday 1 October 2026, evening:  IRQ 185 reads 0 after a reboot and a
+reload, and the line delivers nothing at all.
+
+Same jumper, same shield, same pin, opposite failure. A wire that both rings
+and goes open is a connection problem rather than a threshold problem, which
+is the argument for shortening it or adding series resistance rather than for
+filtering in software.
+
+THE ORDERING TRAP THAT COST THE FIRST REMOTE ATTEMPT
+
+The first remote run connected, authenticated, enumerated and answered, and
+listed only three devices:
+
+    no device named lis2mdl in this context
+    devices present:
+      cpu_thermal
+      rpi_volt
+      sht4x
+
+Those three are hwmon devices surfaced through libiio's hwmon backend. None
+of the four IIO devices appeared, because iiod had been started by systemd
+before the ST modules were insmoded and ENUMERATES ONCE AT STARTUP.
+systemctl restart iiod fixed it.
+
+This is guaranteed to bite anyone following the reload sequence in
+RESUME.md, because that sequence loads drivers after boot and systemd starts
+iiod at boot. The symptom reads as "the remote context cannot see my sensor",
+which points at the network, and the fault is a stale service. The local run
+was unaffected because iio-stream builds a fresh local context every time it
+starts.
+
+WHAT THIS DOES NOT SHOW
+
+  - the accelerometer over the network, which needs the interrupt
+  - anything about throughput: 100 Hz on three channels is not a load test,
+    and the criterion does not ask for one
+  - any claim about libiio 1.x, where iio_buffer_refill does not exist and
+    this program would not compile. Both hosts here are 0.26, the last of
+    the 0.x line

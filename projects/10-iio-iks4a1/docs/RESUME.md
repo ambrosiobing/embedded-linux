@@ -24,7 +24,45 @@ modprobe industrialio-triggered-buffer
 modprobe regmap-i2c
 insmod /root/build-st/st_lsm6dsx.ko
 insmod /root/build-st/st_lsm6dsx_i2c.ko
+insmod /root/build-magn/st_sensors.ko
+insmod /root/build-magn/st_sensors_i2c.ko
+insmod /root/build-magn/st_magn.ko
+insmod /root/build-magn/st_magn_i2c.ko
+insmod /root/build-magn/st_pressure.ko
+insmod /root/build-magn/st_pressure_i2c.ko
+modprobe iio-trig-hrtimer
+systemctl restart iiod
 ```
+
+**The `systemctl restart iiod` is not optional and the reason is an ordering
+trap.** `iiod` enumerates the IIO devices once, at startup, and systemd
+starts it at boot, which is before any of the modules above exist. A remote
+context then connects, answers, and lists only `cpu_thermal`, `rpi_volt` and
+`sht4x`, the three hwmon devices libiio surfaces through its hwmon backend.
+The symptom reads as a network problem and is a stale service. It cost the
+first remote attempt of criterion 5 on Thursday 1 October 2026. A local
+context is unaffected, because it is rebuilt every time a program starts.
+
+**Order matters and the dependency is one-directional.** `st_sensors` is the
+common layer `st_magn` and `st_pressure` both link against, so it goes
+first, and each `_i2c` module after the core it registers with. The three
+sets were built against one `Module.symvers` in `/root/build-magn`, which is
+why they load against each other without complaint.
+
+**Nothing here survives a reboot, and that is the state to expect.** The
+modules were installed nowhere: no `modules_install`, no `depmod`, no
+`/etc/modules-load.d`. Thursday 1 October 2026 at 19:32 a fresh boot
+presented exactly three devices to libiio, `cpu_thermal`, `rpi_volt` and
+`sht4x`, all three of them hwmon devices surfaced through libiio's hwmon
+backend, and no IIO devices at all. That is not a fault, it is what `insmod`
+means, and the archived image carries the same property: a restore gives a
+card that needs this sequence run, not a board that boots into the working
+state.
+
+Making it persistent is a real improvement and is not done: copying the
+eight `.ko` files into `/lib/modules/$(uname -r)/extra`, running `depmod -a`
+and listing them in `/etc/modules-load.d/bench-iio.conf` would turn
+criterion 1 from a property of a live session into a property of the card.
 
 If `/root/build-st` is gone, the Makefile is in
 [driver-build-2026-10-01.txt](evidence/driver-build-2026-10-01.txt) along
@@ -39,14 +77,21 @@ the repository does not. Journal entry 33 has the reason.
 
 | # | state | what it is waiting for |
 |---|---|---|
-| 1 | part met | `st_magn` and `st_pressure`, built like `st_lsm6dsx` |
-| 2 | met | nothing |
-| 3 | not started | `st_sensors` plus `st_magn`, so the LIS2MDL gets a device |
+| 1 | met, Thursday 1 October 2026 | nothing. Four `working` rows, four IIO devices |
+| 2 | met | nothing. Met twice, on two inventories of the same image a day apart |
+| 3 | met, Thursday 1 October 2026 | nothing. 3.341 us on the hrtimer trigger |
 | 4 | half met | the interrupt line. CPU is measured; interrupt counts are not measurable here |
-| 5 | not started | `iiod` and libiio, neither yet on the board |
+| 5 | met, Thursday 1 October 2026 | nothing. 1000 samples each way, identical columns, on `lis2mdl` rather than the accelerometer because IRQ 185 delivers nothing |
 | 6, 7 | met | nothing |
 | 8 | criterion defective | a decision about restating it, not more measurement |
 | 9 | met | nothing |
+
+**On criterion 5 and the libiio version.** `bench-iio_0.1.bb` warns that
+libiio 1.0 replaced buffers with blocks and removed `iio_buffer_refill`, so
+`iio-stream.c` is 0.x code that would fail to compile against 1.0. Debian 13
+trixie ships 0.26-2, the last of the 0.x line, and the program built with no
+warnings on Thursday 1 October 2026. That concern is therefore settled for
+this board and open for any host that has moved to 1.x.
 
 ## The two things the bench itself needs
 
