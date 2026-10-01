@@ -1,0 +1,58 @@
+Acceptance criterion 3: the hrtimer-triggered magnetometer buffer
+=================================================================
+
+Thursday 1 October 2026, 15:59:50, on eplepi, after the board returned to
+the bench. Raspberry Pi 3B+, X-NUCLEO-IKS4A1, stock Raspberry Pi OS
+6.18.50 with st_sensors, st_sensors_i2c, st_magn and st_magn_i2c built
+out of tree.
+
+    iio-rate trigger lis2mdl 100
+
+    path         hrtimer trigger
+    device       lis2mdl at iio:device2
+    rate         100 Hz
+    channels     in_magn_x in_magn_y in_magn_z in_timestamp
+    samples      1003 in 10 s, which is 100.3 a second
+    interrupts   0
+    reader cpu   0.40 percent
+    ts sd        3.341 us, source iio-core
+
+CRITERION 3 ASKS FOR A STANDARD DEVIATION BELOW 100 us AT 100 Hz. The
+measurement is 3.341 us, which is thirty times inside the limit. MET.
+
+AND THIS NUMBER IS A LATENCY MEASUREMENT, which is the whole reason this
+criterion is on the magnetometer. The IIO core stamps each scan as it
+pushes it, so the spread is kernel scheduling. The FIFO path's 0.128 us
+is not comparable and iio-rate prints a warning beside that one and not
+beside this one: there the driver assigns timestamps by interpolating
+backwards from a single interrupt at the watermark, so their regularity
+is the driver's arithmetic agreeing with itself.
+
+A clock that reports the time it was set to always agrees with itself.
+3.341 us is a bench measuring itself and finding scheduling jitter;
+0.128 us is a formula.
+
+ZERO INTERRUPTS, and that is not an absence of data. The hrtimer fires
+from software, so this path never touches the GPIO24 line whose ringing
+makes criterion 4's interrupt count unmeasurable. The design document
+chose the magnetometer for this criterion because it has no FIFO to
+confuse the comparison with, and the choice turns out to have bought a
+second thing nobody planned: the only part of this project the bench's
+interrupt fault cannot reach.
+
+THROUGHPUT IS BETTER THAN THE BUFFERED PATH'S. 1003 samples where 1000
+were asked for, against 96 to 97 percent on every FIFO run. The FIFO
+shortfall was samples still sitting in the hardware when the buffer
+closed; a software trigger has nothing in flight to lose.
+
+THE SUPPLY DID NOT MISBEHAVE DURING THIS RUN. The undervoltage count was
+2 before and 2 after, so no brownout sits inside a figure measured in
+microseconds. That check is cheap and it is the difference between a
+latency measurement and a story about one.
+
+AND ONE THING THIS RUN EXERCISED BY ACCIDENT. The channels line reads
+in_magn_x, in_magn_y, in_magn_z, in_timestamp. iio-rate was corrected
+this morning to discover the scan elements rather than name them, and the
+reason given at the time was that a hard-coded in_accel_ list would
+silently read nothing on the magnetometer. This is the first run on a
+device with different channel names, and it found them.

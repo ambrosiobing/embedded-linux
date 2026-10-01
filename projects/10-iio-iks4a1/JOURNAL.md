@@ -1926,3 +1926,59 @@ to compile it, and the recipe warns that `libiio` 1.0 removed
 `iio_buffer_refill` entirely, so this is 0.x code that a current
 `libiio-dev` may refuse outright. That is a port, not an afternoon, and it
 is now written down rather than discovered again by the next reader.
+
+---
+
+## 39. Criterion 3, and the one path the bench's fault cannot reach
+
+Entry on Thursday 1 October 2026, after the board came back to the bench.
+
+**3.341 microseconds, against a limit of 100.** The hrtimer-triggered
+magnetometer buffer delivered 1003 samples in ten seconds at 100 Hz, with
+0.40 percent reader CPU and zero interrupts.
+
+`st_sensors` and `st_magn` built out of tree exactly as `st_lsm6dsx` did
+this morning, four modules rather than two because `st_magn` does not
+stand alone. The compatible was checked before compiling, as it must be:
+`st_magn_i2c.c` carries `st,lis2mdl` and the settings give `.wai = 0x40`
+at `.wai_addr = 0x4f`, and the part on the bus returns `0x40` from `0x4f`.
+
+**And the same lesson arrived a second time from a different part.**
+`LSM303AGR`, `LIS2MDL` and `IIS2MDC` share `wai = 0x40` in that table,
+just as `LSM6DSV` and `LSM6DSV16X` share `0x70`. WHO_AM_I confirms a
+family and does not name a part. Twice in one day, from two unrelated
+drivers, which makes it a property of how ST numbers its parts rather
+than a coincidence.
+
+**This number is a latency measurement and the FIFO's is not.** The IIO
+core stamps each scan as it pushes it, so 3.341 us is kernel scheduling.
+The FIFO path's 0.128 us is the driver interpolating backwards from one
+interrupt at the watermark, which is its arithmetic agreeing with itself:
+a clock that reports the time it was set to always does. `iio-rate` warns
+beside one figure and not the other, and the two are now measured side by
+side rather than only described.
+
+**Zero interrupts, and that is the finding worth keeping.** A software
+trigger never touches GPIO24, so this path is the only part of the project
+the bench's ringing interrupt line cannot reach. The design document chose
+the magnetometer because it has no FIFO to confuse the comparison with.
+That reason was good and it bought a second thing nobody planned: when the
+interrupt wiring turned out to be the bench's worst fault, one criterion
+was already immune to it.
+
+**Throughput beat the buffered path.** 1003 samples where 1000 were asked,
+against 96 to 97 percent on every FIFO run. The FIFO shortfall was samples
+still in the hardware when the buffer closed; a software trigger has
+nothing in flight to lose.
+
+**The supply was checked either side.** Two undervoltage events before the
+run and two after, so no brownout sits inside a figure measured in
+microseconds. That check costs one command and is the difference between a
+latency measurement and a story about one.
+
+**And a fix from this morning was exercised on the device it was written
+for.** `iio-rate` was corrected to discover scan elements rather than name
+them, and the reason given at the time was that a hard-coded `in_accel_`
+list would silently read nothing on the magnetometer. The channels line of
+this run reads `in_magn_x in_magn_y in_magn_z in_timestamp`. First run on a
+device with different channel names, and it found them.
