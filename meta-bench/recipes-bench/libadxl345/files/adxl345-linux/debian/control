@@ -2,7 +2,11 @@ Source: adxl345
 Section: libs
 Priority: optional
 Maintainer: Joseph Ambrose Pagaran <jagp.coin@proton.me>
-Build-Depends: debhelper-compat (= 13), cmake, pkg-config, libgpiod-dev (>= 2.0)
+Build-Depends: debhelper-compat (= 13),
+               dh-sequence-python3,
+               cmake,
+               pkg-config,
+               libgpiod-dev (>= 2.0)
 Standards-Version: 4.6.2
 Rules-Requires-Root: no
 
@@ -26,7 +30,24 @@ Description: ADXL345 accelerometer library (development files)
 
 Package: adxl345-tools
 Architecture: any
-Depends: libadxl345-1 (>= ${source:Version}), ${misc:Depends}
+# Four substitutions, and three of them were missing until lintian said
+# so on Friday 2 October 2026, the first time this package was ever
+# built. This stanza ships a compiled ELF (adxl-map), a python3 module
+# (usr/lib/python3/dist-packages/adxl345) and a python3 script
+# (adxl-motion), and declared a dependency on none of the three.
+#
+# shlibs:Depends  the C library adxl-map links against, libc included.
+# python3:Depends the interpreter the module and the script need, filled
+#                 by dh_python3 via the dh-sequence-python3 build
+#                 dependency above.
+#
+# The Yocto recipe had the equivalent of the python one all along, and
+# tests/adxl345-build-test.sh asserted it there. It asked one packaging
+# system a question it never asked the other.
+Depends: libadxl345-1 (>= ${source:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends},
+         ${python3:Depends}
 Description: ADXL345 reader and its udev rule
  adxl-map prints live acceleration. The package also ships the udev rule
  that puts /dev/i2c-* in group i2c, so that reading the sensor needs no

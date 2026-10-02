@@ -15,8 +15,15 @@ configure)
 	# The service runs as this user, which owns nothing and can log in
 	# nowhere. Created here rather than shipped in /etc/passwd, because a
 	# package that ships accounts is a package that fights the admin.
+	# --home /nonexistent with --no-create-home, which is the pair
+	# Debian policy wants and which lintian named on Friday 2 October
+	# 2026: without --home the account still gets a home directory
+	# assigned, /home/adxl345, which is then never created. Anything
+	# that resolves the account's home gets a path that is not there,
+	# and the account is meant to own nothing in the first place.
 	if ! getent passwd adxl345 >/dev/null; then
-		adduser --system --no-create-home --group adxl345
+		adduser --system --group --no-create-home \
+			--home /nonexistent adxl345
 	fi
 	for g in i2c gpio; do
 		if getent group "$g" >/dev/null; then

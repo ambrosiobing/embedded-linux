@@ -746,3 +746,96 @@ Which makes the right reading of this run: the packaging check found a
 real defect in the packaging on its first run, and the first run also
 found a real defect in the packaging check. Both are what a first run is
 for, and neither would have been visible from reading the files.
+
+---
+
+## 15. The first successful package build found four real defects, and the checks for them found two of their own
+
+**Friday 2 October 2026, run 36981388527 on `9f721af`.** The packaging
+built. `dpkg-buildpackage` drove debhelper and CMake to three binary
+packages and each carried what its `.install` file promises. Then lintian
+read them.
+
+```
+E: adxl345-tools: missing-dependency-on-libc needed by usr/bin/adxl-map
+E: adxl345-tools: python-package-missing-depends-on-python
+E: adxl345-tools: python3-script-but-no-python3-dep [usr/bin/adxl-motion]
+E: adxl345-tools: maintainer-script-lacks-home-in-adduser [postinst:19]
+E: adxl345 changes: bad-distribution-in-changes-file unstable
+```
+
+**Four of those five are real and would fail on any host.** The
+`adxl345-tools` stanza read
+
+```
+Depends: libadxl345-1 (>= ${source:Version}), ${misc:Depends}
+```
+
+while shipping a compiled ELF, a python3 module under
+`usr/lib/python3/dist-packages/adxl345`, and a python3 script. No
+`${shlibs:Depends}`, so the package that installs `adxl-map` declared no
+dependency on libc. No python3 dependency of any kind, so a machine
+without an interpreter would install it and both python programs would
+fail at exec. And `adduser --system --no-create-home` with no `--home`
+assigns `/home/adxl345` and never creates it.
+
+Every one of those is the kind of fault that a file-against-file
+assertion cannot see, because no file disagrees with any other file. It
+took building the thing.
+
+**The asymmetry that let the python one survive.** This suite has
+asserted "the tools package depends on an interpreter" since the Yocto
+recipe was written. It asked one packaging system a question and never
+asked the other. Four new assertions now ask `debian/control` the same
+questions, so the next time this is wrong it is the suite that says so
+and not a tool that only exists on two hosts.
+
+**AND TWO OF THOSE FOUR NEW ASSERTIONS DID NOT FIRE WHEN BROKEN.**
+
+The repository's rule is to prove a check by reintroducing the defect.
+Doing that: deleting `dh-sequence-python3` from `Build-Depends` left the
+check green, and deleting `--home /nonexistent` from the postinst left
+its check green. Both greps were matching **the explanatory comments
+this same edit had just added**. The comment in `debian/control` contains
+the string `dh-sequence-python3`; the comment in the postinst contains
+`home /nonexistent`. Remove the directive, keep the comment, and the
+grep is satisfied by the prose describing the thing that is no longer
+there.
+
+That is item two on this repository's own list of checks that pass for
+the wrong reason, a regex matching its own file's comments, reintroduced
+by the very commit that cites the list. Writing a good comment made the
+check worse, which is not an obvious failure mode and is now a reason to
+strip comments before grepping anything, every time.
+
+Both now strip comment lines first, and all four fire with the fault
+named:
+
+```
+shlibs         FAILED   the Debian tools package does not substitute shlibs:Depends
+python3sub     FAILED   the Debian tools package does not substitute python3:Depends
+dh-sequence    FAILED   nothing runs dh_python3, so ${python3:Depends} is empty
+adduser home   FAILED   --no-create-home without --home assigns an absent home
+```
+
+**And the control experiment was left in place, again.** The first run of
+that break-and-watch used a backup path that was never written, because
+the fallback `cp` sat behind a `||` after a first `cp` that had
+succeeded. Four breakages accumulated into `debian/control` instead of
+each being undone, and the suite's own summary is what showed it. The
+repository already has this rule, from Project 10 four days ago: a
+control is finished when the system is put back, not when it produces its
+number. The second attempt verified each backup was non-empty before
+breaking anything and checked the restore after every case.
+
+**The fifth lintian error is not settled and is suppressed as such.**
+`bad-distribution-in-changes-file unstable` has two explanations that fit
+the one observation: the runner is Ubuntu and its lintian may not list
+Debian's suite names, in which case a Debian-targeted package trips this
+on any Ubuntu host while being correct; or `unstable` is simply wrong
+here. Nothing available separates them, so the tag is suppressed by name,
+the suppression is printed on every run so it cannot become a quiet
+drawer for unwanted findings, and the host's `dpkg-vendor --query Vendor`
+is printed beside it. If a future run shows the vendor is Debian and the
+tag still fires, the first explanation is dead and the changelog is what
+to change.
