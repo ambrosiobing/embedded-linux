@@ -500,18 +500,32 @@ else
 	# above this point compares one file against another; this is the
 	# first one that asks whether the packaging produces anything.
 	#
-	# WHAT THIS DOES NOT ASK, named here rather than left to be
-	# assumed. -d skips dpkg's build-dependency check, because
-	# Build-Depends asks for libgpiod-dev (>= 2.0) and both hosts that
-	# run this have libgpiod v2 built from source under /usr/local
-	# rather than installed as a package. So the declared
-	# build-dependencies are compared against nothing at all here, and
-	# a wrong one would pass. What is checked is that debhelper drives
-	# CMake to three binary packages and that each carries what its
-	# .install file promises.
+	# ONE FACT BITES THIS IN TWO PLACES, and the first version of this
+	# check only handled one of them. libgpiod v2 is built from a
+	# pinned tag into /usr/local on both hosts that run this, because
+	# Ubuntu packages v1. A library under /usr/local belongs to no
+	# package, and dpkg asks about packages twice:
 	#
-	# It also installs nothing and purges nothing, which is the rest of
-	# criterion 5 and wants a board or a container.
+	#   1. dpkg-buildpackage verifies Build-Depends before building.
+	#      -d skips that. So a wrong Build-Depends passes here.
+	#   2. dh_shlibdeps resolves what the BUILT library links against,
+	#      to fill ${shlibs:Depends}. -d does nothing for this one, and
+	#      it is a hard error: "no dependency information found for
+	#      /usr/local/lib/libgpiod.so.3".
+	#
+	# The second is handled by appending an override to the COPY of
+	# debian/rules below, never to the one in the repository. On any
+	# host where this package would really be built, libgpiod v2 comes
+	# from a package and debian/rules as committed is correct; putting
+	# --ignore-missing-info in it permanently would throw away a real
+	# missing dependency forever, on every host, to accommodate one
+	# unrepresentative runner.
+	#
+	# What is still checked is that debhelper drives CMake to three
+	# binary packages and that each carries what its .install file
+	# promises. What is not: either dependency field, and installing or
+	# purging, which is the rest of criterion 5 and wants a board or a
+	# container.
 	echo
 	echo "--- the Debian packaging, acceptance criterion 5"
 
@@ -524,6 +538,17 @@ else
 	else
 		mkdir -p "$WORK/deb"
 		cp -r "$SRC" "$WORK/deb/adxl345-1.0.0"
+
+		# The override described above, written into the copy. printf
+		# rather than a quoted heredoc because the recipe line under a
+		# make target must begin with a literal tab.
+		{
+			echo
+			echo "# Appended by tests/adxl345-build-test.sh to its"
+			echo "# own copy, never to the committed file."
+			echo "override_dh_shlibdeps:"
+			printf '\tdh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info\n'
+		} >>"$WORK/deb/adxl345-1.0.0/debian/rules"
 
 		if (cd "$WORK/deb/adxl345-1.0.0" &&
 			dpkg-buildpackage -us -uc -b -d) \
@@ -558,9 +583,23 @@ else
 		# going to a Debian archive are style notes, so they are
 		# printed and not scored: a suite that failed on them would
 		# be switched off within a week.
-		if command -v lintian >/dev/null 2>&1; then
-			lintian "$WORK"/deb/*.changes >"$WORK/lint.log" 2>&1 ||
-				true
+		#
+		# THE FILE IS LOOKED FOR BEFORE LINTIAN IS RUN, because the
+		# first version of this check did not and reported a pass on
+		# the run that found the dh_shlibdeps fault. No packages were
+		# built, so there was no .changes, lintian failed, "|| true"
+		# swallowed it, and grep for "^E:" found nothing in an empty
+		# log. A clean bill of health on a build that produced no
+		# package at all. That is the third time this repository has
+		# shipped a check whose failure branch reads as a pass, and
+		# the shape is always the same: the thing being inspected is
+		# chosen by a glob and never confirmed to exist.
+		changes=$(find "$WORK/deb" -maxdepth 1 -name "*.changes" |
+			head -n 1)
+		if [ -z "$changes" ]; then
+			no "there is no .changes file, so lintian inspected nothing"
+		elif command -v lintian >/dev/null 2>&1; then
+			lintian "$changes" >"$WORK/lint.log" 2>&1 || true
 			if grep -q "^E:" "$WORK/lint.log"; then
 				no "lintian reports errors" \
 					"$(grep '^E:' "$WORK/lint.log" | head -8)"

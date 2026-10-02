@@ -3734,6 +3734,30 @@ than the failure it prevents.
 are reachable with no hardware and run on every push. What is left of
 criterion 5 is installing and purging, which wants a board or a
 container, and what is left of criterion 3 is ten thousand samples off
-the real part under ASan. Neither new check has run anywhere at the time
-this is written, so the project README keeps the assertion count it
-measured rather than the one these predict.
+the real part under ASan.
+
+**Amended the same day, after the first run.** CI run 36976709299 passed
+the sanitizer half and failed the packaging half, and the failure was
+this decision's own stated fact applied to only one of the two places it
+applies to. `-d` covers dpkg asking about packages **before** the build,
+when it verifies `Build-Depends`. `dh_shlibdeps` asks again **after** the
+build, resolving what the built library links against to fill
+`${shlibs:Depends}`, and refused: "no dependency information found for
+/usr/local/lib/libgpiod.so.3". `-d` does nothing for that one.
+
+So a third scoped weakening, and the scope is the point:
+`--ignore-missing-info` is appended to `debian/rules` **in the test's own
+copy of the source tree**, never to the committed file. On a host where
+this package would really be built, Debian trixie or the Yocto target,
+libgpiod v2 comes from a package and the committed `debian/rules` is
+correct as it stands. Making it permanent would discard a real missing
+runtime dependency on every host forever, to accommodate one runner that
+is unrepresentative in exactly one respect.
+
+The same run also showed that the `lintian` assertion reported a pass on
+a build that produced no package at all: no `.changes` file existed, the
+`|| true` swallowed lintian's own failure, and the error grep searched an
+empty log. The suite now finds the `.changes` file before running lintian
+and refuses by name when there is none. That is the fourth check in this
+repository to pass because the thing it inspects was chosen by a glob and
+never confirmed to exist, and the entry for it is journal 14.

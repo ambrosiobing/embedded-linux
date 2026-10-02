@@ -42,6 +42,36 @@ catalogue page.
 Four are needed for a first reading: `3V3`, `GND`, `SDA`, `SCL`. A fifth,
 `INT1`, is optional and the library is written to work without it.
 
+**Where each one goes on the Raspberry Pi 4's 40-pin header**, written as
+physical pin numbers because that is what a person counting along a
+header can check, with the GPIO number beside it because that is what
+the software asks for. Physical pin 1 is the corner nearest the microSD
+slot, and the odd numbers are the row nearest the board edge.
+
+| Breakout pad | Raspberry Pi 4 header | GPIO | Signal | Direction |
+|---|---|---|---|---|
+| `3V3` | physical pin 1 | 3V3 rail | supply, 3.3 V | Pi to breakout |
+| `GND` | physical pin 9 | ground | ground | common |
+| `SDA` | physical pin 3 | GPIO2, `SDA1` | I2C data | both ways |
+| `SCL` | physical pin 5 | GPIO3, `SCL1` | I2C clock | Pi to breakout |
+| `INT1` | physical pin 16 | GPIO23 | watermark interrupt | breakout to Pi |
+
+Physical pin 1 for the supply and not physical pin 2, which is 5 V and
+sits directly beside it on the other row. That adjacency is the whole
+reason section 1 above exists, and a 5 V pin is one row away from the
+3V3 pin at both pin 1 and pin 17.
+
+`adxl-map -i 23` is **GPIO23, which is physical pin 16**. The two
+numbers are not the same number and neither is 23. Project 10 lost an
+evening on Thursday 1 October 2026 to its interrupt wire landing on
+physical pin 16 when its overlay asked for GPIO24, which is physical pin
+18: the two sit next to each other, the board came up, the sensor read,
+and only the interrupt count said anything was wrong. Here the same
+mistake is quieter still, because the library falls back to polling when
+it cannot claim the line, so a wrong pin produces working output and an
+interrupt path that was never exercised. That is what the `gpioinfo`
+check at the end of this document is for.
+
 ### 3. The strap address
 
 `SDO` tied low gives `0x53`; tied high gives `0x1d`. Some breakouts fix

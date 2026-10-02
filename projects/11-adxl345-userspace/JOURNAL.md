@@ -175,7 +175,7 @@ suite says so out loud rather than reporting a pass.
 > anywhere" was false by the end of the paragraph above it, which added
 > `cmake` to CI so that the suite would compile it. The host with a
 > toolchain was the CI runner, and it did all four of those things on the
-> next push and on every push after. See entry 11.
+> next push and on every push after. See entry 13.
 
 ---
 
@@ -565,7 +565,7 @@ without rewriting what was decided or why.
 
 ---
 
-## 11. The project had been compiling for eleven days and said it never had
+## 13. The project had been compiling for eleven days and said it never had
 
 **Friday 2 October 2026.** Picked this up as the next project after 10,
 read the README to find where to start, and the first line of the state
@@ -625,7 +625,7 @@ it to a log nobody read.
    sentence false.
 4. Entries 1 and 10 keep their text, with a dated correction beside the
    two sentences that are wrong, the way entry 1 was already corrected on
-   Wednesday 30 September 2026.
+   Wednesday 30 September 2026 and entry 12 re-examined.
 
 **And then the actual work, which the false sentence had been hiding.**
 Two acceptance criteria need no hardware at all and nothing anywhere ran
@@ -666,3 +666,83 @@ README is left at the measured 117 rather than raised to the 124 these
 should produce. A number that has not been printed by a run is a
 prediction, and this entry is about what happens when a prediction is
 filed as a state.
+
+---
+
+## 14. The packaging check failed on its first run, and so did the check watching it
+
+**Friday 2 October 2026, the same day, one push later.** CI run
+36976709299 on `af91824`, the first run of the two checks entry 13 added.
+
+**What the sanitizer check did.** Passed, first time.
+
+```
+--- the sanitizer build, acceptance criterion 3
+ok       the library and its test compile under ASan and UBSan
+ok       ctest passes under the sanitizers with no sensor
+```
+
+Criterion 3's hardware-free half is met on a host, after eleven days of
+green runs that could not have told anyone anything about ASan because
+nothing had ever switched it on.
+
+**What the packaging check did.** Failed, with a precise error:
+
+```
+dpkg-shlibdeps: error: no dependency information found for
+/usr/local/lib/libgpiod.so.3 (used by
+debian/libadxl345-1/usr/lib/x86_64-linux-gnu/libadxl345.so.1.0.0)
+```
+
+**This is not a surprise mechanism. It is a known fact applied to one of
+the two places it applies to.** Entry 13 and the suite's own comment both
+say that libgpiod v2 is built from a pinned tag into `/usr/local` because
+Ubuntu packages v1, and that a library under `/usr/local` belongs to no
+package. That fact was then used to justify `dpkg-buildpackage -d`, which
+addresses dpkg asking about packages **before** the build, when it
+verifies `Build-Depends`. dpkg asks a second time **after** the build,
+when `dh_shlibdeps` resolves what the built library actually links
+against in order to fill `${shlibs:Depends}`. `-d` does nothing for that
+one, and it is a hard error rather than a warning.
+
+Having written the right sentence and used half of it is a worse failure
+than not knowing, because the knowledge was in the file.
+
+**The repair, and where it is allowed to live.** `--ignore-missing-info`
+is appended to `debian/rules` **in the test's own copy of the tree**,
+never to the committed file. On any host where this package would really
+be built, Debian trixie or the Yocto target, libgpiod v2 comes from a
+package and the committed `debian/rules` is correct as it stands. Putting
+`--ignore-missing-info` in it permanently would discard a genuine missing
+runtime dependency forever, on every host, to accommodate one
+unrepresentative runner. The weakening is scoped to the host that needs
+it and announced in the file that does it.
+
+**AND THE CHECK WATCHING THE CHECK REPORTED A PASS.**
+
+```
+FAILED   the package build failed
+FAILED   libadxl345-1 was not produced
+FAILED   libadxl345-dev was not produced
+FAILED   adxl345-tools was not produced
+ok       lintian reports no errors
+```
+
+No packages were built, so there was no `.changes` file. `lintian`
+failed, `|| true` swallowed it, and `grep -q "^E:"` found no errors in an
+empty log. A clean bill of health on a build that produced nothing at
+all. Had the three content assertions not been there, that `ok` would
+have been the only thing the packaging section said.
+
+This repository has now shipped this shape four times: a check defined
+and never added to the linter's list, a regex that matched its own file's
+comments and silenced itself, a test whose failure branch was "some other
+error occurred", and this. The shape is identical every time. **The thing
+being inspected is chosen by a glob, a `find`, a `pgrep` or a wildcard,
+and whether anything was chosen is never asked.** The suite now looks for
+the `.changes` file, and refuses by name when there is none.
+
+Which makes the right reading of this run: the packaging check found a
+real defect in the packaging on its first run, and the first run also
+found a real defect in the packaging check. Both are what a first run is
+for, and neither would have been visible from reading the files.
