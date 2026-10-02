@@ -802,9 +802,20 @@ else
 			# trap this file already dodges once: an AND-OR list
 			# whose test fails returns 1 and ends the script.
 			# That is why no() finishes with return 0.
+			# PRINTED, not just counted. The first version of
+			# this reported "4 warnings, not scored" and showed
+			# none of them, so the only way to read them was to
+			# run lintian by hand. Not scoring a finding is a
+			# decision about whether it fails the suite; it was
+			# never meant to be a decision about whether anyone
+			# can see it. A count with the text withheld is the
+			# same withholding as a guard that refuses without
+			# naming what it matched.
 			w=$(grep -c "^W:" "$WORK/lint.log" || true)
 			if [ "$w" -gt 0 ]; then
-				printf 'note     lintian also reports %s warnings, not scored\n' "$w"
+				printf 'note     lintian reports %s warnings, not scored, listed so they are read:\n' "$w"
+				grep "^W:" "$WORK/lint.log" |
+					sed 's/^/         /'
 			fi
 		else
 			skipped "lintian is absent, so the packages were built
