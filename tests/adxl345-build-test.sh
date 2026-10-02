@@ -624,20 +624,40 @@ else
 		# repository wrote after three guards refused without saying
 		# what they wanted.
 		if command -v dpkg-checkbuilddeps >/dev/null 2>&1; then
-			unmet=$(cd "$WORK/deb/adxl345-1.0.0" &&
-				dpkg-checkbuilddeps 2>&1 || true)
+			# Not "$(cd DIR && cmd || true)", which shellcheck
+			# rejected as SC2015 and was right to: if the cd
+			# failed, "|| true" made the output empty, the
+			# "Unmet build dependencies:" line was absent, and
+			# this reported every dependency present about a
+			# directory it had never entered. The same shape as
+			# the lintian pass on a missing .changes, in code
+			# written an hour after that one was fixed.
+			unmet=$(
+				cd "$WORK/deb/adxl345-1.0.0" || {
+					echo "ENTERFAIL"
+					exit 0
+				}
+				dpkg-checkbuilddeps 2>&1 || true
+			)
 			rest=$(printf '%s' "$unmet" |
 				sed -n 's/.*Unmet build dependencies: //p' |
 				sed 's/libgpiod-dev ([^)]*)//' |
 				sed 's/libgpiod-dev//' |
 				tr -s ' ')
-			case $rest in
-			"" | " ")
-				ok "every build dependency but libgpiod-dev is installed"
+			case $unmet in
+			*ENTERFAIL*)
+				no "could not enter the copied source tree, so the build dependencies were never compared"
 				;;
 			*)
-				no "build dependencies missing on this host:$rest" \
-					"libgpiod-dev is excused here and nothing else is"
+				case $rest in
+				"" | " ")
+					ok "every build dependency but libgpiod-dev is installed"
+					;;
+				*)
+					no "build dependencies missing on this host:$rest" \
+						"libgpiod-dev is excused here and nothing else is"
+					;;
+				esac
 				;;
 			esac
 		else

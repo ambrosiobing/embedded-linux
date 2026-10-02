@@ -913,3 +913,65 @@ The same situation, one run apart, read as a clean bill of health the
 first time and as a refusal naming the reason the second. That is the
 whole value of fixing a check that passes for the wrong reason, and it
 took one run to demonstrate it.
+
+---
+
+## 17. Shellcheck caught the same fault, in the code written to fix it
+
+**Friday 2 October 2026, run 36983258562 on `ed320b0`.** No test failed.
+The run died in the shellcheck step, on a line from entry 16:
+
+```
+In tests/adxl345-build-test.sh line 627:
+    unmet=$(cd "$WORK/deb/adxl345-1.0.0" &&
+    ^-- SC2015 (info): Note that A && B || C is not if-then-else.
+```
+
+**It is not a style note.** If that `cd` had failed, `|| true` would have
+made `unmet` empty, the "Unmet build dependencies:" line would have been
+absent, and the check would have reported **every dependency present**
+about a directory it had never entered.
+
+That is the identical shape as the lintian assertion in entry 14, which
+reported a clean bill of health on a build that produced no package. The
+check chooses what it inspects, the choice silently fails, and the empty
+result reads as good news. Entry 14 named that shape and called it the
+fourth instance. This is the fifth, written roughly an hour after naming
+the fourth, in the code added to fix the fourth.
+
+Knowing the name of a failure mode does not stop you writing it. What
+stops it is a tool that reads the code, which is what shellcheck did.
+
+**What was done.** The command substitution now fails loudly rather than
+quietly: `cd` on its own with an explicit failure marker, and the marker
+checked before the dependency list is read, so the two outcomes report
+once each rather than a refusal followed by a false pass. All four
+branches were exercised by hand, because `dpkg-checkbuilddeps` does not
+exist on this laptop:
+
+```
+ENTERFAIL                                   FAILED could not enter the tree
+Unmet: dh-sequence-python3 libgpiod-dev     FAILED missing: dh-sequence-python3
+Unmet: libgpiod-dev (>= 2.0)                ok
+(nothing unmet)                             ok
+```
+
+**And `scripts/lint.py` could not have caught it, which is now written in
+its own output.** Its SC2015 rule is one regular expression against one
+line. The `&&` was on one line and the `||` on the next, so nothing
+matched, and the run reported "lint: clean" on a file CI then rejected.
+
+The rule this repository follows is to grow a narrow rule when a blind
+spot ships twice and to prove the rule fires. That is the wrong move
+here: catching a construct split across lines means parsing shell, which
+this tool is not and should not become. Writing a rule that looks like it
+covers the case and does not would be a fifth check that passes for the
+wrong reason, which is a strange way to respond to the fifth check that
+passed for the wrong reason.
+
+So the limitation is stated instead. `lint.py` now says, on every host
+without shellcheck, that each of its eight approximations is single-line
+and that a construct spanning lines is invisible to all of them. A clean
+result that does not say which questions were never asked is the failure
+this repository keeps finding in its own tools, and the file's own
+comments already said so about a different gap.

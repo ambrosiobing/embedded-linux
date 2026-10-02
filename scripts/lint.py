@@ -854,6 +854,12 @@ def main() -> int:
         print("note: no shellcheck on this host, so of its findings only")
         print("      SC2086, SC2120, SC1072/SC1073, SC2010, SC2012,")
         print("      SC2015, SC1087 and SC1010 are checked here.")
+        print("      Each is one regex against one line, so a construct")
+        print("      split across lines is invisible to all of them: an")
+        print("      SC2015 with its && and its || on separate lines got")
+        print("      through clean on Friday 2 October 2026 and was")
+        print("      caught by CI. Growing a rule for that would mean")
+        print("      parsing, which this is not.")
         print("      CI runs the real thing.")
 
     print("lint: clean")
