@@ -1208,3 +1208,59 @@ this session actually edited, named on the command line.
 And "tree clean" after a commit meant less than it sounded. It was true,
 and it was true partly because everybody else's work had just been
 committed too.
+
+## 22. Criterion 5's second half, and a gate that counted instead of naming
+
+*Saturday 3 October 2026.* Stage 2 of `tests/adxl345-install-test.sh` ran
+for the first time anywhere, on the wsl laptop JPTOUPM678, and criterion 5
+is met.
+
+**It had never run because nothing could run it.** That host has neither
+podman nor docker, and `scripts/host-setup.sh` installs neither, so the
+test skipped and said clearly why. One `apt-get install -y podman` was the
+entire gap. Worth knowing for the next person: the test prints its stage 1
+heading and then says nothing for several minutes while it pulls a 124 MB
+image and runs apt inside the container, which reads exactly like a hang.
+It is not one.
+
+**Then the gate failed on a by-product.** It reported `5 .deb files came
+out, wanted 3`, named none of the five, and the `trap` deleted the build
+directory on the way out, so the evidence left with it. `debian/control`
+declares three binary packages, and debhelper additionally emits an
+automatic `-dbgsym` for each one carrying ELF objects, which here is the
+shared library and the tools binary; `libadxl345-dev` ships headers and a
+symlink and produces none. Three declared plus two automatic is five.
+Nothing in the packaging was wrong. The assertion was.
+
+The gate now lists what it found and asserts the three declared packages by
+name, which is what `scripts/adxl345-install-purge.sh` had been doing one
+stage later all along. The two stages disagreed about what a finished build
+looks like, and only one of them had ever executed. It was proved against
+fixture directories in four directions before going near a container: the
+three declared alone, the three plus two dbgsym, a stray that is neither,
+and a declared package missing. The run afterwards named all five, and they
+were the two dbgsym packages, so the reading is now evidence rather than
+arithmetic.
+
+**What stage 2 proved**, inside `debian:trixie-slim`, in 30 assertions:
+apt resolved every `Depends` and configured all three packages; each
+`.install` file's promise is on the filesystem; the udev rule landed at
+`/usr/lib/udev/rules.d/60-adxl345.rules` through the merged `/usr` symlink
+and still names both groups; the postinst created `i2c`, `gpio` and the
+`adxl345` account with `/nonexistent` as its home; `ldconfig` knows the
+soname and `adxl345.pc` agrees with the package on 1.0.0; `adxl-map` exits
+1 with no bus present and its message names the bus it could not open; and
+purge leaves none of the 12 shipped files, no bytecode, and nothing in
+`ldconfig`.
+
+**Three residues, named as residues.** The `i2c` and `gpio` groups and the
+`adxl345` user survive the purge. Policy permits it and no `postrm` undoes
+it, and the prover says so in three notes rather than counting them as a
+clean removal. A test that called that clean would be wrong in the
+direction that is hardest to notice.
+
+**Still open from this.** `scripts/host-setup.sh` installs no container
+runtime while a test in `tests/` requires one. The test skips honestly
+rather than passing silently, which is the right failure, but the build
+laptop should have the runtime from setup rather than from somebody
+noticing.
