@@ -73,7 +73,17 @@ jobs:
           # reading one file against another. The runner image carries
           # dpkg-dev and fakeroot, and "the image carries it" is how
           # thirteen runs came to fail once already, so both are named.
-          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev libiio-dev device-tree-compiler cmake debhelper dpkg-dev fakeroot lintian
+          # dh-python provides the virtual package dh-sequence-python3,
+          # which adxl345's Build-Depends asks for so that dh_python3
+          # fills ${python3:Depends}. Named here because the suite
+          # builds that package with -d, which skips the build-
+          # dependency check: without -d dpkg would have said "unmet
+          # build dependencies", and with it the first sign was
+          # "dh: error: unable to load addon python3 ... Can't locate
+          # Debian/Debhelper/Sequence/python3.pm". The suite now runs
+          # dpkg-checkbuilddeps itself so that gap is named rather than
+          # met later as a perl error.
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev libiio-dev device-tree-compiler cmake debhelper dh-python dpkg-dev fakeroot lintian
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so

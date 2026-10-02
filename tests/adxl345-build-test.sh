@@ -603,6 +603,48 @@ else
 			printf '\tdh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info\n'
 		} >>"$WORK/deb/adxl345-1.0.0/debian/rules"
 
+		# -d BLINDED THIS TO EVERY BUILD DEPENDENCY, not just the one
+		# it had to. On Friday 2 October 2026 the runner was missing
+		# dh-python, which provides the virtual dh-sequence-python3
+		# that Build-Depends correctly asks for. Nothing checked, so
+		# the first sign was dh failing to load a perl module:
+		#
+		#   dh: error: unable to load addon python3: Can't locate
+		#   Debian/Debhelper/Sequence/python3.pm in @INC
+		#
+		# The declared dependency was right and the host did not have
+		# it, which is the opposite of what the -d comment above warns
+		# about, and it arrived unreadable because the check that
+		# would have said "unmet build dependencies: dh-sequence-
+		# python3" had been switched off wholesale.
+		#
+		# So dpkg's own resolver is asked, and only the one entry that
+		# genuinely cannot be satisfied here is excused, by name. A
+		# refusal that names what it matched, which is the rule this
+		# repository wrote after three guards refused without saying
+		# what they wanted.
+		if command -v dpkg-checkbuilddeps >/dev/null 2>&1; then
+			unmet=$(cd "$WORK/deb/adxl345-1.0.0" &&
+				dpkg-checkbuilddeps 2>&1 || true)
+			rest=$(printf '%s' "$unmet" |
+				sed -n 's/.*Unmet build dependencies: //p' |
+				sed 's/libgpiod-dev ([^)]*)//' |
+				sed 's/libgpiod-dev//' |
+				tr -s ' ')
+			case $rest in
+			"" | " ")
+				ok "every build dependency but libgpiod-dev is installed"
+				;;
+			*)
+				no "build dependencies missing on this host:$rest" \
+					"libgpiod-dev is excused here and nothing else is"
+				;;
+			esac
+		else
+			skipped "dpkg-checkbuilddeps is absent, so the declared
+         build dependencies were not compared against this host."
+		fi
+
 		if (cd "$WORK/deb/adxl345-1.0.0" &&
 			dpkg-buildpackage -us -uc -b -d) \
 			>"$WORK/deb.log" 2>&1; then

@@ -839,3 +839,77 @@ drawer for unwanted findings, and the host's `dpkg-vendor --query Vendor`
 is printed beside it. If a future run shows the vendor is Debian and the
 tag still fires, the first explanation is dead and the changelog is what
 to change.
+
+---
+
+## 16. The build dependency was right, the host did not have it, and -d had switched off the thing that says so
+
+**Friday 2 October 2026, run 36982754403 on `9f8180e`.** The packaging
+build failed before it compiled anything:
+
+```
+dh: error: unable to load addon python3: Can't locate
+Debian/Debhelper/Sequence/python3.pm in @INC
+```
+
+`dh-sequence-python3` is a virtual package provided by `dh-python`, and
+`dh-python` was not on the runner. Entry 15 added the build dependency
+and did not add the package that satisfies it, so the whole thing stopped
+at `debian/rules clean`.
+
+**The interesting part is not the missing package. It is how the message
+arrived.** `dpkg-buildpackage -d` skips the build-dependency check.
+Without `-d`, dpkg would have said, in these words:
+
+```
+Unmet build dependencies: dh-sequence-python3
+```
+
+With `-d`, the first sign was a perl module that could not be found,
+which says nothing about packaging to anyone who has not met it before.
+
+And note which way round this is. The `-d` comment in the suite warns
+that **a wrong `Build-Depends` would pass here**. What actually happened
+is the mirror of that: the `Build-Depends` was correct, the host was
+missing it, and the check that would have named the gap had been turned
+off wholesale to excuse one entry that genuinely cannot be satisfied.
+Switching off a check to accommodate its one false positive loses every
+true positive with it, which is obvious written down and was not obvious
+while writing it.
+
+**What was done.** `dh-python` added to the CI package list and to
+`scripts/host-setup.sh`. Then the part that matters: the suite now runs
+`dpkg-checkbuilddeps` itself before building, excuses `libgpiod-dev` by
+name because that one is unsatisfiable on both hosts for a reason already
+written down, and refuses by name if anything else is missing.
+
+So `-d` still skips dpkg's own gate, and the gap it leaves is now a
+single named exception rather than a blanket. A guard that refuses names
+what it wanted, which is this repository's rule after three guards
+refused without saying.
+
+The branch logic was checked on this laptop against the three real
+message shapes rather than reasoned about, because `dpkg-checkbuilddeps`
+does not exist here and the suite skips that assertion:
+
+```
+in : Unmet build dependencies: dh-sequence-python3 libgpiod-dev (>= 2.0)
+out: [dh-sequence-python3 ]    refuses, naming it
+in : Unmet build dependencies: libgpiod-dev (>= 2.0)
+out: []                        passes
+in : Unmet build dependencies: libgpiod-dev
+out: []                        passes
+```
+
+**And one thing worked exactly as intended.** Entry 14 added a guard
+because the lintian assertion had reported a pass on a build that
+produced no package. This run produced no package, and the guard said so:
+
+```
+FAILED   there is no .changes file, so lintian inspected nothing
+```
+
+The same situation, one run apart, read as a clean bill of health the
+first time and as a refusal naming the reason the second. That is the
+whole value of fixing a check that passes for the wrong reason, and it
+took one run to demonstrate it.

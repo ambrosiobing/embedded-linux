@@ -29,7 +29,7 @@ python3-subunit zstd lz4 liblz4-tool file locales libacl1
 bmap-tools libgpiod-dev gpiod shellcheck python3-yaml pipx
 pkg-config pkgconf nftables python3-numpy libsystemd-dev libcbor-dev
 libdrm-dev device-tree-compiler cmake
-debhelper dpkg-dev fakeroot lintian
+debhelper dh-python dpkg-dev fakeroot lintian
 "
 
 # Packages that have no candidate on this release and are not worth a
