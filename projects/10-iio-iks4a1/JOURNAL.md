@@ -3095,3 +3095,105 @@ Two things in that tree not to copy, recorded so nobody does: `HelloWorld`
 calls `GetHumidity` with no `begin()` and no `Enable()`, and no sketch there
 wires INT1 at all, so none of them is evidence about the CN9 pin 6 interrupt
 in either direction.
+
+## 56. A second card archive, and nohup does not outlive a virtual machine
+
+*Friday 2 October 2026, morning.* The card is archived again, verified byte
+for byte, at `proj10-iio-iks4a1-card\2026-10-02_af91824`. The question that
+started it was whether one copy was enough. It was not, and the reason is a
+gap of twenty-eight minutes.
+
+### The first archive is a copy of the card from before the thing it needs most
+
+The comparison passed at 19:04. **libiio 0.26-2 and `iiod` were installed at
+19:32.** Criterion 5 is the libiio criterion, so the one archive that existed
+was a copy of the system from before the apparatus that proves criterion 5
+was on it.
+
+Four other things also landed afterwards: `iio-stream` compiled against that
+libiio, the overlay recompiled onto `/boot` with the `lsm6dso16is@6a` node at
+23:24, `interrupts = <24 4>` at 23:35, and the `rates.csv` rows and criterion
+8 captures. All four come back from this repository with three commands and a
+reboot.
+
+**The libiio install does not.** `iio-stream.c` calls `iio_buffer_refill`,
+which libiio 1.0 removed, and it compiles because Debian trixie packages
+0.26-2. A restore that runs `apt install libiio-dev` after the distribution
+moves gets a library the program will not build against. The recipe's own CI
+version guard says this already; what was not noticed is that the guard
+describes a risk the archive had taken on.
+
+The second reason is smaller and sharper: **a restore of the Thursday
+1 October 2026 archive comes back edge-triggered.** It reproduces the 3269-interrupt storm that
+entry 53 closed, and whoever meets it next could spend an evening on a solved
+problem.
+
+Both archives are kept. The Thursday 1 October 2026 one is the only copy of
+the configuration that
+every measurement before 19:04 was taken on, so neither is a duplicate of the
+other.
+
+### The stamp names a commit, and the commit is from another project
+
+The directory stamp is HEAD of the clone at archive time plus `-dirty`. Two
+things nearly spoiled it before any imaging started: the clone on the win11
+skyhorizon demo laptop was seven commits behind, and an untracked zero-byte
+file named `cd`, left by a mistyped redirect, would have appended `-dirty` and
+recorded a modified working tree that did not exist.
+
+Both were fixed, and the stamp came out `2026-10-02_af91824`. **`af91824` is
+a project 11 commit**, the tip that morning, and it describes nothing on this
+card. The commit whose contents the card matches is `488438d`. The two are
+written down together in `docs/RESUME.md`, because a stamp that names one and
+a card that matches the other is exactly the kind of thing a date alone leaves
+to be inferred.
+
+### nohup was the wrong fix for the right problem
+
+The first run, on Thursday 1 October 2026, died at 42 per cent in a foreground
+shell whose tab was closed, and `nohup` went into `docs/CARD.md` as the remedy. This morning a
+nohup'd run died anyway. `wsl -l -v` reported the Ubuntu distro `Stopped` and
+`usbipd list` showed the reader back at `Shared`.
+
+**nohup blocks SIGHUP from a terminal. It cannot keep a process alive when the
+virtual machine hosting it stops.** The remedy was never nohup; it was leaving
+the window alone, and nohup made that look unnecessary.
+
+What stopped the distro is not recorded here, because one line of output does
+not distinguish a closed terminal, an explicit `wsl --shutdown`, a
+`Stop-Process` on `wsl.exe` and WSL's own idle timeout. The ordering that
+preserved even that much is worth keeping: **`wsl -l -v` was run from
+PowerShell before anything re-entered WSL**, because entering a stopped distro
+starts it and destroys the evidence that it was stopped.
+
+The monitoring moved to the Windows side as a result. The image is written to
+a path on `C:`, so `Get-ChildItem` reads its growth with no WSL session
+involved, and the WSL window has nothing to do but exist.
+
+### A plateau that looks exactly like a stall
+
+At 10:05 the file stopped growing at 1,547,436,032 bytes with seven minutes of
+reading still to go, because the written data is near the front of the card
+and the remaining 14 GB of unwritten ext4 free space compresses to nothing.
+
+**That number is within 786,432 bytes of 1,546,649,600, the size of the
+fragment abandoned on Thursday 1 October 2026.** A live archive seven minutes from done and a dead one
+killed at 42 per cent were under a megabyte apart, and `du -h` prints `1.5G`
+for both. The discriminator is `.dd.log`, whose size and timestamp advance in
+both cases, which is why the plateau is now written into `docs/CARD.md` beside
+the size warning rather than left to be re-learned.
+
+### Two smaller things
+
+`usbipd attach --wsl --busid 6-4 --auto-attach` was proposed while the second
+read was in flight and declined. It manipulates the attachment the running
+`dd` reads through, and by the time a dropped device is back, `dd` has already
+failed. It addresses a USB drop; this was not one. Declining it was not a
+judgement call about risk appetite, it was that the action could not help and
+could end the run.
+
+And the remedy in `docs/CARD.md` for USB selective suspend had one of the two
+values it needs. `/setacvalueindex` writes the mains value; the battery value
+read `Enabled` all week, so the fix depended on the laptop staying plugged in
+and that dependency was written down nowhere. Both values are now in the
+document, with the read-back command that shows them.

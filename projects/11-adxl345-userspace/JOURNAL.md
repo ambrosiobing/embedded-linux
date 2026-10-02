@@ -1042,3 +1042,69 @@ the vendor explanation for `bad-distribution-in-changes-file` survives and
 so does the alternative. A Debian host would decide it. Recording that the
 measurement was taken and came back uninformative, rather than quietly
 dropping the question.
+
+---
+
+## 19. Green on a real host, with nothing waived to get there
+
+**Friday 2 October 2026, on the WSL build laptop JPTOUPM678.**
+
+```
+76 passed, 0 failed, 0 skipped
+```
+
+Every branch of the suite executed. No tool was missing, so no assertion
+skipped, which has not been true of this project on any machine before
+today.
+
+**The line worth reading twice is not the total.**
+
+```
+note     libgpiod belongs to a package here, so dh_shlibdeps runs strict
+ok       lintian reports no errors
+```
+
+That host packages `libgpiod-dev` 2.2.1, so the conditional added in
+entry 18 took the strict branch: `dh_shlibdeps` resolved every shared
+library the built package links against, against real packages, with
+nothing excused. The `lintian` clean is therefore a clean on a fully
+resolved package rather than on one whose hardest question was waived.
+
+Had the override stayed unconditional, this result would have looked
+identical and meant less, and nobody would have known the difference.
+That is the argument for scoping a concession to the host that needs it
+rather than applying it everywhere it does no visible harm.
+
+**Where criterion 5's build half ends up: met on a host.** What remains
+is installing and purging, which wants a board or a container.
+
+**What it cost to get there, as a list, because the list is the finding.**
+Five defects, none of which any file-against-file assertion could see,
+because in every case no file disagreed with any other file:
+
+| | Found by |
+|---|---|
+| `dh_shlibdeps` could not resolve a `/usr/local` library | the first package build |
+| the tools package shipped a compiled ELF with no `${shlibs:Depends}` | lintian |
+| it shipped two python3 programs and depended on no interpreter | lintian |
+| `adduser --no-create-home` with no `--home` | lintian |
+| the udev rule went to `lib/udev/rules.d`, through the merged `/usr` symlink | lintian |
+
+Against that, three defects in the checks themselves: a lintian
+assertion passing on a build that produced nothing, two greps matching
+their own comments, and an `A && B || C` that would have reported success
+about a directory it never entered. Five real and three self-inflicted,
+and the self-inflicted ones were all found by breaking the check on
+purpose or by a tool that parses, never by reading.
+
+**And the loop changed.** Five consecutive red CI runs preceded this,
+each costing a push and an email. One run on a host with the tools gave
+72 passed and 1 failed and found the fifth defect, and the next gave 76
+and 0. The authoring laptop cannot run any of this; the build laptop can
+run all of it. CI is now the confirmation rather than the first test.
+
+**Still open, and recorded rather than quietly dropped.** `lintian`
+reports four warnings that this suite prints and does not score, and
+nobody has read them. The decision not to score them was made for a good
+reason, that a suite refusing on archive-policy style notes gets switched
+off, but "not scored" was never meant to mean "not looked at once".

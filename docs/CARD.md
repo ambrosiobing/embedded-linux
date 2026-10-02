@@ -174,6 +174,30 @@ and the `sudo -v` is there because a backgrounded `sudo` cannot show a
 password prompt. **Do not let the laptop sleep either**, because suspending
 it drops the usbipd attachment and the card disappears mid-read.
 
+**`nohup` is not enough on WSL.** On Friday 2 October 2026 a nohup'd run died
+anyway, and `wsl -l -v` reported the Ubuntu distro `Stopped` with `usbipd
+list` showing the reader back at `Shared`. nohup blocks SIGHUP from a
+terminal; it cannot keep a process alive when the virtual machine hosting it
+stops. Closing the terminal, `wsl --shutdown`, a `Stop-Process` on `wsl.exe`
+and WSL's own idle timeout all end the run, and the single `Stopped` line does
+not say which happened. So leave the WSL window open and untouched for the
+whole read, and monitor from PowerShell instead, which needs no WSL session at
+all because the image is being written to a path on `C:`:
+
+    Get-ChildItem Desktop\embedded-linux-bench\images\<project>-card\<stamp> | Select-Object Name,Length,LastWriteTime
+
+Checking from inside WSL is actively worse: re-entering a stopped distro
+starts it, which destroys the evidence of whether it had stopped. Run
+`wsl -l -v` from PowerShell first.
+
+**The size plateaus long before the read ends, and that is not a stall.** The
+written data sits near the front of the card and the rest is unwritten ext4
+free space that gzip collapses to nothing, so on Friday 2 October 2026 the
+file reached 1,547,436,032 bytes with seven minutes of reading still to go.
+That figure is within 786,432 bytes of 1,546,649,600, the size of the fragment
+abandoned on Thursday 1 October 2026. The discriminator is `.dd.log`, whose size and timestamp
+keep advancing in both cases.
+
 A killed run leaves `<name>.img.gz.partial`, which is not an archive and
 cannot be read as one. That naming exists because the first interrupted run
 left a 1.55 GB file with an archive's exact name and no records beside it,
@@ -190,10 +214,19 @@ usbipd re-attach does not reclaim the letter it had.
 Two attempts died at 448 and 496 seconds against a pass needing 828, both
 without an I/O error, with `usbipd list` still showing the reader under
 Connected and its state back to `Shared`. The device was never lost to
-Windows, only to WSL. One setting fixed it:
+Windows, only to WSL. One setting fixed it, and it has TWO values:
 
     powercfg /setacvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+    powercfg /setdcvalueindex SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
     powercfg /setactive SCHEME_CURRENT
+
+**Thursday 1 October 2026 set only the AC value, and that was found out on
+Friday 2 October 2026.** `/setacvalueindex` writes the mains value alone, so
+the battery value stayed at `Enabled` and the whole remedy depended on nobody
+unplugging the laptop, which was written down nowhere. Read both back before
+a long run and want `0x00000000` twice:
+
+    powercfg /query SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226
 
 plus clearing **Allow the computer to turn off this device to save power**
 on every USB Root Hub and Generic USB Hub in Device Manager. The throughput

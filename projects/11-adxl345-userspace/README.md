@@ -21,9 +21,13 @@ bindings that need no structure definitions, tests that run with no
 hardware, permissions without root, and packaging that installs and
 purges cleanly.
 
-**State: compiled and tested on a host, never run on a board.** The
-library builds with `-Werror`, its fake-bus suite passes, and it exports
-exactly the six symbols its packaging pins. No sensor has been read.
+**State: built, packaged and tested on a host, never run on a board.**
+The library builds with `-Werror`, its fake-bus suite passes, it exports
+exactly the six symbols its packaging pins, it passes `ctest` under ASan
+and UBSan, and the three Debian packages build and come out of `lintian`
+without an error. Three of the six acceptance criteria are met that way.
+No sensor has been read, and the other three criteria are the ones that
+need one.
 
 Every one of those happens in CI on every push, and it took eleven days
 to notice. The sentence here until Friday 2 October 2026 read "Nothing
@@ -60,7 +64,7 @@ says that yet.
 | `meta-bench/recipes-bench/libadxl345/libadxl345_1.0.0.bb` | The Yocto recipe over the same CMake project |
 | `meta-bench/recipes-core/images/bench-userdrv-image.bb` | The image, from `bench-image` |
 | `kas/bench-userdrv.yml` | Pi 4, I2C1 at 400 kHz, no kernel fragment at all |
-| `tests/adxl345-build-test.sh` | 56 assertions on the build, the packaging and the recipe, plus compile and run where a toolchain exists |
+| `tests/adxl345-build-test.sh` | 76 assertions on a host with the full toolchain: the build, the packaging, the recipe, the `-Werror` compile, the fake-bus run, the exported-symbol count, the sanitizer build with `ctest`, and the three Debian packages built and inspected. Fewer where a tool is absent, and it says which |
 | `tests/adxl345-motion-test.sh` | 22 assertions on the detector's decision logic |
 | `tests/adxl345_datasheet.py` and `tests/adxl345-registers-test.sh` | 35 assertions comparing the register map against a transcription of the datasheet |
 | `projects/11-adxl345-userspace/docs/` | DESIGN, BRINGUP, the kernel-or-userspace comparison, and an evidence directory that says what is missing |
@@ -131,20 +135,22 @@ toolchain produced the thing and the claim is about what it produced.
 | 2 | The board flat reads about 1 g on Z and near 0 on X and Y, and tilting to each edge moves the expected axis | Not started. The fake-bus suite asserts the library decodes a synthetic 1 g on Z correctly, which is the arithmetic and not the sensor |
 | 3 | `ctest` passes in the sanitizer build with no sensor, and a sanitizer run against the real part survives 10000 samples | **First half met on a host**, CI run 36976709299: the library and its test compile under ASan and UBSan, and `ctest` passes under them. `ADXL_SANITIZE` had existed as a CMake option nothing ever switched on, so eleven days of green `RelWithDebInfo` runs had said nothing about ASan. The sanitizer tree is configured separately from the ordinary one, because ASan changes the layout of what it touches and a mixed tree would prove nothing. The second half needs the part |
 | 4 | `nm -D` lists exactly six defined text symbols, and the soname is `libadxl345.so.1` | **Met on a host.** `nm -D` counted six on the built `libadxl345.so.1` in CI run 36934729926, and the soname is the name of the file it counted. Three file-against-file assertions back it up: the header declares six, the symbols file pins six, and CMake's soname major agrees with `debian/`. The only thing left is that no Pi 4 has loaded it |
-| 5 | The packages install cleanly, the udev rule lands, and purge leaves nothing behind | **Build half added Friday 2 October 2026, and every red run it has produced so far found something that was actually wrong.** No attempt count is given here on purpose: it would need editing after each run and would be stale between them, which is the failure this project spent the morning correcting. One run built all three packages and lintian then found four real defects in them: `adxl345-tools` shipped a compiled ELF, a python3 module and a python3 script while substituting neither `${shlibs:Depends}` nor any python dependency, and its `adduser --no-create-home` had no `--home`. None of those is visible to a file-against-file assertion, because no file disagreed with any other file. The suite now asks `debian/control` the four questions it had only ever asked the Yocto recipe. The first run failed earlier, at `dh_shlibdeps`: `dh_shlibdeps` refused: `no dependency information found for /usr/local/lib/libgpiod.so.3`. One fact bites in two places, and the first version of the check handled one of them. libgpiod v2 is built from a pinned tag into `/usr/local` on both hosts because Ubuntu packages v1, so dpkg cannot name a package for it either when verifying `Build-Depends` before the build, which `-d` skips, or when resolving what the built library links against, which `-d` does nothing for. The second is handled with `--ignore-missing-info` appended to the test's own copy of `debian/rules` and never to the committed one, because on any host where this package would really be built libgpiod comes from a package and the committed file is correct. Neither dependency field is checked here, and installing and purging still needs a board or a container |
+| 5 | The packages install cleanly, the udev rule lands, and purge leaves nothing behind | **Build half MET on a host**, on the WSL build laptop JPTOUPM678 on Friday 2 October 2026: 76 passed, 0 failed, 0 skipped. `dpkg-buildpackage` drives debhelper and CMake to three binary packages, each carries what its `.install` file promises, and `lintian` reports no errors. That host packages `libgpiod-dev` 2.2.1, so it ran `dh_shlibdeps` **strict**: nothing about the shared-library dependencies was waived to get this result. Getting there cost five defects that no file-against-file assertion could see, because no file disagreed with any other file: `dh_shlibdeps` unable to resolve a `/usr/local` library, a tools package shipping a compiled ELF with no `${shlibs:Depends}`, the same package shipping two python3 programs and depending on no interpreter, an `adduser --no-create-home` with no `--home`, and the udev rule shipped to `lib/udev/rules.d` through the merged `/usr` symlink. Installing and purging is what remains, and it wants a board or a container |
 | 6 | A member of `i2c` runs `adxl-map` without `sudo`; a user outside the group gets a clear permission error rather than a crash | Not started. The error path is written: the tool names the group and the other strap address rather than printing a number |
 
 ## What is tested without hardware
 
-117 assertions across three suites, none of which needs a sensor: 60, 35
-and 22, counted from CI run 36934729926 rather than from this file. An
-earlier version said 113 and credited the build suite with 56, which was
-its count before the four compile-and-run assertions were added to it in
-the same commit that added them.
+133 assertions across three suites, none of which needs a sensor: 76, 35
+and 22, counted from runs rather than from this file. The 76 is the WSL
+build laptop JPTOUPM678 on Friday 2 October 2026, which is the only host
+so far where every branch of the build suite could execute; the other two
+are CI run 36934729926.
 
-The sanitizer and packaging checks of Friday 2 October 2026 add seven
-more, and the number above is deliberately not raised to match until a
-run has printed it.
+A host missing a tool runs fewer and says which, so this number is a
+ceiling rather than a promise. It has been wrong once already: it read
+113 while crediting the build suite with 56, which was that suite's count
+before four compile-and-run assertions were added to it in the very
+commit that added them.
 
 | Check | Covers |
 |---|---|

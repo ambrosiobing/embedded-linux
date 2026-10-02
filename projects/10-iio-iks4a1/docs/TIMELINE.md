@@ -1,4 +1,4 @@
-# Timeline: Wednesday 30 September and Thursday 1 October 2026
+# Timeline: Wednesday 30 September, Thursday 1 October and Friday 2 October 2026
 
 The two days project 10 met hardware, minute by minute.
 
@@ -423,6 +423,32 @@ card it came from.
 to using them, and the repairs were only possible because the tools were
 being used. None of those four defects had surfaced in two weeks of unit
 tests.
+
+# Friday 2 October 2026
+
+## Morning: a second card archive, and nohup is not enough
+
+| Time | What happened | Commit |
+| --- | --- | --- |
+| 09:25 | A second archive is decided. The Thursday 1 October 2026 copy was verified at 19:04 and libiio arrived at 19:32, so the one thing criterion 5 depends on is outside it | |
+| 09:30 | The stamp would have been wrong twice over: skyhorizon's clone was seven commits behind, and an untracked file named `cd` would have marked the directory `-dirty` | |
+| 09:45 | First attempt launched with `nohup`, as `docs/CARD.md` says | |
+| n/a | **It dies, and nothing recorded when.** `wsl -l -v` says the Ubuntu distro is `Stopped` and `usbipd list` has the reader back at `Shared`. nohup blocks SIGHUP from a terminal and cannot outlive the virtual machine | |
+| 09:55 | USB selective suspend was `Disabled` on mains and `Enabled` on battery. The Thursday 1 October 2026 remedy used `/setacvalueindex`, which writes one of the two values | |
+| 09:58 | Relaunch. `discarding 1.5G left by an interrupted run` fires on a real fragment for the first time, having only ever been reached by an assertion | |
+| 10:05 | The size plateaus at 1,547,436,032 with seven minutes of reading left, **within 786,432 bytes of the fragment abandoned on Thursday 1 October 2026** | |
+| 10:13 | First read complete: 15,728,640,000 bytes in 877.616 s at 18 MB/s | |
+| 10:27 | **Verified byte for byte.** `2026-10-02_af91824`, 1,563,488,065 bytes, decompressed sha256 `daa4e3a6`, and an independent `sha256sum -c` agrees | |
+
+**The archive was monitored without touching WSL,** because re-entering a
+stopped distro starts it and destroys the evidence of whether it was stopped.
+The image is written to a path on `C:`, so PowerShell reads its size directly
+and the WSL window is left with nothing to do but exist.
+
+**`--auto-attach` was proposed mid-read and declined.** It manipulates the
+attachment the running `dd` reads through, and it cannot rescue a read in
+flight because the file descriptor dies with the device. It also addresses a
+USB drop, which this was not.
 
 ## What was withdrawn across the two days
 

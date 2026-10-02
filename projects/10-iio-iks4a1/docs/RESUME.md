@@ -166,6 +166,99 @@ back on the board, so the work continues on the card rather than on a restore
 of it. The archive exists so that the next project wanting the card costs
 seventeen minutes instead of an afternoon.
 
+
+## A second archive, four and a half hours later
+
+Friday 2 October 2026, 10:27:32. The Thursday 1 October 2026 archive above is a
+proven copy of the card AS IT STOOD AT 19:04, and the single most important thing on the card
+for criterion 5 arrived at 19:32. So there are two archives, and the later one
+is the one to restore.
+
+    proj10-iio-iks4a1-card\2026-10-02_af91824\
+
+1,563,488,065 bytes compressed, from the same 15,728,640,000 on the card,
+decompressing to sha256
+`daa4e3a6448388ed481b6ac9a26aec2fc459e2dac1f7fab4940d35694ca161f6`. The card
+was read a second time and hashed to that value, so this is a verified copy
+and not an assumed one, and an independent `sha256sum -c SHA256SUMS` says
+`OK`. The Thursday 1 October 2026 decompressed hash was `35cc6c22...`, and the two differing
+is the point: the card changed.
+
+What the Thursday 1 October 2026 archive is missing, in the order it
+appeared:
+
+  19:32  libiio 0.26-2 and libiio-dev installed, iiod listening on 30431
+  19:32  iio-stream compiled against that libiio
+  23:24  the overlay recompiled onto /boot with the lsm6dso16is@6a node
+  23:35  interrupts = <24 4>, level instead of edge
+  23:28  the rates.csv rows, and after midnight the criterion 8 captures
+
+Four of those five are in this repository and come back with three commands
+and a reboot. THE FIRST ONE DOES NOT. `iio-stream.c` calls
+`iio_buffer_refill`, which libiio 1.0 removed, and it compiles here because
+Debian trixie packages 0.26-2. A restore that runs `apt install libiio-dev`
+after the distribution moves gets a library the program will not build
+against, and criterion 5 is the libiio criterion. The recipe's own version
+guard in CI says the same thing.
+
+The second reason is smaller and concrete: A RESTORE OF THE THURSDAY ARCHIVE
+COMES BACK EDGE-TRIGGERED. It reproduces the 3269-interrupt storm, and
+whoever meets it next may spend an evening on a problem that was solved at
+23:35 by one word in the device tree.
+
+**The stamp names a commit, not the card.** It is HEAD of the clone at
+archive time plus `-dirty`, nothing more, and `af91824` is a PROJECT 11
+commit that happens to be the tip that morning. The commit whose contents
+this card matches is `488438d`, the last of the project 10 run. The two are
+recorded together here because a date alone would leave it to be inferred.
+
+**Both archives are kept.** Nothing is a duplicate: the Thursday 1 October
+2026 image is the verified state before libiio and before the level-triggered overlay, which is
+the only copy of the configuration every measurement before 19:04 was taken
+on.
+
+### What killed the first two attempts, and it was never the card
+
+The first real run, on Thursday 1 October 2026, died at 42 per cent because it
+ran in a foreground shell and the tab was closed. The fix was `nohup`. On Friday 2 October 2026
+the run died again and `nohup` did not help:
+`wsl -l -v` reported the Ubuntu distro `Stopped`, and `usbipd list` showed
+the reader back at `Shared`. It left a 1.5 GB fragment, and HOW FAR THROUGH
+THE CARD IT ACTUALLY GOT CANNOT BE READ OFF THAT, which is the same lesson as
+below. NOHUP BLOCKS SIGHUP FROM A TERMINAL AND CANNOT
+KEEP A PROCESS ALIVE WHEN THE VIRTUAL MACHINE HOSTING IT STOPS. What killed
+the distro was not determined, and is not written down here as though it had
+been: closing the terminal, an explicit `wsl --shutdown`, a `Stop-Process` on
+`wsl.exe` and WSL's own idle timeout all produce that one line.
+
+Two things follow for the next long read.
+
+The run must be monitored WITHOUT touching WSL, because re-entering a stopped
+distro starts it and destroys the evidence of whether it was stopped. The
+image is written to a path on `C:`, so PowerShell reads its size directly:
+
+    Get-ChildItem Desktop\embedded-linux-bench\images\proj10-iio-iks4a1-card\2026-10-02_af91824 | Select-Object Name,Length,LastWriteTime
+
+And the size plateaus long before the read ends, because the written data is
+near the front of the card and the remaining 14 GB of unwritten ext4 free
+space compresses to nothing. The file sat at 1,547,436,032 bytes with eight
+minutes of reading left. THAT IS WITHIN 786,432 BYTES OF 1,546,649,600, THE
+SIZE OF THE FRAGMENT ABANDONED ON THURSDAY 1 OCTOBER 2026. A plateau is not a stall, and the
+discriminator is `.dd.log`, whose size and timestamp keep advancing either
+way.
+
+`--auto-attach` was considered mid-read and rejected, correctly. It
+manipulates the attachment the running `dd` is reading through, and it cannot
+rescue a read in flight because the file descriptor dies with the device. It
+also would not have prevented this failure, which was not a USB drop.
+
+### One path exercised for the first time on real data
+
+The relaunch printed `discarding 1.5G left by an interrupted run`. Until then
+that branch had only ever been reached by an assertion in
+`tests/card-archive-test.sh`. It discarded the stale fragment rather than
+appending to it or refusing to start.
+
 ## Raw register captures need the part woken first
 
 Friday 2 October 2026. Since the overlay declares `0x6b`, `st_lsm6dsx` owns
