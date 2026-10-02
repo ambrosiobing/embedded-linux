@@ -975,3 +975,70 @@ and that a construct spanning lines is invisible to all of them. A clean
 result that does not say which questions were never asked is the failure
 this repository keeps finding in its own tools, and the file's own
 comments already said so about a different gap.
+
+---
+
+## 18. The suite ran on a host Joseph can see, and the loop stopped costing a push each
+
+**Friday 2 October 2026.** Five consecutive red CI runs, five notification
+emails, and every one of those failures was reproducible on the WSL build
+laptop JPTOUPM678, which has shellcheck, a compiler and now debhelper,
+dh-python and lintian. The authoring laptop has none of it, which is why
+nothing was caught before pushing. **CI was being used as the first test,
+and CI is a slow first test that emails somebody.**
+
+Running `scripts/host-setup.sh` there and then the suite gave, on the
+first attempt, 72 passed and 1 failed. Three results worth keeping.
+
+**The four packaging defects of entry 15 are fixed.** `${shlibs:Depends}`,
+`${python3:Depends}`, `dh-sequence-python3` and `--home /nonexistent` all
+hold up against a real `dpkg-buildpackage` and a real `lintian`.
+
+**A fifth defect, which only a built package shows.**
+
+```
+E: adxl345-tools: aliased-location [lib/udev/rules.d/60-adxl345.rules]
+```
+
+`debian/adxl345-tools.install` shipped the udev rule to `lib/udev/rules.d`.
+On every current Debian and Ubuntu `/lib` is a symlink to `/usr/lib`, so
+the package was writing through a symlink into a directory another package
+owns. It installs. It works. The rule loads. It is still wrong, and no
+file in this repository disagreed with any other file about it.
+
+Fixed to `usr/lib/udev/rules.d`, and the suite now checks **every**
+destination in **every** `.install` file for a top-level `lib`, `bin`,
+`sbin` or `lib64`, rather than the one line that was wrong. The next
+`.install` line anybody adds will be copied from the shape of the existing
+ones, so the check has to cover the shape. Proved by restoring the old
+path and watching it fire, then restoring:
+
+```
+FAILED   adxl345-tools.install ships into an aliased location: lib/udev/rules.d
+```
+
+**And a claim of mine that the host falsified.** The suite's comment said
+"both hosts that run this have libgpiod v2 built from source under
+/usr/local". True of the CI runner, which is Ubuntu noble and packages v1.
+False of JPTOUPM678, which is Ubuntu resolute and packages libgpiod-dev
+2.2.1. So `--ignore-missing-info` was being applied unconditionally,
+weakening a host that needed no weakening and ready to hide any genuinely
+unpackaged library the code picked up later.
+
+It is conditional now: dpkg is asked who owns the libgpiod that
+`pkg-config` points at, and the host is told which way it went.
+
+```
+note     libgpiod belongs to a package here, so dh_shlibdeps runs strict
+note     libgpiod is unpackaged here, so dh_shlibdeps gets --ignore-missing-info
+```
+
+That is the second time today a sentence about "both hosts" was written
+from one host. Entry 13 was the same error about compilation.
+
+**What the run did not settle.** `dpkg-vendor --query Vendor` printed
+`Ubuntu`, which was the expected answer and therefore separates nothing:
+the vendor explanation for `bad-distribution-in-changes-file` survives and
+so does the alternative. A Debian host would decide it. Recording that the
+measurement was taken and came back uninformative, rather than quietly
+dropping the question.

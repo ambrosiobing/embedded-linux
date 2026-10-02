@@ -263,6 +263,32 @@ else
 		fi
 	fi
 
+	# MERGED /usr, which lintian calls aliased-location and which this
+	# package got wrong until Friday 2 October 2026. The tools package
+	# shipped its udev rule into lib/udev/rules.d. On every current
+	# Debian and Ubuntu, /lib is a symlink to /usr/lib, so a package
+	# writing to the top-level name is writing through a symlink into
+	# a directory another package owns. It installs, it works, and it
+	# is wrong, which is why only a tool reading the built package
+	# found it.
+	#
+	# Every destination is checked rather than the one that was wrong,
+	# because the next .install line added will be written by whoever
+	# copies the shape of the existing ones.
+	for f in "$DEB"/*.install; do
+		[ -f "$f" ] || continue
+		bad=$(grep -v '^[[:space:]]*#' "$f" |
+			awk 'NF > 1 { print $NF }
+			     NF == 1 { print $1 }' |
+			grep -E '^(lib|bin|sbin|lib64)(/|$)' || true)
+		if [ -z "$bad" ]; then
+			ok "$(basename "$f") ships nothing through the merged /usr symlinks"
+		else
+			no "$(basename "$f") ships into an aliased location: $bad" \
+				"prefix it with usr/: /lib is a symlink to /usr/lib"
+		fi
+	done
+
 	if grep -q "60-adxl345.rules" "$DEB/adxl345-tools.install"; then
 		ok "the udev rule is installed by the tools package"
 	else
@@ -592,16 +618,38 @@ else
 		mkdir -p "$WORK/deb"
 		cp -r "$SRC" "$WORK/deb/adxl345-1.0.0"
 
-		# The override described above, written into the copy. printf
-		# rather than a quoted heredoc because the recipe line under a
-		# make target must begin with a literal tab.
-		{
-			echo
-			echo "# Appended by tests/adxl345-build-test.sh to its"
-			echo "# own copy, never to the committed file."
-			echo "override_dh_shlibdeps:"
-			printf '\tdh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info\n'
-		} >>"$WORK/deb/adxl345-1.0.0/debian/rules"
+		# THE OVERRIDE IS CONDITIONAL, and it was not until Friday 2
+		# October 2026. The comment above said "both hosts that run
+		# this have libgpiod v2 built from source under /usr/local",
+		# which was true of the CI runner and false of the WSL build
+		# laptop: Ubuntu resolute packages libgpiod-dev 2.2.1, so
+		# dh_shlibdeps resolves it from a package there and needs no
+		# help. Applying --ignore-missing-info anyway weakened a host
+		# that did not need weakening, and would have hidden any
+		# genuinely unpackaged library the code picked up later.
+		#
+		# So dpkg is asked who owns the libgpiod that pkg-config
+		# points at, and the answer decides. Printed either way, so
+		# the log says which hosts are running the strict check.
+		gpiodlib=$(pkg-config --variable=libdir libgpiod 2>/dev/null)
+		if [ -n "$gpiodlib" ] &&
+			dpkg -S "$gpiodlib"/libgpiod.so.? >/dev/null 2>&1; then
+			printf 'note     libgpiod belongs to a package here, so dh_shlibdeps runs strict\n'
+		else
+			printf 'note     libgpiod is unpackaged here, so dh_shlibdeps gets --ignore-missing-info\n'
+			# printf rather than a quoted heredoc, because the
+			# recipe line under a make target must begin with a
+			# literal tab.
+			{
+				echo
+				echo "# Appended by tests/adxl345-build-test.sh"
+				echo "# to its own copy, never to the committed"
+				echo "# file, and only on a host where libgpiod"
+				echo "# belongs to no package."
+				echo "override_dh_shlibdeps:"
+				printf '\tdh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info\n'
+			} >>"$WORK/deb/adxl345-1.0.0/debian/rules"
+		fi
 
 		# -d BLINDED THIS TO EVERY BUILD DEPENDENCY, not just the one
 		# it had to. On Friday 2 October 2026 the runner was missing
