@@ -1158,3 +1158,53 @@ this package ever goes near an archive.
 
 A warning is triaged against what the project said it would do. That is
 only possible once the warnings are on the screen.
+
+---
+
+## 21. git add -A published another session's work under this project's commit message
+
+**Friday 2 October 2026.** A second session was editing project 10 in the
+same working tree while this project was being committed from it. Every
+commit here used `git add -A`.
+
+`15b2da4`, whose subject is "docs(11): criterion 5's build half is met on
+a host, with nothing waived", contains:
+
+```
+docs/CARD.md                            +35
+projects/10-iio-iks4a1/JOURNAL.md      +102
+projects/10-iio-iks4a1/docs/RESUME.md   +93
+projects/10-iio-iks4a1/docs/TIMELINE.md +28
+```
+
+258 lines of project 10 documentation, written by nobody in this session,
+committed under a subject that mentions none of it, and pushed.
+
+**What was not damaged**, established before deciding anything: the other
+session finished its own work six minutes later in `ca2c0f0`, adding the
+remaining 23 lines to the two files it was still editing. Nothing was
+lost, nothing was truncated, and the only other commit of this session
+that touched anything outside project 11 is this one. `8009360` was
+checked and is clean.
+
+**What is damaged** is the record. `git log --oneline -- projects/10-iio-iks4a1`
+now shows a project 11 subject against the bulk of a project 10 write-up,
+and anyone tracing when the card archive was documented will find the
+wrong story first.
+
+**Not rewritten.** The commits are pushed, the content is correct and
+complete, and this repository has already spent a day cleaning up after a
+history rewrite that left orphaned commits on GitHub. Trading a confusing
+subject line for that is a bad exchange. The note here is the fix: it
+names the commit so a search finds the explanation.
+
+**The practice that caused it is the thing to change.** `git add -A` in a
+shared working tree stages whatever anyone else happens to have open. It
+is the same shape as every other failure this project hit today, a tool
+choosing its own inputs and never saying what it chose, except this one
+chose files rather than findings. Staging is explicit from here: the paths
+this session actually edited, named on the command line.
+
+And "tree clean" after a commit meant less than it sounded. It was true,
+and it was true partly because everybody else's work had just been
+committed too.
