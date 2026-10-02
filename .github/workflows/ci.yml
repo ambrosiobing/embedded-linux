@@ -67,7 +67,13 @@ jobs:
           # against its fake bus. Without cmake that suite skips its
           # compile section and says so, which would make its own skip
           # message ("CI installs cmake and does compile it") false.
-          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev libiio-dev device-tree-compiler cmake
+          # debhelper, dpkg-dev, fakeroot and lintian: Project 11's
+          # acceptance criterion 5 is about the packaging, and until
+          # these were here the whole debian/ directory was proved by
+          # reading one file against another. The runner image carries
+          # dpkg-dev and fakeroot, and "the image carries it" is how
+          # thirteen runs came to fail once already, so both are named.
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev libiio-dev device-tree-compiler cmake debhelper dpkg-dev fakeroot lintian
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so

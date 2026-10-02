@@ -21,10 +21,36 @@ bindings that need no structure definitions, tests that run with no
 hardware, permissions without root, and packaging that installs and
 purges cleanly.
 
-**State: written, not yet built.** Nothing here has been compiled, on any
-machine. The authoring laptop has neither `gcc` nor `cmake`, so every
-claim below that says "asserted" is a statement about agreement between
-files, and everything that would need a toolchain says so.
+**State: compiled and tested on a host, never run on a board.** The
+library builds with `-Werror`, its fake-bus suite passes, and it exports
+exactly the six symbols its packaging pins. No sensor has been read.
+
+Every one of those happens in CI on every push, and it took eleven days
+to notice. The sentence here until Friday 2 October 2026 read "Nothing
+here has been compiled, on any machine", and it went into the repository
+in commit `5167220` on Monday 21 September 2026, **the same commit that
+added `cmake` to the CI package list and the compile section to
+`tests/adxl345-build-test.sh`**. It was false the moment it was written,
+and 103 commits went past it. What the authoring laptop can do is not
+what the project has had done to it; the first is a fact about this
+machine and the second is a fact about the project, and writing the
+first in the second's place is how the whole hardware-free half of this
+work stayed invisible.
+
+The evidence is CI run 36934729926, on `488438d`:
+
+```
+--- compile and run
+ok       cmake configures
+ok       everything builds with -Werror
+ok       the fake-bus suite passes (48 checked)
+ok       the built library exports exactly six symbols
+```
+
+So "asserted" below still means a file agrees with another file, and it
+is no longer the strongest thing on offer: where a row says compiled, a
+compiler produced it. "Measured" still means a board did it, and no row
+says that yet.
 
 ## What this project adds to the repository
 
@@ -94,25 +120,35 @@ lintian ../*.deb
 ## Acceptance criteria
 
 Written out in full so nothing outside this repository has to be
-consulted. "Asserted" means a file says so and a test checks the file;
-"measured" means a board did so. Nothing has been measured.
+consulted. Three words, and keeping them apart is the point. "Asserted"
+means a file says so and a test checks the file. "Compiled" means a
+toolchain produced the thing and the claim is about what it produced.
+"Measured" means a board did so, and nothing here is measured.
 
 | # | Criterion | State |
 |---|---|---|
 | 1 | `adxl_open` succeeds in under 100 ms at 400 kHz | Not started |
 | 2 | The board flat reads about 1 g on Z and near 0 on X and Y, and tilting to each edge moves the expected axis | Not started. The fake-bus suite asserts the library decodes a synthetic 1 g on Z correctly, which is the arithmetic and not the sensor |
-| 3 | `ctest` passes in the sanitizer build with no sensor, and a sanitizer run against the real part survives 10000 samples | **Half written.** The suite and the `ADXL_SANITIZE` option exist. Neither has been compiled |
-| 4 | `nm -D` lists exactly six defined text symbols, and the soname is `libadxl345.so.1` | **Asserted three ways**, measured none: the header declares six, the symbols file pins six, and the test compares the soname major in CMake against the one in `debian/`. The `nm` count runs only where the library can be built |
-| 5 | The packages install cleanly, the udev rule lands, and purge leaves nothing behind | Not started |
+| 3 | `ctest` passes in the sanitizer build with no sensor, and a sanitizer run against the real part survives 10000 samples | **First half added Friday 2 October 2026 and not yet run anywhere.** `ADXL_SANITIZE` existed as a CMake option that nothing ever switched on: the build in CI is `RelWithDebInfo`, so eleven days of green runs say nothing about ASan. The suite now configures a second, separate tree with the sanitizers on and runs `ctest` in it. Separate because ASan changes the layout of what it touches and a mixed tree would prove nothing. The second half needs the part |
+| 4 | `nm -D` lists exactly six defined text symbols, and the soname is `libadxl345.so.1` | **Met on a host.** `nm -D` counted six on the built `libadxl345.so.1` in CI run 36934729926, and the soname is the name of the file it counted. Three file-against-file assertions back it up: the header declares six, the symbols file pins six, and CMake's soname major agrees with `debian/`. The only thing left is that no Pi 4 has loaded it |
+| 5 | The packages install cleanly, the udev rule lands, and purge leaves nothing behind | **Build half added Friday 2 October 2026 and not yet run anywhere.** The suite now runs `dpkg-buildpackage`, checks that the three binary packages are produced and that each carries what its `.install` file promises, and runs `lintian` for errors. It skips dpkg's build-dependency check, and says so, because `libgpiod-dev (>= 2.0)` is built from source on both hosts rather than installed as a package. Installing and purging still needs a board or a container |
 | 6 | A member of `i2c` runs `adxl-map` without `sudo`; a user outside the group gets a clear permission error rather than a crash | Not started. The error path is written: the tool names the group and the other strap address rather than printing a number |
 
 ## What is tested without hardware
 
-113 assertions across three suites, none of which needs a sensor.
+117 assertions across three suites, none of which needs a sensor: 60, 35
+and 22, counted from CI run 36934729926 rather than from this file. An
+earlier version said 113 and credited the build suite with 56, which was
+its count before the four compile-and-run assertions were added to it in
+the same commit that added them.
+
+The sanitizer and packaging checks of Friday 2 October 2026 add seven
+more, and the number above is deliberately not raised to match until a
+run has printed it.
 
 | Check | Covers |
 |---|---|
-| `sh tests/adxl345-build-test.sh` | The API surface, hidden visibility, the soname agreeing between CMake and `debian/`, both platform implementations offering the same functions, the packaging file list, the Yocto recipe shipping what CMake installs, the design and the code agreeing, and that Project 5's kernel driver is not in this image. Where a toolchain exists it also configures, builds with `-Werror`, runs the fake-bus suite and counts the exported symbols |
+| `sh tests/adxl345-build-test.sh` | The API surface, hidden visibility, the soname agreeing between CMake and `debian/`, both platform implementations offering the same functions, the packaging file list, the Yocto recipe shipping what CMake installs, the design and the code agreeing, and that Project 5's kernel driver is not in this image. Where a toolchain exists, which is CI on every push and the WSL build laptop, it also configures, builds with `-Werror`, runs the fake-bus suite, counts the exported symbols with `nm -D`, builds a second tree under ASan and UBSan and runs `ctest` in it, and builds the three Debian packages and checks their contents |
 | `sh tests/adxl345-registers-test.sh` | Every register address, fixed value, rate code and range code against `tests/adxl345_datasheet.py`, transcribed from the datasheet rather than from the code |
 | `sh tests/adxl345-motion-test.sh` | The detector: the running baseline, the consecutive-burst requirement, and that sustained movement is absorbed |
 | The fake-bus suite itself | Every register the library writes, including two ordering claims: measurement is enabled after the configuration, and the interrupt is disabled before measurement stops |

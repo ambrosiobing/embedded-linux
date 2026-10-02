@@ -171,6 +171,12 @@ files; the compile, the `-Werror` clean, the fake-bus run and the
 six-exported-symbols count all wait for a host with a toolchain. The
 suite says so out loud rather than reporting a pass.
 
+> **Corrected Friday 2 October 2026.** "Nothing here has been compiled
+> anywhere" was false by the end of the paragraph above it, which added
+> `cmake` to CI so that the suite would compile it. The host with a
+> toolchain was the CI runner, and it did all four of those things on the
+> next push and on every push after. See entry 11.
+
 ---
 
 ## 6. Packaging twice, and three checks that were right for the wrong reason
@@ -556,3 +562,107 @@ the false sentence. The README's "Where this differs from the original
 plan" section drops the parts reason and keeps the two that hold.
 Decision 108 and the two journals are corrected the same way, in place,
 without rewriting what was decided or why.
+
+---
+
+## 11. The project had been compiling for eleven days and said it never had
+
+**Friday 2 October 2026.** Picked this up as the next project after 10,
+read the README to find where to start, and the first line of the state
+paragraph was wrong.
+
+**What happened.** The README said "Nothing here has been compiled, on
+any machine." CI run 36934729926, on `488438d`, pushed the night before:
+
+```
+--- compile and run
+ok       cmake configures
+ok       everything builds with -Werror
+ok       the fake-bus suite passes (48 checked)
+ok       the built library exports exactly six symbols
+
+60 passed, 0 failed, 0 skipped
+```
+
+That is acceptance criterion 4 met on a host, a `-Werror` clean build and
+a 48-check test run, printed on every push since Monday 21 September
+2026. 103 commits.
+
+**The part worth keeping is where the false sentence came from**, because
+it was not carelessness and it was not drift. Entry 10's own text, five
+paragraphs above, says `cmake` was added to the CI package list
+deliberately, and gives the right reason: the skip message claims CI
+compiles it, and a skip message that lies is what Project 7 shipped. That
+reasoning is correct and the edit was correct.
+
+Then the next paragraph of the same entry says "Nothing here has been
+compiled anywhere."
+
+Both were written in the same sitting by the same hand. The first is
+about CI. The second is about the authoring laptop. Neither sentence is
+confused on its own; what is wrong is that the second was filed under the
+project's state, and **the state of a project is not the state of the
+machine you happen to be typing on.** The `5167220` commit title says it
+in three words: "three projects written, none yet built", added in the
+same commit as the thing that builds one of them.
+
+No test can catch this. The suite was green and correct throughout; it
+was the only thing in the project telling the truth, and it was telling
+it to a log nobody read.
+
+**What was done.**
+
+1. The state line, the criteria table and the assertion count corrected
+   against the CI run, which is named so the claim can be checked.
+2. The top-level README row corrected. Second day running that this table
+   was the stale one: the project 10 row was fixed on Thursday 1 October
+   2026 for the same reason, that every document inside a project
+   directory was current and the table nobody opens was not.
+3. The count was wrong too, in a smaller way: 113 assertions across three
+   suites, crediting the build suite with 56. It is 60, 35 and 22, which
+   is 117. The four that made the difference are the compile-and-run
+   assertions, so the number went stale in the same edit that made the
+   sentence false.
+4. Entries 1 and 10 keep their text, with a dated correction beside the
+   two sentences that are wrong, the way entry 1 was already corrected on
+   Wednesday 30 September 2026.
+
+**And then the actual work, which the false sentence had been hiding.**
+Two acceptance criteria need no hardware at all and nothing anywhere ran
+them.
+
+Criterion 3 asks for `ctest` in the sanitizer build. `ADXL_SANITIZE`
+existed as a CMake option and nothing had ever switched it on: the build
+in CI is `RelWithDebInfo`. Eleven days of green runs say nothing whatever
+about ASan. The suite now configures a second build tree with the
+sanitizers on and runs `ctest` in it. A second tree rather than a
+reconfigure, because ASan changes the layout of everything it touches and
+a directory already holding an unsanitized `libadxl345.so.1` would link a
+mixture of the two.
+
+Criterion 5 is about the packaging, and every assertion the project had
+about `debian/` compared one file against another. The suite now runs
+`dpkg-buildpackage`, checks the three binary packages exist and that each
+carries what its `.install` promises, and runs `lintian` for errors.
+`debhelper`, `dpkg-dev`, `fakeroot` and `lintian` were added to the CI
+package list in the same edit, which is the rule entry 10 got right and
+is worth getting right twice.
+
+**What that check does not ask, said here because the suite says it too.**
+It passes `-d`, which skips dpkg's build-dependency verification, because
+`Build-Depends` asks for `libgpiod-dev (>= 2.0)` and both hosts that run
+this build libgpiod v2 from source under `/usr/local` rather than
+installing it as a package. So a wrong build-dependency would pass. And
+nothing is installed or purged, which is the rest of criterion 5 and
+wants a board or a container.
+
+Lintian warnings are printed and not scored. A suite that failed on style
+notes for a package that is not going to a Debian archive is a suite
+people switch off, and a guard that trains you to bypass it has done more
+damage than the failure it prevents.
+
+**Neither new check has run anywhere yet**, so the assertion count in the
+README is left at the measured 117 rather than raised to the 124 these
+should produce. A number that has not been printed by a run is a
+prediction, and this entry is about what happens when a prediction is
+filed as a state.

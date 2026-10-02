@@ -459,6 +459,127 @@ else
 		skipped "nm or the built library is absent, so the exported
          symbol count was not measured here."
 	fi
+
+	# --------------------------------------------------- criterion 3
+	#
+	# The sanitizer build, which is the half of criterion 3 a host can
+	# prove. The other half, ten thousand samples off a real part under
+	# ASan, needs the sensor and is not attempted here.
+	#
+	# A separate build tree rather than a reconfigure of the first one.
+	# ASan changes the layout of everything it touches, so a directory
+	# that has already produced an unsanitized libadxl345.so.1 would
+	# link a mixture of the two and the result would mean nothing.
+	echo
+	echo "--- the sanitizer build, acceptance criterion 3"
+
+	if ! command -v ctest >/dev/null 2>&1; then
+		skipped "ctest is absent, so the hardware-free half of
+         criterion 3 was not run."
+	elif cmake -S "$SRC" -B "$WORK/s" -DCMAKE_BUILD_TYPE=Debug \
+		-DADXL_SANITIZE=ON >"$WORK/scfg.log" 2>&1 &&
+		cmake --build "$WORK/s" -j2 >"$WORK/sbuild.log" 2>&1; then
+		ok "the library and its test compile under ASan and UBSan"
+
+		if ctest --test-dir "$WORK/s" --output-on-failure \
+			>"$WORK/sctest.log" 2>&1; then
+			ok "ctest passes under the sanitizers with no sensor"
+		else
+			no "ctest failed under the sanitizers" \
+				"$(tail -15 "$WORK/sctest.log")"
+		fi
+	else
+		no "the sanitizer build failed" \
+			"$(tail -12 "$WORK/sbuild.log" 2>/dev/null ||
+				tail -5 "$WORK/scfg.log")"
+	fi
+
+	# --------------------------------------------------- criterion 5
+	#
+	# The Debian packaging, built rather than read. Every assertion
+	# above this point compares one file against another; this is the
+	# first one that asks whether the packaging produces anything.
+	#
+	# WHAT THIS DOES NOT ASK, named here rather than left to be
+	# assumed. -d skips dpkg's build-dependency check, because
+	# Build-Depends asks for libgpiod-dev (>= 2.0) and both hosts that
+	# run this have libgpiod v2 built from source under /usr/local
+	# rather than installed as a package. So the declared
+	# build-dependencies are compared against nothing at all here, and
+	# a wrong one would pass. What is checked is that debhelper drives
+	# CMake to three binary packages and that each carries what its
+	# .install file promises.
+	#
+	# It also installs nothing and purges nothing, which is the rest of
+	# criterion 5 and wants a board or a container.
+	echo
+	echo "--- the Debian packaging, acceptance criterion 5"
+
+	if ! command -v dpkg-buildpackage >/dev/null 2>&1; then
+		skipped "dpkg-buildpackage is absent, so no package was built
+         and the packaging was only read."
+	elif ! command -v dh >/dev/null 2>&1; then
+		skipped "debhelper is absent, so no package was built and the
+         packaging was only read."
+	else
+		mkdir -p "$WORK/deb"
+		cp -r "$SRC" "$WORK/deb/adxl345-1.0.0"
+
+		if (cd "$WORK/deb/adxl345-1.0.0" &&
+			dpkg-buildpackage -us -uc -b -d) \
+			>"$WORK/deb.log" 2>&1; then
+			ok "dpkg-buildpackage drives debhelper and CMake to .deb"
+		else
+			no "the package build failed" \
+				"$(tail -15 "$WORK/deb.log")"
+		fi
+
+		for p in libadxl345-1 libadxl345-dev adxl345-tools; do
+			d=$(find "$WORK/deb" -maxdepth 1 -name "${p}_*.deb" |
+				head -n 1)
+			if [ -z "$d" ]; then
+				no "$p was not produced"
+				continue
+			fi
+			case $p in
+			libadxl345-1) want=libadxl345.so.1 ;;
+			libadxl345-dev) want=adxl345.pc ;;
+			adxl345-tools) want=60-adxl345.rules ;;
+			esac
+			if dpkg-deb -c "$d" 2>/dev/null | grep -q "$want"; then
+				ok "$p carries $want"
+			else
+				no "$p is missing $want" \
+					"$(dpkg-deb -c "$d" | head -10)"
+			fi
+		done
+
+		# Errors only. Lintian's warnings on a package that is never
+		# going to a Debian archive are style notes, so they are
+		# printed and not scored: a suite that failed on them would
+		# be switched off within a week.
+		if command -v lintian >/dev/null 2>&1; then
+			lintian "$WORK"/deb/*.changes >"$WORK/lint.log" 2>&1 ||
+				true
+			if grep -q "^E:" "$WORK/lint.log"; then
+				no "lintian reports errors" \
+					"$(grep '^E:' "$WORK/lint.log" | head -8)"
+			else
+				ok "lintian reports no errors"
+			fi
+			# Not "[ "$w" -gt 0 ] && printf", which is the set -e
+			# trap this file already dodges once: an AND-OR list
+			# whose test fails returns 1 and ends the script.
+			# That is why no() finishes with return 0.
+			w=$(grep -c "^W:" "$WORK/lint.log" || true)
+			if [ "$w" -gt 0 ]; then
+				printf 'note     lintian also reports %s warnings, not scored\n' "$w"
+			fi
+		else
+			skipped "lintian is absent, so the packages were built
+         and not inspected."
+		fi
+	fi
 fi
 
 echo

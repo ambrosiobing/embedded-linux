@@ -3687,3 +3687,53 @@ remembers the purpose of. Until then the debugging path is `./go tee-mod`,
 a card prepared as in bring-up steps 2 and 3, `modprobe.blacklist=optee`
 added to `cmdline.txt`, and the failure triggered by hand at a shell with
 `dmesg`, `/proc` and a serial console still available.
+
+---
+
+## 116. A packaging check that builds the packages, and names the two things it still does not ask
+
+**Context.** Project 11's acceptance criterion 5 is about the Debian
+packaging, and until Friday 2 October 2026 every assertion the project
+had about `debian/` compared one file against another: the symbols file
+against the header, the soname major in `debian/` against the one in
+`CMakeLists.txt`, the `.install` lists against what CMake installs.
+Internal agreement, which entry 10 of that journal had already found is
+not correctness once, when the fake bus and the library shared their
+register numbers and 56 assertions stayed green through a wrong
+`POWER_CTL`.
+
+Nothing anywhere had run `dpkg-buildpackage`. The same was true of
+criterion 3's `ADXL_SANITIZE`, a CMake option nothing ever switched on,
+while the README said the criterion was half written.
+
+**Decision.** `tests/adxl345-build-test.sh` builds the three binary
+packages and checks each carries what its `.install` promises, and runs
+`lintian`. `debhelper`, `dpkg-dev`, `fakeroot` and `lintian` join the CI
+package list and `scripts/host-setup.sh` in the same edit, which is the
+rule entry 10 got right about `cmake` and is worth getting right twice:
+a check that silently skips is a check that was never added.
+
+Two deliberate weaknesses, both named in the suite's own output and in
+its comments rather than left for a reader to discover.
+
+`dpkg-buildpackage -d` skips the build-dependency check. `Build-Depends`
+asks for `libgpiod-dev (>= 2.0)`, Ubuntu packages v1, and both hosts that
+run this build v2 from a pinned tag under `/usr/local`. A source build
+cannot satisfy a dpkg dependency, so the choice is between `-d` and a
+check that always refuses. What that costs is precise and worth writing
+down: a wrong entry in `Build-Depends` passes here.
+
+Lintian's warnings are printed and not scored; only `E:` fails. These
+packages are not going to a Debian archive, and a suite that refuses on
+archive-policy style notes is a suite that gets switched off. The
+repository has the rule already, from three guards that fired wrongly in
+one evening: a guard that trains you to bypass it has done more damage
+than the failure it prevents.
+
+**Consequence.** Criterion 3's first half and criterion 5's build half
+are reachable with no hardware and run on every push. What is left of
+criterion 5 is installing and purging, which wants a board or a
+container, and what is left of criterion 3 is ten thousand samples off
+the real part under ASan. Neither new check has run anywhere at the time
+this is written, so the project README keeps the assertion count it
+measured rather than the one these predict.
