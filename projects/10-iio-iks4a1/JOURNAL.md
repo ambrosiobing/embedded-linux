@@ -3197,3 +3197,25 @@ values it needs. `/setacvalueindex` writes the mains value; the battery value
 read `Enabled` all week, so the fix depended on the laptop staying plugged in
 and that dependency was written down nowhere. Both values are now in the
 document, with the read-back command that shows them.
+
+### Where this entry's changes actually landed, and why that is worth a note
+
+This entry, the `docs/RESUME.md` section, the `docs/TIMELINE.md` rows and the
+`docs/CARD.md` corrections were all written while a SECOND session was working
+on project 11 in the same working tree. That session committed with a
+whole-tree stage, so all four project 10 files went into **`15b2da4`, whose
+message reads `docs(11): criterion 5's build half is met on a host, with
+nothing waived`**, and it was pushed before any of this was noticed.
+
+Nothing is lost and nothing is wrong in the files. What is wrong is the
+history: 93 lines of `RESUME.md`, 102 of this journal, 28 of the timeline and
+35 of `docs/CARD.md` are invisible under a project 11 heading, and the commit
+message describes none of them. The commit is on the remote, so it stays as it
+is; a rewrite of pushed history to tidy a message would cost more than the
+confusion it removes.
+
+**The operational lesson is about staging, not about project 11.** When two
+sessions share one working tree, `git add -A` and `git commit -a` cannot tell
+whose work they are taking. Either session's half-finished edit can be
+published under the other's message. Stage by explicit path, every time, which
+is how this paragraph itself was committed.

@@ -439,6 +439,7 @@ tests.
 | 10:05 | The size plateaus at 1,547,436,032 with seven minutes of reading left, **within 786,432 bytes of the fragment abandoned on Thursday 1 October 2026** | |
 | 10:13 | First read complete: 15,728,640,000 bytes in 877.616 s at 18 MB/s | |
 | 10:27 | **Verified byte for byte.** `2026-10-02_af91824`, 1,563,488,065 bytes, decompressed sha256 `daa4e3a6`, and an independent `sha256sum -c` agrees | |
+| 10:46 | The write-up of all this is swept into `15b2da4`, a project 11 commit, by a concurrent session staging the whole tree. Pushed before it was noticed | `15b2da4` |
 
 **The archive was monitored without touching WSL,** because re-entering a
 stopped distro starts it and destroys the evidence of whether it was stopped.
