@@ -99,13 +99,24 @@ if [ -z "$RT" ]; then
 	exit 0
 fi
 if ! "$RT" info >/dev/null 2>&1; then
-	skipped "$RT is installed but not answering, so no container was
-         started. On WSL this usually means the Docker service is not
-         running."
+	# Two different faults produce one failure here, and saying which
+	# costs one more call. A daemon that is down needs starting; a
+	# socket this user cannot open needs the docker group and a new
+	# login. Reporting the first when it is the second sends the reader
+	# to the wrong place.
+	if sudo -n "$RT" info >/dev/null 2>&1; then
+		skipped "$RT answers to root but not to $(id -un), so this is a
+         socket permission rather than a stopped daemon. Add the user to
+         the docker group and log in again, or run this under sudo."
+	else
+		skipped "$RT is installed and not answering, to this user or to
+         root, so no container was started. On WSL that is usually the
+         service not running."
+	fi
 	done_summary
 	exit 0
 fi
-ok "$RT is present and answering"
+ok "$RT is present and answering to $(id -un)"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
