@@ -151,7 +151,10 @@ else
 	done_summary || exit 1
 fi
 
-built=$(ls "$WORK/build"/*.deb 2>/dev/null | wc -l)
+built=0
+for f in "$WORK/build"/*.deb; do
+	[ -e "$f" ] && built=$((built + 1))
+done
 if [ "$built" -eq 3 ]; then
 	ok "three .deb files came out of the container"
 else

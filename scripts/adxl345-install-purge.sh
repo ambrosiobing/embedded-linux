@@ -79,7 +79,10 @@ cd "$DEBS"
 
 echo "--- the three packages are here"
 for p in libadxl345-1 libadxl345-dev adxl345-tools; do
-	n=$(ls "$p"_*.deb 2>/dev/null | wc -l)
+	n=0
+	for f in "$p"_*.deb; do
+		[ -e "$f" ] && n=$((n + 1))
+	done
 	if [ "$n" -eq 1 ]; then
 		ok "$p has exactly one .deb"
 	else
