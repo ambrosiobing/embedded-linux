@@ -31,6 +31,28 @@
 BEGIN="# >>> bench optee-armstub"
 END="# <<< bench optee-armstub"
 
+# uboot.env is what mkenvimage writes: a CRC32 and then NUL-separated
+# key=value pairs, padded out to the environment size. Turning the NULs
+# into newlines reads it with nothing but tr, which is what makes the
+# question below answerable without a board.
+#
+# The question is not whether the file is there. On Thursday 1 October
+# 2026 it was there, this script said so, and the board still stopped at
+# the U-Boot prompt, because nothing in that environment patches the
+# device tree the firmware hands over. That tree has no /psci node and no
+# /firmware/optee node, so three of four cores time out and the driver
+# this project exists for never probes. "present" answered a question
+# nobody was asking.
+#
+# The marker is the CPU enable-method rather than the word psci alone,
+# because a /psci node on its own does nothing: the cpu nodes have to
+# name it. Journal entry 31 has what that cost.
+UBOOT_ENV_FDT_MARK="enable-method psci"
+
+env_patches_fdt() {
+	tr '\000' '\n' <"$1" 2>/dev/null | grep -q "$UBOOT_ENV_FDT_MARK"
+}
+
 usage() {
 	sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'
 	exit 2
@@ -119,9 +141,16 @@ do_install() {
 	fi
 
 	# uboot.env is U-Boot's environment, and it carries the commands
-	# that load kernel8.img and the device tree. Without it U-Boot
-	# stops at its own prompt on the serial console, which looks like
-	# a hang to anyone not watching that console.
+	# that load kernel8.img. Without it U-Boot stops at its own prompt
+	# on the serial console, which looks like a hang to anyone not
+	# watching that console.
+	#
+	# It does NOT carry anything that patches the device tree, and
+	# that sentence used to say it did. The reference environment loads
+	# a kernel and boots it, and the tree the firmware hands over has
+	# no /psci and no /firmware/optee, so the board stops at the
+	# prompt with the file present and correct. That is what status
+	# now says out loud rather than reporting "present".
 	if [ -f "$src/uboot.env" ]; then
 		cp "$src/uboot.env" "$boot/uboot.env"
 		note "uboot.env installed"
@@ -207,7 +236,17 @@ do_status() {
 		note "armstub8.bin absent"
 	fi
 	if [ -f "$boot/uboot.env" ]; then
-		note "uboot.env present"
+		note "uboot.env present, $(wc -c <"$boot/uboot.env") bytes"
+		if env_patches_fdt "$boot/uboot.env"; then
+			note "  and it patches the device tree, so the board"
+			note "  boots without anyone at the console"
+		else
+			note "  but no variable in it contains"
+			note "  '$UBOOT_ENV_FDT_MARK', so it cannot boot alone:"
+			note "  the firmware's tree has no /psci and no"
+			note "  /firmware/optee. Boot by hand from the U-Boot"
+			note "  prompt, the sequence is in docs/BRINGUP.md."
+		fi
 	else
 		note "uboot.env absent"
 	fi
