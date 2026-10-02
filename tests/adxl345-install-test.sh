@@ -151,15 +151,42 @@ else
 	done_summary || exit 1
 fi
 
-built=0
-for f in "$WORK/build"/*.deb; do
-	[ -e "$f" ] && built=$((built + 1))
+# debian/control declares three binary packages, and debhelper also emits
+# an automatic -dbgsym for each one that carries ELF objects. So the
+# number of .deb files is not the number of declared packages, and
+# counting the glob asserts the wrong thing.
+#
+# The first container run of this test, on Saturday 3 October 2026 on the
+# wsl laptop JPTOUPM678, reported "5 .deb files came out, wanted 3",
+# named none of them, and then deleted the directory on its way out. A
+# guard that refuses has to name what it matched, or a by-product cannot
+# be told apart from a defect. scripts/adxl345-install-purge.sh already
+# does this correctly one stage later, asserting each package by name.
+found=$(for f in "$WORK/build"/*.deb; do
+	[ -e "$f" ] || continue
+	printf '%s\n' "${f##*/}"
+done | sort)
+printf 'note     .deb files produced:\n'
+printf '%s\n' "$found" | sed 's/^/         /'
+
+for p in libadxl345-1 libadxl345-dev adxl345-tools; do
+	if printf '%s\n' "$found" | grep -q "^${p}_"; then
+		ok "$p was built"
+	else
+		no "$p was not built"
+		done_summary || exit 1
+	fi
 done
-if [ "$built" -eq 3 ]; then
-	ok "three .deb files came out of the container"
+
+extra=$(printf '%s\n' "$found" |
+	grep -vE '^(libadxl345-1|libadxl345-dev|adxl345-tools)_' || true)
+unexpected=$(printf '%s\n' "$extra" | grep -v -- '-dbgsym_' || true)
+if [ -z "$extra" ]; then
+	ok "nothing came out beyond the three declared packages"
+elif [ -n "$unexpected" ]; then
+	no "a .deb is neither declared nor an automatic dbgsym" "$unexpected"
 else
-	no "$built .deb files came out, wanted 3"
-	done_summary || exit 1
+	ok "the extra .deb files are automatic dbgsym packages"
 fi
 
 # dh_shlibdeps ran strict in there, because libgpiod-dev is a Debian
