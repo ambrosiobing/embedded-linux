@@ -11,7 +11,7 @@ actually run; nothing in this folder should be written from expectation.
 | `reproduce.txt` | `./go reproduce > projects/01-yocto-image/docs/evidence/reproduce.txt`, the diff of the two buildhistory package lists |
 | `sdk-check.txt` | `./go sdk-check > projects/01-yocto-image/docs/evidence/sdk-check.txt`, plus the output of running the binary on the board |
 | `state-transition.txt` | `bench-state show`, then `systemctl stop sshd.socket`, then `bench-state show` again. The state machine on hardware, without needing LEDs |
-| `leds.mp4` | Deferred. Needs three bare LEDs or an LK-Cable, see the project README |
+| `leds.mp4` | Not taken yet. No longer blocked: the modules mate with ordinary jumpers and were lit from GPIO17, GPIO27 and GPIO22 on Friday 2 October 2026. What remains is to film `bench-status` driving them on this project's own image |
 
 Build times are not a separate file: they live in the table in the
 [project README](../../README.md), so there is one place to look.

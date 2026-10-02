@@ -207,16 +207,38 @@ from the same commit produces the same package list. It does not claim
 bit-identical images. Timestamps and build paths still differ, which is what
 `buildhistory` is for.
 
-## Deferred: the LED indication
+## The LED indication, and the reason it was deferred for nothing
 
-This project's specification drives three LEDs from the status daemon. That
-is deferred, and the reason is worth recording rather than hiding.
+This project's specification drives three LEDs from the status daemon. It was
+deferred on a reason that turned out to be false, and the correction is worth
+recording more than the original was.
 
-The bench LEDs are Joy-IT LinkerKit LK-LED10 modules. They have a 2.0 mm
-socket and, in the manufacturer's own words, require "a Linker Kit baseboard
-as well as an Linker Kit connecting cable". Standard 2.54 mm jumper wires
-cannot mate with that socket, so the modules were never electrically
-connected and no polarity or wiring test could have succeeded.
+The bench LEDs are Joy-IT LinkerKit LK-LED10 modules. They do have a 2.0 mm
+socket, and the manufacturer does ask for "a Linker Kit baseboard as well as
+an Linker Kit connecting cable". What nobody looked at is the rest of the
+board: **beside that socket the module carries a 2.54 mm header with `S1`,
+`S2`, `U` and `G` printed next to it, and ordinary jumper wires mate with it.**
+The modules were never blocked. The claim that they could not be connected was
+written from the manufacturer's page and from the socket, and the part was not
+examined.
+
+On Friday 2 October 2026 three of them were wired to a Raspberry Pi 3 Model B
+and lit, on **GPIO17, GPIO27 and GPIO22**, which are the three lines this
+project's daemon requests. Each module took its signal pin to a header pin and
+its ground pin to a breadboard ground rail, with one jumper from that rail to a
+Pi ground pin. What the bench measured:
+
+| Pin state | LED |
+|---|---|
+| driven high | lit |
+| driven low | dark |
+| released to an input | dark, and the line reads low |
+
+So the arrangement is **active high with the module sourcing from the pin**,
+the supply pin `U` is not needed at all (one module had it wired and lit
+identically with that jumper pulled), and the fourth row is independent
+evidence for the first three: a floating signal pin is pulled down through the
+LED and its own resistor rather than up towards a supply.
 
 **Nothing in the software was changed or removed.** `bench-status` runs,
 requests lines 17, 22 and 27 through libgpiod v2, holds them for as long as
@@ -229,19 +251,23 @@ line  22: "GPIO22"  output consumer="bench-status"
 line  27: "GPIO27"  output consumer="bench-status"
 ```
 
-What is **not** verified is that those output values reach the pins as
-voltages. That needs either an LED or a meter, and it is the single
-unverified link in the chain.
+What is still **not** verified is narrower than it was, and it is worth stating
+precisely rather than claiming the whole link is closed. The modules light from
+those three lines on a Raspberry Pi 3 Model B running a general-purpose image,
+driven with `pinctrl`. They have not yet been lit by `bench-status` on this
+project's own image. The electrical half of the chain is settled; what remains
+is the daemon's own output on the bench image, which is now one short test
+rather than a blocked step, and nothing needs to be bought to run it.
 
-To close it, either fit three bare LEDs with 330 Ohm series resistors from
-GPIO17, GPIO27 and GPIO22 to ground, which is the original wiring and is
-unambiguously active high, or buy an LK-Cable and use the modules as the
-manufacturer intends. Grove 4-pin cables are the same 2.0 mm pitch and fit.
+Nothing needs rewiring either: the wiring above is exactly what the daemon
+expects. Fit the three modules, boot the image, and change the state file.
 
-The polarity and line-offset configuration in `/etc/bench/leds.conf` stays.
-It costs one small file and one libgpiod call, it is the correct design for
-a module whose wiring is not known in advance, and it means neither option
-above needs a rebuild.
+The polarity and line-offset configuration in `/etc/bench/leds.conf` stays, and
+it has earned its keep rather than merely being defensible. It was written
+because a module with a supply pin might light on a low signal, which was an
+honest unknown at the time. The bench has now answered it for this part, active
+high with `U` unconnected, so the file records a measurement instead of a
+hedge, and a module wired the other way still needs no rebuild.
 
 ## Build times
 
@@ -372,12 +398,16 @@ differently, each for a reason worth keeping:
 
 1. **The LEDs are four-pin modules, not bare LEDs.** `S1` is the signal, `S2`
    is unused, `U` is the 3V3 supply, `G` is ground, and the series resistor
-   is on the module, so the three loose 330 Ohm resistors are not needed.
-   The signal pins are still GPIO17, GPIO27 and GPIO22.
+   is on the module, so the three loose 330 Ohm resistors are not needed. In
+   this wiring `U` is not needed either: signal and ground are enough. The
+   signal pins are still GPIO17, GPIO27 and GPIO22, and the module's own
+   header takes an ordinary jumper.
 2. **Polarity and line offsets are configuration, not constants.** A module
-   with a supply pin may light on a low signal.
+   with a supply pin may light on a low signal, and which way round the LED
+   sits is not printed on the board.
    `gpiod_line_settings_set_active_low()` exists for this, so
-   `/etc/bench/leds.conf` decides and the C never reasons about volts.
+   `/etc/bench/leds.conf` decides and the C never reasons about volts. For
+   this part the answer is now measured rather than assumed: active high.
 3. **The GPIO chip is found by label, not by index.** `/dev/gpiochip0` is the
    header on a Pi 4 but not on every board, and the numbering moves when an
    expander probes first.

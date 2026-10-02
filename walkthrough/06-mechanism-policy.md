@@ -43,16 +43,22 @@ and precise. Policy in configuration and shell, mechanism in C.
 
 ## What is proven, and what is deferred
 
-Everything below describes a working system, with one link unverified. The
-daemon runs on the board, holds lines 17, 22 and 27, and reports state
-correctly. What has never been observed is an LED lighting, because the
-bench modules are LinkerKit parts with a 2.0 mm socket that standard 2.54 mm
-jumper wires cannot mate with.
+Everything below describes a working system, with one link now much shorter
+than it was. The daemon runs on the board, holds lines 17, 22 and 27, and
+reports state correctly.
 
-So the mechanism is verified up to the kernel call and no further. That is
-recorded as a deferral with a written reason rather than quietly omitted,
-and it changes nothing about the design below, which is the part worth
-reading.
+This section used to say an LED had never been observed lighting, because the
+bench modules are LinkerKit parts with a 2.0 mm socket that standard jumper
+wires cannot mate with. The modules also carry a 2.54 mm header, the jumpers do
+mate with it, and three of them lit from those same three lines on Friday 2
+October 2026, active high. The reason given for the deferral was false, and it
+had been standing in five documents.
+
+What is genuinely still unobserved is narrower: `bench-status` driving those
+modules on this project's own image. The electrical path is settled, so the
+mechanism is verified past the kernel call and up to the daemon's own output,
+and the remaining step needs nothing bought. It changes nothing about the
+design below, which is the part worth reading.
 
 ## The state machine
 

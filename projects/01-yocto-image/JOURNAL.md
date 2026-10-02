@@ -37,6 +37,10 @@ table came from the same rule.
 
 ## 2. The LEDs were not bare LEDs
 
+> **Partly withdrawn, see entry 27.** The parts are modules and carry their own
+> resistor, which is still true. What this entry led to, the conclusion that
+> they could not be connected at all, is false.
+
 **What happened.** The specification described three LEDs with series
 resistors. The actual parts are four-pin modules: `S1` signal, `S2` unused,
 `U` supply, `G` ground, with the resistor on the board.
@@ -389,6 +393,10 @@ modules, which have a 2.0 mm socket and require a LinkerKit baseboard and
 cable. The jumper wires in use are 2.54 mm Dupont. They cannot mate. Every
 polarity test was driving pins into open air. The datasheet says a baseboard
 and cable are required, in one line, and nobody read it until the end.
+
+> **Withdrawn, see entry 27.** The modules also carry a 2.54 mm header, the
+> jumpers mate with it, and three of them lit on Friday 2 October 2026. The
+> datasheet line was read and believed; the board was not looked at.
 
 **What changed in the layer.** An image whose only console is a serial port
 is undebuggable the day that serial port fails, which is what happened. The
@@ -1043,3 +1051,54 @@ board is up. Both commands are one line each and are in the table already.
 index by deleting the three unfilled rows, which would have destroyed the
 thing that makes the file useful: it tells the next session what to capture
 and how. An index that lists only what already exists cannot do that.
+
+## 27. The LEDs were never blocked, and the reason given was read off a web page
+
+**Withdraws the conclusion in entry 2 and in "Why the LEDs never lit either"
+above.** Both stay where they are, because a journal that deletes what it got
+wrong is worth less than one that shows it.
+
+**What happened.** This project's LED output was deferred for two weeks on one
+sentence: the LK-LED10 modules have a 2.0 mm LinkerKit socket, the manufacturer
+asks for a baseboard and a connecting cable, the bench has 2.54 mm Dupont
+jumpers, therefore the modules cannot be connected and every polarity test was
+driving pins into open air. That sentence reached five documents, an evidence
+index, a walkthrough page and two journal entries, and it explained an absence
+in all of them.
+
+On Friday 2 October 2026 a photograph of the module settled it in a minute.
+Beside the 2.0 mm socket the board carries a **2.54 mm header with `S1`, `S2`,
+`U` and `G` printed next to it**, and `R1`, the fitted resistor. Ordinary
+jumpers mate with it. Three modules went onto GPIO17, GPIO27 and GPIO22 of a
+Raspberry Pi 3 Model B, grounds to a breadboard rail and one jumper to a Pi
+ground pin, and they lit.
+
+What was measured, three controls on each of three pins:
+
+| Pin state | LED |
+|---|---|
+| driven high | lit |
+| driven low | dark |
+| released to an input | dark, and the line reads low |
+
+So the arrangement is active high with the pin sourcing, the module needs
+signal and ground only, and `U` does nothing: one module had it wired and lit
+identically with that jumper pulled. The fourth row is independent of the other
+three, because a floating signal pin pulled down through the LED and its own
+resistor is evidence about which way the diode faces, and it agrees.
+
+**What was done.** The README, `docs/BRINGUP.md`, `docs/DESIGN.md`, the evidence
+index and `walkthrough/08-board-bringup.md` now say what the board does. The
+evidence row for `leds.mp4` stops saying "deferred, needs bare LEDs or a cable"
+and says what is actually left, which is filming `bench-status` driving the
+modules on this project's own image. That is the honest remainder: the
+electrical half is settled on a general-purpose image with `pinctrl`, and the
+daemon's own output on the bench image has not been seen yet.
+
+**Why that and not the alternative.** The alternative was to quietly fix the
+wiring table and move on. The mistake is worth more than the wiring. The claim
+was true-sounding, sourced from the vendor rather than from the part, written
+once and then copied, and it survived two weeks because it explained why
+something was missing. A claim that explains an absence is the one nobody
+re-reads, and this repository's own method file says exactly that. The part was
+on the bench the whole time with the answer printed on it.

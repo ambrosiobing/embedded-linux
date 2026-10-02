@@ -63,8 +63,9 @@ consume. Both come out of the same compile step, which is why
 
 ## Figure 2: Schematic
 
-Three status LEDs on the 40-pin header, and the serial console. Each LED
-gets its own series resistor; a GPIO pin sources at most 16 mA.
+Three status LEDs on the 40-pin header, and the serial console. The series
+resistor is on each module rather than on the breadboard; a GPIO pin sources at
+most 16 mA, and three modules together stay well inside that.
 
 ```
    Raspberry Pi 4
@@ -101,9 +102,12 @@ high. That is the daemon's default and needs no configuration.
 ### As built, this bench differs
 
 The bench LED parts are Joy-IT LinkerKit LK-LED10 modules, not bare LEDs.
-They carry their own resistor and a four-pin 2.0 mm socket that 2.54 mm
-jumper wires cannot mate with, so the LED output is **deferred**. Their
-pinout, for whenever an LK-Cable arrives:
+They carry their own resistor, a four-pin 2.0 mm LinkerKit socket, and beside
+it a 2.54 mm header that ordinary jumper wires mate with. This paragraph used
+to say the modules could not be connected and that the LED output was
+deferred for want of an LK-Cable. That was read off the manufacturer's page
+and not off the board, and it was wrong: three of them were lit from GPIO17,
+GPIO27 and GPIO22 on Friday 2 October 2026. The pinout:
 
 ```
   +----------------------+

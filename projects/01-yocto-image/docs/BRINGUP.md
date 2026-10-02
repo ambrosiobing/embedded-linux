@@ -14,25 +14,41 @@ what order, and what to check once it is powered.
 | Raspberry Pi 4 | Target board, machine `raspberrypi4-64` | microSD, HDMI optional |
 | Renkforce USB/TTL cable | Serial console at 115200 baud, catches boot messages before the network is up | UART0 on GPIO14/15 |
 | Green, yellow, red LED modules | Status indicators driven by `bench-status` | S1 to GPIO17, GPIO27, GPIO22 |
-| Breadboard and jumpers | Distributes the 3V3 and ground rails to the three modules | 40-pin header |
+| Breadboard and jumpers | Carries the common ground rail for the three modules | 40-pin header |
 
 The LED modules carry four pins, `S1`, `S2`, `U`, `G`, and their own series
-resistor. The loose 330 Ohm resistors in the inventory are therefore not
-needed here. Check the board anyway: if there is no small resistor next to
-the LED, put 330 Ohm in series with `S1` before connecting anything.
+resistor, marked `R1` on the board. No loose resistor is needed here, which is
+just as well because the bench has none. Check the board anyway: if there is no
+small resistor next to the LED, do not connect it to a pin until one is in
+series with `S1`.
 
-## Wiring the LEDs (optional, currently deferred)
+## Wiring the LEDs
 
-The bench LED modules are Joy-IT LinkerKit LK-LED10, which need a LinkerKit
-baseboard and a 2.0 mm LK-Cable. Standard 2.54 mm jumper wires do not mate
-with that socket, so this section describes what to do once one of the two
-options in the project README is in hand. Nothing else in the project
-depends on it.
+The bench LED modules are Joy-IT LinkerKit LK-LED10. They carry a 2.0 mm
+LinkerKit socket, and beside it a 2.54 mm header with `S1`, `S2`, `U` and `G`
+printed next to it, which ordinary jumper wires mate with. An earlier version
+of this section said they could not be connected without a LinkerKit baseboard
+and cable. That was wrong, it was taken from the manufacturer's page rather
+than from the board, and it deferred this project's LED output for nothing.
 
-With three bare LEDs and 330 Ohm resistors, the wiring is simply GPIO17,
-GPIO27 and GPIO22 through a resistor to each anode, cathodes to a ground
-rail, ground rail to pin 9. That is active high and needs no configuration
-change.
+Three wires per module and nothing else:
+
+| Module pin | Goes to | Note |
+|---|---|---|
+| `S1` | header pin 11, 13 or 15 (GPIO17, GPIO27, GPIO22) | the signal, and the anode side |
+| `G` | the breadboard ground rail | one jumper from that rail to pin 9 |
+| `U` | nothing | the module lights without it |
+| `S2` | nothing | unused |
+
+Measured on a Raspberry Pi 3 Model B on Friday 2 October 2026: driving a pin
+high lights its module, driving it low puts it out, and releasing the line to
+an input also puts it out and reads low. That is **active high**, so
+`/etc/bench/leds.conf` needs no polarity change for these modules.
+
+Settle it on one module before wiring three. Which way round the LED sits is
+not printed on the board, and a module wired the other way sinks instead, in
+which case every statement above inverts and the configuration file is where
+that is recorded.
 
 The table below is for the four-pin modules.
 
@@ -43,7 +59,7 @@ The table below is for the four-pin modules.
 | Green module signal | 11 | GPIO17 | S1 |
 | Yellow module signal | 13 | GPIO27 | S1 |
 | Red module signal | 15 | GPIO22 | S1 |
-| Module supply, all three | 1 (3V3) | | U |
+| Module supply, all three | not connected | | U, see below |
 | Module ground, all three | 9 (GND) | | G |
 | Not connected | | | S2 |
 | Console TXD, cable RX, white | 8 | GPIO14 | |
@@ -52,10 +68,13 @@ The table below is for the four-pin modules.
 
 Two rules that protect the board:
 
-- **`U` goes to 3V3 on pin 1, never to 5 V.** If a module is wired with the
-  LED between its supply and `S1`, then `S1` sits at the supply voltage
-  whenever the GPIO is not driving. A 5 V supply would put 5 V on a 3.3 V
-  input. With `U` on 3V3 the worst case is harmless.
+- **`U` is not needed, and if it is ever used it goes to 3V3 on pin 1, never
+  to 5 V.** These modules light from `S1` and `G` alone, which was tested by
+  pulling the supply jumper off a module that had one and watching nothing
+  change. The rule still matters for a module wired the other way: if the LED
+  sits between its supply and `S1`, then `S1` sits at the supply voltage
+  whenever the GPIO is not driving, and a 5 V supply would put 5 V on a 3.3 V
+  input. With `U` on 3V3, or absent, the worst case is harmless.
 - **Leave the red 5 V lead of the USB/TTL cable disconnected.** The Pi runs
   from its own USB-C supply. Two supplies fighting over the same rail is the
   usual way a board and a cable are lost at the same time.
@@ -66,8 +85,11 @@ daisy-chaining, and nothing here chains.
 ## Which way round are the LEDs?
 
 The modules light either when the line is driven high or when it is pulled
-low, and the silkscreen rarely says which. Settle it once on the running
-board and record the answer in `/etc/bench/leds.conf`:
+low, and the silkscreen rarely says which. **For the LK-LED10 modules on this
+bench the answer is active high**, measured on Friday 2 October 2026, so
+`/etc/bench/leds.conf` keeps its default. Settle it anyway on whatever module
+is actually in front of you, because this is a property of the part and not of
+the Raspberry Pi, and record the answer in that file:
 
 ```sh
 gpioset -c gpiochip0 17=1     # green lights? active high

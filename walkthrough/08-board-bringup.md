@@ -77,18 +77,27 @@ become seconds, and checksums are verified as it goes.
 target is one of the few commands that can destroy a laptop's filesystem
 without warning. Confirmation and a refusal list cost nothing.
 
-## Wiring (deferred)
+## Wiring
 
 The bench LED modules are Joy-IT LinkerKit LK-LED10 parts with a 2.0 mm
-socket, and the available jumper wires are 2.54 mm Dupont. They do not mate,
-so this wiring has never been connected and the LED output is deferred. The
-manufacturer says it in one line: a baseboard and a connecting cable are
-required.
+socket. An earlier version of this page said the available 2.54 mm Dupont
+jumper wires do not mate with it, so the wiring had never been connected and
+the LED output was deferred. The manufacturer does say in one line that a
+baseboard and a connecting cable are required, and that line was taken as the
+whole answer.
 
-Three bare LEDs with 330 Ohm series resistors from GPIO17, GPIO27 and GPIO22
-to a ground rail work immediately and are unambiguously active high, which
-is the daemon's default. The table below is for the four-pin modules,
-for whenever an LK-Cable arrives.
+It was not. Beside the socket the module carries a 2.54 mm header with `S1`,
+`S2`, `U` and `G` printed next to it, and the jumper wires on this bench mate
+with that. On Friday 2 October 2026 three modules were wired to GPIO17, GPIO27
+and GPIO22 on a Raspberry Pi 3 Model B and lit: high is lit, low is dark, a
+released line is dark and reads low, and the supply pin is not needed at all.
+Active high, which is the daemon's default, so nothing in the configuration
+changes.
+
+The lesson is worth more than the wiring. The claim was read off a vendor page,
+written into five documents and a journal, and left to explain an absence for
+two weeks, while the thing it described sat on the bench with the answer
+printed on it. The table below is the module wiring.
 
 ```
                     Raspberry Pi 4, 40-pin header

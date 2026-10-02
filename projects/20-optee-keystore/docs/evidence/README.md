@@ -30,7 +30,7 @@ board can prove that a MAC came out of a secure world.
 | `verify.txt` | The verifier against a real device record and against an altered one. Criterion 5 is **met in software** against the canonicalisation suite; this file is the same command against records a TEE produced |
 | `timing.txt` | A signing call timed over enough repetitions to quote a distribution rather than one number. Criterion 6 is under 1 ms |
 | `ta-missing.txt` | The TA removed, then the client run. Criterion 7 wants `TEEC_OpenSession` failing with `ITEM_NOT_FOUND` and origin `TEE`, which is a different failure from the TA being present and refusing |
-| `leds.jpg` | The red LED lit for the criterion above. Deferred on the same terms as Project 1: it needs three bare LEDs or an LK-Cable |
+| `leds.jpg` | The red LED lit for the criterion above. Not blocked: Project 1's claim that the modules need an LK-Cable was withdrawn on Friday 2 October 2026, and they light from an ordinary jumper on their own 2.54 mm header. The photograph has still to be taken |
 
 Two of these carry a caveat worth writing beside the number when the time
 comes. The Pi 3 has no secure boot and no hardware unique key, so nothing

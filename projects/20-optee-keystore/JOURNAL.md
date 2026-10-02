@@ -533,8 +533,10 @@ the citation still arrived nowhere.
 
 **What was done.** `docs/evidence/README.md` added, one row per criterion
 with its command, including the two that carry caveats rather than numbers:
-`leds.jpg` is deferred on the same terms as Project 1, needing three bare
-LEDs or an LK-Cable, and the whole folder carries a pointer to
+`leds.jpg` was deferred on the same terms as Project 1, needing three bare
+LEDs or an LK-Cable, which Project 1 entry 27 later withdrew: the modules mate
+with an ordinary jumper and were lit on Friday 2 October 2026. The whole folder
+carries a pointer to
 `THREAT-MODEL.md` because the Pi 3 has no secure boot and no hardware
 unique key.
 

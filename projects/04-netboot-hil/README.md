@@ -125,7 +125,7 @@ that a wire carries a signal. Only two boards show that.
 
 | Item | Why | What would un-defer it |
 |---|---|---|
-| The three status LEDs | The bench's LED parts are Joy-IT LinkerKit LK-LED10 modules with a 2.0 mm socket, and standard 2.54 mm jumper wires cannot mate with it. The same blocker Project 1 recorded | Three bare LEDs and three 330 ohm resistors. `leds.py` and the fixture already handle both cases, and the indication is reporting rather than measurement |
+| The three status LEDs | No longer deferred for the reason given here. The claim that the LK-LED10's 2.0 mm socket cannot take 2.54 mm jumpers was wrong in Project 1 and is wrong here: the module carries a 2.54 mm header beside the socket, and three of them were lit on Friday 2 October 2026, active high. What remains is wiring them to this lab's server and filming it | Nothing to buy. Fit the three modules, signal to GPIO17, GPIO27 and GPIO22 and ground to the common rail. `leds.py` and the fixture already handle both polarities |
 | Automatic power cycling | No relay, no switched USB hub and no smart plug. The PPK2 could switch 5 V but its 1 A limit is below what a 3B+ draws with Ethernet active at boot | A USB power switch driven from a server GPIO. It is the first purchase this lab would justify, and until then the manual step is printed and counted |
 | A second DUT | The specification's stretch goal, with the NanoPi NEO Air loading a kernel over `tftpboot` from U-Boot | Project 2, which brings that board up in the first place |
 | A `bench-lab-image` | The server runs Raspberry Pi OS because it is the instrument rather than the product, and four configuration files are cheaper than a week of `PACKAGECONFIG` | The day the lab itself has to be reproducible from source |

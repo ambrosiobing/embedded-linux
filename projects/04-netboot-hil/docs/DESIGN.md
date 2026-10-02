@@ -136,12 +136,19 @@ failing. It is in the specification's pitfalls for the same reason.
 have their own supply, and two supplies back-feeding through a serial cable
 is the ordinary way to reset a board in the middle of a boot.
 
-**The LEDs are deferred.** The bench's LED parts are Joy-IT LinkerKit
-LK-LED10 modules with a 2.0 mm socket, which standard 2.54 mm jumper wires
-cannot mate with. This is the same blocker Project 1 recorded, and the
-runner is written so the indication is optional rather than assumed: pass
-and fail are the pytest exit status, the JUnit XML and the console log,
-which is what a CI system reads anyway.
+**The LEDs are not wired yet, and the reason once given for that was wrong.**
+The bench's LED parts are Joy-IT LinkerKit LK-LED10 modules with a 2.0 mm
+socket, and this paragraph used to say standard 2.54 mm jumper wires cannot
+mate with it, citing Project 1. Project 1 withdrew that on Friday 2 October
+2026: the module carries a 2.54 mm header beside the socket, and three of them
+lit from GPIO17, GPIO27 and GPIO22, active high, with the supply pin
+unconnected. Nothing has to be bought.
+
+What the design keeps either way is that the runner treats the indication as
+optional rather than assumed: pass and fail are the pytest exit status, the
+JUnit XML and the console log, which is what a CI system reads anyway. That
+choice was right for a better reason than the one recorded, because an
+indicator should never be the only place a result exists.
 
 ---
 
