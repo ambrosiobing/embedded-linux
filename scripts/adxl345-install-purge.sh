@@ -99,7 +99,14 @@ had_user=0
 for g in i2c gpio; do
 	if getent group "$g" >/dev/null; then
 		note "group $g already exists, so its survival proves nothing"
-		eval "had_group_$g=1"
+		# A case rather than eval: shellcheck cannot follow a variable
+		# name built at run time, and reported these as unused and as
+		# referenced-but-unassigned. The code was right and the warnings
+		# were noise, which is the kind a reader learns to ignore.
+		case "$g" in
+			i2c) had_group_i2c=1 ;;
+			gpio) had_group_gpio=1 ;;
+		esac
 	fi
 done
 if getent passwd adxl345 >/dev/null; then
@@ -292,7 +299,10 @@ echo "--- the residue that is meant to be there"
 # leaves nothing behind" is scored on FILES, and the account and the
 # groups are named rather than silently tolerated.
 for g in i2c gpio; do
-	eval "had=\$had_group_$g"
+	case "$g" in
+		i2c) had=$had_group_i2c ;;
+		gpio) had=$had_group_gpio ;;
+	esac
 	if getent group "$g" >/dev/null; then
 		if [ "$had" = 1 ]; then
 			note "group $g survives and predated the install"
