@@ -1108,3 +1108,53 @@ reports four warnings that this suite prints and does not score, and
 nobody has read them. The decision not to score them was made for a good
 reason, that a suite refusing on archive-policy style notes gets switched
 off, but "not scored" was never meant to mean "not looked at once".
+
+---
+
+## 20. Printing the warnings found a sixth defect within a minute of printing them
+
+**Friday 2 October 2026.** The suite had been reporting "4 warnings, not
+scored" and showing none of them. Changed to list them, run once, and the
+first two lines were this:
+
+```
+W: adxl345-tools: maintainer-script-needs-depends-on-adduser adduser (does not satisfy adduser) [postinst:26]
+W: adxl345-tools: maintainer-script-needs-depends-on-adduser adduser (does not satisfy adduser) [postinst:39]
+```
+
+**Not a style note.** The postinst calls `addgroup` at line 12 and
+`adduser` at lines 25 and 30, both from the `adduser` package, and it
+runs under `set -e`. `adduser` stopped being essential in Debian trixie.
+On a minimal system without it the postinst dies, the package fails to
+configure, and the service account the systemd unit runs as is never
+created.
+
+That is **criterion 5's own first clause**, "the packages install
+cleanly", and it had been sitting in a counted-but-unread line.
+
+**The order of events is the whole entry.** The decision not to score
+lintian's warnings was made for a sound reason and is still right: a
+suite that refuses on archive-policy style notes gets switched off. But
+"not scored" quietly became "not printed", and in that state the
+distinction between a style note and a package that will not install
+could not be drawn by anyone, because nobody could see either. One day
+in that state, and the thing hiding there was a real install failure.
+
+Not scoring a finding decides whether it fails the suite. It was never
+meant to decide whether anyone can read it.
+
+**What was done.** `adduser` added to `Depends`. An assertion added that
+reads the maintainer script for `adduser` or `addgroup` calls and
+requires the dependency when it finds one, so a script that grows a new
+command is covered by the same check rather than by a hard-coded name.
+Proved by removing the dependency and watching it fire, then restored.
+
+**And the other two warnings were triaged rather than fixed**, which is
+the point of being able to read them. `no-manual-page` for `adxl-map` and
+`adxl-motion` is fair, and no acceptance criterion asks for a man page,
+while the `adduser` warning in the same list went straight to criterion
+5. Decision 117 records that and says they are the first thing to add if
+this package ever goes near an archive.
+
+A warning is triaged against what the project said it would do. That is
+only possible once the warnings are on the screen.

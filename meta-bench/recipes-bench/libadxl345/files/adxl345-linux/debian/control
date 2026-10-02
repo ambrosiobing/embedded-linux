@@ -44,7 +44,21 @@ Architecture: any
 # The Yocto recipe had the equivalent of the python one all along, and
 # tests/adxl345-build-test.sh asserted it there. It asked one packaging
 # system a question it never asked the other.
+# adduser is a real dependency, not a formality. The postinst calls
+# addgroup at line 12 and adduser at lines 25 and 30, both from the
+# adduser package, and it runs under set -e. That package stopped being
+# essential in Debian trixie, so on a minimal system the postinst dies,
+# the package fails to configure and the service account is never
+# created. That is criterion 5's own "the packages install cleanly"
+# clause, and lintian found it as a WARNING, which this suite prints and
+# does not score. It was read on Friday 2 October 2026 only because the
+# suite had just been changed to print the warnings instead of counting
+# them.
+#
+# Line 39 also says "adduser" and does not need this: it is an echo
+# telling the admin what to type.
 Depends: libadxl345-1 (>= ${source:Version}),
+         adduser,
          ${misc:Depends},
          ${shlibs:Depends},
          ${python3:Depends}

@@ -252,6 +252,22 @@ else
 			"an unsubstituted variable is not an error, it is a blank"
 	fi
 
+	# A maintainer script may only call what the package depends on.
+	# The postinst runs addgroup and adduser under set -e, and the
+	# adduser package stopped being essential in Debian trixie, so a
+	# minimal system without it fails to configure the package and
+	# never creates the service account. Read from the script rather
+	# than hard-coded, so a maintainer script that grows a new command
+	# is covered by the same assertion.
+	if printf '%s' "$pin" | grep -qE '(^|[^-])\b(adduser|addgroup) +-'; then
+		if printf '%s' "$tools" | grep -q "^ *adduser,"; then
+			ok "the postinst calls adduser and the package depends on it"
+		else
+			no "the postinst calls adduser and nothing depends on it" \
+				"set -e plus a missing adduser is a package that will not configure"
+		fi
+	fi
+
 	# An account with --no-create-home and no --home still gets one
 	# assigned that is never made. Checked here as well as by lintian,
 	# because this suite runs on hosts where lintian does not.

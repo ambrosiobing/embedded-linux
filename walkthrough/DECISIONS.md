@@ -3761,3 +3761,44 @@ empty log. The suite now finds the `.changes` file before running lintian
 and refuses by name when there is none. That is the fourth check in this
 repository to pass because the thing it inspects was chosen by a glob and
 never confirmed to exist, and the entry for it is journal 14.
+
+---
+
+## 117. Two tools ship without man pages, named as a gap rather than left as a warning
+
+**Context.** Printing lintian's unscored warnings instead of counting
+them, on Friday 2 October 2026, produced four. Two were the same real
+defect, a postinst calling `adduser` with nothing depending on it, and
+that is fixed. The other two are:
+
+```
+W: adxl345-tools: no-manual-page [usr/bin/adxl-map]
+W: adxl345-tools: no-manual-page [usr/bin/adxl-motion]
+```
+
+Debian policy asks for a manual page for every program in `/usr/bin`,
+and this is a project whose stated subject is what has to be true before
+a library is fit to hand to somebody else. The warning is fair.
+
+**Decision.** They are not written, and this entry is why rather than an
+omission nobody noticed.
+
+No acceptance criterion asks for them. Criterion 5 is that the packages
+install cleanly, the udev rule lands and purge leaves nothing behind, and
+a missing man page affects none of the three. The `adduser` warning sat
+in the same list and **did** affect criterion 5 directly, which is the
+distinction being drawn: a warning is triaged against what the project
+said it would do, not against whether it is annoying.
+
+Both tools answer `--help`, and for a two-tool bench package that is the
+interface people actually use.
+
+**Consequence.** If this package were ever aimed at a Debian archive,
+this is the first thing to add, along with resolving
+`bad-distribution-in-changes-file`, which is suppressed and unexplained
+for a different reason. Both are listed here so that "it passed lintian"
+is never read as "lintian had nothing to say".
+
+The warnings stay printed and unscored. Printing them is what made this
+decision possible: for one day the suite reported a count with the text
+withheld, and in that state nobody could have triaged anything.
