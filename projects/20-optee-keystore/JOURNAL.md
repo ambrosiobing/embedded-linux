@@ -1686,3 +1686,82 @@ label is otherwise identified by flashing over it, which is the one test
 that destroys the answer. `lsblk -f` plus a read only mount and a directory
 listing settles it in under a minute and changes nothing. That sequence is
 now in `docs/CARD.md`.
+
+## 31. A different board, and a documented procedure I read as a defect
+
+Wednesday 30 September 2026 into Thursday 1 October 2026.
+
+**The card went back to Project 20.** 184.9 MiB mapped in 15.8 seconds at
+11.7 MiB/s, `wifi.conf` written before it left the reader, and `./go
+armstub status /mnt/boot` reporting `armstub8.bin present, 1261624 bytes`,
+`uboot.env present`, `config.txt boots the secure world`.
+
+**Then hours on a board that was never silent.** picocom opened
+`/dev/ttyUSB0`, printed `Terminal ready`, received one byte and stopped
+with `FATAL: read zero bytes from port` and `reset failed for dev
+UNKNOWN`. A `read()` returning zero on a tty is the device node going away
+under an open handle, which is the adapter, not the board. `dmesg` had it
+twice: `-62`, which is `ETIME`, on every `pl2303` control transfer for USB
+device 9, then a clean attach for device 12 followed twenty-two seconds
+later by `urb stopped: -32`, `usb 1-1: seqnum max` and `vhci_hcd:
+connection reset by peer`. The part is the PL2303HXA whose own USB device
+string reads `PL2303HXA PHASED OUT SINCE 2012`, which is Prolific's driver
+refusing it on Windows and the reason it runs through usbipd at all.
+`usbipd detach --busid 4-4` then `usbipd attach --wsl --busid 4-4`
+resynchronised a stale attachment, and it then held for an entire boot. In
+the meantime the card, `config.txt` and the header wiring were all
+suspected in turn, and `enable_uart=1`, `arm_64bit=1` and
+`uart_2ndstage=1` were read off the card to disprove a guess about the
+console that the console had already disproved by existing.
+
+**The board is not the board entry 20 was taken on.** TF-A reported
+`Raspberry Pi 3 Model B+ (1GB, Sony, UK) [0x00a020d3]` and the firmware
+chose `bcm2710-rpi-3-b-plus.dtb`. The capture in
+`docs/evidence/boot-console-2026-09-22.txt` is `RPI 3 Model B (0xa22082)`
+with `bcm2710-rpi-3-b.dtb`. Two different boards off the same bench, and
+nothing here said which one the evidence belonged to. The bring-up now
+names both.
+
+**What I got wrong, and said out loud twice.** `mmcboot` ended at `ERROR:
+Did not find a cmdline Flattened Device Tree`, and I read the absence of a
+`load_fdt` beside `load_kernel` in `uboot.env` as the defect, with a
+one-line fix. `BRINGUP.md` has said since Tuesday 22 September 2026 that
+the kernel will not come up on its own here, and why: the tree the
+firmware hands over has no `/psci` node, no `/firmware/optee` node, and
+four CPUs on a `spin-table` whose addresses are stale under TF-A. The
+hand-typed `fdt` sequence is this project's documented boot procedure, and
+`mmcboot` ending that way is its expected state, not a regression. The fix
+I proposed, a `fatload` of the raw `.dtb` and then `run mmcboot`, would
+have produced a kernel with one core and no `/dev/tee0`, which is the
+entire subject of the project absent. I had opened the file that says so,
+in the same session, before saying it.
+
+**The shortcut that looked closer to working than it was.** `booti
+${kernel_addr_r} - ${fdtcontroladdr}` started Linux 6.6.63-v8 and reached
+`Waiting for root device /dev/mmcblk0p2`. Three symptoms, one cause.
+`Machine model: Raspberry Pi 3 Model B` on a B+. CPUs 1 to 3 timing out at
+about five seconds each, fifteen seconds spent, `SMP: Total of 1
+processors activated`. And `bcm2835-power bcm2835-power: Timeout waiting
+for grafx power OK` holding `3f202000.mmc` in deferred probe, so the SD
+controller never appeared and `mmc0` enumerated the SDIO wireless part
+instead. `fdtcontroladdr` is U-Boot's own built-in tree and is always a
+valid tree, so `booti` accepts it and the consequences surface three
+subsystems later, none of them naming the tree.
+
+**And the address in the bring-up was never a constant.** It carried
+`0x04000000` as a literal. The firmware placed the tree at `0x4000000` on
+Tuesday 22 September 2026 and at `0x1000000` on Thursday 1 October 2026,
+with `device_tree_address=0x01000000` in `config.txt` both times. One
+observation each way is not a mechanism and I am not offering one. The
+page now says to read the address from the firmware's own `Device tree
+loaded to` line, confirm it with `md.l <addr> 4` returning `edfe0dd0`, and
+carry it in `setenv dtb` so there is one place to change. Worth keeping:
+on Thursday 1 October 2026 `booti` was handed `${fdt_addr_r}`, which held
+`0x01000000`, the address the firmware had just named, and refused it
+anyway. Why is not established. `md.l` would have said so in one second
+and was not run.
+
+**Still open.** Nothing in entries 23 to 29 has been re-proved on the B+,
+because `/dev/tee0` was never reached on it. The permanent fix is still a
+tree that carries `/psci`, `/firmware/optee` and the two reserved regions
+without anyone typing them at a prompt.

@@ -148,10 +148,36 @@ world that booted perfectly is then invisible to Linux.
 
 Until the permanent fix exists, patch it in RAM. Stop at the `U-Boot>`
 prompt, and run these, which touch nothing on the card and are gone at
-the next reset:
+the next reset.
+
+**First read where the firmware put the tree, because it is not a
+constant.** With `uart_2ndstage=1` in `config.txt` the firmware names the
+address on the console:
+
+    MESS:00:00:04.010198:0: Device tree loaded to 0x4000000 (size 0x9160)
+
+It was `0x4000000` on the Raspberry Pi 3 Model B (`0xa22082`) on Tuesday
+22 September 2026, and `0x1000000` on the Raspberry Pi 3 Model B+
+(`0x00a020d3`) on Thursday 1 October 2026, with the same
+`device_tree_address=0x01000000` in `config.txt` both times. Why the
+firmware chose differently is not established here, so take the address
+from the console rather than from this page, and confirm it before using
+it:
 
 ```sh
-fdt addr 0x04000000
+md.l 0x4000000 4
+```
+
+The first word must be `edfe0dd0`, the device tree magic as this board
+prints it. Anything else means the tree is not at that address and nothing
+below will work. On Thursday 1 October 2026 `booti` was given
+`${fdt_addr_r}`, which held `0x01000000`, the very address the firmware had
+just reported, and it still answered `ERROR: Did not find a cmdline
+Flattened Device Tree`. One `md.l` would have said so in a second.
+
+```sh
+setenv dtb 0x4000000
+fdt addr ${dtb}
 fdt resize 4096
 fdt mknode / psci
 fdt set /psci compatible arm,psci-1.0
@@ -167,20 +193,25 @@ fdt set /firmware/optee method smc
 fdt rsvmem add 0x08000000 0x400000
 fdt rsvmem add 0x10100000 0xf00000
 fatload mmc 0:1 ${kernel_addr_r} kernel8.img
-booti ${kernel_addr_r} - 0x04000000
+booti ${kernel_addr_r} - ${dtb}
 ```
 
-The first line is not optional either. Without `fdt addr` the very next
-command answers `No FDT memory address configured` and nothing else in
-the block runs, and `${fdt_addr_r}` is the wrong value to give it for the
-reason below.
+The `fdt addr` line is not optional. Without it the very next command
+answers `No FDT memory address configured`, and nothing else in the block
+runs.
 
-The last argument of `booti` is a literal, not `${fdt_addr_r}`, and that
-is the other half of it. The firmware puts the tree wherever
-`device_tree_address` says, `uboot.env` carries `fdt_addr_r` from the
-reference build, and the two do not agree; the address above is where
-the tree actually was, confirmed with `md.l 0x04000000 4` returning
-`edfe0dd0`. Journal entry 20 has the whole sequence and what it proved.
+**`${fdt_addr_r}` is not the answer and `${fdtcontroladdr}` is worse.**
+`fdt_addr_r` comes from the reference build's `uboot.env` and only
+sometimes coincides with where the firmware put the tree: it matched on
+Thursday 1 October 2026 and did not on Tuesday 22 September 2026, so it
+carries no information either way. `fdtcontroladdr` is U-Boot's own
+built-in tree, and it is always a valid tree, which is why `booti` accepts
+it and why it is the trap. On Thursday 1 October 2026 it booted a
+Raspberry Pi 3 Model B+ as `Machine model: Raspberry Pi 3 Model B`, with
+one CPU of four and `3f202000.mmc` held in deferred probe behind a
+`bcm2835-power` timeout, so the root filesystem never appeared at all.
+Journal entry 20 has the sequence that works and what it proved; entry 31
+has that failure in full.
 
 Once Linux is up:
 
