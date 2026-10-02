@@ -42,6 +42,23 @@ catalogue page.
 Four are needed for a first reading: `3V3`, `GND`, `SDA`, `SCL`. A fifth,
 `INT1`, is optional and the library is written to work without it.
 
+**What this bench's part carries, read off the board on Saturday 3 October
+2026.** Eight pads in one row:
+
+    GND  VCC  CS  INT1  INT2  SDO  SDA  SCL
+
+with an axis marker showing X and Y in the plane of the board and Z out of
+its face, which is the orientation criterion 2's "flat reads about 1 g on
+Z" refers to. Three things follow that the paragraph above could not say:
+the supply pad is labelled **`VCC`** rather than `3V3`, consistent with the
+`3.3~6V` rating and an on-board regulator; there is an **`INT2`** this
+project does not use; and **`CS` is exposed**, which matters more than
+either and has its own entry below.
+
+Confirm it against the part in hand anyway. That is one board photographed
+once, and breakouts sold under a single part number are not always one
+layout.
+
 **Where each one goes on the Raspberry Pi 4's 40-pin header**, written as
 physical pin numbers because that is what a person counting along a
 header can check, with the GPIO number beside it because that is what
@@ -54,6 +71,8 @@ slot, and the odd numbers are the row nearest the board edge.
 | `GND` | physical pin 9 | ground | ground | common |
 | `SDA` | physical pin 3 | GPIO2, `SDA1` | I2C data | both ways |
 | `SCL` | physical pin 5 | GPIO3, `SCL1` | I2C clock | Pi to breakout |
+| `CS` | physical pin 17 | 3V3 rail | selects I2C, see 3 below | strap, must be high |
+| `SDO` | physical pin 14 | ground | address strap, low gives `0x53` | strap |
 | `INT1` | physical pin 16 | GPIO23 | watermark interrupt | breakout to Pi |
 
 Physical pin 1 for the supply and not physical pin 2, which is 5 V and
@@ -72,10 +91,23 @@ it cannot claim the line, so a wrong pin produces working output and an
 interrupt path that was never exercised. That is what the `gpioinfo`
 check at the end of this document is for.
 
-### 3. The strap address
+### 3. The two straps: which bus, and which address
 
-`SDO` tied low gives `0x53`; tied high gives `0x1d`. Some breakouts fix
-it, some expose it. This is why `adxl_open` takes the address as an
+**`CS` decides whether the part is on I2C at all, and it is the strap this
+document did not name.** The ADXL345 uses `CS` as an active-low SPI chip
+select, and for I2C it must be tied **high**. Left low or floating, the
+part is in SPI mode and answers nothing on the bus however correct the rest
+of the wiring is. That presents as an empty `i2cdetect` grid, which sends a
+reader to `SDA` and `SCL` and to the bus, none of which is the fault.
+
+On Saturday 3 October 2026 this bench got exactly that empty grid, with
+`/dev/i2c-1` present and the controller working and the shield off the bus.
+That attempt is not resolved, so this records the strap rather than a fix:
+`CS` is the first thing to check, not the last.
+
+**`SDO` decides the address.** Tied low gives `0x53`; tied high gives
+`0x1d`. A floating `SDO` gives neither reliably. Some breakouts fix
+it, some expose it; this one exposes it. This is why `adxl_open` takes the address as an
 argument rather than compiling one in, and why `adxl-map` names the other
 one in its error message.
 
