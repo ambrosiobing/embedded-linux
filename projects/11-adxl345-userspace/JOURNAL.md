@@ -1264,3 +1264,60 @@ runtime while a test in `tests/` requires one. The test skips honestly
 rather than passing silently, which is the right failure, but the build
 laptop should have the runtime from setup rather than from somebody
 noticing.
+
+## 23. The sensor was never the fault, and three registers said so
+
+*Saturday 3 October 2026.* The DFRobot SEN0032 answered for the first
+time, and criterion 2 is met: 0.960 g lying flat with Z carrying 936 mg,
+1.031 g standing on one long edge with Y carrying 998 mg, taken with
+`i2c-tools` and nothing from this project. The capture is in
+`docs/evidence/flat-and-tilted-2026-10-03.txt`.
+
+**The silence was `CS`.** `i2cdetect -y 1` returned an empty grid with the
+bus provably working, `/dev/i2c-1` present and the X-NUCLEO-IKS4A1 off the
+header. The ADXL345 uses `CS` as an active-low SPI chip select and it must
+be tied high for I2C; left floating the part is in SPI mode and answers
+nothing. That strap was in no document in this repository until `40fa2a6`
+earlier the same day. It is not isolated as the single cause, because the
+wiring was redone in full rather than one lead at a time, and saying so
+costs nothing while claiming otherwise would be a guess.
+
+**Then three things in a row made a working part look broken, and each
+time the conclusion came before the register that governed it.**
+
+`DATA_FORMAT` read `0x42`, plus or minus 8 g, where I had assumed the
+`0x00` default of plus or minus 2 g. That is 64 counts per g rather than
+256, so the first magnitude I computed came out 42 per cent low and I said
+so out loud.
+
+`FIFO_CTL` read `0x6b`, FIFO mode, with `FIFO_STATUS` showing all 32
+entries used. The data registers were serving queued samples captured in
+an earlier orientation, so ten reads gave ten near-identical lines and the
+part looked frozen. I had raised the FIFO as a candidate, then withdrew it
+a message later when a photograph offered a simpler story about the
+mounting. The photograph was true and the FIFO was also true, and dropping
+a live hypothesis because a second one arrived is its own mistake.
+
+The offset trims read `0xa4 0x29 0x2a`, which at that range add -1.44 g,
++0.64 g and +0.66 g to every sample. Left in, the part reads 2.3 g.
+
+**The mounting, and a limit I invented.** The breakout has no soldered
+header; its pads rest on header pins in a breadboard under a cushion. I
+wrote that this mounting could not be moved and that criterion 2 was
+therefore blocked. It is wrong: the whole breadboard moves as one piece
+and the contact is undisturbed. Joseph moved it and the dominant axis
+followed, which is the half of criterion 2 I had just declared out of
+reach.
+
+**What makes the result trustworthy** is not either reading on its own but
+that the magnitude holds across both. A single orientation can be flattered
+by luck; 0.960 g and 1.031 g from two different dominant axes cannot. The
+off-axis terms are not noise either: they put the board 12.5 degrees off
+horizontal flat and 14.1 degrees off vertical standing, and both agree with
+the photographs of a breadboard propped on a cushion.
+
+**Still open.** Five register groups came up away from their documented
+reset values and nothing in the session wrote them. A clone with different
+reset values is a candidate and is not asserted; one power cycle and a read
+before any write settles it. And the library has still not run on this
+part, so criteria 1, 3 and 6 are untouched by any of this.

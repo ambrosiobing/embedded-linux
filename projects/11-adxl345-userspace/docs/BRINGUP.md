@@ -144,6 +144,48 @@ driving. The readings will look plausible and be wrong.
 check is a formality. It is here because the expensive version of this
 mistake is running the wrong image and not noticing.
 
+## Read the configuration before believing a reading
+
+**This bench's SEN0032 does not come up at the documented reset values**,
+and taking them on trust made a correct part look broken three times in a
+row on Saturday 3 October 2026. What it actually held:
+
+| register | read | documented reset | what it changed |
+|---|---|---|---|
+| `DATA_FORMAT` `0x31` | `0x42` | `0x00` | plus or minus 8 g, so one count is 15.6 mg and 1 g is **64** counts, not the 256 the default gives |
+| `FIFO_CTL` `0x38` | `0x6b` | `0x00` | FIFO mode with all 32 entries used, so the data registers served queued samples from an earlier orientation and looked frozen |
+| `OFSX` `OFSY` `OFSZ` `0x1e` to `0x20` | `0xa4 0x29 0x2a` | `0x00` | adds -1.44 g, +0.64 g and +0.66 g to every sample |
+| `INT_ENABLE` `0x2e`, `INT_MAP` `0x2f` | `0xe0`, `0x60` | `0x00` | interrupts enabled and mapped, which this project does not want yet |
+
+Assuming the defaults made the part read 42 per cent low, then apparently
+frozen, then 2.3 g. It was reading 1 g correctly the whole time.
+
+So read these three before any number is believed, and write what you
+need rather than inheriting it:
+
+```sh
+i2ctransfer -y 1 w1@0x53 0x2c r6     # BW_RATE .. DATA_FORMAT
+i2ctransfer -y 1 w1@0x53 0x38 r2     # FIFO_CTL, FIFO_STATUS
+i2ctransfer -y 1 w1@0x53 0x1e r3     # the three offset trims
+```
+
+Bypass and zeroed trims, which is what the raw-register checks below want:
+
+```sh
+i2cset -y 1 0x53 0x38 0x00
+i2ctransfer -y 1 w4@0x53 0x1e 0x00 0x00 0x00
+```
+
+Why the part holds a configuration nobody in that session wrote is not
+established. A clone with different reset values is one candidate and is
+not asserted. The control that answers it costs one power cycle: drop the
+3.3 V on physical pin 1, bring it back, and read those registers before
+writing anything.
+
+This is also the reason `adxl_open` takes the range and the rate as
+arguments rather than compiling them in. A library that trusts what it
+finds on this part is wrong by a factor of four before it starts.
+
 ## First reading
 
 ```sh

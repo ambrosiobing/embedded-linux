@@ -1,0 +1,88 @@
+Criterion 2 measured: gravity in two orientations.
+Saturday 3 October 2026.
+
+Host:    Raspberry Pi 3 Model B+, hostname eplepi
+Kernel:  6.18.50+rpt-rpi-v8 aarch64, Raspberry Pi OS (Debian trixie)
+Part:    DFRobot SEN0032, an ADXL345, I2C address 0x53
+Bus:     i2c-1, header pins 3 (GPIO2, SDA1) and 5 (GPIO3, SCL1)
+Tools:   i2c-tools only. No library, no kernel driver, nothing from this
+         project. i2cdetect printed 53 rather than UU throughout, so
+         i2c-dev owned the address and nothing else was driving the part.
+
+Wiring, every lead to the Raspberry Pi 3 Model B+ 40-pin header:
+
+  red     VCC   to pin 1,  3V3
+  black   GND   to pin 9,  GND
+  blue    SDA   to pin 3,  GPIO2 SDA1
+  yellow  SCL   to pin 5,  GPIO3 SCL1
+  orange  CS    to pin 17, 3V3   selects I2C; low or floating is SPI
+  brown   SDO   to pin 14, GND   address strap; low gives 0x53
+  INT1 and INT2 not connected. The console occupies pins 6, 8 and 10.
+
+Mounting. The breakout has no soldered header. Its pads rest on header
+pins pushed into a breadboard and are held down by a cushion underneath.
+The whole breadboard is moved as one piece, so a change of orientation
+does not disturb the contact, which is what made this capture possible
+without soldering. Photographs of both orientations exist and are not in
+this directory yet; when they are, they belong beside this file and this
+paragraph should name them.
+
+Configuration at the time of the capture. None of this is the documented
+power-on default, and nothing in this session wrote any of it except
+where stated:
+
+  DATA_FORMAT 0x31 = 0x42  plus or minus 8 g with FULL_RES clear, so
+                           10-bit fixed, one count is 15.6 mg, and
+                           1 g is 64 counts. NOT the 0x00 default
+  BW_RATE     0x2c = 0x0a  100 Hz, normal power
+  POWER_CTL   0x2d = 0x08  measure. Written by this session
+  FIFO_CTL    0x38 = 0x00  Bypass. Written by this session. It was 0x6b,
+                           FIFO mode, and FIFO_STATUS 0x39 read 0x20,
+                           all 32 entries used, so the data registers
+                           were serving queued samples from an earlier
+                           orientation and looked frozen
+  OFSX/Y/Z    0x1e..0x20 = 0x00 0x00 0x00. Written by this session. They
+                           were 0xa4 0x29 0x2a, which at this range add
+                           -1.44 g, +0.64 g and +0.66 g to every sample
+
+Why those four lines are here rather than assumed: with DATA_FORMAT taken
+to be the 0x00 default, this part reads 42 per cent low. With the offsets
+left in, it reads 2.3 g. Neither is a fault in the sensor.
+
+The command, run once in each orientation, holding the board still:
+
+root@eplepi:~# i2ctransfer -y 1 w1@0x53 0x32 r6
+
+Standing on one long edge of the breadboard:
+
+  0xfe 0xff 0x40 0x00 0xf0 0xff
+
+  X = 0xfffe =  -2 counts =  -31 mg
+  Y = 0x0040 = +64 counts = +998 mg
+  Z = 0xfff0 = -16 counts = -250 mg
+  magnitude 66.00 counts = 1030 mg = 1.031 g
+  Y is 14.1 degrees off vertical, arccos(64 / 66.00)
+
+Lying flat, component side up:
+
+  0xfd 0xff 0x0d 0x00 0x3c 0x00
+
+  X = 0xfffd =  -3 counts =  -47 mg
+  Y = 0x000d = +13 counts = +203 mg
+  Z = 0x003c = +60 counts = +936 mg
+  magnitude 61.47 counts =  959 mg = 0.960 g
+  Z is 12.5 degrees off vertical, arccos(60 / 61.47)
+
+What this settles. Flat puts almost all of gravity on Z with X and Y
+small; standing moves it to Y with X and Z small; and the magnitude stays
+within four per cent of 1 g in both, which is the half of the test that a
+convenient orientation cannot fake. The off-axis terms are not noise:
+they are the tilt of a breadboard propped on a cushion, and the two
+angles agree with the photographs.
+
+What it does not settle. The library has not run on this part, so
+criteria 1, 3 and 6 are untouched by this capture. And one count is
+15.6 mg at this range, which is 1.6 per cent of a g, so a few per cent of
+spread here is quantisation rather than measurement error. Reading the
+same part at plus or minus 2 g would be four times finer and is worth
+doing once the library can configure it.
