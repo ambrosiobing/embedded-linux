@@ -261,6 +261,8 @@ is small, known, and named.
                                         +----------------+
 ```
 
+![The nRF PPK2 supplying and measuring the NanoPi NEO Air on Sunday 20 September 2026. The board's micro USB port is empty, which is the condition the whole measurement rests on: the source meter is the only supply. The logic port ribbon and the source and ammeter leads are both attached, and the antenna is fitted, so the board is in the state it is measured in.](figures/ppk2-neo-air.jpg)
+
 The console cable's red lead is left open. It carries 5 V from the host and
 would be a second supply on a board whose whole measurement depends on
 having exactly one.

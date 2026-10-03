@@ -120,6 +120,8 @@ GPIO27 and GPIO22 on Friday 2 October 2026. The pinout:
   +----------------------+
 ```
 
+![Four LK-LED10 modules wired to a Raspberry Pi 3 Model B on Friday 2 October 2026, red, blue and yellow lit. The leads are ordinary 2.54 mm Dupont jumpers in the module's own header, the one beside the 2.0 mm LinkerKit socket that the deferral was blamed on. S1, S2, U, G and R1 are printed on the board.](figures/leds-lit.jpg)
+
 `U` must be 3V3. If the module puts its LED between supply and `S1`, then
 `S1` floats at the supply voltage whenever the GPIO is not driving, and 5 V
 on a 3.3 V input damages the pin. Which way round the LED sits is not

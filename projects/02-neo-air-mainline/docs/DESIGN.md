@@ -122,6 +122,8 @@ this table on every reconnection, not once.
 is connected.** Two supplies onto one rail is the other way this header
 destroys a board.
 
+![The same board supplied through the header with the micro USB port empty, on Sunday 20 September 2026. The supply is the nRF PPK2's source meter, which is also the instrument, so exactly one source is connected. This is Project 3's measuring rig; it is shown here because it is the configuration the rule above describes.](../../03-boot-energy/docs/figures/ppk2-neo-air.jpg)
+
 ## Figure 3: bench layout
 
 ```
