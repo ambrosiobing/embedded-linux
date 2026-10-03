@@ -185,13 +185,23 @@ drawing cannot be written without:
    both either way, because that is the subsystem's shape; what the board
    exposes decides which half gets hardware evidence and which stays a
    compile-time claim.
-2. Which pin carries `INT1`, without which the FIFO watermark path and the
-   event path are unreachable and two thirds of this project is a
-   compile test.
+2. Which pin carries `INT1`. **Answered on Saturday 3 October 2026:
+   physical pin 16, BCM GPIO23**, the same lead Project 11 uses, so the two
+   projects share one wiring. Proved by changing `INT_ENABLE` inside the
+   sensor and watching the pin follow high, low, high, in
+   `projects/11-adxl345-userspace/docs/evidence/flat-and-tilted-2026-10-03.txt`.
+   Without it the FIFO watermark path and the event path are unreachable
+   and two thirds of this project is a compile test, which is why it was
+   the question. It is no longer open.
 3. **The supply, which is the one that can do damage.** A board rated to
    6 V regulates, and if it is powered from 5 V and drives `INT1` at 5 V
    into a Pi GPIO, the pin is destroyed. Powering it from the Pi's 3V3
    removes the question; confirming the level shifting answers it.
+   **Removed rather than answered, on Saturday 3 October 2026.** The
+   SEN0032 is powered from physical pin 1, 3V3, so `INT1` cannot be driven
+   above 3V3 whatever the level shifting does, and GPIO23 read it high and
+   low without incident. The level shifting itself is still unconfirmed and
+   no longer needs to be.
 
 The repository's own rule applies, from `walkthrough` and from the bring-up
 discipline every board project here follows: a pin number is a property of

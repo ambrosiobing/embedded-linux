@@ -17,7 +17,8 @@ Wiring, every lead to the Raspberry Pi 3 Model B+ 40-pin header:
   yellow  SCL   to pin 5,  GPIO3 SCL1
   orange  CS    to pin 17, 3V3   selects I2C; low or floating is SPI
   brown   SDO   to pin 14, GND   address strap; low gives 0x53
-  INT1 and INT2 not connected. The console occupies pins 6, 8 and 10.
+  purple  INT1  to pin 16, GPIO23   verified, see the end of this file
+  INT2 is not connected. The console occupies pins 6, 8 and 10.
 
 Mounting. The breakout has no soldered header. Its pads rest on header
 pins pushed into a breadboard and are held down by a cushion underneath.
@@ -86,3 +87,40 @@ criteria 1, 3 and 6 are untouched by this capture. And one count is
 spread here is quantisation rather than measurement error. Reading the
 same part at plus or minus 2 g would be four times finer and is worth
 doing once the library can configure it.
+
+The interrupt line, verified the same day
+-----------------------------------------
+
+INT1 is wired purple to physical pin 16, BCM GPIO23. INT2 is not
+connected. This was proved before any of this project's software touched
+the line, because the library falls back to polling when it cannot claim
+a GPIO, so a wrong pin produces working output and an interrupt path that
+was never exercised.
+
+INT_ENABLE 0x2e was found at 0xe0 and INT_MAP 0x2f at 0x60, which puts
+SINGLE_TAP and DOUBLE_TAP on INT2 and leaves DATA_READY on INT1. At 100 Hz
+that line is asserted essentially all the time, so the Pi can watch it
+with nothing but pinctrl.
+
+root@eplepi:~# pinctrl set 23 ip pd && pinctrl get 23
+23: ip    -- | hi // GPIO23 = input
+
+root@eplepi:~# i2cset -y 1 0x53 0x2e 0x00 && pinctrl get 23
+23: ip    -- | lo // GPIO23 = input
+
+root@eplepi:~# i2cset -y 1 0x53 0x2e 0x80 && pinctrl get 23
+23: ip    -- | hi // GPIO23 = input
+
+High, low, high, with the only thing changing being one register inside
+the sensor. That is the lead proved end to end.
+
+One way the run differed from the test as designed, said rather than
+glossed: the pull-down did not apply. The pull column reads "--" in all
+three lines, so "pd" had no effect. The result stands anyway, because the
+ADXL345 drives its interrupt pins push-pull and DATA_FORMAT 0x42 has
+INT_INVERT clear, so the part drives the line both high and low and the
+middle reading was driven rather than a floating pin drifting down. Had
+INT1 been open-drain, that reading would have meant nothing without the
+pull-down and the test would have needed redoing.
+
+INT_ENABLE was left at 0x80, DATA_READY alone. It was 0xe0 when found.

@@ -215,6 +215,23 @@ If `adxl-map` refuses:
 `INT1` is the only step that puts a signal from the breakout into a Pi
 GPIO, so it comes after everything above has worked at 3V3.
 
+**Prove the line before any software touches it.** `INT_MAP` leaves
+`DATA_READY` on `INT1`, and at 100 Hz that line is asserted essentially
+all the time, so the Pi can watch it with no library at all. Change one
+register inside the sensor and watch the pin follow:
+
+```sh
+pinctrl set 23 ip && pinctrl get 23           # expect hi
+i2cset -y 1 0x53 0x2e 0x00 && pinctrl get 23  # expect lo
+i2cset -y 1 0x53 0x2e 0x80 && pinctrl get 23  # expect hi
+```
+
+Done on Saturday 3 October 2026 and recorded in
+`docs/evidence/flat-and-tilted-2026-10-03.txt`. The ADXL345 drives `INT1`
+push-pull, so both states are driven and no pull resistor is needed to
+read it. Restore `INT_ENABLE` with `i2cset -y 1 0x53 0x2e 0xe0` if you
+want what the part was found holding.
+
 ```sh
 adxl-map -i 23 -n 5
 ```
