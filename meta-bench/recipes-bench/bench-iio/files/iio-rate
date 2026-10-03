@@ -340,6 +340,29 @@ capture() {
 	irq_after=$(irq_count_of "${BENCH_IIO_IRQ:-lsm6}")
 	irqs=$((irq_after - irq_before))
 
+	# An interrupt counter cannot go backwards during a run. When it does,
+	# the measurement is void rather than negative, and every cause is a
+	# real one: the counter was reset, the module was reloaded, the IRQ was
+	# renumbered onto another line, or /proc/interrupts was read while
+	# something was rewriting it.
+	#
+	# Found on Saturday 3 October 2026 by CI run 37146377402. A test
+	# fixture rewritten with ">" was sampled inside its truncation window,
+	# irq_after came back 0 against an irq_before of 824, and this program
+	# printed "interrupts -824", "-824.00/s" and "ratio -109.9x" as though
+	# they were measurements. Three assertions then missed for reasons the
+	# output never explained, because the storm check asks whether a ratio
+	# is above 2 and a negative one is not.
+	irq_void=
+	if [ "$irqs" -lt 0 ]; then
+		irq_void=yes
+		IRQ_VERDICT=fail
+		note "FAIL  the interrupt counter went backwards, $irq_before then"
+		note "      $irq_after, so this run measured nothing. A counter"
+		note "      that falls has been reset, renumbered or read"
+		note "      mid-write. It has not counted fewer edges."
+	fi
+
 	samples=$(iio-decode "$dev" --raw <"$raw" | tail -n +2 | wc -l)
 	cpu_pct=$(awk -v t="$ticks" -v hz="$(clock_ticks)" -v s="$_elapsed" \
 		'BEGIN { printf "%.2f", (hz > 0 && s > 0) ? 100 * t / hz / s : 0 }')
@@ -413,7 +436,10 @@ emit() {
 	# to catch a wire that rings, not to fail a run that batched slightly
 	# differently, and the one fault this has ever seen is a factor of
 	# thirty.
-	if [ "$path" = fifo ] && [ -n "${watermark:-}" ]; then
+	# The ratio is skipped when the counter went backwards, because a
+	# ratio computed from a void measurement is the thing the guard above
+	# exists to stop being printed.
+	if [ "$path" = fifo ] && [ -n "${watermark:-}" ] && [ -z "${irq_void:-}" ]; then
 		_expected=$(awk -v h="$hz" -v w="$watermark" 			'BEGIN { printf "%.2f", (w > 0) ? h / w : 0 }')
 		_ratio=$(awk -v m="$irq_rate" -v e="$_expected" 			'BEGIN { printf "%.1f", (e > 0) ? m / e : 0 }')
 		note "expected   ${_expected}/s from ${hz} Hz over a watermark of $watermark"
