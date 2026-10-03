@@ -303,8 +303,18 @@ check "a ratio inside the limit exits zero" "$status" "0"
 (
 	i=200
 	while [ "$i" -lt 2000 ]; do
+		# Written to a temporary file and moved into place. ">"
+		# truncates before it writes, iio-rate samples this file
+		# twice, and a read landing inside that window sees an empty
+		# file, comes back 0 and sends the delta negative. That is
+		# what failed CI run 37146377402 on Saturday 3 October 2026
+		# while this suite passed on the authoring laptop: the race
+		# is timing-dependent and the two hosts schedule differently.
+		# mv within one filesystem is atomic, so a reader sees either
+		# the old complete file or the new one and never a gap.
 		printf '%s' " 185:   $i   $i   $i   $i  pinctrl-bcm2835  24 Edge  lsm6dsx" \
-			>"$WORK/proc/interrupts"
+			>"$WORK/proc/interrupts.tmp"
+		mv "$WORK/proc/interrupts.tmp" "$WORK/proc/interrupts"
 		i=$((i + 100))
 		sleep 0.1
 	done
