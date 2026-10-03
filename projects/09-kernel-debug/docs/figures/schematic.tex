@@ -50,15 +50,22 @@
               \scriptsize \textcolor{badcol}{red = 5V, LEFT OPEN}};
 
   %% ---------------- the heartbeat LED ----------------
+  %% No series resistor is drawn: the LK-LED10 module carries its own,
+  %% R1, and this figure used to show a 330 ohm part that is not on this
+  %% bench at all. S1 is the signal pin and G the ground pin; U and S2
+  %% are left unconnected.
   \draw[thick] (p11) -- ++(10mm,0) coordinate (r1);
-  \draw (r1) to[R, l=\SI{330}{\ohm}, *-*] ++(20mm,0) coordinate (r2);
-  \draw (r2) to[leD, l_=green, *-] ++(0,-10mm) coordinate (lk);
+  \draw[thick] (r1) -- ++(20mm,0) coordinate (r2);
+  \draw (r2) to[leD, *-] ++(0,-10mm) coordinate (lk);
   \draw[thick] (lk) -- ($(lk)+(0,-6mm)$) coordinate (gnd);
   \draw[thick] (gnd) -| (p9);
   \node[circ] at (p9) {};
 
+  \node[font=\sffamily\scriptsize, anchor=west, inner sep=1pt]
+       at ($(r1)+(2mm,3mm)$) {S1};
   \node[font=\sffamily\scriptsize, anchor=north, align=center]
-       at ($(r2)+(6mm,-16mm)$) {\texttt{ledtrig-heartbeat}};
+       at ($(r2)+(6mm,-16mm)$) {\texttt{ledtrig-heartbeat}\\[-2pt]
+                                LK-LED10, active high};
 
   %% ---------------- the two notes that matter ----------------
   \node[umlnote, anchor=north west, text width=86mm, align=left]

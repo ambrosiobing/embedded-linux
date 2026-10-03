@@ -173,9 +173,9 @@ was there a 3 second gap" wastes an evening.
   | pin 6   GND     o----------------------- USB/TTL black
   |                                  |       ( red lead left open )
   |                                  |
-  | pin 11  GPIO17  o---[ 330R ]---->|--+    green: kernel heartbeat
-  |                                  |  |
-  | pin 9   GND     o-------------------+
+  | pin 11  GPIO17  o--- S1  -------------> LK-LED10 signal
+  | pin 9   GND     o--- G   -------------> LK-LED10 ground
+  |                                  |       ( U and S2 left unconnected )
   |                                  |
   +----------------------------------+
 
@@ -190,23 +190,41 @@ was there a 3 second gap" wastes an evening.
 | Console TXD | 8 | GPIO14 | PL011 after `disable-bt` |
 | Console RXD | 10 | GPIO15 | |
 | Console GND | 6 | GND | |
-| Heartbeat LED via 330 ohm | 11 | GPIO17 | `ledtrig-heartbeat` |
-| LED cathode | 9 | GND | |
+| Heartbeat LED, module pin `S1` | 11 | GPIO17 | `ledtrig-heartbeat`, active high |
+| Heartbeat LED, module pin `G` | 9 | GND | |
 
 The cable's red 5 V lead stays open. The board is powered by its own
 supply, and a second source on the same rail is how a USB/TTL adapter
 gets destroyed.
 
+**The LED is a Joy-IT LinkerKit LK-LED10 module, not a bare LED, and it
+needs no resistor.** This section used to draw one through 330 ohm on a
+breadboard, which is what the specification assumes and what this bench
+does not have: there are no bare LEDs and no loose resistors here. Each
+module carries its own resistor, `R1`, and a 2.54 mm header printed
+`S1 S2 U G` beside the 2.0 mm LinkerKit socket, so ordinary Dupont
+jumpers reach it. `U` and `S2` stay unconnected; one module was lit with
+`U` wired and lit identically with that jumper pulled.
+
+Polarity is settled rather than assumed. On Friday 2 October 2026 three
+modules were driven on a Raspberry Pi 3 Model B: high lights the module,
+low puts it out, and a line released to an input is also out and reads
+low. So the pin **sources** and the arrangement is **active high**, which
+is what `dtoverlay=gpio-led` does by default, and no `active_low`
+parameter belongs in `kas/bench-debug.yml`. The photograph is in
+[Project 1](../../01-yocto-image/docs/figures/leds-lit.jpg) and the
+finding in commit `04caf17`.
+
 ## Bench layout
 
 ```
-      breadboard                  Raspberry Pi 3B+
+     LK-LED10                   Raspberry Pi 3B+
     +--------------+            +--------------------------+
-    |     (G)      |            |  [ 40-pin header ]       |
-    |      |       |<===========|  GPIO17 + GND            |
-    |     330      |            |                          |
-    |      |_______|            |  [BCM2837]        [USB]  |
-    |   ground rail|            |                   [ETH]--+---> network,
+    |  S1  o-------|<===========|  [ 40-pin header ]       |
+    |  S2     n/c  |            |  pin 11 GPIO17, pin 9 GND|
+    |  U      n/c  |            |                          |
+    |  G   o-------|<===========|  [BCM2837]        [USB]  |
+    |  R1 fitted   |            |                   [ETH]--+---> network,
     +--------------+            |  [microSD] [micro-USB]   |     for scp of
                                 +------------+-------------+     trace files
                                              |

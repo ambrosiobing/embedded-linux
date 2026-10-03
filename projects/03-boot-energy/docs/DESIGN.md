@@ -136,8 +136,8 @@ signal has in common.
   |            D0    o----- boot complete --------o pin 12  PA6    (3.3 V)   |
   +------------------+           |                +--------------------------+
         | USB                    |
-        v                        +--[330R]--|>|--- GND (pin 9)
-   Windows host                              green LED, visible marker
+        v                        +--- S1 [LK-LED10] G --- GND (pin 9)
+   Windows host                            visible marker, R1 on the module
 
    micro USB supply: DISCONNECTED during every measurement
    USB/TTL cable:  white -> debug 3 (TX, in parallel with D2)
@@ -157,7 +157,7 @@ signal has in common.
 | Console activity | debug header pin 3 (UART0 TXD) | PPK2 `D2`, cable white | idle high, falls on the first start bit |
 | Console RX | debug header pin 4 | cable green | |
 | Console GND | debug header pin 1 | cable black | |
-| LED | pin 12 via 330 ohm to pin 9 (GND) | | optional, visible marker |
+| LED | LK-LED10 `S1` to pin 12, `G` to pin 9 (GND) | | optional, visible marker; `R1` is on the module, `U` and `S2` unconnected |
 
 The specification's wiring table carries a caution worth repeating rather
 than paraphrasing: the `VDD_5V` header pins are on the same net as the
@@ -246,13 +246,13 @@ is small, known, and named.
    |   nRF-PPK2       |------\  D2 to the debug header TX
    | source meter 5 V |       \
    |  logic port      |        \      +-------------------+
-   +------------------+         >---->| NanoPi NEO Air    |      breadboard
+   +------------------+         >---->| NanoPi NEO Air    |      LK-LED10
                                       |  header:          |     +-----------+
-                                      |   2 5V   6 GND    |     |  o  o  o  |
-                                      |   7 PG11 12 PA6   |---->|   green   |
-                                      |                   |     |  LED+330R |
-                                      | micro USB: EMPTY  |     +-----------+
-                                      +---------+---------+
+                                      |   2 5V   6 GND    |     |  S1  o    |
+                                      |   7 PG11 12 PA6   |---->|  S2  n/c  |
+                                      |   9 GND           |--+  |  U   n/c  |
+                                      | micro USB: EMPTY  |  +->|  G   o    |
+                                      +---------+---------+     +-----------+
                                                 | USB/TTL
                                                 v
                                         +----------------+

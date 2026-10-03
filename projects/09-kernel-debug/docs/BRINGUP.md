@@ -15,8 +15,10 @@ The rule this bench applies before every project, and it is short here:
 - The USB/TTL adapter's **red 5 V lead stays open.** The board has its own
   supply. Two sources on one rail is how the adapter, and sometimes the
   board, is destroyed.
-- The LED goes to **GPIO17 through 330 ohm** to ground. Nothing else on
-  the header is driven by anything in this project.
+- The LED is an **LK-LED10 module**, which has its own resistor. Its `S1`
+  goes to **pin 11, GPIO17** and its `G` to **pin 9, GND**, with `U` and
+  `S2` left unconnected. Nothing else on the header is driven by anything
+  in this project, and no HAT is stacked.
 - Nothing here writes a GPIO from software that has not been checked
   against the schematic: the only output is the LED, and it is driven by
   a kernel trigger declared in `config.txt` rather than by any program.

@@ -72,13 +72,13 @@ most 16 mA, and three modules together stay well inside that.
    40-pin header
   +---------------+
   |               |
-  | pin 11 GPIO17 o---[ 330R ]---->|---+        green
-  |               |                 LED |
-  | pin 13 GPIO27 o---[ 330R ]---->|---+        yellow
-  |               |                 LED |
-  | pin 15 GPIO22 o---[ 330R ]---->|---+        red
-  |               |                 LED |
-  |  pin 9   GND  o---------------------+---+
+  | pin 11 GPIO17 o--- S1 -[ LK-LED10 ]--+        green
+  |               |         R1 fitted    |
+  | pin 13 GPIO27 o--- S1 -[ LK-LED10 ]--+        yellow
+  |               |         R1 fitted    |
+  | pin 15 GPIO22 o--- S1 -[ LK-LED10 ]--+        red
+  |               |       U and S2 n/c   |
+  |  pin 9   GND  o--- G ----------------+---+
   |               |                         |
   +---------------+                        ===  ground rail
                                             -
@@ -122,11 +122,20 @@ GPIO27 and GPIO22 on Friday 2 October 2026. The pinout:
 
 ![Four LK-LED10 modules wired to a Raspberry Pi 3 Model B on Friday 2 October 2026, red, blue and yellow lit. The leads are ordinary 2.54 mm Dupont jumpers in the module's own header, the one beside the 2.0 mm LinkerKit socket that the deferral was blamed on. S1, S2, U, G and R1 are printed on the board.](figures/leds-lit.jpg)
 
-`U` must be 3V3. If the module puts its LED between supply and `S1`, then
-`S1` floats at the supply voltage whenever the GPIO is not driving, and 5 V
-on a 3.3 V input damages the pin. Which way round the LED sits is not
-printed on the board, which is why polarity is configuration rather than a
-constant; see `/etc/bench/leds.conf`.
+**`U` need not be connected at all.** The module wants `S1` and `G` and
+nothing else: one of the three was lit with `U` wired and lit identically
+with that jumper pulled out. If `U` is connected it must go to 3V3, pin 1
+or pin 17, never pin 2 or pin 4, because 5 V reaching a 3.3 V input through
+the module damages the pin.
+
+**Polarity was measured, not left open.** On each of the three pins,
+driving the line high lights the module, driving it low puts it out, and
+releasing it to an input also puts it out and reads low. So the signal pin
+is the anode side and sources the current, and the arrangement is active
+high, which is the daemon's default and needs no change to
+`/etc/bench/leds.conf`. That is settled for these modules. It is still
+worth the three-step test on a module from any other batch, because which
+way round the diode sits is not printed on the board.
 
 ---
 
@@ -136,10 +145,12 @@ The Pi is powered by its own USB-C supply. The USB/TTL cable carries TX, RX
 and ground only.
 
 ```
-                                 breadboard
+                     three LK-LED10, grounds on a
+                       breadboard rail and one
+                       jumper from rail to pin 9
                         +--------------------------+
                         |  (G)   (Y)   (R)         |
-                        |  330R  330R  330R        |
+                        |   S1    S1    S1         |
                         +---+-----+-----+----+-----+
                             |     |     |    |
        GPIO17 ______________|     |     |    |
