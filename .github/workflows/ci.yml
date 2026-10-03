@@ -56,6 +56,12 @@ jobs:
           # libdrm-dev: Project 7's drmfill, compiled here with -Werror.
           # The host libdrm is the same API the target has, so a mistake
           # in the DRM calls is caught here rather than by a board.
+          # libevdev-dev: Project 14's kbd_bridge, the evdev to HID
+          # bridge. The host libevdev is the same API the target has, so
+          # a mistake in the event handling is caught here. Added with
+          # the step that uses it, in the same commit, because a
+          # dependency installed for a step that does not exist is the
+          # exact way drmfill went uncompiled for months.
           # device-tree-compiler: Project 7's overlay is compiled with
           # dtc -@ by tests/lcd35a-overlay-test.sh, and its acceptance
           # criterion is that it compiles WITHOUT WARNINGS. That test
@@ -83,7 +89,7 @@ jobs:
           # Debian/Debhelper/Sequence/python3.pm". The suite now runs
           # dpkg-checkbuilddeps itself so that gap is named rather than
           # met later as a perl error.
-          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev libiio-dev device-tree-compiler cmake debhelper dh-python dpkg-dev fakeroot lintian
+          sudo apt-get install -y shellcheck python3-yaml python3-numpy pkg-config build-essential autoconf autoconf-archive automake libtool nftables libsystemd-dev libcbor-dev libdrm-dev libevdev-dev libiio-dev device-tree-compiler cmake debhelper dh-python dpkg-dev fakeroot lintian
 
       - name: Build libgpiod v2 from a pinned tag
         # Ubuntu 24.04 packages libgpiod 1.6.3 and the daemon targets v2, so
@@ -268,6 +274,45 @@ jobs:
             exit 1
           fi
           echo "reports no panel, as expected off-target"
+
+      - name: Compile kbd_bridge
+        # Project 14's evdev to HID bridge, 503 lines, the largest single
+        # C file in this repository. Until this step nothing anywhere
+        # compiled it: not this workflow, not scripts/host-check.sh, not
+        # any test. It was written, reviewed, committed, pushed and shipped
+        # in an image recipe without a compiler ever reading it.
+        #
+        # That is the third time this repository has found such a file, and
+        # the shape is identical every time. Project 10's journal entry 38
+        # is titled "the one program nothing compiles, read instead of
+        # run". Project 7's drmfill had its libdrm-dev line added to two
+        # places, which made the work look done, while no step invoked gcc.
+        # In each case the recipe, the dependency and the documentation all
+        # read as finished and nothing executed the compiler.
+        #
+        # usage_table.h sits beside the source and is committed, so -I on
+        # that directory is all the include path this needs. -Werror
+        # because the recipe builds with -Wall -Wextra, and a warning here
+        # is one a reader of this repository would have to account for.
+        run: |
+          src=meta-bench/recipes-bench/bench-kbd-bridge/files
+          gcc -Wall -Wextra -Werror -O2 -I"$src" $(pkg-config --cflags libevdev) "$src/kbd_bridge.c" -o /tmp/kbd-bridge $(pkg-config --libs libevdev)
+
+      - name: kbd-bridge refuses without a keyboard on a runner
+        # A compile proves the syntax. This proves the binary links against
+        # libevdev and runs, which the compile alone does not. A runner has
+        # no /dev/input/bench-kbd, so a clean exit 1 naming the path it
+        # could not open is the correct answer, and the grep is there
+        # because a refusal that does not say what it wanted is a refusal
+        # nobody can act on.
+        run: |
+          if /tmp/kbd-bridge 2>/tmp/kbd-bridge.err; then
+            echo "unexpected: this runner has /dev/input/bench-kbd"
+            exit 1
+          fi
+          cat /tmp/kbd-bridge.err
+          grep -q "/dev/input/bench-kbd" /tmp/kbd-bridge.err
+          echo "refuses and names the path, as expected off-target"
 
       - name: Compile the SDK example
         run: make -C sdk/hello-gpiod

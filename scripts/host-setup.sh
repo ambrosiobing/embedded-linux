@@ -28,7 +28,7 @@ xz-utils debianutils iputils-ping python3-git python3-jinja2
 python3-subunit zstd lz4 liblz4-tool file locales libacl1
 bmap-tools libgpiod-dev gpiod shellcheck python3-yaml pipx
 pkg-config pkgconf nftables python3-numpy libsystemd-dev libcbor-dev
-libdrm-dev device-tree-compiler cmake
+libdrm-dev libevdev-dev device-tree-compiler cmake
 debhelper dh-python dpkg-dev fakeroot lintian
 "
 

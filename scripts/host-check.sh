@@ -273,6 +273,45 @@ else
 	fi
 fi
 
+step "compile kbd_bridge against host libevdev"
+# Project 14's evdev to HID bridge. Its own step for the same reason as
+# drmfill above: it needs libevdev and nothing else, so a host missing it
+# should still check everything else and say what it could not.
+#
+# This file was committed, pushed and shipped in an image recipe without a
+# compiler ever reading it. Nothing here and nothing in CI compiled it
+# until both were added together. usage_table.h is committed beside the
+# source, so -I on that directory is the whole include path.
+if ! command -v pkg-config >/dev/null 2>&1; then
+	echo "pkg-config is not installed. Run scripts/host-setup.sh."
+	fail=1
+elif ! pkg-config --exists libevdev; then
+	echo "libevdev development files are not installed."
+	echo "Run scripts/host-setup.sh, or: sudo apt-get install -y libevdev-dev"
+	fail=1
+else
+	echo "libevdev $(pkg-config --modversion libevdev)"
+	out=$(mktemp -d)/kbd-bridge
+	kbd_src=meta-bench/recipes-bench/bench-kbd-bridge/files
+	# Word splitting on the pkg-config output is intended: it returns a
+	# list of flags, not one argument.
+	# shellcheck disable=SC2046
+	if gcc -Wall -Wextra -Werror -O2 -I"$kbd_src" $(pkg-config --cflags libevdev) \
+		"$kbd_src/kbd_bridge.c" -o "$out" $(pkg-config --libs libevdev); then
+		echo "compiled clean with -Werror"
+		# No /dev/input/bench-kbd on a build host, so this refuses and
+		# names the path it could not open. That exercises the link
+		# against libevdev, which the compile alone does not prove.
+		if timeout 5 "$out" 2>/dev/null; then
+			echo "note: this host has /dev/input/bench-kbd"
+		else
+			echo "runs and refuses without a keyboard, as expected off-target"
+		fi
+	else
+		fail=1
+	fi
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then
 	echo "host checks passed. Next: ./go build"
