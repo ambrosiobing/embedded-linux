@@ -21,6 +21,14 @@
 # The Yocto reference list, plus what this repository's own checks need.
 # lz4 and liblz4-tool are the same tool under two names across releases;
 # whichever one this distribution has is the one that gets installed.
+#
+# podman is here because tests/adxl345-install-test.sh needs a container
+# runtime and skips without one. On Saturday 3 October 2026 that skip was
+# the only thing between Project 11's criterion 5 and being met: the test
+# said plainly why it was skipping, which is the right failure, but a
+# check in tests/ that this script cannot satisfy is a gap in this script
+# rather than in the test. Rootless and daemonless, so unlike docker it
+# needs no group membership and no running service before it will answer.
 PACKAGES="
 gawk wget git diffstat unzip texinfo gcc build-essential
 chrpath socat cpio python3 python3-pip python3-pexpect
@@ -29,7 +37,7 @@ python3-subunit zstd lz4 liblz4-tool file locales libacl1
 bmap-tools libgpiod-dev gpiod shellcheck python3-yaml pipx
 pkg-config pkgconf nftables python3-numpy libsystemd-dev libcbor-dev
 libdrm-dev libevdev-dev device-tree-compiler cmake
-debhelper dh-python dpkg-dev fakeroot lintian
+debhelper dh-python dpkg-dev fakeroot lintian podman
 "
 
 # Packages that have no candidate on this release and are not worth a
