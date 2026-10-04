@@ -340,3 +340,55 @@ machine has no cross compiler, so `buggy.c` **has never been compiled**.
 It is C written against kernel headers and read back carefully, which is
 not the same as building. That is the first thing the build laptop
 should say something about.
+
+---
+
+## 14. The heartbeat LED was drawn as a part this bench does not have
+
+**What happened.** The schematic, the wiring table, the bench layout,
+`docs/BRINGUP.md` and both TikZ figure sources all drew a bare green LED
+through a 330 ohm resistor on a breadboard. That is what the
+specification assumes, and **none of those three parts is on this bench**:
+no bare LEDs, no loose resistors. The bench's LEDs are Joy-IT LinkerKit
+LK-LED10 modules, which carry their own resistor, `R1`, and a 2.54 mm
+header printed `S1 S2 U G` beside a 2.0 mm LinkerKit socket.
+
+This project did not make the error, it inherited it. Project 1 had
+recorded for two weeks that the modules could not be connected at all,
+read off the manufacturer's page rather than off the board, and that
+belief is why three projects deferred their LED output. Commit `04caf17`
+corrected it after three modules were lit on a Raspberry Pi 3 Model B on
+Friday 2 October 2026, and corrected projects 1, 4 and 20. **Its sweep did
+not reach this project or project 3.**
+
+**What was done.** Six places rewritten. The wiring is now `S1` to pin 11,
+GPIO17, and `G` to pin 9, GND, with `U` and `S2` left unconnected; one
+module was lit with `U` wired and lit identically with that jumper pulled
+out. Both TikZ sources were compiled with pdflatex and the schematic was
+read as a rendered page before committing, rather than trusted from the
+source.
+
+**Why that and not the alternative.** The alternative was to leave the
+documents alone, since the LED appears in **none of this project's twelve
+acceptance criteria** and nothing measured depends on it. That was
+rejected because the drawings are what a reader follows with the parts in
+front of them, and a document that asks for a resistor that is not in the
+drawer sends them looking for a shop rather than for a jumper. What the
+correction also settles is that the `gpio-led` overlay needs no
+`active_low`: driving the line high lights the module, low puts it out,
+and releasing it to an input also puts it out and reads low, on each of
+three pins.
+
+**The part worth carrying elsewhere is how it was found.** Not by
+re-reading around the earlier correction, which is what one would do and
+which would have found nothing here, but by grepping the tree for the
+number `330`. Correcting the prose of a document does not correct the
+drawing sitting beside it, and `04caf17` had done exactly that in its own
+files. The same grep found two more in project 3 and two more in project
+1's own figures, in the very file whose prose that commit had already
+fixed.
+
+**Still unmeasured, and this changes none of it.** The LED is an
+instrument that reports after the kernel has stopped, and whether it does
+so on this image is a board question like every other row in the
+acceptance table.
