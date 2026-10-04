@@ -11,7 +11,7 @@ what the bus glue owns, and where the seam is that makes any of it testable.
 | [The seam](#the-seam-is-the-regmap) | Where the fake goes, and what that buys |
 | [A compatible of our own](#a-compatible-string-of-our-own) | How this driver avoids fighting the one already in the tree |
 | [The IIO surface](#the-iio-surface) | What userspace sees, and who else consumes it |
-| [Schematic](#schematic) | Which pin goes where. **Not yet drawn, and why** |
+| [Schematic](#schematic) | Which pin goes where. **Drawn from the board, Sunday 4 October 2026** |
 | [Data flow](#data-flow) | What turns into what, from a sample to a CSV row |
 | [What gets built](#what-gets-built) | The files this project adds |
 
@@ -174,17 +174,75 @@ ecosystem against it without further work".
 
 ## Schematic
 
-**Not drawn yet, and deliberately not guessed.**
+**Drawn on Sunday 4 October 2026, from the board rather than from the wiki.**
 
-This bench's ADXL345 is a DFRobot SEN0032. Its wiki states the part
-communicates over `I2C / SPI (3 or 4 lines)` at `3.3~6V`, and publishes no
-pin list. Which pins the *breakout* exposes decides three things the
-drawing cannot be written without:
+It said "not drawn yet, and deliberately not guessed" from Monday 21
+September 2026 until today. The refusal was right, and all three reasons it
+gave have since expired: two were answered on Saturday 3 October 2026 and
+the third is answerable from the pad list the same session produced. The
+sentence outlived them by a day. That is the same failure as the three in
+Project 11's README and the one in Project 3 about Project 2's missing
+image: a stated reason for an absence outliving the absence, which reads as
+current work because the conclusion it supports is still there.
 
-1. Whether SPI is reachable at all, or only I2C. The driver is written for
-   both either way, because that is the subsystem's shape; what the board
-   exposes decides which half gets hardware evidence and which stays a
-   compile-time claim.
+This bench's ADXL345 is a DFRobot SEN0032, whose wiki states the part
+communicates over `I2C / SPI (3 or 4 lines)` at `3.3~6V` and publishes no
+pin list. The pads were read off the board instead, in this order along the
+single row:
+
+```
+GND  VCC  CS  INT1  INT2  SDO  SDA  SCL
+```
+
+### The wiring as built
+
+Every lead to the Raspberry Pi 3 Model B+ 40-pin header, which is the board
+this project specifies. Observed on hostname `eplepi` on Saturday 3 October
+2026 and recorded in
+`projects/11-adxl345-userspace/docs/evidence/flat-and-tilted-2026-10-03.txt`.
+
+| Colour | Pad | Header pin | Signal there | Direction |
+|---|---|---|---|---|
+| red | `VCC` | 1 | 3V3 | supply into the breakout |
+| black | `GND` | 9 | GND | return |
+| blue | `SDA` | 3 | GPIO2, SDA1 | bidirectional, both ends drive it |
+| yellow | `SCL` | 5 | GPIO3, SCL1 | out of the Pi, into the sensor |
+| orange | `CS` | 17 | 3V3 | strap into the sensor, high selects I2C |
+| brown | `SDO` | 14 | GND | strap into the sensor, low gives `0x53` |
+| purple | `INT1` | 16 | GPIO23 | out of the sensor, into the Pi |
+
+`INT2` is not connected. The serial console occupies pins 6, 8 and 10, so
+those three are unavailable while it is attached.
+
+```
+  Raspberry Pi 3 Model B+                     SEN0032 (ADXL345)
+
+  pin  1  3V3  ------------- red ----------->  VCC
+  pin  9  GND  ------------- black ---------->  GND
+  pin  3  GPIO2  SDA1 <----- blue ----------->  SDA
+  pin  5  GPIO3  SCL1 ------ yellow -------->  SCL
+  pin 17  3V3  ------------- orange -------->  CS    high: I2C, not SPI
+  pin 14  GND  ------------- brown --------->  SDO   low: address 0x53
+  pin 16  GPIO23 <---------- purple ---------  INT1
+                                               INT2  not connected
+```
+
+### The three questions this section used to hold open
+
+1. Whether SPI is reachable at all, or only I2C. **Answered on Sunday 4
+   October 2026, and with a hazard attached.** All four lines a 4-wire SPI
+   needs are on that header: `CS`, `SCL` as the clock, `SDA` as the data in
+   and `SDO` as the data out. That is an inference from the observed pad
+   list and the part's pin sharing, not a run: **nothing has ever driven
+   this breakout over SPI**, so the SPI half of the driver remains a
+   compile-time claim and the I2C half is the one with hardware behind it.
+
+   The hazard is in the wiring above. `SDO` is the address strap in I2C
+   mode and the serial data **output** in SPI mode, and the brown lead
+   holds it at GND. Switching this wiring to SPI without removing that lead
+   would have the sensor driving an output into ground. So SPI is reachable
+   on this breakout and **not** reachable from this wiring, and the brown
+   lead comes off first.
 2. Which pin carries `INT1`. **Answered on Saturday 3 October 2026:
    physical pin 16, BCM GPIO23**, the same lead Project 11 uses, so the two
    projects share one wiring. Proved by changing `INT_ENABLE` inside the

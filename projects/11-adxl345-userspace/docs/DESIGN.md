@@ -116,31 +116,45 @@ machine that has never seen the sensor.
 
 ## Figure 2: Wiring
 
-**Not drawn, and deliberately not guessed.** This is not a gap; it is the
-same refusal Project 5 made about the same board, and repeating the pin
-table here would create a second place for it to be wrong.
+**Answered, and still not drawn here.** The refusal in this section was
+about guessing, not about drawing, so now that the board has been read the
+answer goes in one place and this section says where. Repeating the pin
+table would create a second place for it to be wrong, which was the original
+reason and has not changed.
 
-The SEN0032 wiki states the part speaks `I2C / SPI (3 or 4 lines)` at
-`3.3~6V` and publishes no pin list. Three things cannot be drawn without
-reading the board:
+[Project 5's schematic section](../../05-iio-adxl345/docs/DESIGN.md#schematic)
+carries the drawing, every lead with its colour, its pad, its header pin and
+its direction. It was drawn on Sunday 4 October 2026 from the wiring built
+on Saturday 3 October 2026, and the capture behind it is
+[docs/evidence/flat-and-tilted-2026-10-03.txt](evidence/flat-and-tilted-2026-10-03.txt).
 
-1. Whether `SDO` is tied low or high, which decides whether the address is
-   `0x53` or `0x1D`. The library takes the address as an argument for this
-   reason rather than compiling one in.
-2. Which pin carries `INT1`. Without it the FIFO watermark path is
-   unreachable and the library polls instead, which works and is worse.
-3. **The supply, which is the one that can do damage.** A board rated to
-   6 V regulates, and a part powered from 5 V driving `INT1` at 5 V into a
-   Pi GPIO destroys the pin. Powering from the Pi's 3V3 removes the
-   question; confirming the level shifting answers it.
+The three things this section said could not be drawn without reading the
+board, and what reading it gave:
 
-[Project 5's schematic section](../../05-iio-adxl345/docs/DESIGN.md) is
-where that gets filled in once, when the board has been read. This project
-links there rather than copying it.
+1. Whether `SDO` is tied low or high, which decides the address. **Low, so
+   `0x53`.** The library still takes the address as an argument, because the
+   strap is a property of the wiring rather than of the library.
+2. Which pin carries `INT1`. **Header pin 16, BCM GPIO23**, proved by
+   changing `INT_ENABLE` in the sensor and watching the pin follow high,
+   low, high. So the FIFO watermark path is reachable and the library need
+   not poll.
+3. **The supply.** Removed rather than answered: the breakout is powered
+   from header pin 1, 3V3, so `INT1` cannot be driven above 3V3 whatever the
+   level shifting does. The level shifting itself is still unconfirmed and no
+   longer needs to be.
 
-What can be said without the board: the bus is I2C1 on GPIO2 and GPIO3,
-which is fixed by the Pi rather than by the sensor, and 400 kHz is enough
-for any rate the ADXL345 offers.
+**One thing this project cannot borrow from that drawing.** Project 5
+specifies a Raspberry Pi 3 and the wiring was built and read on a Raspberry
+Pi 3 Model B+, so for that project the drawing is an observation. This
+project specifies a Raspberry Pi **4**. The pin numbers carry because the
+40-pin header is the same across models, which is a fact about the header
+rather than something anyone has seen on a Pi 4 with this part attached. If
+this project is ever run on its own specified board, that is the line to
+re-read.
+
+What could be said without the board and still can: the bus is I2C1 on GPIO2
+and GPIO3, which is fixed by the Pi rather than by the sensor, and 400 kHz is
+enough for any rate the ADXL345 offers.
 
 ## Figure 3: Bench layout
 
@@ -245,9 +259,12 @@ conversion is one multiplication the caller can do, and an integer
 crosses the ctypes boundary without a float conversion in the middle.
 
 `int_gpio` may be negative, meaning no interrupt line is wired. The library
-then polls at the configured rate. That is worse, and it is the difference
-between a project that works today with four jumpers and one that waits for
-Figure 2 to be answered.
+then polls at the configured rate. That is worse, and it was written as the
+difference between a project that works today with four jumpers and one that
+waits for Figure 2 to be answered. Figure 2 is answered: there are seven
+leads rather than four, and `-i 23` is the one that makes the interrupt path
+real. The negative case stays in the API, because a caller with three
+jumpers and no spare GPIO is a caller this library should still serve.
 
 ## Ownership
 
