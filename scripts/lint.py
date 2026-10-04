@@ -714,6 +714,81 @@ def check_csv_line_endings() -> None:
                        f"lineterminator writes CRLF. Pass {want}")
 
 
+# Byte values a text file has a reason to contain. Everything else below
+# 0x20, and 0x7f, is editing damage far more often than it is content.
+TEXT_BYTES_OK = frozenset({9, 10, 13})
+
+# Suffixes whose contents are bytes on purpose.
+BINARY_SUFFIXES = frozenset({
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico",
+    ".pdf", ".gz", ".xz", ".bz2", ".zip", ".tar",
+    ".bin", ".img", ".dtb", ".dtbo", ".o", ".so", ".a",
+})
+
+# Verbatim captures of a serial line, where an ESC or a backspace is what
+# the device sent and removing it would falsify the record. These are listed
+# one by one rather than matched by a pattern, so that a fourth capture
+# fires the rule and somebody decides about it instead of a glob deciding.
+VERBATIM_CAPTURES = frozenset({
+    "projects/02-neo-air-mainline/docs/bootlog-emmc.txt",
+    "projects/02-neo-air-mainline/docs/bootlog-sd.txt",
+    "projects/20-optee-keystore/docs/evidence/boot-console-2026-09-22.txt",
+})
+
+
+def check_control_bytes() -> None:
+    """A control byte in an authored file is damage, not content.
+
+    On Sunday 4 October 2026 a journal entry acquired a 0x08 byte in the
+    middle of a documented Windows path. The cause is the hazard this
+    repository already knows from the other direction: a backslash followed
+    by the letter b, inside a non-raw Python string written through a
+    heredoc, is one backspace character rather than two characters. The file
+    then held "CMake", a backspace, and "bin", which a terminal renders as
+    "CMakein" and which no reader would question.
+
+    Everything passed. This linter was clean, the Markdown was valid, the
+    link check had nothing to say, and the damage was findable only by
+    reading the bytes. That is the argument for a rule rather than more
+    prose: the same class has eaten a backslash continuation in a recipe
+    four times and a printf format string twice, and nothing mechanical
+    could see any of it.
+
+    What this does not look at: files whose suffix is in BINARY_SUFFIXES,
+    the verbatim serial captures in VERBATIM_CAPTURES, and anything git does
+    not track, because git provides the list.
+    """
+    try:
+        listing = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=ROOT, capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("note: not a git checkout, control bytes not checked")
+        return
+
+    for name in listing.split("\0"):
+        if not name or name in VERBATIM_CAPTURES:
+            continue
+        path = ROOT / name
+        if path.suffix.lower() in BINARY_SUFFIXES or not path.is_file():
+            continue
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        for number, line in enumerate(data.split(b"\n"), start=1):
+            hits = sorted({b for b in line
+                           if (b < 32 and b not in TEXT_BYTES_OK) or b == 127})
+            if not hits:
+                continue
+            shown = ", ".join(f"0x{b:02x}" for b in hits)
+            fail(path, f"line {number}: control byte {shown}. In an authored "
+                       f"file that is editing damage. If this file is a "
+                       f"verbatim capture of a device, add it to "
+                       f"VERBATIM_CAPTURES in scripts/lint.py and say so")
+
+
 def check_untracked_scripts() -> None:
     """A new script has no index entry, so the check above cannot see it.
 
@@ -815,6 +890,7 @@ def main() -> int:
         check_shellcheck_directives,
         check_shell_patterns,
         check_csv_line_endings,
+        check_control_bytes,
         check_busybox_compat,
         check_src_uri_installed,
         check_image_packages,
