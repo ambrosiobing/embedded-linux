@@ -123,6 +123,46 @@ local_conf_header:
     # docs/BRINGUP.md names the exact unknowns that would have to be
     # settled before the recipe is worth attempting.
 
+    # --- both worlds on one wire ----------------------------------------
+    #
+    # TF-A and OP-TEE print on the PL011 at 0x3f201000. Linux is on
+    # ttyS0, the mini UART at 0x3f215040, because ENABLE_UART in
+    # bench-rpi4.yml yields console=serial0 and on a Pi 3 without
+    # disable-bt the alias resolves to the mini UART. Only one of the two
+    # reaches GPIO14 and GPIO15 at a time.
+    #
+    # That is why I/TC: lines appear during boot and nothing from the
+    # secure world appears afterwards. The PL011 is wired to the Bluetooth
+    # radio, so the secure world has been printing into a port nothing is
+    # listening to through every one of the six hangs of Tuesday
+    # 22 September 2026. Journal entry 28 calls it the instrument that was
+    # missing for five of them, and rates it above any further work on the
+    # normal-world side.
+    #
+    # disable-bt puts the PL011 on the header. CMDLINE_SERIAL moves Linux
+    # onto the same port. Upstream declares it weakly,
+    #
+    #     CMDLINE_SERIAL ?= "...console=serial0,115200..."
+    #
+    # in rpi-cmdline.bb at scarthgap, so this assignment wins. Read there
+    # rather than assumed, because the same file is where CMDLINE_CONSOLE
+    # was once set for months and did nothing.
+    #
+    # bench-rpi4.yml appends console=tty1 AFTER this, and that order is
+    # deliberate: the last console= becomes /dev/console. Do not append a
+    # serial console; replace this variable.
+    #
+    # NOT YET SEEN ON A BOARD. The card that would prove it could not be
+    # found on Sunday 4 October 2026. The signature of success is a boot
+    # log that starts earlier than any before it, carrying TF-A's banners
+    # from its first line rather than only the I/TC: lines, because
+    # config.txt overlays are applied by the VideoCore firmware before any
+    # ARM code runs. A card already flashed can be changed by hand instead
+    # of rebuilt: add the overlay to config.txt and replace the serial
+    # console in cmdline.txt, in place.
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=disable-bt"
+    CMDLINE_SERIAL = "console=ttyAMA0,115200"
+
     # The kernel, the TEE stack and the keystore are what gets debugged
     # here, so keep their work directories when rm_work runs.
     RM_WORK_EXCLUDE += "linux-raspberrypi optee-os optee-client bench-keystore"
