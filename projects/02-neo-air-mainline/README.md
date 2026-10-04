@@ -22,16 +22,35 @@ only diagnostic interface.
 
 ## State
 
-**Written, not yet built, and no board has been powered on.** Every script,
-fragment and document exists and the two that can destroy something are
-tested, but nothing here has cross-compiled a single object and the NEO Air
-has not been out of its box.
+**Complete, on hardware.** U-Boot 2025.10 and a 6.12.0 kernel, both built
+on the build laptop on Friday 18 September 2026, boot this board from the
+SD card and from its own eMMC to a `neo-air login:` prompt on Debian 12
+bookworm. A board deliberately bricked by erasing its eMMC bootloader was
+recovered over USB in FEL mode with nothing opened.
 
-That is a rung below Software complete on purpose, the same one Project 6
-uses: `gcc-arm-linux-gnueabihf` is not installed on the authoring laptop,
-so the build scripts have been exercised only as far as their refusals.
+**This section said the opposite until Sunday 4 October 2026.** It read
+"written, not yet built, and no board has been powered on", and the
+acceptance table below said `not started` for seven rows whose evidence
+sits in `docs/` beside it, including the row that asks for the two boot
+logs by name. Both sentences were true when they were written and false
+from the moment `8c1f894` landed. Nothing was wrong with the work. The
+sentence describing it went stale, and no test holds a sentence, which is
+this repository's own standing warning and is recorded here rather than
+quietly fixed.
 
-What is proven today, on a laptop:
+What is proven on the board:
+
+| Proven | Where |
+|---|---|
+| U-Boot SPL 2025.10 comes up and sees all three MMC controllers | `docs/bootlog-sd.txt`, lines 1 and 13 |
+| The board identifies itself as `FriendlyARM NanoPi NEO Air` | the U-Boot banner in both logs |
+| Linux 6.12.0, no vendor suffix, cross-built on the build laptop | the kernel banner in both logs |
+| It boots from the SD card, root on `mmcblk0p2` | `docs/bootlog-sd.txt`, `Trying to boot from MMC1` |
+| It boots from its own eMMC, root on `mmcblk2p2`, a different PARTUUID | `docs/bootlog-emmc.txt`, `Trying to boot from MMC2` |
+| Reprovisioning is idempotent across a second and a third run, fsck clean | `8c1f894` |
+| A bricked board answers on USB as `1f3a:efe8` and writes its own bootloader back | `8c1f894` |
+
+What is proven on a laptop:
 
 | Proven | How |
 |---|---|
@@ -43,7 +62,11 @@ What is proven today, on a laptop:
 | It writes the partition table before the bootloader | the same test, proved by swapping the two and watching it fail |
 | Both build scripts refuse an unpinned environment and a build inside the checkout | run by hand, both directions |
 
-What that does not prove is that any of it compiles. See
+Those laptop assertions cover the two tools that can destroy something, and
+they were written before any of this reached hardware. They are kept because
+a refusal that has been proved to fire is worth more than one that has only
+ever been read, and because the eMMC provisioner is the tool that bricked a
+board on purpose and had to bring it back. See
 [Acceptance criteria](#acceptance-criteria).
 
 ## What this project adds
@@ -128,14 +151,14 @@ sh /boot/flash-emmc.sh           the provisioning
 
 | # | Criterion | How it is checked | State |
 |---|---|---|---|
-| 1 | The SPL banner appears within about a second of power, and `mmc list` shows both the SD card and the eMMC | serial console capture | not started |
-| 2 | `cat /proc/device-tree/model` prints `FriendlyARM NanoPi NEO Air`, and `uname -r` is the tag from `toolchain.env` with no vendor suffix | on the board | not started |
-| 3 | `dmesg \| grep brcmfmac` shows a firmware version line, `wlan0` exists, and ssh over Wi-Fi works | on the board | not started |
-| 4 | With the SD card removed, the board boots from eMMC to a login, and `findmnt /` shows the eMMC partition | on the board | not started |
+| 1 | The SPL banner appears within about a second of power, and `mmc list` shows both the SD card and the eMMC | serial console capture | **met**, `docs/bootlog-sd.txt` lines 1 and 13 |
+| 2 | `cat /proc/device-tree/model` prints `FriendlyARM NanoPi NEO Air`, and `uname -r` is the tag from `toolchain.env` with no vendor suffix | on the board | **met**, the U-Boot and kernel banners in both logs: that model string and `6.12.0` with no suffix |
+| 3 | `dmesg \| grep brcmfmac` shows a firmware version line, `wlan0` exists, and ssh over Wi-Fi works | on the board | **met**, recorded in `8c1f894` and `661fa04`; see the note below, the committed logs stop at the login prompt |
+| 4 | With the SD card removed, the board boots from eMMC to a login, and `findmnt /` shows the eMMC partition | on the board | **met**, `docs/bootlog-emmc.txt`: `Trying to boot from MMC2`, root on `mmcblk2p2` |
 | 5 | `flash-emmc.sh` run twice in a row succeeds both times, and the second boot log differs only in timestamps | on the board, and the idempotence of the `PARTUUID` patching is already proven off-board | **the off-board half is met**, `tests/neo-air-flash-test.sh` |
-| 6 | FEL recovery restores a board whose eMMC bootloader has been erased, without opening anything | on the board, deliberately erasing it first | not started |
-| 7 | `docs/bootlog-sd.txt` and `docs/bootlog-emmc.txt` are complete captures from power-on to login | the console, captured from before power is applied | not started |
-| 8 | Every kernel fragment option reaches the built `.config` | `kernel/build.sh` refuses if not | written, never run |
+| 6 | FEL recovery restores a board whose eMMC bootloader has been erased, without opening anything | on the board, deliberately erasing it first | **met**, `8c1f894`: bricked deliberately, answered as `1f3a:efe8`, bootloader written back |
+| 7 | `docs/bootlog-sd.txt` and `docs/bootlog-emmc.txt` are complete captures from power-on to login | the console, captured from before power is applied | **met**, 516 and 522 lines, SPL banner to `neo-air login:` |
+| 8 | Every kernel fragment option reaches the built `.config` | `kernel/build.sh` refuses if not | **met by construction**: the 6.12.0 kernel in both logs is the one that script produced, and it refuses rather than producing one |
 | 9 | The provisioner cannot be made to write to the medium it booted from | `tests/neo-air-flash-test.sh` | **met** |
 
 Criterion 6 is the one worth doing rather than assuming. A recovery path
