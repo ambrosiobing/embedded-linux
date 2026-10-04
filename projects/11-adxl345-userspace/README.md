@@ -21,13 +21,19 @@ bindings that need no structure definitions, tests that run with no
 hardware, permissions without root, and packaging that installs and
 purges cleanly.
 
-**State: built, packaged and tested on a host, never run on a board.**
-The library builds with `-Werror`, its fake-bus suite passes, it exports
-exactly the six symbols its packaging pins, it passes `ctest` under ASan
-and UBSan, and the three Debian packages build and come out of `lintian`
-without an error. Three of the six acceptance criteria are met that way.
-No sensor has been read, and the other three criteria are the ones that
-need one.
+**State: the part has been read, and this library has not read it.**
+Those are two different facts and the distinction is the whole status of
+this project. The library builds with `-Werror`, its fake-bus suite
+passes, it exports exactly the six symbols its packaging pins, it passes
+`ctest` under ASan and UBSan, and the three Debian packages build, install
+and purge cleanly. The sensor answered on Saturday 3 October 2026 and gave
+gravity in two orientations, measured with `i2c-tools` and nothing from
+this project.
+
+So three of the six criteria are met, one of them on hardware, and the
+three that remain all want the same thing: this library compiled and run
+on the board that has the part on it. Until then every statement here
+about the library is a statement about a host.
 
 Every one of those happens in CI on every push, and it took eleven days
 to notice. The sentence here until Friday 2 October 2026 read "Nothing
@@ -53,8 +59,13 @@ ok       the built library exports exactly six symbols
 
 So "asserted" below still means a file agrees with another file, and it
 is no longer the strongest thing on offer: where a row says compiled, a
-compiler produced it. "Measured" still means a board did it, and no row
-says that yet.
+compiler produced it. "Measured" still means a board did it, and as of
+Saturday 3 October 2026 one row says it: criterion 2. The sentence here
+read "no row says that yet" for a day after that stopped being true. It is
+the third such sentence in this file, after the one claiming nothing here
+had been compiled and the one claiming no sensor had been read. All three
+described an absence, all three were true when written, and none of them
+was held by any test, because no test can hold a sentence.
 
 ## What this project adds to the repository
 
@@ -64,7 +75,7 @@ says that yet.
 | `meta-bench/recipes-bench/libadxl345/libadxl345_1.0.0.bb` | The Yocto recipe over the same CMake project |
 | `meta-bench/recipes-core/images/bench-userdrv-image.bb` | The image, from `bench-image` |
 | `kas/bench-userdrv.yml` | Pi 4, I2C1 at 400 kHz, no kernel fragment at all |
-| `tests/adxl345-build-test.sh` | 76 assertions on a host with the full toolchain: the build, the packaging, the recipe, the `-Werror` compile, the fake-bus run, the exported-symbol count, the sanitizer build with `ctest`, and the three Debian packages built and inspected. Fewer where a tool is absent, and it says which |
+| `tests/adxl345-build-test.sh` | 77 assertions on a host with the full toolchain: the build, the packaging, the recipe, the `-Werror` compile, the fake-bus run, the exported-symbol count, the sanitizer build with `ctest`, and the three Debian packages built and inspected. Fewer where a tool is absent, and it says which |
 | `tests/adxl345-motion-test.sh` | 22 assertions on the detector's decision logic |
 | `tests/adxl345_datasheet.py` and `tests/adxl345-registers-test.sh` | 35 assertions comparing the register map against a transcription of the datasheet |
 | `projects/11-adxl345-userspace/docs/` | DESIGN, BRINGUP, the kernel-or-userspace comparison, and an evidence directory that says what is missing |
@@ -93,9 +104,14 @@ burst of up to 32, and a caller that assumed it always got `max` would
 read stale values off the end of its own array.
 
 `addr` is an argument rather than a constant because the part has two
-strap addresses, `0x53` and `0x1d`, and which one this board is has not
-been read yet. `int_gpio` may be negative, meaning no interrupt is wired;
-the library then polls, which works and is worse.
+strap addresses, `0x53` and `0x1d`. Which one this board is was read on
+Saturday 3 October 2026: the DFRobot SEN0032 has `SDO` to GND and answers
+at `0x53`. The argument stays, because the strap is a property of the
+wiring and not of the library. `int_gpio` may be negative, meaning no
+interrupt is wired; the library then polls, which works and is worse. On
+this bench it need not be negative: INT1 goes to header pin 16, which is
+BCM 23, verified on Saturday 3 October 2026 by driving `INT_ENABLE` and
+watching the line follow.
 
 ## Running it
 
@@ -135,22 +151,35 @@ toolchain produced the thing and the claim is about what it produced.
 | 2 | The board flat reads about 1 g on Z and near 0 on X and Y, and tilting to each edge moves the expected axis | **MET on Saturday 3 October 2026**, with `i2c-tools` and no library at all. Lying flat: Z +60 counts, 936 mg, with X at -47 mg and Y at +203 mg. Standing on one long edge: Y +64 counts, 998 mg, with X at -31 mg and Z at -250 mg. Magnitudes **0.960 g** and **1.031 g**, both inside four per cent of gravity, which is the half of the test that a convenient orientation cannot fake. The off-axis terms are the 12.5 and 14.1 degree tilt of a breadboard propped on a cushion and agree with the photographs. Capture in `docs/evidence/flat-and-tilted-2026-10-03.txt`. The library itself has still not run on this part; the fake-bus suite asserts it decodes a synthetic 1 g on Z, which is the arithmetic and not the sensor |
 | 3 | `ctest` passes in the sanitizer build with no sensor, and a sanitizer run against the real part survives 10000 samples | **First half met on a host**, CI run 36976709299: the library and its test compile under ASan and UBSan, and `ctest` passes under them. `ADXL_SANITIZE` had existed as a CMake option nothing ever switched on, so eleven days of green `RelWithDebInfo` runs had said nothing about ASan. The sanitizer tree is configured separately from the ordinary one, because ASan changes the layout of what it touches and a mixed tree would prove nothing. The second half needs the part |
 | 4 | `nm -D` lists exactly six defined text symbols, and the soname is `libadxl345.so.1` | **Met on a host.** `nm -D` counted six on the built `libadxl345.so.1` in CI run 36934729926, and the soname is the name of the file it counted. Three file-against-file assertions back it up: the header declares six, the symbols file pins six, and CMake's soname major agrees with `debian/`. The only thing left is that no Pi 4 has loaded it |
-| 5 | The packages install cleanly, the udev rule lands, and purge leaves nothing behind | **MET, both halves.** The build half on the WSL build laptop JPTOUPM678 on Friday 2 October 2026: 76 passed, 0 failed, 0 skipped. `dpkg-buildpackage` drives debhelper and CMake to three binary packages, each carries what its `.install` file promises, and `lintian` reports no errors. That host packages `libgpiod-dev` 2.2.1, so it ran `dh_shlibdeps` **strict**: nothing about the shared-library dependencies was waived to get this result. Getting there cost five defects that no file-against-file assertion could see, because no file disagreed with any other file: `dh_shlibdeps` unable to resolve a `/usr/local` library, a tools package shipping a compiled ELF with no `${shlibs:Depends}`, the same package shipping two python3 programs and depending on no interpreter, an `adduser --no-create-home` with no `--home`, and the udev rule shipped to `lib/udev/rules.d` through the merged `/usr` symlink. Installing and purging closed on Saturday 3 October 2026 in two podman containers on that same laptop: 15 passed, 0 failed, 0 skipped in the test, and 30 passed, 0 failed in the prover it runs inside `debian:trixie-slim`, a base with no `adduser`, so the `Depends` on it was exercised rather than assumed. The udev rule landed at `/usr/lib/udev/rules.d/60-adxl345.rules`, purge left none of the 12 shipped files, the python module and its bytecode are gone, and `ldconfig` no longer lists the library. The `i2c` and `gpio` groups and the `adxl345` account survive the purge, which policy permits and no `postrm` undoes; the prover names them as residue rather than counting them clean |
+| 5 | The packages install cleanly, the udev rule lands, and purge leaves nothing behind | **MET, both halves.** The build half on the WSL build laptop JPTOUPM678, 77 passed, 0 failed, 0 skipped when it was last run on Sunday 4 October 2026. `dpkg-buildpackage` drives debhelper and CMake to three binary packages, each carries what its `.install` file promises, and `lintian` reports no errors. That host packages `libgpiod-dev` 2.2.1, so it ran `dh_shlibdeps` **strict**: nothing about the shared-library dependencies was waived to get this result. Getting there cost five defects that no file-against-file assertion could see, because no file disagreed with any other file: `dh_shlibdeps` unable to resolve a `/usr/local` library, a tools package shipping a compiled ELF with no `${shlibs:Depends}`, the same package shipping two python3 programs and depending on no interpreter, an `adduser --no-create-home` with no `--home`, and the udev rule shipped to `lib/udev/rules.d` through the merged `/usr` symlink. Installing and purging closed on Saturday 3 October 2026 in two podman containers on that same laptop: 15 passed, 0 failed, 0 skipped in the test, and 32 passed, 0 failed in the prover it runs inside `debian:trixie-slim`, a base with no `adduser`, so the `Depends` on it was exercised rather than assumed. The udev rule landed at `/usr/lib/udev/rules.d/60-adxl345.rules`, purge left none of the 12 shipped files, the python module and its bytecode are gone, and `ldconfig` no longer lists the library. The `i2c` and `gpio` groups and the `adxl345` account survive the purge, which policy permits and no `postrm` undoes; the prover names them as residue rather than counting them clean |
 | 6 | A member of `i2c` runs `adxl-map` without `sudo`; a user outside the group gets a clear permission error rather than a crash | Not started. The error path is written: the tool names the group and the other strap address rather than printing a number |
 
 ## What is tested without hardware
 
-133 assertions across three suites, none of which needs a sensor: 76, 35
-and 22, counted from runs rather than from this file. The 76 is the WSL
-build laptop JPTOUPM678 on Friday 2 October 2026, which is the only host
-so far where every branch of the build suite could execute; the other two
-are CI run 36934729926.
+134 assertions across three suites, none of which needs a sensor: 77, 35
+and 22, counted from runs rather than from this file. All three are the WSL
+build laptop JPTOUPM678 on Sunday 4 October 2026, which is the only host
+so far where every branch of the build suite can execute. A fourth count
+sits beside them and is not added in, because it needs a container rather
+than only a toolchain: 32 in the install prover, also on that laptop on
+Sunday 4 October 2026, with 15 in the test that drives it.
 
 A host missing a tool runs fewer and says which, so this number is a
-ceiling rather than a promise. It has been wrong once already: it read
+ceiling rather than a promise. It has now been wrong twice. First it read
 113 while crediting the build suite with 56, which was that suite's count
 before four compile-and-run assertions were added to it in the very
-commit that added them.
+commit that added them. Then it read 133 and 76 from Friday 2 October 2026
+until Sunday 4 October 2026, because the run it was copied from happened
+earlier on the Friday morning than commit `8009360` at 10:53, which added
+the assertion that the `adduser` dependency the postinst needs is
+declared. The suite was not touched again after that, so the file was
+simply one behind for two days.
+
+Both are the same failure and it is not arithmetic: a number copied from a
+run is a measurement with a timestamp, and nothing in the repository
+notices when the thing it measured moves. The only defence is to re-run
+before quoting, which is why every count above names the host and the day
+it came from.
 
 | Check | Covers |
 |---|---|
