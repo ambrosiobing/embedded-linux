@@ -186,6 +186,156 @@ This is also the reason `adxl_open` takes the range and the rate as
 arguments rather than compiling them in. A library that trusts what it
 finds on this part is wrong by a factor of four before it starts.
 
+## Getting this project's software onto the board
+
+Everything above this point used `i2c-tools` and nothing from this project,
+which is why criterion 2 could be measured on Saturday 3 October 2026 with
+no library at all. Everything below it needs `libadxl345` and `adxl-map`
+present, and until Sunday 4 October 2026 no document said how they get
+there. There are two routes and they are not interchangeable.
+
+**The Yocto route.** `./go userdrv` builds `bench-userdrv-image` for a
+Raspberry Pi 4 and the recipe installs the library, the tool, the bindings
+and the udev rule into the image. Nothing is built on the board. This is the
+route the rest of this document was written for.
+
+**The Debian route, which is the one eplepi is on.** The board holding the
+sensor is a Raspberry Pi 3 Model B+ running Raspberry Pi OS on Debian
+trixie, from a card no `kas` file ever touched. The software has to be built
+there. Native rather than cross: this is a small CMake project, the board
+can compile it, and a native build removes the question of whether the
+binary that was tested is the binary that ran. It also happens to be the
+same base as `debian:trixie-slim`, which is the container the packaging was
+proved in, so `libgpiod-dev (>= 2.0)` and the non-essential `adduser` behave
+as they did there rather than as a new unknown.
+
+Note that this board is full Debian, so the repository's standing warning
+about a BusyBox userland does not apply here. It applies to the Yocto cards.
+
+### Getting the source there, which is 123 KiB of it
+
+The whole CMake project is one directory, 123 KiB of it:
+
+```
+meta-bench/recipes-bench/libadxl345/files/adxl345-linux
+```
+
+The repository around it is about 27 MiB with its history. Both routes work
+and they say different things:
+
+```sh
+git clone https://github.com/ambrosiobing/embedded-linux.git
+cd embedded-linux/meta-bench/recipes-bench/libadxl345/files/adxl345-linux
+```
+
+A clone on the board means the commit that was built is recorded by `git
+rev-parse` rather than remembered, which is what an evidence file needs. The
+alternative is to copy the one directory from the authoring laptop, which
+avoids 27 MiB on the card and loses that: a copied tree cannot say which
+commit it came from unless the commit is written down by hand at the time.
+Prefer the clone, and if the directory is copied instead, record the commit
+in the same command that copies it.
+
+Every command below runs in that `adxl345-linux` directory, not at the top
+of the repository.
+
+### Check the disk, and check the one dependency that can be absent
+
+```sh
+df -h /
+apt-cache policy libgpiod-dev debhelper cmake pkg-config
+```
+
+The build needs a few hundred megabytes with the build dependencies
+installed, and minutes rather than seconds on a Pi 3. The dependency to read
+rather than assume is `libgpiod-dev`: this project requires **2.0 or later**
+and the v1 API is not source compatible, so a candidate of 1.6 means the
+build cannot proceed on this card. That is a finding to write down, not a
+surprise to hit halfway through a build.
+
+### Two builds, and they must not be installed over each other
+
+This is the part that is easy to get wrong, because both builds produce a
+program called `adxl-map`.
+
+**The packaged build gives criteria 1 and 6.**
+
+```sh
+sudo apt install debhelper dh-python cmake pkg-config libgpiod-dev
+dpkg-buildpackage -us -uc -b
+sudo apt install ../libadxl345-1_*.deb ../adxl345-tools_*.deb
+```
+
+`dpkg-buildpackage` writes its output into the **parent** directory, which is
+why the install line reaches back with `../`. Installing both packages rather
+than only the tools one is deliberate: `adxl345-tools` depends on
+`libadxl345-1`, and letting apt resolve it from the local files is what
+proves the dependency is declared correctly.
+
+`dh-python` rather than `dh-sequence-python3`, which is what `debian/control`
+asks for: the second is a virtual package and the first is what provides it.
+Installing the provider by name is clearer than relying on apt to resolve a
+virtual package with one provider, and it is the same package either way.
+
+Criterion 6 is reachable no other way: it is about a member of `i2c` reading
+the sensor without `sudo`, and the `i2c` group, the `adxl345` account and the
+udev rule that puts `/dev/i2c-*` in that group are all created by the
+package's `postinst`. A binary built in a work tree creates none of them.
+
+**The sanitizer build gives criterion 3's second half, and is never
+installed.**
+
+```sh
+cmake -S . -B build-asan -DADXL_SANITIZE=ON
+cmake --build build-asan
+./build-asan/adxl-map -n 320
+```
+
+Run it from its build directory. If it were installed it would replace the
+packaged `adxl-map` with a sanitized one, and then criterion 1's open time
+would be measured on a binary carrying ASan and UBSan, which on a Pi 3 is
+slow by a large factor. That number would be wrong without looking wrong,
+which is the expensive kind. Criterion 3 asks for 10000 samples; the FIFO
+delivers up to 32 per burst, so 320 bursts is the floor and more is better.
+
+So the order is: package, install, measure criterion 1 and criterion 6, and
+only then build the sanitizer tree and run it from where it was built.
+
+### Criterion 1 needs two numbers, not one
+
+`adxl-map` prints the open time to stderr on every run, in milliseconds and
+again in microseconds, and says whether the interrupt path was inside what it
+measured, because `-i 23` adds a gpiochip open and a line request.
+
+```sh
+adxl-map -n 1
+adxl-map -i 23 -n 1
+```
+
+Run each several times and record the spread rather than one figure. The
+criterion is "under 100 ms", so a single sample that happens to land under it
+is the weaker half of the evidence.
+
+The second number is the bus frequency, because the criterion says "at
+400 kHz" and that is a property of this card rather than of this project.
+`kas/bench-userdrv.yml` sets 400 kHz for a Yocto image on a Pi 4 and says
+nothing about this board, so quoting it would be a measurement borrowed from
+a different machine. Where Raspberry Pi OS states the running bus clock has
+not been checked on this board yet. The two candidates are the adapter's
+device-tree node under `/sys/class/i2c-adapter/` and the `dtparam` line in
+`/boot/firmware/config.txt`, and the step is to look at both and say which
+one answered:
+
+```sh
+ls /sys/class/i2c-adapter/i2c-1/of_node/
+grep -n i2c /boot/firmware/config.txt
+```
+
+If the bus is not at 400 kHz, the honest result is the open time with the
+frequency it was actually taken at, and a separate note about whether
+changing it is worth a reboot. A time measured at 100 kHz is not a failure of
+criterion 1; it is criterion 1 not yet asked.
+
 ## First reading
 
 ```sh
