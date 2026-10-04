@@ -153,6 +153,22 @@ both CI and `./go check`. `cmake` was added to the CI package list and to
 message says CI compiles it, and Project 7 shipped exactly that sentence
 while it was false.
 
+> **Corrected on Sunday 4 October 2026.** The first sentence is wrong about
+> `cmake`. Checked on win11 aquamarine: `cmake` is present and on `PATH`,
+> version 4.4.2 at `C:\Program Files\CMake\bin\cmake`. What is absent is
+> the compiler, and that part is right: no `gcc`, no `cc`, no `clang` and no
+> `make` on `PATH`. A host `gcc` bundled with Qt does exist on that machine
+> and there is a standing rule never to run it, so "not on `PATH`" and "not
+> to be used" point the same way.
+>
+> The conclusion is unchanged and the reason is narrower than it was
+> written. `CMakeLists.txt` opens with `project(adxl345 LANGUAGES C)`, which
+> cannot configure without a compiler, so having `cmake` buys nothing here
+> and the compiling still happens on the WSL build laptop and in CI. This is
+> the same fault the entry above it describes: a reason given for an absence,
+> correct in its conclusion and wrong in its stated cause, which is the kind
+> that survives review.
+
 **The checks were proved by breaking what they check.** Four defects
 introduced deliberately, five findings, each naming the fault:
 
