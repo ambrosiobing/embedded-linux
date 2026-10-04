@@ -1385,3 +1385,34 @@ text did not say where INT1 is. Both were read on Saturday 3 October 2026:
 0x53 with SDO to GND, and INT1 on header pin 16, which is BCM 23. Help
 text is documentation that ships inside the binary, and it goes stale the
 same way a document does.
+
+**Proved by removing it.** Two new assertions that pass are two assertions
+that might always pass, and this repository has shipped three checks that
+never fired. The break needed no edit, because the instrument is one commit
+old: restoring `apps/adxl-map.c` from `HEAD~1` while leaving
+`scripts/adxl345-install-purge.sh` alone puts the checks in front of a
+binary that cannot satisfy them.
+
+| | prover | outer test |
+|---|---|---|
+| instrument present | 32 passed, 0 failed | 15 passed, 0 failed, 0 skipped |
+| instrument removed | 30 passed, 2 failed | 14 passed, 1 failed, 0 skipped |
+
+Both on the WSL build laptop JPTOUPM678 on Sunday 4 October 2026, in
+`debian:trixie-slim` under podman. The failing run named what it found
+rather than only what it wanted, printing the `adxl-map` output it had
+searched, and the file was restored from `HEAD` afterwards with `git status`
+confirming the tree clean.
+
+**Three mistakes in the hand-over, worth more than the result.** The clone
+on that laptop is at `/home/bing/src/embedded-linux-bench` and the standing
+rule is absolute paths, never `~`, because `~` exists on the board too. The
+block went over as `~/embedded-linux-bench` and the `cd` failed, which is
+the guard working and is not the same as the guard being unnecessary. Then
+the container is gated behind `BENCH_INSTALL_TEST=1`, documented at line 30
+of the very file being handed over, so the first attempt ran three
+assertions and skipped the two that were the point. Then the predicted
+assertion count came from this project's README rather than from a run, and
+the README was one behind, which is the same fault the README was about to
+be corrected for. Each of the three was a fact available in a file that was
+not read before writing the block.
