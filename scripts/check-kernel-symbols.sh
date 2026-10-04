@@ -298,22 +298,42 @@ check_fragment() {
 			# be checked here, so the other two are reported as unchecked
 			# rather than passed silently. A claim nobody can verify is
 			# not evidence, and saying so is cheaper than pretending.
-			named= ; missing=
+			# unmatched, not missing. "missing" is the count of MISSING
+			# symbols this run, tested with -gt at the end of the
+			# script, and reusing the name here turned that number into
+			# a string the moment any claim failed:
+			#
+			#     check-kernel-symbols.sh: 353: [: Illegal number:
+			#                              lib/Kconfigkasan
+			#
+			# Found on Sunday 4 October 2026 by the first consequence
+			# markers this tree has carried.
+			named= ; unmatched=
 			for word in $marker_text; do
 				case $word in
 				*Kconfig*)
-					word=$(printf '%s' "$word" | tr -d ',.;')
+					# Trailing punctuation only. This was tr -d ',.;',
+					# which deletes those characters wherever they
+					# occur, so lib/Kconfig.debug arrived here as
+					# lib/Kconfigdebug and could never match. Every
+					# Kconfig with a suffix was affected, which is
+					# lib/Kconfig.debug, .kgdb, .kasan, .kfence and
+					# mm/Kconfig.debug among others, so the check
+					# reported a FALSE CLAIM against claims that were
+					# true. Only a path with no dot in it, such as
+					# kernel/trace/Kconfig, ever passed.
+					word=$(printf '%s' "$word" | sed 's/[,.;]*$//')
 					if printf '%s\n' "$all" | grep -qx "$word"; then
 						named="$named $word"
 					else
-						missing="$missing $word"
+						unmatched="$unmatched $word"
 					fi
 					;;
 				esac
 			done
 
-			if [ -n "$missing" ]; then
-				echo "            FALSE CLAIM: the comment names$missing,"
+			if [ -n "$unmatched" ]; then
+				echo "            FALSE CLAIM: the comment names$unmatched,"
 				echo "            which does not select CONFIG_$sym."
 				fail=1
 			elif [ -n "$named" ]; then
