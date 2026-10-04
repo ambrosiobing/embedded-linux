@@ -1321,3 +1321,67 @@ reset values and nothing in the session wrote them. A clone with different
 reset values is a candidate and is not asserted; one power cycle and a read
 before any write settles it. And the library has still not run on this
 part, so criteria 1, 3 and 6 are untouched by any of this.
+
+## 24. A criterion that named a measurement with nothing able to take it
+
+*Sunday 4 October 2026.* Criterion 1 reads "`adxl_open` succeeds in under
+100 ms at 400 kHz". It has read that since the acceptance table was
+written on Monday 21 September 2026, and until today nothing in this tree
+timed anything at all. Checked rather than assumed: no `clock_gettime`, no
+`gettimeofday`, nothing in `src/`, nothing in `apps/`, nothing in either
+test suite. `src/platform.c` calls `nanosleep`, which spends time rather
+than measuring it. The criterion was not failing and it was
+not blocked on hardware: it had no instrument, so the only way it could
+ever have closed was somebody timing a whole process with `time` and
+calling that figure the open.
+
+That is a different fault from a blank row and it hides better. A blank
+row is honest about being empty. A criterion with no instrument looks
+like work waiting on a board, and the board was never what it waited on.
+It joins the two in this project already recorded under the same shape:
+the sentence claiming nothing had been compiled while CI compiled it on
+every push, and the limitation I invented about a mounting that moves.
+Each was a statement about the project that nobody had checked against
+the project.
+
+**The instrument.** `adxl-map` now brackets `adxl_open` with
+`CLOCK_MONOTONIC` and prints the elapsed time to stderr on every run,
+whether the open succeeded or failed, in milliseconds and again in
+microseconds. Three decisions in it are worth keeping:
+
+- **It is in the application, not the library.** Criterion 4 pins the
+  library at exactly six exported symbols. A seventh for timing would
+  have closed criterion 1 by breaking criterion 4, and timing a public
+  call from outside is what a caller does anyway.
+- **It names which path it measured.** With `-i` the open also opens a
+  gpiochip and requests a line, and that is the slow half. A time
+  reported without saying whether the interrupt path was inside it
+  invites the faster of the two numbers to be quoted for both.
+- **It says when it could not measure.** If either `clock_gettime` fails
+  the program says so instead of printing a zero, because a zero here
+  reads like a very fast open.
+
+**Asserted without a sensor.** `scripts/adxl345-install-purge.sh` already
+runs `adxl-map` in a container with no `/dev/i2c-*` to prove an absent bus
+is reported rather than faulted. A failed open is still a timed open, so
+two assertions go there: that the figure is printed, and that the line
+says which path it covers. The number in a container is meaningless and is
+not checked. What is checked is that the instrument exists and fires,
+which is the half that was missing.
+
+**What is still not measured, and the trap in measuring it.** The open
+time on eplepi, and the bus frequency it was taken at. The second is the
+one with the trap: `kas/bench-userdrv.yml` sets I2C1 to 400 kHz, and that
+file configures a Yocto image for a Pi 4. The board that has the sensor on
+it is a Raspberry Pi 3 Model B+ running Raspberry Pi OS from a card that
+`kas` file never touched, so quoting 400 kHz from it would be a
+measurement borrowed from a different machine. Where the running board
+states its own bus clock has not been checked; it is a step on the board,
+not a choice to make here.
+
+**Two stale strings fixed in passing.** The `-a` help text said which
+strap address this board uses "has not been read yet", and the `-i` help
+text did not say where INT1 is. Both were read on Saturday 3 October 2026:
+0x53 with SDO to GND, and INT1 on header pin 16, which is BCM 23. Help
+text is documentation that ships inside the binary, and it goes stale the
+same way a document does.

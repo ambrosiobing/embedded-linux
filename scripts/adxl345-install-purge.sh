@@ -242,6 +242,24 @@ else
 	no "its message does not name the bus" "$out"
 fi
 
+# Criterion 1 is a time, and until Sunday 4 October 2026 nothing could
+# produce it. The instrument is in adxl-map, and this is the only place it
+# can be exercised with no sensor: a failed open is still a timed open, so
+# the line has to appear here even though the number it carries is
+# meaningless on a bus that does not exist. What is asserted is that the
+# instrument runs and says which path it measured, not that it is fast.
+if printf '%s' "$out" | grep -q 'adxl_open .* ms (.* us)'; then
+	ok "adxl-map timed the open and printed the figure"
+else
+	no "adxl-map printed no open time, so criterion 1 has no instrument" \
+		"$out"
+fi
+if printf '%s' "$out" | grep -q 'interrupt line requested'; then
+	ok "and it says whether the interrupt path was part of that time"
+else
+	no "it timed the open without saying which path it measured" "$out"
+fi
+
 echo
 echo "--- purge, and what is allowed to survive it"
 # The file list is taken BEFORE the purge, because dpkg -L says nothing

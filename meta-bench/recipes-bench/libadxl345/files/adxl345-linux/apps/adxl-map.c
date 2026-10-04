@@ -13,12 +13,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <adxl.h>
 
 /* FULL_RES fixes the scale at 3.9 mg per count at every range, which is
  * the reason the library always sets it. */
 #define MILLI_G_PER_COUNT 39 /* tenths of a milli-g, to stay in integers */
+
+/*
+ * How long adxl_open took.
+ *
+ * Criterion 1 of this project is "adxl_open succeeds in under 100 ms at
+ * 400 kHz", and until Sunday 4 October 2026 nothing in this tree could
+ * produce that number. The criterion named a measurement and no
+ * instrument existed to take it, which is the same shape as a blank left
+ * looking like a gap: it would have been closed eventually by somebody
+ * timing the whole process with a wristwatch and calling it the open.
+ *
+ * It is here rather than in the library on purpose. Criterion 4 pins the
+ * library at exactly six exported symbols, so a seventh for timing would
+ * close one criterion by breaking another. Timing a public call from
+ * outside is also what a caller actually does.
+ *
+ * CLOCK_MONOTONIC rather than CLOCK_REALTIME: a clock step during the
+ * open would otherwise be reported as the open taking it.
+ */
+static long long elapsed_us(const struct timespec *a, const struct timespec *b)
+{
+	return (long long)(b->tv_sec - a->tv_sec) * 1000000 +
+	       (b->tv_nsec - a->tv_nsec) / 1000;
+}
 
 static volatile sig_atomic_t stop_requested;
 
@@ -36,10 +61,12 @@ static void usage(const char *argv0)
 		"\n"
 		"  -d  I2C bus. Default /dev/i2c-1, the Raspberry Pi header.\n"
 		"  -a  address. 0x53 with SDO low, 0x1d with SDO high.\n"
-		"      Which one this board is has not been read yet; see\n"
-		"      the project design, Figure 2.\n"
+		"      The DFRobot SEN0032 on this bench has SDO strapped to\n"
+		"      GND and answered at 0x53 on Saturday 3 October 2026,\n"
+		"      so the default is the measured one and not a guess.\n"
 		"  -i  BCM offset of INT1. Omitted means not wired, and the\n"
-		"      library polls instead.\n"
+		"      library polls instead. On this bench INT1 goes to\n"
+		"      header pin 16, which is BCM 23, so: -i 23.\n"
 		"  -r  range in g. Default 2.\n"
 		"  -f  output data rate in Hz. Default 100.\n"
 		"  -n  stop after COUNT bursts. Default 0, meaning run until\n"
@@ -58,6 +85,16 @@ int main(int argc, char **argv)
 	long done = 0;
 	adxl_dev *d = NULL;
 	int16_t samples[ADXL_FIFO_DEPTH][ADXL_AXES];
+	/*
+	 * Both initialised, and the "did it work" kept in its own flag
+	 * rather than smuggled into tv_sec. With the flag folded into the
+	 * value, -Wmaybe-uninitialized cannot prove t1 is never read on the
+	 * path where reading the clock failed, and this project builds with
+	 * -Werror, so the compiler's doubt would be a red CI run.
+	 */
+	struct timespec t0 = { .tv_sec = 0, .tv_nsec = 0 };
+	struct timespec t1 = { .tv_sec = 0, .tv_nsec = 0 };
+	int timed = 1;
 	int rc, i;
 
 	for (i = 1; i < argc; i++) {
@@ -94,7 +131,43 @@ int main(int argc, char **argv)
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 
+	/*
+	 * Timed whether or not anyone asked, because a measurement behind a
+	 * flag is a measurement nobody has. It goes to stderr, so stdout
+	 * stays a column of numbers something else can read.
+	 */
+	if (clock_gettime(CLOCK_MONOTONIC, &t0) != 0)
+		timed = 0;
 	rc = adxl_open(&d, path, addr, int_gpio);
+	if (clock_gettime(CLOCK_MONOTONIC, &t1) != 0)
+		timed = 0;
+
+	if (timed) {
+		long long us = elapsed_us(&t0, &t1);
+
+		/*
+		 * Which path was taken is part of the number. With -i the
+		 * open also opens a gpiochip and requests a line, and that
+		 * is the slow half; reporting a time without saying which
+		 * of the two was measured invites the faster one to be
+		 * quoted for both.
+		 */
+		fprintf(stderr,
+			"%s: adxl_open %s after %lld.%03lld ms (%lld us), "
+			"%s, CLOCK_MONOTONIC\n",
+			argv[0], rc == ADXL_OK ? "returned" : "failed",
+			us / 1000, us % 1000, us,
+			int_gpio < 0 ? "no interrupt line requested"
+				     : "interrupt line requested");
+	} else {
+		/* Say that the question could not be asked, rather than
+		 * printing a zero that reads like a fast open. */
+		fprintf(stderr,
+			"%s: the monotonic clock could not be read, so how "
+			"long adxl_open took is not reported\n",
+			argv[0]);
+	}
+
 	if (rc != ADXL_OK) {
 		/*
 		 * Name the likely cause rather than printing a number. A
