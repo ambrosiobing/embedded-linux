@@ -749,10 +749,19 @@ def check_control_bytes() -> None:
 
     Everything passed. This linter was clean, the Markdown was valid, the
     link check had nothing to say, and the damage was findable only by
-    reading the bytes. That is the argument for a rule rather than more
-    prose: the same class has eaten a backslash continuation in a recipe
-    four times and a printf format string twice, and nothing mechanical
-    could see any of it.
+    reading the bytes.
+
+    WHAT THIS COVERS IS NARROWER THAN THE HAZARD, and the commit that added
+    it said otherwise, which was wrong. An escape producing a non-printable
+    byte is refused: backslash-b gives 0x08, backslash-a 0x07, backslash-f
+    0x0c, backslash-zero a NUL. An escape producing legitimate whitespace is
+    invisible here, and those are the two that have cost this repository the
+    most. Backslash-n gives 0x0a, which is how a printf format string
+    acquired a real newline twice. A dropped backslash continuation leaves
+    no byte at all, which is how a recipe lost a line four times. Neither is
+    reachable by looking at bytes, so the Edit tool and an asserted anchor
+    remain the only defence against them. Four of the seven escapes checked
+    on Sunday 4 October 2026 are refused here and three are not.
 
     What this does not look at: files whose suffix is in BINARY_SUFFIXES,
     the verbatim serial captures in VERBATIM_CAPTURES, and anything git does
