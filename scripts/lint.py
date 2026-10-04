@@ -776,9 +776,20 @@ def check_control_bytes() -> None:
         print("note: not a git checkout, control bytes not checked")
         return
 
-    for name in listing.split("\0"):
-        if not name or name in VERBATIM_CAPTURES:
-            continue
+    tracked = {name for name in listing.split("\0") if name}
+
+    # An exemption that names a file nobody tracks any more exempts nothing,
+    # while still reading as though three captures are covered. That is the
+    # same fault as a check that passes for the wrong reason, and it is
+    # silent in exactly the same way, so the list is asked to account for
+    # itself before it is used.
+    for name in sorted(VERBATIM_CAPTURES - tracked):
+        fail(ROOT / "scripts/lint.py",
+             f"VERBATIM_CAPTURES names {name}, which git does not track. "
+             f"Either it was renamed, in which case fix the entry, or it is "
+             f"gone, in which case remove it. As written it exempts nothing.")
+
+    for name in sorted(tracked - VERBATIM_CAPTURES):
         path = ROOT / name
         if path.suffix.lower() in BINARY_SUFFIXES or not path.is_file():
             continue
