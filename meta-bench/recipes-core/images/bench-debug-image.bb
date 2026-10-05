@@ -96,10 +96,63 @@ IMAGE_INSTALL:remove = "bench-status"
 #
 # To get the stock behaviour back, drop this and read
 # /var/lib/systemd/pstore/ instead.
-ROOTFS_POSTPROCESS_COMMAND += "mask_systemd_pstore; "
+#
+# MEASURED ON THE BOARD, Monday 5 October 2026, and it corrects the block
+# above. None of that sequence happens on this image, because neither half
+# of it is present:
+#
+#   /usr/lib/systemd/system/systemd-pstore.service   does not exist
+#   journalctl -b | grep -i pstore                   only the kernel's own
+#                                                    two lines, so systemd
+#                                                    never tried to mount
+#                                                    it and never logged a
+#                                                    failure
+#
+# This systemd was built without its pstore component. The mask above is
+# therefore a symlink to /dev/null for a unit that is not here. It is kept
+# as insurance, because a later layer or PACKAGECONFIG change could bring
+# the service in and the argument for masking it would hold again. What it
+# is not, and what the block above implies it is, is a guard against
+# something currently happening.
+#
+# The real problem is the opposite one. Nothing mounts the filesystem, so a
+# crash record sits in the backend while /sys/fs/pstore is an empty
+# directory, which reads exactly like the failure the block above was
+# written to prevent. docs/BRINGUP.md step 6 runs `mount | grep pstore` and
+# expects a mount; without the unit below that step is a false negative
+# every time, and it was one on Sunday 4 October 2026.
+#
+# The unit directory is /usr/lib/systemd/system, read off the running board
+# rather than assumed: it is where bench-status.service was loaded from
+# before that daemon was removed from this image.
+ROOTFS_POSTPROCESS_COMMAND += "mask_systemd_pstore; mount_pstore; "
 
 mask_systemd_pstore() {
     install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system
     ln -sf /dev/null \
         ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/systemd-pstore.service
+}
+
+mount_pstore() {
+    unitdir=${IMAGE_ROOTFS}/usr/lib/systemd/system
+    wants=${IMAGE_ROOTFS}${sysconfdir}/systemd/system/sysinit.target.wants
+    install -d "$unitdir" "$wants"
+    cat > "$unitdir/sys-fs-pstore.mount" <<'UNIT'
+[Unit]
+Description=Persistent Store File System
+Documentation=https://github.com/ambrosiobing/embedded-linux
+DefaultDependencies=no
+ConditionPathExists=/sys/fs/pstore
+Before=sysinit.target
+
+[Mount]
+What=pstore
+Where=/sys/fs/pstore
+Type=pstore
+Options=nosuid,nodev,noexec
+
+[Install]
+WantedBy=sysinit.target
+UNIT
+    ln -sf /usr/lib/systemd/system/sys-fs-pstore.mount "$wants/sys-fs-pstore.mount"
 }

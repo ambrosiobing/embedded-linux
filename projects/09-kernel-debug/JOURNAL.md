@@ -409,14 +409,18 @@ own clock reads 26 June 2025 throughout and none of its wall times are
 used here. After 23:09 nothing on either host wrote a wall clock, so
 the rows below that point are ordered from the console transcript and
 carry no time of their own. The last of them ran past midnight into
-Monday 5 October 2026.
+Monday 5 October 2026. Four capture files exist from that
+evening rather than two, found by listing the directory on Monday 5
+October 2026 after this entry had been written from their modification
+times alone. Two are false starts at 265 and 0 bytes; an empty picocom
+log is an abandoned session and not a corrupt one.
 
 | Time | What happened |
 | --- | --- |
 | 21:14 | `/dev/ttyUSB0` present on JPTOUPM678, picocom installed |
 | 21:18 | picocom started, `proj09-firstboot-2026-10-04-2118.log` |
 | 21:18 to 21:23 | 303 `BUG: sleeping function` traces, one per second, 713,037 bytes. The log opens at board time 32.4 s, so the first 32 seconds were never recorded |
-| about 21:25 | board powered down. The LED on pin 11 was lit and steady, not beating |
+| about 21:27 | board powered down. The LED on pin 11 was lit and steady, not beating. A second capture had run from 21:25, `proj09-firstboot-2026-10-04-2125.log`, 256,566 bytes and about 109 more traces, which was not known about when this entry was first written |
 | 21:27 | card in the reader, `/dev/sde`, `sde1` vfat `boot`, `sde2` ext4 `root` |
 | about 21:30 | `config.txt` carries all three `dtoverlay` lines, exactly as written |
 | about 21:32 | `cmdline.txt` carries `kgdboc=ttyAMA0,115200` and `nokaslr` |
@@ -831,3 +835,93 @@ Two words spliced together out of the middle of the line. The board's
 shell is BusyBox ash and its console has no flow control. Commands typed
 at that console are kept short from here, and anything long is written to
 the card from the reader instead.
+
+
+## 22. Monday 5 October 2026: the three fixes, and thirty lines about a service that is not in the image
+
+**What happened.** The three things Sunday left open were applied and taken
+to a board. All four predictions written down beforehand held.
+
+| Predicted | Observed |
+| --- | --- |
+| `bench-status` gone, no EBUSY, no restart loop | `Unit bench-status.service could not be found.` |
+| the `audit` pair every 2.5 s gone, since it was that loop | gone. What remains is ordinary startup BPF loading, prog-id 6 to 19, which stops |
+| `cfg80211: failed to load regulatory.db` gone | gone. Instead the four regulatory certificates load |
+| the heartbeat still beating, nothing now competing | `[heartbeat]` in brackets |
+
+And one that was not predicted and is better: `wlan0` took
+`192.168.92.154/24` on the first boot with no intervention at all. Sunday's
+WiFi trouble was entirely the placeholder key and the `RemainAfterExit`
+no-op, and nothing about the credentials file or the radio.
+
+The rebuild was 1 min 45 s, 5,383 tasks of which 5,350 cached, against 48
+minutes on Sunday. It is archived as `2026-10-05_c246665`, the first
+archive of this project whose provenance record is exactly true, because
+the tree was clean when it was taken.
+
+**The overlay check ran against a card for the first time.** Until this
+point it had only ever seen fixtures in /tmp:
+
+    --- requested    5: disable-bt gpio-led ramoops vc4-fkms-v3d vc4-kms-dsi-7inch
+    --- commented out, not checked: act-led
+    --- on the card  69 .dtbo files
+    --- every requested overlay is present
+
+It found the commented `#dtoverlay=act-led` in the stock config.txt and
+named it. That branch had never run against real input before.
+
+**A reading note about KFENCE.** This boot produced no KFENCE report, and
+Sunday's produced two. That is not a fix. KFENCE guards a small random
+sample of allocations, 255 objects at a time, so a defect caught twice in
+one boot can go unsampled in the next. The write past the end of that
+eighteen byte `usb_device_descriptor` is still there. Absence of a report
+is absence of a sample.
+
+**And the thirty lines that describe something which cannot happen here.**
+`/sys/fs/pstore` was still not mounted, so the question was finally put to
+the board rather than reasoned about:
+
+    journalctl -b | grep -i pstore
+      only the kernel's own two lines
+
+    ls -l /usr/lib/systemd/system/systemd-pstore.service
+      No such file or directory
+
+systemd never attempted the mount, never logged a failure, and does not
+contain the service at all. This systemd was built without its pstore
+component.
+
+`bench-debug-image.bb` spends thirty lines explaining why
+`systemd-pstore.service` must be masked, and masks it, against a unit this
+image does not have. The mask is a symlink to /dev/null for a file that is
+not there: harmless, and not the guard the comment says it is.
+
+The consequence is the opposite of the one it worries about. That comment
+fears an archiver moving records out from under the reader. What actually
+happens is that nothing mounts the filesystem at all, so a crash record
+sits in the backend while `/sys/fs/pstore` is an empty directory, which
+reads exactly like the failure being guarded against. `docs/BRINGUP.md`
+step 6 runs `mount | grep pstore` and expects a mount, and on Sunday that
+step was a false negative.
+
+**What was done.** A `sys-fs-pstore.mount` unit, installed by the image
+and wanted by `sysinit.target`. The mask stays, relabelled as insurance
+against a later layer bringing the service in rather than described as
+preventing something current.
+
+**Why not simply correct BRINGUP instead.** Because the document was
+right. A debugging lab should have its crash records visible at a path
+every instruction ever written about pstore names. Teaching the reader to
+mount it by hand each boot moves the cost onto the person who is already
+dealing with a crash.
+
+**Not yet seen on hardware.** The mount unit is written and not yet
+booted. Everything else in this entry was measured.
+
+**The third of its kind this week.** Project 10's image recipe asserts
+that the gpio-led overlays claim those lines so libgpiod cannot open them,
+which was never true on any card. `leds.conf` ships a Pi 4 chip label that
+never matches on a Pi 3, so the width fallback is the normal path rather
+than the exception its own comment calls it. And now thirty lines about a
+service that is not installed. All three are correct reasoning about a
+premise nobody put to a board.
