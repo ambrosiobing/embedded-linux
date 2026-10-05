@@ -25,6 +25,7 @@ IMAGE_INSTALL:append = " \
     linux-firmware-rpidistro-bcm43455 \
     kernel-module-brcmfmac \
     kernel-module-brcmfmac-wcc \
+    wireless-regdb-static \
     bench-status \
 "
 
@@ -46,6 +47,28 @@ IMAGE_INSTALL:append = " \
 #
 # wcc is the Cypress and Infineon variant, which is what the Pi 4 carries.
 # bca is the other one and is not needed here.
+
+# The third piece of the same chain is the regulatory database. Driver and
+# firmware get the radio probing; without regulatory.db the kernel falls
+# back to its built-in world domain, which is the conservative one: fewer
+# channels and lower transmit power than the country actually permits.
+# Observed on a Raspberry Pi 3 Model B Plus on Sunday 4 October 2026, on
+# every boot:
+#
+#   platform regulatory.0: Direct firmware load for regulatory.db failed
+#                          with error -2
+#   cfg80211: failed to load regulatory.db
+#
+# THE PACKAGE IS NOT NAMED AFTER THE RECIPE. poky's wireless-regdb recipe
+# declares PACKAGES = "${PN}-static ${PN}", and it is FILES:${PN}-static
+# that holds regulatory.db and regulatory.db.p7s. Asking for
+# "wireless-regdb" would build the recipe, install a package containing no
+# database, and leave the two lines above exactly where they were. That is
+# the same failure shape as asking for bench-buggy instead of
+# kernel-module-buggy, which bench-debug-image.bb records for its own.
+#
+# The "static" in the name is about the database being a file rather than a
+# CRDA lookup, not about linkage.
 
 # The Pi 4 radio firmware is proprietary and binary-redistributable, so
 # Yocto refuses to build it until the licence is accepted explicitly.
