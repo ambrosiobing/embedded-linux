@@ -74,4 +74,40 @@ else
 	sudo bmaptool copy --nobmap "$image" "$dev"
 fi
 sync
-note "written. Connect the console at 115200 8N1 before powering up."
+note "written."
+
+# The card is written and still in the reader, which is the last moment the
+# boot partition can be read before it becomes a board's problem. config.txt
+# can name an overlay whose .dtbo was never deployed, and the firmware skips
+# it in silence: the board boots and the feature is simply absent. That cost
+# Project 9 a boot, a card and most of an evening on Sunday 4 October 2026.
+case $dev in
+*[0-9]) part=${dev}p1 ;;
+*) part=${dev}1 ;;
+esac
+
+overlays=unchecked
+if [ -b "$part" ]; then
+	mnt=$(mktemp -d)
+	if sudo mount -o ro "$part" "$mnt" 2>/dev/null; then
+		if sh "$(dirname "$0")/check-overlays.sh" "$mnt"; then
+			overlays=ok
+		else
+			overlays=bad
+		fi
+		sudo umount "$mnt"
+	else
+		note "could not mount $part read-only, so the overlays on this"
+		note "card were NOT checked. Mount it and run:"
+		note "    ./go overlays /path/to/boot"
+	fi
+	rmdir "$mnt" 2>/dev/null || true
+else
+	note "no $part, so the overlays on this card were NOT checked."
+fi
+
+note "Connect the console at 115200 8N1 before powering up."
+
+# Non-zero on purpose. The image is written either way, and a card that will
+# boot with features silently missing is worth failing the command over.
+[ "$overlays" != bad ] || exit 1

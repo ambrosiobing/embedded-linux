@@ -94,6 +94,15 @@ this project has four candidates rather than the usual one.
 | The ramoops RAM region | the pstore driver, reserved by a device-tree node | the page allocator, which must never see it | The region is reused across a reboot and the crash record is whatever was there |
 | `vmlinux` on the host | the build that produced the running kernel | any other build | Addresses resolve to the wrong symbols, confidently and silently |
 | `/sys/kernel/debug/buggy/trigger` | the buggy module | nothing else writes it | none; it is write-only and trigger-driven on purpose |
+| GPIO17 | `leds-gpio`, created by `dtoverlay=gpio-led` and driven by `ledtrig-heartbeat` | `bench-status`, which claims 17, 27 and 22 through libgpiod and arrives with `bench-image` | The daemon asks for all three lines in one request, gets EBUSY and restarts forever. Were it to win instead, the LED would sit lit, and a frozen lit lamp is indistinguishable from a healthy board |
+
+**The GPIO17 row was added on Sunday 4 October 2026, after the thing it
+describes had already happened.** The conflict had been present since
+this image first required `bench-image`, and it never showed because
+`gpio-led.dtbo` was on no card, so `leds-gpio` was never created and
+never competed. A table that exists to catch two managers on one
+resource was missing the one resource that had two, and nothing failed
+for as long as one of the two could not start.
 
 The `vmlinux` row is the one that bites hardest, because the failure is
 not an error. A `vmlinux` from a different build of the same source gives

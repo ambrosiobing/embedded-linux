@@ -49,6 +49,7 @@
 #   sudo ./go card-archive PROJECT /dev/sdX   keep a copy of a whole card
 #   ./go card-archive list    what card images have been kept
 #   ./go flash /dev/sdX [IMAGE]   write an image to a card
+#   ./go overlays /mnt/boot      every dtoverlay= in config.txt has its .dtbo
 #   ./go ksym         check the fragment names real symbols, before a build
 #   ./go kconfig      check that the kernel fragment reached the .config
 #   ./go reproduce    build the same commit again and diff the package lists
@@ -106,6 +107,7 @@ sdk-check)  exec sh ./scripts/sdk.sh check ;;
 archive)    shift; exec sh ./scripts/archive.sh "$@" ;;
 card-archive) shift; exec sh ./scripts/card-archive.sh "$@" ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
+overlays)   shift; exec sh ./scripts/check-overlays.sh "$@" ;;
 ksym)       shift; exec sh ./scripts/check-kernel-symbols.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
 reproduce)  shift; exec sh ./scripts/reproduce.sh "$@" ;;

@@ -39,6 +39,35 @@ IMAGE_INSTALL:append = " perf"
 # that cannot write one anywhere is worse than a large image.
 IMAGE_ROOTFS_EXTRA_SPACE = "262144"
 
+# --- the second claimant on GPIO17 --------------------------------------
+#
+# bench-image installs bench-status, Project 12's LED daemon, which drives
+# GPIO 17, 27 and 22 through libgpiod and gives them a health meaning:
+# green healthy, yellow starting, red failed. kas/bench-debug.yml declares
+# a gpio-led overlay on 17 for the kernel's heartbeat trigger, and
+# docs/DESIGN.md's ownership table gives that line to ledtrig-heartbeat.
+#
+# Two claimants, and only one can win. leds-gpio takes the line from the
+# device tree during probe, so bench-status asks for 17, 27 and 22 in a
+# single all or nothing libgpiod request, gets EBUSY and exits 1. Measured
+# on Sunday 4 October 2026, with systemd restarting it 301 times before it
+# was stopped by hand:
+#
+#     bench-status: requesting lines 17/27/22: Device or resource busy
+#
+# bench-ab-image.bb and bench-lcd35a-image.bb already resolve this the same
+# way for the same reason. This image had not, and the reason it had never
+# shown is worth recording: until that evening gpio-led.dtbo was not
+# deployed to any card, so leds-gpio never competed and nothing ever
+# failed. The conflict was always here; only the evidence was missing.
+#
+# The heartbeat wins rather than the health indicator, and the reason is
+# specific to this project. The LED is the instrument that still reports
+# once the kernel has stopped, and a userspace daemon cannot do that: it
+# would freeze lit, and a frozen lit lamp is indistinguishable from a
+# healthy one.
+IMAGE_INSTALL:remove = "bench-status"
+
 # --- the second manager on /sys/fs/pstore -------------------------------
 #
 # systemd mounts pstore itself (src/shared/mount-setup.c has an entry for
