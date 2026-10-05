@@ -155,6 +155,12 @@ The `heartbeat` trigger should be the one in brackets. The LED should be
 visibly beating. It is the only instrument that still reports once the
 kernel has stopped, so confirm it now rather than when you need it.
 
+![The LK-LED10 on pin 11 of the Raspberry Pi 3 Model B Plus under the kernel's heartbeat trigger, Sunday 4 October 2026, looped over two periods. The pattern is two flashes of about 100 ms separated by 0.30 s, repeating every 1.22 s. That was measured from the 11 s source recording by normalising the red channel of the dome against the white background beside it, and measured again from this file, which gives 0.30 s and 1.23 s. A steady lamp instead of this means something else owns GPIO17, which is entry 17 of the journal.](figures/heartbeat.gif)
+
+If it is lit but not beating, read
+`systemctl status bench-status` before anything else. A userspace daemon
+holding the line looks exactly like a trigger that did not attach.
+
 ## 6. Check pstore is mounted and empty
 
 **On the board over the picocom console:**

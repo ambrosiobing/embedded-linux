@@ -392,3 +392,442 @@ fixed.
 instrument that reports after the kernel has stopped, and whether it does
 so on this image is a board question like every other row in the
 acceptance table.
+
+
+## 15. Sunday 4 October 2026 from 21:14, into Monday 5 October 2026, minute by minute
+
+**What happened.** The debug image reached a board for the first time.
+Seven things were found, four of them defects in this repository rather
+than in the kernel, and one of them a real memory safety fault that only
+this image could have seen. The order matters, because three of the
+seven were visible only because of the fix for the one before.
+
+Times carrying seconds are read from log timestamps. Times given to the
+minute come from file modification times, or bracket a command between
+two timestamped events either side of it. The board has no RTC, so its
+own clock reads 26 June 2025 throughout and none of its wall times are
+used here. After 23:09 nothing on either host wrote a wall clock, so
+the rows below that point are ordered from the console transcript and
+carry no time of their own. The last of them ran past midnight into
+Monday 5 October 2026.
+
+| Time | What happened |
+| --- | --- |
+| 21:14 | `/dev/ttyUSB0` present on JPTOUPM678, picocom installed |
+| 21:18 | picocom started, `proj09-firstboot-2026-10-04-2118.log` |
+| 21:18 to 21:23 | 303 `BUG: sleeping function` traces, one per second, 713,037 bytes. The log opens at board time 32.4 s, so the first 32 seconds were never recorded |
+| about 21:25 | board powered down. The LED on pin 11 was lit and steady, not beating |
+| 21:27 | card in the reader, `/dev/sde`, `sde1` vfat `boot`, `sde2` ext4 `root` |
+| about 21:30 | `config.txt` carries all three `dtoverlay` lines, exactly as written |
+| about 21:32 | `cmdline.txt` carries `kgdboc=ttyAMA0,115200` and `nokaslr` |
+| about 21:33 | `ls /mnt/boot/overlays/` returns 68 files and only `disable-bt.dtbo` of the three |
+| about 21:35 | `/etc/fstab` on `sde2` does mount `/boot`, so the WiFi unit's condition was never the obstacle |
+| 21:51:43 | kas run without `KAS_WORK_DIR` begins cloning poky, meta-openembedded and meta-raspberrypi into the checkout |
+| 21:52:24 | cancelled. 7.9 MB of `meta-raspberrypi` and a 4 kB `build` left behind |
+| 21:53:17 | the same gate with `KAS_WORK_DIR` and `KAS_BUILD_DIR` set resolves `KERNEL_DEVICETREE` with both overlays appended |
+| 21:55:25 | full `bitbake -e` to a file. The operation history shows the append attaching at `rpi-base.inc:110` |
+| 21:59:07 | build starts. Sstate: Wanted 478, Local 443, Missed 35, Current 1983 |
+| 22:00:15 | `linux-raspberrypi:do_compile` starts |
+| 22:15:00 | `do_compile` succeeds, 14 min 45 s |
+| 22:16:52 | `perf:do_compile` succeeds |
+| 22:38:24 | `do_compile_kernelmodules` succeeds, 23 min 23 s |
+| 22:46:11 | `do_rootfs` starts |
+| 22:47:43 | 5,382 tasks attempted, 5,313 cached, all succeeded |
+| 22:47:49 | build done, 48 min 42 s, 72 MB image |
+| about 22:52 | the overlays are flat in the deploy directory, not under `overlays/`, so the pre-flash check could not be written against it |
+| about 22:55 | flashed to `/dev/sde`, 200.6 MiB of 728.8 MiB mapped, 17.1 s at 11.7 MiB/sec |
+| about 22:57 | card now carries 70 overlays, `gpio-led.dtbo` and `ramoops.dtbo` among them |
+| about 22:58 | `cmdline.txt` gets `dwc_otg.fiq_enable=0 dwc_otg.fiq_fsm_enable=0`, original kept as `cmdline.txt.orig` |
+| 23:00 | picocom started, logfile stayed empty |
+| 23:01 | picocom restarted, 24,517 bytes captured |
+| 23:05:02 | the LED filmed, 11.17 s at 30.001 fps, 1920x1080 |
+| then | measured: two flashes of about 100 ms, 0.30 s apart, repeating every 1.22 s |
+| after 23:09 | root prompt. The flood is gone, replaced by one `audit` pair every 2.5 s |
+| then | `[heartbeat]` is the active trigger. `bench-status` is failing, restart counter 301 |
+| then | `bench-status: requesting lines 17/27/22: Device or resource busy`, verbatim as predicted |
+| then | ramoops registered at boot, but `/sys/fs/pstore` is not mounted |
+| then | `fiq_enable` and `fiq_fsm_enable` both read `N` against a default of `Y` |
+| then | `brcmfmac` has BCM4345/6 and firmware 7.45.265. `cfg80211: failed to load regulatory.db` |
+| then | reboot, and this time a full log from `[0.000000]` |
+| board 3.075 s and 4.62 s | two KFENCE reports in `hub_port_init` |
+| then | pstore mounted by hand: `console-ramoops-0`, 32,756 bytes, carrying the previous boot |
+| then | a 300 character paste overruns the UART input buffer and writes an empty key |
+| then | the generated supplicant config still holds a placeholder, because `start` on a `RemainAfterExit` oneshot does nothing |
+| past midnight | associated, `192.168.92.154/24`, ssh from aquamarine |
+
+**What was done.** One line of configuration changed, in
+`kas/bench-debug.yml`. Everything else in this list is a finding, a
+measurement, or a mistake. The image was rebuilt once, flashed once, and
+booted twice.
+
+**Why that and not the alternative.** The alternative, at 21:33 with the
+overlay list in hand, was to add the two overlays and get on with the
+acceptance criteria. That would have skipped the question of why a card
+had been built repeatedly without anyone reading its `overlays/`
+directory, which is the finding with the longest reach, because it is
+not specific to this project.
+
+
+## 16. Three overlays were named in config.txt and one was on the card
+
+**What happened.** The first boot put the LK-LED10 on pin 11 solidly lit
+rather than beating. A steady LED is not a slow heartbeat: the kernel
+trigger is mostly off, two short flashes and a pause, so a steady lamp
+means nothing is modulating it.
+
+`docs/BRINGUP.md` step 2 says to read the boot partition back after
+flashing, and that step had been skipped in favour of writing
+`wifi.conf`. Run late, it gave the answer in one line. Of the three
+overlays `config.txt` asks for, the card held one:
+
+    ls /mnt/boot/overlays/ | grep -E 'gpio-led|ramoops|disable-bt'
+    disable-bt.dtbo
+
+Sixty eight overlays were present. `gpio-led.dtbo` and `ramoops.dtbo`
+were not among them. The firmware skips a `dtoverlay=` line whose `.dtbo`
+is absent, and nothing in the kernel log mentions it, which is structural
+rather than unlucky: overlay handling finishes before the kernel starts.
+
+So the heartbeat LED was never created and ramoops reserved nothing. Two
+of this project's acceptance criteria were unreachable, from a
+`config.txt` that was exactly right.
+
+**Where it came from.** meta-raspberrypi builds `KERNEL_DEVICETREE` in
+`conf/machine/include/rpi-base.inc` out of `RPI_KERNEL_DEVICETREE` and a
+hand curated `RPI_KERNEL_DEVICETREE_OVERLAYS`. That list carries
+`gpio-ir`, `gpio-ir-tx`, `gpio-key`, `gpio-poweroff`, `gpio-shutdown`,
+`i2c-gpio`, `pps-gpio` and `w1-gpio`, and neither of the two this project
+needs. `KERNEL_DEVICETREE` appears nowhere in this repository, so the
+list was never extended.
+
+**What was done.** One line in `kas/bench-debug.yml`:
+
+    KERNEL_DEVICETREE:append = " overlays/gpio-led.dtbo overlays/ramoops.dtbo"
+
+Both overlay sources exist in the kernel tree at `rpi-6.6.y`, read out of
+the downloads mirror before the build rather than discovered by a failing
+`do_compile`:
+
+    arch/arm/boot/dts/overlays/gpio-led-overlay.dts
+    arch/arm/boot/dts/overlays/ramoops-overlay.dts
+    arch/arm/boot/dts/overlays/ramoops-pi4-overlay.dts
+
+There being two ramoops variants is worth the second look it got. This
+board is a Raspberry Pi 3 Model B Plus, so `ramoops` is correct, and
+`ramoops-pi4` would have built cleanly and reserved memory at an address
+this board does not have.
+
+The change was verified at four points before it was believed: the
+resolved variable from `bitbake -e`, the compiled `.dtbo` in the deploy
+directory, the boot partition after flashing with 70 overlays against the
+previous 68, and the running board.
+
+**Why the append goes on `KERNEL_DEVICETREE`.** Appending to the layer's
+own `RPI_KERNEL_DEVICETREE_OVERLAYS` would read better and is what the
+layer invites. It was rejected because an append to an internal variable
+that a later layer version renames does nothing and says nothing, which
+is the exact failure this line exists to repair.
+
+**The part that reaches past this project.** `kas/bench-rpi3-ab.yml` asks
+for `gpio-led` three times, on 17, 27 and 22. Project 10's slot LEDs have
+never had an overlay on any card either. That is not fixed here.
+
+And `meta-bench/recipes-core/images/bench-ab-image.bb` carries this,
+under a heading in capitals:
+
+    The gpio-led overlays in kas/bench-rpi3-ab.yml claim those lines in
+    the device tree, so libgpiod cannot open them at all
+
+The conflict it resolves is real and the resolution is right. The
+sentence justifying it has never been true on any card this bench has
+built. It was written as a statement about the device tree and never
+checked against a boot partition, which is the same failure as the one it
+was explaining.
+
+
+## 17. Two claimants for GPIO17, written down before the boot and read off it after
+
+**What happened.** With the overlay question answered, the lit LED was
+still unexplained. Entry 14 had recorded, from three modules on three
+pins on Friday 2 October 2026, that releasing a line to an input puts the
+module out and reads low. With nothing claiming GPIO17 it should have
+been dark.
+
+`bench-status.c` has the answer at lines 100 to 102:
+
+    cfg->offset[GREEN]  = 17;
+    cfg->offset[YELLOW] = 27;
+    cfg->offset[RED]    = 22;
+
+`bench-image.bb` installs `bench-status` at line 28, so Project 9
+inherits it. `leds.conf` ships `green=17` and `active_low=0`, and the
+daemon sets GREEN active whenever `/run/bench/state` reads `ok`,
+refreshing every 1000 ms. The steady lamp was the bench status daemon
+saying the system was healthy, on the pin this project's ownership table
+assigns to `ledtrig-heartbeat`.
+
+**The prediction, written before the board was powered.** With
+`gpio-led.dtbo` present, `leds-gpio` claims GPIO17 from the device tree
+during probe. `bench-status` asks for 17, 27 and 22 in a single
+`gpiod_chip_request_lines`, which is all or nothing, so it gets EBUSY and
+exits 1. The console should carry
+`bench-status: requesting lines 17/27/22: Device or resource busy`, and
+the LED should beat. Falsifiable in the direction that matters: if the
+LED beat and the daemon still ran, the reading of that single request was
+wrong.
+
+**What the board said.**
+
+    bench-status: lines 17/27/22, active high
+    bench-status: no chip labelled pinctrl-bcm2711, using the first wide enough chip
+    bench-status: requesting lines 17/27/22: Device or resource busy
+    bench-status.service: Main process exited, code=exited, status=1/FAILURE
+    bench-status.service: Scheduled restart job, restart counter is at 301
+
+Verbatim. And it closed a loose end that had been read as unrelated noise
+for an hour: the `audit: prog-id=N op=LOAD` and `op=UNLOAD` pair arriving
+every 2.5 seconds was this restart loop, each start loading a cgroup BPF
+program and unloading it when the process died 230 ms later. The symptom
+and the defect were the same event.
+
+**A second finding in the same three lines.** `leds.conf` ships
+`chip_label=pinctrl-bcm2711`, which is the Raspberry Pi 4 SoC. On a
+Raspberry Pi 3 Model B Plus the label is `pinctrl-bcm2835`, so that match
+never succeeds and the width fallback carries every Pi 3 image this bench
+builds. The source comment describes that fallback as being so that the
+daemon still starts on a board nobody has taught it about yet, which is
+not what is happening: it is the normal path here, not the exception.
+That belongs to Project 12.
+
+**What was done, and what was not.** The daemon was stopped by hand,
+which does not survive a reboot. The fix is
+`IMAGE_INSTALL:remove = "bench-status"` in `bench-debug-image.bb`, which
+is what `bench-ab-image.bb` and `bench-lcd35a-image.bb` already carry for
+the same reason. It is not applied yet.
+
+**Why that and not teaching the daemon another pin.** The same argument
+`bench-ab-image.bb` makes. The heartbeat and a health indicator are two
+meanings for one lamp, and an indicator that needs the image name to
+interpret is not an indicator. The heartbeat wins here because it is the
+instrument that keeps reporting after the kernel has stopped, which a
+userspace daemon cannot do: it would freeze lit, and a frozen lit lamp is
+indistinguishable from a healthy one.
+
+
+## 18. KFENCE found a write two bytes past a USB device descriptor
+
+**What happened.** The second boot, captured from `[0.000000]` because
+picocom was attached before power this time, carried two KFENCE reports.
+
+    BUG: KFENCE: memory corruption in hub_port_init+0x6bc/0xcc8
+    Corrupted memory at 0x000000003f22a999 [ ! ! . . . . . . . . . . . . . . ]
+    kfence-#18: size=18, cache=kmalloc-64
+      allocated by task 9 ... usb_get_device_descriptor+0x30/0x98
+                             hub_port_init+0x69c/0xcc8
+      freed     by task 9 ... hub_port_init+0x6bc/0xcc8
+
+Eighteen bytes is `sizeof(struct usb_device_descriptor)`. The two `!`
+marks are the first two bytes of the trailing redzone, so two bytes past
+the end of the object were written, and the canary check at free time
+caught it. It happened twice in the one boot, at 3.075 s as `kfence-#18`
+and at 4.62 s as `kfence-#23`, both during enumeration of the onboard
+hub, `idVendor=0424 idProduct=2514`.
+
+**What is established and what is not.** Established: the size, the
+allocation site, the free site, that the overwrite is two bytes past an
+eighteen byte object, and that it reproduces within a single boot. Not
+established: the mechanism. Nothing here says which code wrote those
+bytes, and no claim is made about it.
+
+Two other things sit in the same window, relationship unknown: a
+`WARNING` at `drivers/firmware/raspberrypi.c:69`, "Firmware transaction
+timeout", reached through `rpi_firmware_property_list` from
+`bcm2835_sdhost_set_clock` under `mmc_sd_init_card`, and
+`mmc0: Problem switching card into high-speed mode!`. They are recorded
+next to each other because they share a boot, not because they share a
+cause.
+
+**Why this entry exists at all.** This is the first thing Project 9 has
+found that could not have been found without the image it builds. KFENCE
+is one of the twelve acceptance criteria, and it has now produced a real
+report on real hardware rather than a configured symbol. The report is a
+notebook entry waiting to be written, not a closed question.
+
+**A reading note for whoever opens that log.** The two KFENCE reports and
+the firmware WARNING interleave line by line, because two CPUs were
+printing at once. Neither report is corrupt; they are braided.
+
+
+## 19. The vendor USB driver sleeps inside its own interrupt handler
+
+**What happened.** The first boot produced this 303 times in five
+minutes, one per second, 713,037 bytes of log:
+
+    BUG: sleeping function called from invalid context at /kernel/irq/manage.c:737
+    in_atomic(): 1, irqs_disabled(): 1, preempt_count: 10002
+      dwc_otg_handle_common_intr+0x484/0xda8
+      local_fiq_disable+0x28/0x40
+      disable_irq+0x2c/0x70
+
+with `hcd->lock` held through `DWC_SPINLOCK`. `disable_irq` waits for an
+in flight handler to finish, so it may sleep, and it is being called from
+hardirq context with interrupts off and a spinlock held. It is
+`CONFIG_DEBUG_ATOMIC_SLEEP` that makes this visible, which is why a stock
+image never shows it.
+
+At one per second with forty five lines each it makes the console useless
+and `kgdboc` unusable, since both share `ttyAMA0`.
+
+**What was done.** Two parameters added to `cmdline.txt` by hand, with
+the original kept beside it as `cmdline.txt.orig`:
+
+    dwc_otg.fiq_enable=0 dwc_otg.fiq_fsm_enable=0
+
+The names were inferred from `local_fiq_disable` appearing in the trace,
+so the test was built to fail informatively: a kernel parameter for a
+module that does not declare it is accepted and ignored, which looks
+exactly like a fix that did not work. After the boot:
+
+    cat /sys/module/dwc_otg/parameters/fiq_enable
+    cat /sys/module/dwc_otg/parameters/fiq_fsm_enable
+    N
+    N
+
+Both files exist, so the names are real, and both read `N` against a
+default of `Y`, so the command line did it. A full boot afterwards
+carries not one occurrence.
+
+**What this does not establish.** Two parameters were changed at once, so
+which of them is responsible is unknown. The cost is USB throughput, and
+on a Raspberry Pi 3 Model B Plus the Ethernet port is behind that
+controller.
+
+**Why it is on the card and not in the kas file.** Because of the
+paragraph above. A workaround whose mechanism has not been separated does
+not belong in a committed configuration where it will be inherited by
+images that never saw the symptom.
+
+
+## 20. ramoops carried a console across a reboot, and systemd did not mount it
+
+**What happened.** With `ramoops.dtbo` finally on the card, the kernel
+said all of it:
+
+    OF: reserved mem: 0x000000000b000000..0x000000000b01ffff (128 KiB)
+        map non-reusable ramoops@b000000
+    pstore: Using crash dump compression: deflate
+    printk: console [ramoops-1] enabled
+    pstore: Registered ramoops as persistent store backend
+    ramoops: using 0x20000@0xb000000, ecc: 0
+
+The reservation is exactly the `base-addr` and `total-size` written into
+`config.txt`.
+
+But `mount | grep pstore` returned nothing and `/sys/fs/pstore` was an
+empty directory. The image masks `systemd-pstore.service`, which is the
+archiver and not the mount, so that is not the cause. Mounted by hand
+after a reboot:
+
+    mount -t pstore pstore /sys/fs/pstore
+    -r--r--r-- 1 root root 32756 console-ramoops-0
+
+32,756 bytes is `console-size=0x8000` less its header, and the contents
+carry the previous boot: its audit records are stamped `1750927741`
+against the current boot's `1750928498`. pstore is proven end to end on
+hardware, from `config.txt` through the overlay and the kernel to a real
+console surviving a reboot in DRAM.
+
+**One loose end closed as a side effect.** The commit earlier the same
+day that removed `CONFIG_PSTORE_DEFLATE_COMPRESS` argued that
+`CONFIG_PSTORE_COMPRESS` being `default y` meant the image already had
+the compression the dead symbol was reaching for, and that the image did
+not need rebuilding. `pstore: Using crash dump compression: deflate` is
+that argument shown rather than reasoned.
+
+**What is wrong and not yet fixed.** `docs/BRINGUP.md` step 6 reads
+`mount | grep pstore; ls /sys/fs/pstore/` and expects the mount to be
+there. On this image it is not, and a reader following that step sees an
+empty result and concludes ramoops is broken, which is precisely the
+confusion `bench-debug-image.bb` spends thirty lines of comment trying to
+prevent for a different reason.
+
+
+## 21. The radio was never the problem, and three checks that could not fail
+
+**What happened.** WiFi was reported not working. It took four rounds to
+establish that nothing was wrong with it, and every round was a different
+fault.
+
+`brcmfmac` bound BCM4345/6 over SDIO with firmware 7.45.265 on every
+boot. The radio was never in question. What happened instead:
+
+1. On the first boot `/boot/wifi.conf` had never been written, so
+   `bench-wifi-setup` was skipped by its `ConditionPathExists` without an
+   error, which is correct behaviour and invisible.
+2. The first picocom log opened at board time 32.4 s, so the window where
+   any of this would have been visible was never recorded. The conclusion
+   drawn at the time was that there was no evidence of WiFi failing,
+   which was true and useless.
+3. A template line was then pasted literally, putting
+   `PSK=PASTE_THE_64_HEX_HERE` into `/boot/wifi.conf`. `wpa_supplicant`
+   exited 255 on a config it could not parse.
+4. With `/boot/wifi.conf` corrected, `systemctl start bench-wifi-setup`
+   did nothing whatever, because the unit is `Type=oneshot` with
+   `RemainAfterExit=yes` and was already active. Only `restart` re-reads
+   the file. Nothing in this project says so, and the failure is silent:
+   `start` returns success.
+
+`systemctl restart bench-wifi-setup`, then the supplicant, and the
+generated config went from a 21 character key line to a 72 character one
+and the board took a lease on `192.168.92.154/24`. There is no avahi in
+this image, so `.local` will never resolve for it and the address is the
+only way in.
+
+**Still open.** `cfg80211: failed to load regulatory.db` with error -2 on
+every boot. The regulatory database is not in the image, so the kernel
+falls back to the restrictive built in world domain. It did not prevent
+association here, and it is a missing package rather than a configuration
+mistake.
+
+**The three checks that could not fail.** This is the part worth keeping.
+
+The first was a verification command:
+
+    sed 's/=.*/=<set>/' /boot/wifi.conf
+    SSID=<set>
+    PSK=<set>
+
+which prints `<set>` whether the value is sixty four characters or zero.
+It reported success on exactly the failure it existed to catch, and the
+file at that moment had an empty key. Replaced by
+`awk -F= '{print $1" len="length($2)}'`, which prints `SSID len=14` and
+`PSK len=64` and cannot be right by accident.
+
+The second was a recursive `grep` with several patterns piped through a
+filter, which returned nothing and was read as the repository not
+containing the thing. It did contain it, in the very file under
+discussion. A search that returns nothing is not evidence until the
+search itself has been shown to work on something it should find.
+
+The third is the one this repository already had a guard for. Running kas
+without `KAS_WORK_DIR` and `KAS_BUILD_DIR` started cloning poky,
+meta-openembedded and meta-raspberrypi into the checkout. `common.sh`
+carries `warn_stray_build_tree`, which exists because 469 MB of exactly
+that sat in this checkout for weeks, and which prints a full account of
+it. The guard fired. The "Falling back to file-relative addressing"
+warnings printed. Both were read past, and the clone was noticed only
+because it was slow.
+
+A guard that fires correctly and is ignored is a different failure from a
+guard that does not fire, and this evening produced one of each.
+
+**And one that is not a check at all.** A single pasted command of about
+300 characters overran the board's UART input buffer:
+
+    ttyAMA ttyAMA0: 1 input overrun(s)
+    -sh: echowpa_passphrase: command not found
+
+Two words spliced together out of the middle of the line. The board's
+shell is BusyBox ash and its console has no flow control. Commands typed
+at that console are kept short from here, and anything long is written to
+the card from the reader instead.

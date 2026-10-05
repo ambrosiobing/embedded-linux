@@ -18,6 +18,20 @@ make fault-matrix.pdf   # just one
 | `uml-sequence.tex` | The same crash captured twice: after the fact, then live | [DESIGN.md](../DESIGN.md#a-crash-captured-twice) |
 | `uml-components.tex` | What is built where, including the two firsts for this layer | [DESIGN.md](../DESIGN.md#components-and-what-is-new-here) |
 
+## Recordings
+
+| File | What it shows | Referenced from |
+|---|---|---|
+| `heartbeat.gif` | The heartbeat LED beating, two periods, 240x210 at 15 fps | [BRINGUP.md](../BRINGUP.md#5-check-the-heartbeat) |
+
+This one is evidence rather than a drawing, so unlike the PDFs and PNGs
+below it is tracked. It is cut from an 11 s recording made on Sunday 4
+October 2026 and cropped to the module; the recording itself is not in
+the repository. Both were measured the same way and agree: two flashes
+of about 100 ms, 0.30 s apart, repeating every 1.22 s in the source and
+1.23 s in the GIF. The clip is a whole number of periods, so the loop
+has no visible join and the pause reads as part of the pattern.
+
 `preamble.tex` holds the palette and the styles. The colours carry
 meaning and are the same in every figure: target user space, target
 kernel, host, a debugging tool, hardware and files, and the grey used for

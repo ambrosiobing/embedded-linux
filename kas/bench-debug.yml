@@ -82,6 +82,37 @@ local_conf_header:
     # beating before anything that could crash has run.
     RPI_EXTRA_CONFIG:append = "\ndtoverlay=disable-bt\ndtoverlay=ramoops,base-addr=0x0b000000,total-size=0x20000,record-size=0x4000,console-size=0x8000\ndtoverlay=gpio-led,gpio=17,label=heartbeat,trigger=heartbeat"
 
+    # --- the overlays the firmware actually has --------------------------
+    #
+    # config.txt above asks for three overlays. On the first boot of this
+    # project, Sunday 4 October 2026, only one of the three .dtbo files was
+    # on the boot partition: disable-bt. gpio-led and ramoops were absent,
+    # read off the card with ls /mnt/boot/overlays/ against a config.txt
+    # that was exactly right. The heartbeat LED was therefore never
+    # created, so it sat at whatever GPIO17 was doing rather than beating,
+    # and ramoops reserved nothing, so pstore had no backend.
+    #
+    # INFERRED, NOT SEEN: that the firmware says nothing a running system
+    # can read when it skips a dtoverlay line whose .dtbo is missing. What
+    # is seen is that no kernel message mentions it, which is structural,
+    # since overlay handling finishes before the kernel starts.
+    #
+    # meta-raspberrypi builds KERNEL_DEVICETREE in
+    # conf/machine/include/rpi-base.inc out of RPI_KERNEL_DEVICETREE and a
+    # hand-curated RPI_KERNEL_DEVICETREE_OVERLAYS. That list carries
+    # gpio-ir, gpio-ir-tx, gpio-key, gpio-poweroff, gpio-shutdown,
+    # i2c-gpio, pps-gpio and w1-gpio, and neither gpio-led nor ramoops.
+    #
+    # The append goes on KERNEL_DEVICETREE and not on the layer's own
+    # RPI_KERNEL_DEVICETREE_OVERLAYS, on purpose. An append to an internal
+    # variable that a later layer version renames does nothing and says
+    # nothing, which is the exact failure mode this line exists to repair.
+    #
+    # ramoops, not ramoops-pi4. Both sources exist in the kernel tree at
+    # rpi-6.6.y and the pi4 variant reserves memory this board does not
+    # have at that address.
+    KERNEL_DEVICETREE:append = " overlays/gpio-led.dtbo overlays/ramoops.dtbo"
+
     # --- what to keep after the build -----------------------------------
     #
     # vmlinux and System.map are the whole point of the debug kernel, and
