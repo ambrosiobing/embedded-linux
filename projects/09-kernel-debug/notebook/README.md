@@ -4,7 +4,9 @@ Six entries, one per fault and tool. This directory is the deliverable:
 the project produces no product, and what it leaves behind is these files
 with real console output in them.
 
-**Nothing here has been run yet.** Every output block is empty and marked
+**Almost nothing here has been run yet.** The one exception is part four
+of [06](06-lockdep-kasan.md), which carries real KFENCE reports from two
+boots and is marked as such. Every output block is empty and marked
 `NOT YET RUN`. An empty block is honest. A plausible-looking block written
 from expectation would be the single worst thing this repository could
 contain, because the whole point of the project is learning to tell a

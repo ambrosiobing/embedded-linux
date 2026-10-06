@@ -915,8 +915,36 @@ every instruction ever written about pstore names. Teaching the reader to
 mount it by hand each boot moves the cost onto the person who is already
 dealing with a crash.
 
-**Not yet seen on hardware.** The mount unit is written and not yet
-booted. Everything else in this entry was measured.
+**Seen on hardware the same evening.** The image rebuilt in 1 min 45 s,
+archived as `2026-10-05_a743c9c`, and the boot log carries systemd doing
+it rather than anyone typing:
+
+    systemd[1]: Mounting Persistent Store File System...
+    systemd[1]: Mounted Persistent Store File System.
+
+and after login, with nothing typed first:
+
+    pstore on /sys/fs/pstore type pstore (rw,nosuid,nodev,noexec,relatime)
+
+`docs/BRINGUP.md` step 6 is true as written for the first time since the
+project was created.
+
+The unit text was proven before the rebuild rather than by it. It was
+written into `/run/systemd/system` on the running board over ssh and
+started by hand, which tested the syntax, `Type=pstore` and the options
+without costing a card. `/run` is a tmpfs, so it left nothing behind.
+What the rebuild added was the half that could not be tested that way:
+that the image installs the file and that the `sysinit.target.wants`
+symlink makes systemd pull it in at the right point in the boot.
+
+**And that boot found a second KFENCE defect.** A two byte `kmalloc`
+buffer in `usb_get_status`, allocated and freed 300 microseconds apart
+inside one call, with two canary bytes changed at free time. A different
+site from the eighteen byte `usb_device_descriptor` in `hub_port_init`,
+and it had never appeared before. Both reports are now in
+`notebook/06-lockdep-kasan.md` as part four, raw, with a table of what
+three boots sampled. The third boot caught neither, which is what KFENCE
+sampling looks like rather than evidence that anything was fixed.
 
 **The third of its kind this week.** Project 10's image recipe asserts
 that the gpio-led overlays claim those lines so libgpiod cannot open them,
