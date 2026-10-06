@@ -140,7 +140,7 @@ reader will check.
 | # | Criterion | Kind | Status |
 |---|---|---|---|
 | 1 | `decode_stacktrace.sh` resolves the NULL dereference to a source line in `buggy.c` | measured | met Tuesday 6 October 2026: `fault_null` at `buggy.c:109`, the line holding `victim->magic = 0x1234;`, with `x2 : 0000000000001234` in the register dump agreeing. [notebook/01](notebook/01-oops.md) |
-| 2 | `/sys/fs/pstore/dmesg-ramoops-0` holds the same oops after the reboot, and the SysRq crash makes a second capture | measured | |
+| 2 | `/sys/fs/pstore/dmesg-ramoops-0` holds the same oops after the reboot, and the SysRq crash makes a second capture | measured | met Tuesday 6 October 2026, and **the wording describes a state the hardware cannot be left in**: the recovered record matched entry 01's block on all 46 lines, and the SysRq crash then overwrote it, because the ramoops zone cursor restarts at zone 0 on every boot. Both captures are in `docs/evidence/`. [notebook/05](notebook/05-pstore.md) |
 | 3 | gdb stops at a breakpoint in `fault_null`, prints a backtrace with module symbols, and `lx-dmesg` works | measured | |
 | 4 | The irqsoff tracer reports a maximum within 5 percent of 3 s with `fault_lock` in the stack | measured | |
 | 5 | `perf report` attributes most lock-fault samples to `fault_lock` or `__delay` | measured | |

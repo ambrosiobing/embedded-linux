@@ -4,11 +4,11 @@ Six entries, one per fault and tool. This directory is the deliverable:
 the project produces no product, and what it leaves behind is these files
 with real console output in them.
 
-**Two of the six have been run.** [01](01-oops.md) in full, on Tuesday 6
-October 2026, and part four of [06](06-lockdep-kasan.md), which carries
-real KFENCE reports from two boots. Both say so in their first line. The
-remaining entries, and parts one to three of 06, are empty and marked
-`NOT YET RUN`. An empty block is honest. A plausible-looking block written
+**Three of the six have been run**, all on Tuesday 6 October 2026 except
+where noted: [01](01-oops.md) and [05](05-pstore.md) in full, and part
+four of [06](06-lockdep-kasan.md), which carries real KFENCE reports from
+two boots. Each says so in its first line. Entries 02, 03 and 04, and
+parts one to three of 06, are empty and marked `NOT YET RUN`. An empty block is honest. A plausible-looking block written
 from expectation would be the single worst thing this repository could
 contain, because the whole point of the project is learning to tell a
 real report from a tool that found nothing.

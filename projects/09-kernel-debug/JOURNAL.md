@@ -1018,3 +1018,79 @@ notebook README, which carried the same `sudo` and the same ten seconds.
 Two frames below the faulting one resolve one line past their call, which
 looks like an off-by-one and is not: a frame holds a return address. Noted
 in entry 01 so the next reader does not spend ten minutes on it.
+
+## 24. Tuesday 6 October 2026: the second capture destroyed the first, and that is the finding
+
+Acceptance criterion 2 is met. The oops ramoops kept across the reboot
+matches the block in notebook entry 01 on all 46 lines, and the SysRq
+crash produced its own record with `Kernel panic - not syncing: sysrq
+triggered crash` in it. Both are in `docs/evidence/` as files rather than
+as quotations.
+
+**The run contradicted a prediction, and the wrong prediction was worth
+more than a right one.** Before the crash I wrote down three expectations
+so they could fail. Two held: one new record rather than two, because
+SysRq calls `panic()` with no oops ahead of it, and no `O` in the taint
+field, because nothing auto-loads the module. The third was that the new
+record would be `dmesg-ramoops-2`, taking a free zone.
+
+It was not. The crash overwrote `dmesg-ramoops-0`, which held the oops.
+`fs/pstore/ram.c` says why at lines 366 and 389: `dump_write_cnt` is a
+field of the in-RAM context, nothing restores it from the persistent
+region, so it starts at zero on every boot and the first dump after any
+reboot lands in zone zero no matter how many zones exist. The header
+numbering agrees from the other side, `Oops#1` then `Panic#2` on the
+crash boot, `Panic#1` on the next.
+
+So entry 05's sentence about there being room for six records and the
+seventh overwriting the first was wrong twice. Not the seventh crash, the
+next boot's first crash. And the six was arithmetic on the overlay README
+rather than a measurement.
+
+**It also means criterion 2 asks for a state the hardware cannot be left
+in.** Both captures exist and the board cannot hold both at the end. The
+acceptance row now says that instead of passing quietly, because a row
+that reads "met" and hides an impossibility teaches the wrong thing about
+the next criterion.
+
+**The reason the oops record still exists is a question asked yesterday.**
+"are we saving first before wiping out" became the order of operations
+today: three files copied off the board, byte counts compared against
+`ls -l`, and only then a deliberate crash. Had the entry's own
+instructions been followed, they say `rm -f /sys/fs/pstore/*` before
+triggering, and the oops record would have been deleted on purpose in the
+name of not confusing old records with new ones. The record headers make
+that confusion impossible anyway.
+
+**A control did the work that reading could not.** `kernel.sysrq` reads
+`16`, sync only, and `sysrq_crash_op` carries `.enable_mask =
+SYSRQ_ENABLE_DUMP`, so by the mask the crash should have been refused.
+Rather than reason about which dispatch path checks the mask, SysRq `m`
+was used first: it prints memory statistics, it carries the identical
+enable mask, and it crashes nothing. It ran. So the gate the crash had to
+pass was already known to be open, and nothing on the board needed
+changing. Raising `kernel.sysrq` as a precaution would have changed two
+things at once immediately before a deliberate crash, which is how the
+`dwc_otg` workaround became unattributable.
+
+**Two sloppy things I did in the same hour, both of the same shape.** A
+`find` for `sysrq.c` piped to `head -n 1` handed me the NanoPi NEO Air
+tree, and I read it and reported on it without saying which tree it was.
+The conclusion survived only because the control had run on the actual
+board; the source reading was corroboration from the wrong kernel and
+could have corroborated nothing. Listing every match afterwards showed
+both trees agree, so it happened to be right, which is exactly the
+failure mode the kernel config checks had: right for the wrong reason,
+and that teaches you to trust it.
+
+The other was handing over a command containing a made up IP address,
+`192.168.1.50`, as a placeholder. It was run as written and timed out.
+A placeholder that is syntactically runnable is not a placeholder.
+
+**Three things are open and named in entry 05 rather than guessed.** The
+zone count, which two records at once bounds from below and does not
+determine, and which no experiment crossing a reboot can measure now that
+the cursor behaviour is known. The console zone, unchanged in size and
+mtime across a fresh panic and a reboot at 32,756 bytes of 32,768, so not
+currently recording. And the `-28` from entry 01's oops, whose two
+candidate causes the first two items distinguish.
