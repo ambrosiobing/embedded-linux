@@ -1257,3 +1257,171 @@ is the other display stack. Commenting it out changed nothing about the
 UART, so it is not today's fault, but a debug image carrying another
 project's display overlay is a leak between kas files and should not be
 there.
+
+## 27. Tuesday 6 October 2026, minute by minute: an afternoon on a console that was never connected
+
+Written Wednesday 7 October 2026. Entry 26 says what the fault was. This
+one is the log, because the shape of the afternoon is the lesson and a
+summary hides it.
+
+**Two clocks, and they disagree.** Laptop times are win11 skyhorizon's
+WSL, taken from file mtimes. Board times are the Raspberry Pi's own, from
+`uptime` and `ls -l`. At one point the laptop read about 11:00 while the
+board read 09:14, so the board runs roughly an hour and three quarters
+behind. It has no RTC and sets its clock from the network after boot.
+Every timestamp below says which clock it is, and none of them have been
+reconciled into a single line, because that would be inventing one.
+
+### Before any of this
+
+- **02:55 board.** The `null` fault triggered, the oops, the warm reboot.
+  Entry 01's material.
+- **04:27 board.** The SysRq crash. Entry 05's second capture, and the
+  one that overwrote the first record.
+- Then entries 01 and 05 were written, corrected and pushed. Criteria 1
+  and 2 met. All of that is entries 23 to 25.
+
+### Setting up for entry 02
+
+- **10:51 laptop.** `/dev/ttyUSB0` present, `crw-rw---- root dialout`.
+  The adapter is enumerated.
+- Tool survey: `agent-proxy` ABSENT, `gdb-multiarch` ABSENT, `telnet`
+  ABSENT, `nc` present, `socat` present, `fuser` present.
+- `vmlinux` found under
+  `work/raspberrypi3_64-poky-linux/linux-raspberrypi/6.6.63+git/linux-raspberrypi3_64-standard-build`,
+  dated Oct 4 22:14, 319,668,904 bytes. `buggy.ko` found under
+  `work/raspberrypi3_64-poky-linux/bench-buggy/0.1`.
+- `agent-proxy` cloned from git.kernel.org, built with `gcc`, installed
+  into `/usr/local/bin`. `gdb-multiarch` 17.1-2ubuntu1 installed from
+  the archive.
+- **11:08 laptop.** `buggy.ko` copied beside `vmlinux`; `vmlinux-gdb.py`
+  symlinked from the kernel source tree. **`scripts/gdb` does not exist
+  in the build directory**, which is why `lxmod` cannot work. Noted then,
+  and it is still true.
+- `agent-proxy` started on `/dev/ttyUSB0`, pid 41482, both ports
+  listening.
+- `nc localhost 5550` produced a run of replacement characters and then
+  nothing. **I read that as line noise off a floating pin.** It was
+  agent-proxy's own telnet negotiation arriving raw through `nc`.
+- Board powered on. Nothing in either window.
+
+### Chasing the cable, which was fine
+
+- **09:14:33 board, up 4 min.** The board answers ssh. So it boots, and
+  the fault is somewhere in the serial path.
+- `/proc/cmdline` read: `console=ttyAMA0,115200` present, and
+  `kgdboc=ttyAMA0,115200`, and `nokaslr`. `/dev/ttyAMA0` is `204:64`,
+  the PL011.
+- A marker written to `/dev/ttyAMA0` returned success. Nothing arrived.
+- Aliases read: `serial0 = /soc/serial@7e201000` the PL011,
+  `serial1 = /soc/serial@7e215040` the mini UART. So `disable-bt` had
+  taken and `ttyAMA0` is the header UART. A marker to `/dev/ttyS0`
+  failed with EIO, consistent.
+- **White and green swapped on the header**, on the strength of the
+  mojibake. Nothing changed, which it could not have, since the mojibake
+  was never evidence about the wire.
+- **11:24 laptop.** `/dev/ttyUSB1` appears and `agent-proxy` is gone. The
+  adapter had re-enumerated under a new name and the proxy died with its
+  device, which reads from the outside as a dead cable.
+- `telnet` installed. Proxy restarted on `/dev/ttyUSB1`, pid 42273.
+  telnet connected. Still nothing.
+- **09:25 to 09:31 board.** Three alive checks across reboots, all fine.
+
+### The loopback, which cleared the adapter in one minute
+
+- Both signal leads taken off the header and mated to each other with a
+  straightened paperclip. The Pi is not in the circuit at all.
+- **11:39 laptop.** `/dev/ttyUSB0` again, proxy down again. Restarted,
+  pid 43960.
+- telnet connected, `hello` typed, **every letter came back**. The
+  PL2303, both leads along their whole length, agent-proxy and telnet are
+  all good. That test had been available since the first silent console
+  and cost one minute.
+
+### The actual fault, found in the first place I should have looked
+
+- `pinmux-pins`: `pin 14 (gpio14): (MUX UNCLAIMED) (GPIO UNCLAIMED)`,
+  same for 15.
+- `config.txt` read whole: `enable_uart=1`, `disable-bt`, `ramoops`,
+  `gpio-led`, and also `vc4-fkms-v3d` and `vc4-kms-dsi-7inch`, the latter
+  a 7 inch DSI panel overlay belonging to the kiosk project on a Pi 4.
+- `/proc/consoles` lists `ttyAMA0` as an enabled console.
+- `dmesg` carries, at board time 4.607102:
+
+      uart-pl011 3f201000.serial: there is not valid maps for state default
+
+  **That line was there from the first boot of the day.**
+  `dmesg | grep uart` would have printed it in the first minute.
+- `/dev/mem` read refused with "Bad address", so the register could not
+  be read directly. debugfs `gpio` shows GPIO17 claimed by `heartbeat`
+  and 14 and 15 bare, which is the same ambiguous reading rather than a
+  second independent one.
+- Device tree read property by property: `pinctrl-0` is phandle `0x09`,
+  `uart0_pins`' own phandle is `0x09`, so the reference resolves. And
+  `brcm,pins` and `brcm,function` are **zero length**. The `bluetooth`
+  child reads `disabled`.
+- `vc4-kms-dsi-7inch` commented out, rebooted: no change. Innocent.
+- `config.txt` checked for conditional filter sections: there are none,
+  so every setting applies.
+- **13:53 laptop.** `disable-bt.dtbo` copied off the card and decompiled
+  with `dtc`. `fragment@3` declares `brcm,pins`, `brcm,function` and
+  `brcm,pull` as empty properties. The overlay blanks the group and
+  leaves the values to firmware that does not supply them.
+
+### The fix for the mux, and what it did not fix
+
+- `dtoverlay=uart0,txd0_pin=14,rxd0_pin=15,pin_func=4` appended to
+  `config.txt`. Appended three times by accident across retries, then
+  deduplicated, because a repeated overlay load can fail and take later
+  overlays with it.
+- **11:39:29, 11:52:47 and 12:00:48 board**, three reboots across these
+  attempts.
+- After the fix: `pin 14 (gpio14): 3f201000.serial (GPIO UNCLAIMED)
+  function alt0 group gpio14`, `uart0-gpio14/brcm,pins` reads
+  `00 00 00 0e 00 00 00 0f`, `brcm,function` reads `00 00 00 04`, and the
+  "not valid maps" line is gone.
+- **The console still produced nothing.** Markers sent, boot watched, no
+  output. A second fault remains and is recorded as open.
+
+### What the finding then did to work already committed
+
+- Entry 01 claimed its oops came off a serial console. It cannot have.
+  Diffing against `console-ramoops-0` identified the real source and
+  found that the block was **missing an entire line**, `CPU features:
+  0x0,0000000c,00020000,0000421b`. With that and the trailing space from
+  earlier in the day restored, all 55 lines match.
+- `decode.sh` no longer says CRLF means a serial capture.
+- Entry 05 and the evidence header carried the same wrong provenance in
+  three sentences and were corrected, which made entry 05's case stronger:
+  pstore is not the backup that caught an unwatched crash, it is the only
+  reason any record of either crash exists.
+- `kas/bench-debug.yml` carries the fix and the measurements. Entry 02
+  and criterion 3 are blocked rows with reasons. `host/kgdb-setup.sh` and
+  `./go kgdb-setup` were written so the setup is a script that finds its
+  own inputs instead of prose with blanks in it, and testing it before it
+  shipped found two defects in it.
+
+### The accounting
+
+Roughly four hours, of which the diagnosis took about twenty minutes once
+it started in the right place. What the rest went to, all mine:
+
+1. Reading agent-proxy's telnet negotiation as line noise, and moving
+   wires on the strength of it.
+2. A placeholder IP address, `192.168.1.50`, written into a runnable
+   command. It was run, as placeholders in runnable commands always are.
+3. Three hedged wiring tables for a second adapter whose socket pinout is
+   published in neither its manual, its datasheet, nor its product page.
+   Each looked like progress and none was.
+4. Not running `dmesg | grep uart` until the cable had been exhausted.
+
+The bench reference already warns that four hours once went to wiring
+while the fault was the instrument. This is the second time, and this
+time the instrument was innocent too: **the cable was good, the board was
+good, and the pins were never switched on.**
+
+The general form, for the next time: when a signal path produces nothing,
+ask the source whether it is actually driving before asking the wire
+whether it is carrying. The source can be asked in one command and
+answers in writing. The wire cannot answer at all without an instrument
+this bench does not have.
