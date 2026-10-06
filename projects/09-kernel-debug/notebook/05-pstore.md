@@ -87,15 +87,23 @@ crash were told apart from two records from two crashes.
 
 **The recovered oops.** `dmesg-ramoops-0` from the crash of Tuesday 6
 October 2026 at 02:55 was diffed against the block committed in entry
-[01](01-oops.md), which is what the serial console printed live, after
-stripping the `<N>` syslog level prefixes that pstore keeps and the
-console does not. Both sides are 46 lines and they agree on all 46.
+[01](01-oops.md), after stripping the `<N>` syslog level prefixes that a
+dmesg record keeps and a console record does not. Both sides are 46 lines
+and they agree on all 46.
 
-They did not at first. One line differed invisibly, and it was the
-`Code:` line, where the kernel emits a trailing space that the path from
-console through picocom through a terminal through the clipboard had
-dropped. 105 bytes in the record, 104 in the committed block. The byte
-was restored in entry 01 rather than explained away.
+Entry 01's block is **not** a live serial capture, which both entries
+claimed until later the same day. The serial console on this image has
+never worked: `disable-bt` blanks `uart0_pins` and the firmware does not
+fill it, so `ttyAMA0` is an enabled console with an unmuxed transmit pin.
+The block is the **console** record, `console-ramoops-0`, which is why it
+has no level prefixes, and the carriage returns that made `decode.sh` say
+"a serial capture" came from a Windows clipboard.
+
+Two defects turned up in that block, both invisible to a reader and both
+found by diffing rather than reading. The `Code:` line was missing the
+trailing space the kernel emits, 105 bytes against 104. And an entire
+line, `CPU features: ...`, was absent. Both restored, after which all 55
+lines of the console record's span match.
 
 **The SysRq capture.** From
 `pstore-2026-10-06-sysrq-dmesg-ramoops-0.txt`. These are selected lines
@@ -131,10 +139,14 @@ captured. They cannot both be on the board at the end, because the SysRq
 crash necessarily overwrote the record holding the oops. The README row
 says so rather than passing quietly.
 
-What would have been missed without the tool: the entire crash. The oops
-in entry 01 was captured live only because a terminal happened to be
-logging. This one was read off a board that had already rebooted, from a
-session the crash itself had disconnected, with nothing watching.
+What would have been missed without the tool: **everything, and more than
+this entry used to claim.** It said the oops in entry 01 was captured live
+because a terminal happened to be logging. There was no live capture. The
+serial console has never worked on this image, so pstore is not the backup
+that caught a crash nobody watched, it is the **only** reason any record
+of either crash exists at all. Both entries 01 and 05 rest on this
+backend, and a bench with a dead console and no pstore would have produced
+nothing from a whole day of deliberate crashing.
 
 ## The cursor lives in RAM, and that is the whole behaviour
 

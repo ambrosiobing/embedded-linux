@@ -36,8 +36,13 @@ archived as `2026-10-05_a743c9c`.
 | `pstore-2026-10-06-dmesg-ramoops-1.txt` | `Panic#2 Part1` | 27,240 | the same crash, dumped again at the panic |
 | `pstore-2026-10-06-sysrq-dmesg-ramoops-0.txt` | `Panic#1 Part1` | 27,283 | the SysRq crash, which overwrote zone 0 |
 
-Every record carries `<N>` syslog level prefixes that the serial console
-does not, and **each is a truncated log rather than a whole one.** They
+**The three dmesg records carry `<N>` syslog level prefixes. The console
+record does not**, because it holds what printk sent to a console rather
+than the raw log buffer, and that difference is what identified it as the
+source of the raw block in notebook entry [01](../../notebook/01-oops.md).
+Fifty five of its lines are byte identical to that block.
+
+The dmesg records are also **truncated logs rather than whole ones**, and
 begin at board times 0.383732, 0.396773 and 0.438597, not at zero.
 `ramoops_pstore_write` takes only `Part1` of any dump and returns
 `ENOSPC` for the rest, deliberately, so each record holds what fit one
@@ -63,6 +68,13 @@ the `-28` in entry 01's oops. Notebook entry
   `drivers/firmware/raspberrypi.c:69`, and a third of the `hub_port_init`
   KFENCE report, both from the boot that preceded the oops. Journal
   entries 18 and 19 hold the first sightings.
+
+**What none of them is.** A serial capture. The serial console on this
+image has never worked: `disable-bt` blanks `uart0_pins` and the firmware
+does not fill it, so `ttyAMA0` is an enabled console whose transmit pin
+was never muxed. These records are the only reason any trace of either
+crash exists. Journal entry 26 and `kas/bench-debug.yml` carry the
+measurements.
 
 **What is not in them.** No ramoops or pstore probe lines. Two of the
 three records begin after the probe window outright, and the third begins
