@@ -42,6 +42,15 @@ echo null > /sys/kernel/debug/buggy/trigger
 
 The ssh session dies on the last line. That is the expected result.
 
+**The `rm -f` is what was run and is not what to run again.** It was
+harmless on this occasion because the board had not crashed since its
+last reflash, so there was nothing in `/sys/fs/pstore` to lose. As a
+standing instruction it is wrong: entry [05](05-pstore.md) established
+that the records from a previous boot are the evidence, that every record
+names which dump it is so an old one cannot be mistaken for a new one,
+and that a crash overwrites `dmesg-ramoops-0` anyway. Copy whatever is
+there off the board first, then trigger.
+
 **On JPTOUPM678, WSL bash**, against the log picocom kept:
 
 ```sh
