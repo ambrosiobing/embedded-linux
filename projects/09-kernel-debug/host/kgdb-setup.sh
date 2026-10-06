@@ -43,6 +43,17 @@ say()  { echo "$*"; }
 note() { echo "    $*"; }
 bad()  { echo "MISSING: $*" >&2; fail=1; }
 
+# Is this an ELF file? The four byte magic, read with od rather than with
+# readelf, which is absent on some hosts. The candidate lists below are only
+# worth printing if they can be trusted, and a stray file named vmlinux is
+# not a kernel. This runs on the host, never on the board, so GNU od is a
+# fair assumption; BusyBox od has no -A and would need a different reader.
+is_elf() {
+	[ -f "$1" ] || return 1
+	magic=$(od -An -t x1 -N 4 "$1" 2>/dev/null | tr -d ' \n')
+	[ "$magic" = "7f454c46" ]
+}
+
 say "kgdb-setup.sh"
 say "    work dir   $TMPDIR_BUILD"
 say "    device     $DEVICE"
@@ -144,16 +155,23 @@ say ""
 # to head picked the wrong kernel tree earlier on Tuesday 6 October 2026
 # and the mistake was invisible because the answer happened to agree.
 say "3. vmlinux and vmlinux-gdb.py"
-vms=""
+# Counted in the loop rather than accumulated into a string and split
+# again afterwards. The string version needed an unquoted expansion to
+# count, shellcheck refuses that as SC2086, and CI refused the whole run
+# on Tuesday 6 October 2026 because of it.
+vmcount=0
+vmfirst=""
 for v in $(find "$TMPDIR_BUILD" -maxdepth 9 -name vmlinux -type f 2>/dev/null || true); do
 	if is_elf "$v"; then
 		note "candidate      $v"
-		vms="$vms $v"
+		vmcount=$((vmcount + 1))
+		if [ -z "$vmfirst" ]; then
+			vmfirst=$v
+		fi
 	else
 		note "not an ELF     $v   (ignored)"
 	fi
 done
-vmcount=$(printf '%s\n' $vms | grep -c . || true)
 VMDIR=""
 if [ "$vmcount" = "0" ]; then
 	bad "no ELF vmlinux under $TMPDIR_BUILD. Build the debug image."
@@ -165,7 +183,7 @@ elif [ "$vmcount" != "1" ]; then
 	note "    between kernels, and has chosen nothing. Remove the trees you"
 	note "    are not debugging, or start gdb yourself in the one you mean."
 else
-	VMDIR=$(dirname "$(printf '%s\n' $vms | head -n 1)")
+	VMDIR=$(dirname "$vmfirst")
 	note "chosen         $VMDIR/vmlinux"
 	if [ -f "$VMDIR/vmlinux-gdb.py" ]; then
 		note "gdb scripts    $VMDIR/vmlinux-gdb.py"
