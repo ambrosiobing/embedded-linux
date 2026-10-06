@@ -30,8 +30,8 @@ not in the ordinary debug image.
 **On the board over the picocom console:**
 
 ```sh
-sudo modprobe buggy
-echo uaf | sudo tee /sys/kernel/debug/buggy/trigger
+modprobe buggy
+echo uaf > /sys/kernel/debug/buggy/trigger
 dmesg | sed -n '/BUG: KASAN/,/^\[.*\] =\+$/p'
 ```
 
@@ -79,9 +79,9 @@ Back on the **ordinary debug kernel**, since kmemleak is in `debug.cfg`.
 **On the board over the picocom console:**
 
 ```sh
-echo leak | sudo tee /sys/kernel/debug/buggy/trigger
-echo scan | sudo tee /sys/kernel/debug/kmemleak; sleep 10
-sudo cat /sys/kernel/debug/kmemleak
+echo leak > /sys/kernel/debug/buggy/trigger
+echo scan > /sys/kernel/debug/kmemleak; sleep 10
+cat /sys/kernel/debug/kmemleak
 ```
 
 ```
@@ -100,7 +100,7 @@ trigger that caused it.
 ### Count the objects rather than reading them
 
 ```sh
-sudo grep -c '^unreferenced object' /sys/kernel/debug/kmemleak
+grep -c '^unreferenced object' /sys/kernel/debug/kmemleak
 ```
 
 ## Part three: lockdep, which needs no trigger at all

@@ -88,16 +88,32 @@ It must contain `kgdboc=ttyAMA0,115200` and `nokaslr`.
 
 ## 3. First boot, and the two checks that catch the classic failure
 
-On the **authoring laptop (Windows)**, start the proxy before powering the
-board, so the boot messages are captured:
+On **JPTOUPM678, WSL bash**, start the proxy before powering the board,
+so the boot messages are captured. Not aquamarine: the serial adapter
+appears as `/dev/ttyUSB0`, which is a Linux device, and the cross `gdb`
+and `vmlinux` this proxy exists to serve are on the same laptop.
 
 ```bash
 ./go proxy /dev/ttyUSB0
 ```
 
 Then a terminal on the console port, **logged to a file**. This is not
-optional advice: `panic_on_oops` with a ten second timeout means an
-unlogged session loses the oops you just caused.
+optional advice, and the reason is worse than it used to read here. This
+document said `panic_on_oops` came with a ten second timeout. It does
+not: the board reads `panic_on_oops 1` and `panic 0`, because
+`CONFIG_PANIC_TIMEOUT` is set nowhere in this layer, so it **halts**
+rather than rebooting. An unlogged session therefore loses the oops
+permanently, and the only way to restart a halted Raspberry Pi 3B+ is to
+pull the power, which is a cold cycle that also clears the ramoops
+region. Measured on Tuesday 6 October 2026; notebook entries
+[01](../notebook/01-oops.md) and [05](../notebook/05-pstore.md) carry it.
+
+If you want the board back warm with its records intact, the timeout is a
+runtime step on every boot:
+
+```sh
+sysctl -w kernel.panic=10
+```
 
 ```bash
 picocom --logfile boot-$(date +%F-%H%M).log localhost:5550

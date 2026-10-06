@@ -30,7 +30,7 @@ how long, but what ran.
 cd /sys/kernel/tracing
 echo 0 > tracing_on; echo irqsoff > current_tracer; echo 0 > tracing_max_latency
 echo 1 > tracing_on
-echo lock | sudo tee /sys/kernel/debug/buggy/trigger
+echo lock > /sys/kernel/debug/buggy/trigger
 cat tracing_max_latency
 ```
 
@@ -55,7 +55,7 @@ the file is megabytes and the cable does about 11 kB/s.
 scp /dev/shm/lock.dat user@host:/tmp/
 ```
 
-**On the authoring laptop (Windows):**
+**On JPTOUPM678, WSL bash**, which is where `trace-cmd` is:
 
 ```bash
 trace-cmd report /tmp/lock.dat | head -60

@@ -17,7 +17,9 @@ yet when the breakpoint hits.
 
 ## Commands
 
-**On the authoring laptop (Windows)**, first:
+**On JPTOUPM678, WSL bash**, first. Not aquamarine: this takes a
+`/dev/ttyUSB0`, and the serial adapter, the cross `gdb` and the
+`vmlinux` are all on that laptop.
 
 ```bash
 ./go proxy /dev/ttyUSB0
@@ -27,13 +29,22 @@ yet when the breakpoint hits.
 the debugger:
 
 ```sh
-echo g | sudo tee /proc/sysrq-trigger
+echo g > /proc/sysrq-trigger
 ```
 
-The heartbeat LED freezes here. That is the confirmation the kernel has
-actually stopped, available before gdb says anything.
+`kernel.sysrq` on this image reads `16`, the sync command alone, and that
+does not matter: `/proc/sysrq-trigger` does not consult the mask at all.
+Measured in entry [05](05-pstore.md) with a harmless control before
+anything irreversible depended on it. So `g` works as written, and
+nothing needs raising first.
 
-**On the authoring laptop (Windows)**, in the directory holding `vmlinux`:
+The heartbeat LED freezes here. That is the confirmation the kernel has
+actually stopped, available before gdb says anything. Freezes rather than
+goes dark: the trigger's timer stops with the kernel, so the LED holds
+whatever brightness it had at that instant, and since heartbeat is off
+most of the time it usually looks dark.
+
+**On JPTOUPM678, WSL bash**, in the directory holding `vmlinux`:
 
 ```bash
 gdb-multiarch -x projects/09-kernel-debug/host/gdbinit vmlinux
@@ -51,7 +62,7 @@ continue
 **On the board over the picocom console**, in the other window:
 
 ```sh
-echo null | sudo tee /sys/kernel/debug/buggy/trigger
+echo null > /sys/kernel/debug/buggy/trigger
 ```
 
 Back at the gdb prompt, when it stops:
