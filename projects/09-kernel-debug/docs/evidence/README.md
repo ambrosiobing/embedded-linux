@@ -37,8 +37,13 @@ archived as `2026-10-05_a743c9c`.
 | `pstore-2026-10-06-sysrq-dmesg-ramoops-0.txt` | `Panic#1 Part1` | 27,283 | the SysRq crash, which overwrote zone 0 |
 
 Every record carries `<N>` syslog level prefixes that the serial console
-does not, and each holds the whole kernel log buffer from about board time
-0.38 seconds, so anything the kernel printed earlier is cut off the front.
+does not, and **each is a truncated log rather than a whole one.** They
+begin at board times 0.383732, 0.396773 and 0.438597, not at zero.
+`ramoops_pstore_write` takes only `Part1` of any dump and returns
+`ENOSPC` for the rest, deliberately, so each record holds what fit one
+16 kB compressed zone and the remainder was discarded. That refusal is
+the `-28` in entry 01's oops. Notebook entry
+[05](../../notebook/05-pstore.md) has the source and the reasoning.
 
 **What they prove.**
 
@@ -59,6 +64,14 @@ does not, and each holds the whole kernel log buffer from about board time
   KFENCE report, both from the boot that preceded the oops. Journal
   entries 18 and 19 hold the first sightings.
 
-**What is not in them.** No ramoops or pstore probe lines, because those
-are printed before the point where these records begin. The zone count is
-therefore still unmeasured; entry 05 says so and says where to look.
+**What is not in them.** No ramoops or pstore probe lines. Two of the
+three records begin after the probe window outright, and the third begins
+about 2 ms before it, so in that boot the lines most likely fell just off
+the front. That last part is inference; the boot that would settle it is
+gone.
+
+Those probe lines were read from the board's live log instead, and with
+the device tree properties they make the region fully measured: 128 kB at
+`0x0b000000`, `record-size` `0x4000`, `console-size` `0x8000`, deflate
+compression, six dmesg zones. Nothing in entry 05's geometry is taken on
+trust any more.

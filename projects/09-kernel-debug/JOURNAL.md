@@ -1094,3 +1094,68 @@ the cursor behaviour is known. The console zone, unchanged in size and
 mtime across a fresh panic and a reboot at 32,756 bytes of 32,768, so not
 currently recording. And the `-28` from entry 01's oops, whose two
 candidate causes the first two items distinguish.
+
+## 25. Tuesday 6 October 2026: the -28 was never a failure, and two of my own readings were
+
+The region is now measured end to end and the `-28` in entry 01's oops is
+explained. Both took one command each, after several that took the wrong
+route first.
+
+**The geometry.** From the board's own probe lines: 128 kB reserved at
+`0x0b000000`, `pstore: Using crash dump compression: deflate`, and
+`ramoops: using 0x20000@0xb000000, ecc: 0`. From the device tree the
+firmware applied, read with `cat` over ssh and formatted by GNU `od` on
+the laptop because BusyBox `od` has no `-A`: `record-size` is `0x4000`
+and `console-size` is `0x8000`. So `(0x20000 - 0x8000) / 0x4000` gives
+six dmesg zones, and the compression that explains 27 kB records in 16 kB
+zones is the kernel's own statement rather than my arithmetic.
+
+**The `-28`.** `ramoops_pstore_write` contains this, and the comment is
+the kernel's:
+
+    /*
+     * Explicitly only take the first part of any new crash.
+     * If our buffer is larger than kmsg_bytes, this can never happen,
+     * and if our buffer is smaller than kmsg_bytes, we don't want the
+     * report split across multiple records.
+     */
+    if (record->part != 1)
+            return -ENOSPC;
+
+Six zones were free and ramoops refused anyway, because it refuses every
+part after the first on purpose. The records agree from outside: every
+one is `Part1`, `Part` appears exactly once per file, and no `Part2` has
+ever been stored. So the error line is pstore offering a second chunk and
+the backend declining it.
+
+**The consequence is bigger than the error.** Every pstore dmesg record
+on this bench is a truncated log. It holds one zone's worth and discards
+the rest, which is why the three records start at board times 0.383732,
+0.396773 and 0.438597 instead of at zero. That applies to whatever
+entries 02 to 04 recover from pstore, and it is a standing argument for
+keeping a serial console attached: the console prints everything, the
+record keeps one zone.
+
+**My first wrong reading: the console zone.** I had it in the entry as
+"not recording", on the evidence that its size and mtime were unchanged
+across a fresh panic and a reboot. One `diff` of the contents showed it
+recording perfectly well: different bytes, beginning mid word at
+`mcblk0p2 rootfstype=ext4`, which is a circular buffer read from its wrap
+point. A full ring has a fixed size and a first write that never happens
+again, so both pieces of metadata are static while the contents roll.
+Metadata described the container and I read it as describing the
+behaviour.
+
+**My second wrong reading: calling a correct number unmeasured
+arithmetic.** The entry said the region had room for roughly six dmesg
+records. I established that the sentence it sat in was wrong, which it
+was, and then went on to describe the six itself as arithmetic on a
+README rather than a measurement, in a tone that implied doubt. The six
+is right. Unverified and wrong are different things, and the response to
+an unverified number is to measure it, not to cast doubt on it in a
+document and move on. It cost nothing this time only because measuring it
+was two commands away.
+
+Both have the same shape as the `find` piped to `head` in entry 24: a
+reading that was available cheaply, replaced by an inference that sounded
+like a reading.

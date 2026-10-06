@@ -207,15 +207,22 @@ terminal**, with a note about sending a break in picocom. It does not.
 `/proc/sysrq-trigger` over ssh is enough, and it suits an entry about
 evidence from an unwatched board better than a keystroke does.
 
-**The region arithmetic was wrong.** The old text read: "there is room
-for roughly six dmesg records plus a rolling console capture. The seventh
-crash overwrites the first." It is not the seventh crash, it is the next
-boot's first crash, for the reason two sections above. And the six was
-arithmetic on parameters read from the Raspberry Pi overlay README rather
-than measured on the board. What replaces it is below, including the part
-that is still unmeasured.
+**Half of the region arithmetic was wrong, and the wrong half is not the
+one I first accused.** The old text read: "there is room for roughly six
+dmesg records plus a rolling console capture. The seventh crash
+overwrites the first." The six is right, and the device tree now confirms
+it. The second sentence is not: it is never the seventh crash, it is the
+next boot's first crash, for the reason two sections above. Six zones
+exist and no run can reach the third, because the cursor restarts at zero
+every boot.
 
-## What the region holds, and what is still unmeasured
+Worth separating, because I conflated them for an hour: the six came from
+the overlay README rather than from the board, which made it
+**unverified**. It did not make it wrong, and calling it doubtful was its
+own small error. The fix for an unverified number is to measure it, not
+to distrust it.
+
+## What the region holds, all of it measured
 
 Measured on Tuesday 6 October 2026:
 
@@ -224,33 +231,62 @@ Measured on Tuesday 6 October 2026:
 | `console-ramoops-0` size | 32,756 bytes | `ls -l` on the board, before and after a crash |
 | dmesg record size as read | 27,240 to 27,283 bytes | the four evidence files |
 | dmesg records present at once | 2 | three crashes, never a third file |
+| dmesg zones that exist | 6 | `(0x20000 - 0x8000) / 0x4000`, all three sizes measured |
 | zone taken by a new boot's first dump | zone 0 | `ls -l` before and after |
 
-From the Raspberry Pi overlay README rather than from the board:
-`total-size=0x20000`, `record-size=0x4000`, `console-size=0x8000`.
+Also measured, from the probe lines in the board's own log:
 
-**The records read larger than a record.** 27 kB of plain text cannot fit
-in a 16,384 byte zone, so pstore stores them deflated and decompresses on
-read. That follows from two numbers, and it holds only as long as the
-16 kB is right, which is one of the numbers still taken on trust.
+```
+[    0.000000] OF: reserved mem: 0x000000000b000000..0x000000000b01ffff (128 KiB) map non-reusable ramoops@b000000
+[    0.385447] pstore: Using crash dump compression: deflate
+[    0.385619] printk: console [ramoops-1] enabled
+[    0.387005] pstore: Registered ramoops as persistent store backend
+[    0.387099] ramoops: using 0x20000@0xb000000, ecc: 0
+```
 
-**Still open, and named rather than guessed:**
+That confirms `total-size=0x20000` against the overlay README, and it
+says the compression outright. The records read larger than a 16 kB zone
+because they are deflated in the zone and decompressed on read, which is
+now the kernel's statement rather than my arithmetic.
 
-- **`max_dump_cnt`**, the number of dmesg zones. Two records have been
-  seen at once, which is a lower bound and not the value. The cursor
-  behaviour above means no experiment crossing a reboot can measure it,
-  so it needs either the probe time log or the device tree properties the
-  firmware applied, under `/proc/device-tree/reserved-memory/`.
-- **The console zone is not recording.** `console-ramoops-0` is unchanged
-  in both size and mtime across a fresh panic and a reboot, still 32,756
-  bytes of a 32,768 byte zone. Either it filled and stopped, or it is
-  being written somewhere this entry has not looked.
-- **The `-28` in entry 01's oops.** `pstore: backend (ramoops) writing
-  error (-28)` is `ENOSPC`, printed between the end of the oops and the
-  panic, and two dumps from that same crash succeeded. The candidates are
-  a dump needing a zone that was already taken, and a console write to
-  the full zone above. The two open items settle between them, so this one
-  waits rather than picking.
+`record-size` and `console-size` were read from the device tree the
+firmware actually applied, on the board:
+
+```sh
+ssh root@BOARD "cat /proc/device-tree/reserved-memory/ramoops@b000000/record-size" | od -An -tx1
+```
+
+BusyBox `od` has no `-A`, so the bytes come across and GNU `od` on the
+laptop formats them. Four bytes each, big endian:
+`record-size = 00004000`, `console-size = 00008000`. Both match the
+overlay README exactly, which makes the zone count arithmetic on measured
+numbers: `(0x20000 - 0x8000) / 0x4000` is **six dmesg zones**.
+
+**None of the four records contains those probe lines**, which is a
+property of where each record begins and not of ramoops. Each holds the
+tail of the log buffer that fit one compressed zone, and they begin at
+board times 0.383732, 0.396773 and 0.438597. Two of the three start after
+0.387099 outright. The third starts about 2 ms before the probe window,
+and since probe ordering shifts by a few milliseconds between boots, the
+likely reading is that in that boot the lines fell just off the front.
+That last part is inference: the evidence that would settle it is the
+earliest log of a boot that no longer exists.
+
+**Settled since this entry was first written, and the corrections are
+mine rather than the file's:**
+
+- ~~The console zone is not recording.~~ **Settled, and the first
+  reading was wrong.** `console-ramoops-0` is unchanged in both size and
+  mtime across a fresh panic and a reboot, still 32,756 bytes of a 32,768
+  byte zone, and it **is** recording. Comparing the bytes rather than the
+  metadata showed different content, beginning mid word at
+  `mcblk0p2 rootfstype=ext4 ...`, which is what a circular buffer looks
+  like when it is read from a wrap point. A full ring has a fixed size and
+  a first write that never happens again, so size and mtime are both
+  static while the contents roll. Inferring behaviour from metadata is
+  what produced the wrong answer; one `diff` produced the right one.
+Nothing in the geometry is still open. The one item that is appears two
+sections below, and it is smaller than it was.
 
 One further measured oddity, with an explanation that is reasoning and
 not evidence: `console-ramoops-0` carries an mtime of `Jun 26 2025` while
@@ -258,6 +294,55 @@ the dmesg records carry the crash time. The console zone is written from
 very early boot, before systemd-timesyncd has corrected the clock on a
 board with no RTC, so its first write would land at whatever date the
 rootfs starts with. Plausible, unverified, and recorded as such.
+
+## The -28 is a refusal by design, and every record here is truncated
+
+Entry [01](01-oops.md)'s oops carries this between the end of the trace
+and the panic:
+
+```
+[ 2057.724969] pstore: backend (ramoops) writing error (-28)
+```
+
+`-28` is `ENOSPC`, and two dumps from that same crash succeeded, which
+made it look like a partial failure. It is not a failure. Both of the
+obvious causes are dead on measurement: there are six dmesg zones and
+that boot used two, so it was not zone exhaustion, and the console zone
+is a wrapping ring that cannot run out of space. What remains is in
+`ramoops_pstore_write` in the tree that built this kernel:
+
+```c
+	/*
+	 * Explicitly only take the first part of any new crash.
+	 * If our buffer is larger than kmsg_bytes, this can never happen,
+	 * and if our buffer is smaller than kmsg_bytes, we don't want the
+	 * report split across multiple records.
+	 */
+	if (record->part != 1)
+		return -ENOSPC;
+```
+
+pstore offered a second chunk of the log and ramoops declined it, on
+purpose, rather than split one report across records. The evidence agrees
+from the outside: every dmesg record taken on this bench is `Part1`, the
+string `Part` occurs exactly once in each file, and no `Part2` has ever
+been stored.
+
+**So every pstore dmesg record here is a truncated log and not a complete
+one.** It holds what fits one zone and the remainder is discarded, which
+is why the three records begin at board times 0.383732, 0.396773 and
+0.438597 rather than at zero. That applies to anything entries 02 to 04
+recover from pstore as well, and it is the reason a serial console is
+still worth having attached: the console prints everything, the record
+keeps one zone.
+
+Why a second part was offered at all is one layer further down and is
+left as reasoning rather than measurement. `pstore_dump` keeps taking
+chunks while the total written is under `pstore.kmsg_bytes`, and the
+total it accumulates is the **compressed** size. A 16 kB zone holding
+deflated text can come well under that threshold, which would send the
+loop around again for a part the backend then refuses. Plausible,
+consistent with everything above, and not verified here.
 
 ## If /sys/fs/pstore is empty, read this before suspecting ramoops
 
