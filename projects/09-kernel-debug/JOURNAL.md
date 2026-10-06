@@ -1159,3 +1159,101 @@ was two commands away.
 Both have the same shape as the `find` piped to `head` in entry 24: a
 reading that was available cheaply, replaced by an inference that sounded
 like a reading.
+
+## 26. Tuesday 6 October 2026: the console was never connected, and the proof of that was in entry 01 all along
+
+An afternoon went on a serial console that has never worked on this image.
+The cause is one line of device tree behaviour, the evidence was in a boot
+log nobody could read because the thing that would print it is the thing
+that was broken, and the whole class of failure is the one this project
+exists to document.
+
+**What was wrong.** `disable-bt.dtbo` moves the PL011 to the header pins
+by targeting `uart0_pins` and declaring `brcm,pins`, `brcm,function` and
+`brcm,pull` as **empty** properties. It blanks the group and leaves the
+real values to the VideoCore firmware. On this image the firmware does not
+supply them, so the group names no pins and no function. Decompiled off
+the card:
+
+    fragment@3 {
+            target = <0xffffffff>;
+            __overlay__ {
+                    brcm,pins;
+                    brcm,function;
+                    brcm,pull;
+            };
+    };
+
+**What that looks like from the running board**, every line measured:
+
+    uart-pl011 3f201000.serial: there is not valid maps for state default
+    pin 14 (gpio14): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+    /proc/device-tree/soc/gpio@7e200000/uart0_pins/brcm,pins   0 bytes
+
+And at the same time, all true: `config.txt` carries `enable_uart=1` with
+no conditional filter above it, `disable-bt` is present and worked, the
+Bluetooth child reads `disabled`, `serial0` resolves to the PL011,
+`console=ttyAMA0,115200` is in the command line, `/proc/consoles` lists
+`ttyAMA0` as enabled, the driver probes and prints
+`console [ttyAMA0] enabled`, and every `echo > /dev/ttyAMA0` returns
+success. The kernel was writing to a UART whose output pin was not
+connected to anything, and said so once, at 4.6 seconds, on the console
+that did not work.
+
+**The fix for that half**, now in `kas/bench-debug.yml`:
+`dtoverlay=uart0,txd0_pin=14,rxd0_pin=15,pin_func=4`. Proven on the board:
+
+    pin 14 (gpio14): 3f201000.serial (GPIO UNCLAIMED) function alt0 group gpio14
+    uart0-gpio14/brcm,pins      00 00 00 0e 00 00 00 0f
+    uart0-gpio14/brcm,function  00 00 00 04
+
+and the "not valid maps" line gone.
+
+**And the console still produces nothing.** That is recorded as unresolved
+rather than smoothed over. A second fault sits between a correctly muxed
+GPIO14 and the laptop. Cleared by measurement: the PL2303 adapter and both
+signal leads, by a loopback that echoed every character typed;
+agent-proxy; telnet; the kernel's console registration; the cmdline; the
+device tree routing. Entry 02 and criterion 3 are marked blocked with
+those reasons rather than left as empty rows.
+
+**The expensive part was mine.** `dmesg | grep uart` was one command,
+available in the first minute, and it names the fault. Instead the
+afternoon went on wiring: a swap of white and green on a hypothesis built
+from mojibake that turned out to be agent-proxy's own telnet negotiation,
+three hedged wiring tables for a second adapter whose pinout is published
+nowhere, and a hand-over that put a made up IP address in a runnable
+command. The bench reference already warns that four hours once went to
+wiring while the fault was the instrument. This is the second time, and
+the instrument was innocent on both counts: the cable was fine, the board
+was fine, and the pins were never switched on.
+
+**Entry 01's oops did not come off a serial console, and now we know what
+it is.** It cannot have, because the console has never worked. The
+evidence I used for "a serial capture" was 46 carriage returns, and CRLF
+identifies a line ending and nothing else; a Windows clipboard produces it
+too. Diffing settled the real provenance: it is
+`docs/evidence/pstore-2026-10-06-console-ramoops-0.txt`, the pstore
+**console** record, which holds what printk sent to the console and
+therefore carries no `<N>` level prefixes. Fifty five lines, and after two
+corrections all fifty five are byte identical.
+
+**The second correction is worse than the first.** The trailing space on
+the `Code:` line was one byte. This time a whole line was missing from
+what entry 01 called the raw oops:
+
+    [ 2057.746406] CPU features: 0x0,0000000c,00020000,0000421b
+
+Neither was visible to a reader. Both were found the same way, by diffing
+a quotation against a file rather than reading it. **A quotation is not
+raw output until it has been diffed against its source**, and that is the
+rule this entry exists to establish. `decode.sh` no longer claims CRLF
+means a serial line; it says CRLF and stops there.
+
+**One more thing worth a look later.** The Pi 3 debug image's `config.txt`
+carries `dtoverlay=vc4-kms-dsi-7inch`, a 7 inch DSI panel overlay that
+belongs to the kiosk project on a Pi 4, alongside `vc4-fkms-v3d`, which
+is the other display stack. Commenting it out changed nothing about the
+UART, so it is not today's fault, but a debug image carrying another
+project's display overlay is a leak between kas files and should not be
+there.

@@ -80,7 +80,41 @@ local_conf_header:
     # userspace, which matters here more than it looks: the overlay's own
     # README notes the LED is brought up early in boot, so it is already
     # beating before anything that could crash has run.
-    RPI_EXTRA_CONFIG:append = "\ndtoverlay=disable-bt\ndtoverlay=ramoops,base-addr=0x0b000000,total-size=0x20000,record-size=0x4000,console-size=0x8000\ndtoverlay=gpio-led,gpio=17,label=heartbeat,trigger=heartbeat"
+    # uart0: disable-bt moves the UART and does NOT mux the pins, which
+    # cost a whole afternoon on Tuesday 6 October 2026 before anyone read
+    # the one line that says so. disable-bt.dtbo's fragment@3 targets
+    # uart0_pins and declares brcm,pins, brcm,function and brcm,pull as
+    # EMPTY properties, blanking whatever was there and leaving the real
+    # values to the VideoCore firmware. On this image the firmware does
+    # not supply them, so the group specifies no pins and no function.
+    #
+    # What that looks like on a running board, all measured:
+    #
+    #   uart-pl011 3f201000.serial: there is not valid maps for state default
+    #   pin 14 (gpio14): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+    #   /proc/device-tree/soc/gpio@7e200000/uart0_pins/brcm,pins   0 bytes
+    #
+    # and at the same time /proc/consoles lists ttyAMA0 as an enabled
+    # console, the driver probes, printk says "console [ttyAMA0] enabled",
+    # and every write to /dev/ttyAMA0 succeeds. The kernel is talking to a
+    # UART whose output pin is not connected to anything.
+    #
+    # The uart0 overlay sets the group explicitly instead of hoping. With
+    # it, the same reads become:
+    #
+    #   pin 14 (gpio14): 3f201000.serial (GPIO UNCLAIMED) function alt0 group gpio14
+    #   uart0-gpio14/brcm,pins      00 00 00 0e 00 00 00 0f
+    #   uart0-gpio14/brcm,function  00 00 00 04
+    #
+    # and the "not valid maps" line is gone.
+    #
+    # HONEST LIMIT: this fixes the mux and it did NOT by itself make the
+    # console produce output on the host. A second fault remains between a
+    # correctly muxed GPIO14 and the laptop, unidentified as of Tuesday 6
+    # October 2026, with the USB adapter and both signal leads already
+    # cleared by a loopback test. This line is here because the unmuxed
+    # pins were real and measured, not because the console now works.
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=disable-bt\ndtoverlay=uart0,txd0_pin=14,rxd0_pin=15,pin_func=4\ndtoverlay=ramoops,base-addr=0x0b000000,total-size=0x20000,record-size=0x4000,console-size=0x8000\ndtoverlay=gpio-led,gpio=17,label=heartbeat,trigger=heartbeat"
 
     # --- the overlays the firmware actually has --------------------------
     #

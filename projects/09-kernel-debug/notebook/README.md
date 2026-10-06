@@ -7,8 +7,15 @@ with real console output in them.
 **Three of the six have been run**, all on Tuesday 6 October 2026 except
 where noted: [01](01-oops.md) and [05](05-pstore.md) in full, and part
 four of [06](06-lockdep-kasan.md), which carries real KFENCE reports from
-two boots. Each says so in its first line. Entries 02, 03 and 04, and
-parts one to three of 06, are empty and marked `NOT YET RUN`. An empty block is honest. A plausible-looking block written
+two boots. Each says so in its first line. Entries 03 and 04, and parts one to
+three of 06, are empty and marked `NOT YET RUN`.
+
+[02](02-kgdb.md) is **blocked rather than merely unrun**, and says why in
+its first paragraph. It is the only one of the six that needs the serial
+console, and this image enables a console on a UART whose pins
+`disable-bt` left unmuxed. The mux is fixed and measured; the console
+still produces nothing, and a second fault is unidentified. Entries 03,
+04 and 06 need only ssh and a board that is up. An empty block is honest. A plausible-looking block written
 from expectation would be the single worst thing this repository could
 contain, because the whole point of the project is learning to tell a
 real report from a tool that found nothing.

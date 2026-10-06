@@ -38,6 +38,7 @@
 #   ./go debug        build bench-debug-image, the debugging lab of Project 9
 #   ./go debug-kasan  the same lab with KASAN on, which is a second kernel
 #   ./go proxy        split the console cable into a gdb port and a terminal
+#   ./go kgdb-setup   find what entry 02 needs and print the three commands
 #   ./go armstub      put the secure world on a card the image is already on
 #   ./go sdk          build the cross SDK installer
 #   ./go sdk install  run that installer into /opt/poky
@@ -101,6 +102,7 @@ kiosk)      exec sh ./scripts/build.sh bench-kiosk ;;
 debug)      exec sh ./scripts/build.sh bench-debug ;;
 debug-kasan) exec sh ./scripts/build.sh bench-debug-kasan ;;
 proxy)      shift; exec sh ./projects/09-kernel-debug/host/agent-proxy.sh "$@" ;;
+kgdb-setup) shift; exec sh ./projects/09-kernel-debug/host/kgdb-setup.sh "$@" ;;
 armstub)    shift; exec sh ./scripts/optee-armstub.sh "$@" ;;
 sdk)        shift; exec sh ./scripts/sdk.sh "${1:-build}" ;;
 sdk-check)  exec sh ./scripts/sdk.sh check ;;

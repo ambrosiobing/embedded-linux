@@ -76,14 +76,35 @@ decoder     scripts/decode_stacktrace.sh, from the kernel source tree that
             produced the vmlinux it was given
 ```
 
-The raw oops, as logged. This block was checked line by line against
-`docs/evidence/pstore-2026-10-06-dmesg-ramoops-0.txt`, the copy ramoops
-kept in DRAM across the reboot, and the two agree on all 46 lines of the
-oops. They did not at first: the `Code:` line ends with a trailing space
-that the kernel emits and the clipboard path dropped, so the block below
-was one byte short until Tuesday 6 October 2026. A difference that does
-not render is the one a reader cannot catch by eye, which is the argument
-for keeping the pstore copy as a file rather than only quoting it.
+The raw oops. **It did not come off a serial console**, and this entry
+said it did until Tuesday 6 October 2026. The serial console on this
+image has never worked: `disable-bt` blanks the pin group and leaves the
+real values to firmware that does not supply them, so `ttyAMA0` is an
+enabled console whose transmit pin was never muxed. Nothing has ever
+left the board on that wire. The kas file carries the measurement and the
+fix.
+
+What it actually is, established by diffing rather than assumed: the
+pstore **console** record, `docs/evidence/pstore-2026-10-06-console-ramoops-0.txt`,
+which holds what printk sent to the console and therefore carries no
+`<N>` level prefixes. Fifty four of its fifty five lines are byte
+identical to the block below.
+
+Two lines went missing or wrong on the way here, both found by comparing
+against files rather than by reading:
+
+- The `Code:` line ends with a trailing space that the kernel emits and
+  the copy dropped, 105 bytes against 104. Restored.
+- The whole `CPU features:` line was absent. Restored.
+
+A difference that does not render, and a line that is simply not there,
+are both invisible to a reader. That is the argument for keeping the
+pstore copies as files instead of only quoting them, and for diffing a
+quotation against its source before calling it raw.
+
+The same block also matches `pstore-2026-10-06-dmesg-ramoops-0.txt`, the
+dmesg dump ramoops kept across the reboot, on all 46 lines of the oops
+proper once its level prefixes are stripped.
 
 
 ```
@@ -139,6 +160,7 @@ for keeping the pstore copy as a file rather than only quoting it.
 [ 2057.731100] Kernel panic - not syncing: Oops: Fatal exception
 [ 2057.737559] SMP: stopping secondary CPUs
 [ 2057.742207] Kernel Offset: disabled
+[ 2057.746406] CPU features: 0x0,0000000c,00020000,0000421b
 [ 2057.752445] Memory Limit: none
 [ 2057.761920] Rebooting in 10 seconds..
 ```

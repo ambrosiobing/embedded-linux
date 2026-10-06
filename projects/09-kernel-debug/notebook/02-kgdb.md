@@ -1,6 +1,28 @@
 # 02: the same fault, live under gdb
 
-**Status: NOT YET RUN.** No board has produced the output below.
+**Status: BLOCKED on Tuesday 6 October 2026, not merely unrun.** No board
+has produced the output below, and two things stand in the way that the
+rest of the notebook does not share.
+
+**The serial console has never worked on this image.** kgdb speaks the gdb
+remote protocol over `ttyAMA0`, so this is the one entry of the six that
+cannot be driven over ssh. `disable-bt` blanks `uart0_pins` and leaves the
+real pin values to firmware that does not supply them, so `ttyAMA0` has
+been an enabled console with an unmuxed transmit pin. Adding
+`dtoverlay=uart0,txd0_pin=14,rxd0_pin=15,pin_func=4` fixes the mux,
+measured as `pin 14 (gpio14): 3f201000.serial ... function alt0`, and the
+console still produced nothing on the host. A second fault remains between
+a correctly muxed GPIO14 and the laptop, with the USB adapter and both
+signal leads already cleared by a loopback test. `kas/bench-debug.yml`
+carries the measurements.
+
+**`lxmod` cannot work as written.** It is `lx-symbols .`, and the `lx-`
+commands need `scripts/gdb/linux/constants.py` generated into the kernel
+build directory. Yocto does not run the `scripts_gdb` target, and
+`ls scripts/gdb` in that directory fails. The mechanism underneath is
+`add-symbol-file buggy.ko <addr>` with the address from
+`/sys/module/buggy/sections/.text` on the board, which needs none of it,
+and this entry should document both once it can run.
 
 ## Symptom
 

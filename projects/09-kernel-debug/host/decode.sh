@@ -122,10 +122,17 @@ echo >&2
 # directory that no longer exists at the same path.
 # --- carriage returns, which cost an hour on Tuesday 6 October 2026 ------
 #
-# A serial console emits CRLF and picocom --logfile records the stream
-# verbatim, so every line of an oops captured that way ends \r\n. The only
-# way logs reach this script on this bench is picocom, so this is the normal
-# case rather than an edge one.
+# Kernel logs arrive here with CRLF line endings often enough to be the
+# normal case rather than an edge one, so they are stripped and counted.
+#
+# WHERE THE CRLF COMES FROM, corrected later the same day. This script
+# used to say "a serial capture", because a serial console emits CRLF and
+# picocom records the stream verbatim. That was an inference from the
+# carriage returns alone and it was wrong: the serial console on this
+# bench has never worked, the log in question came out of pstore, and the
+# CRLF was added by a Windows clipboard on the way to a file. CRLF means
+# CRLF. It does not identify the transport, and saying it did sent a
+# whole afternoon after a cable that was fine.
 #
 # decode_stacktrace.sh takes the module name from the last token of the
 # line, "[buggy]", by stripping a leading "[" and then a trailing "]". With
@@ -144,7 +151,7 @@ echo >&2
 # frames you care about are missing.
 crs=$(tr -dc '\r' < "$LOG" | wc -c | tr -d ' ')
 if [ "$crs" -gt 0 ]; then
-	echo "decode.sh: stripped    $crs carriage returns, a serial capture" >&2
+	echo "decode.sh: stripped    $crs carriage returns (CRLF input)" >&2
 	echo >&2
 fi
 
