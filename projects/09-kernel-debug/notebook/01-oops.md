@@ -67,7 +67,15 @@ decoder     scripts/decode_stacktrace.sh, from the kernel source tree that
             produced the vmlinux it was given
 ```
 
-The raw oops, as logged:
+The raw oops, as logged. This block was checked line by line against
+`docs/evidence/pstore-2026-10-06-dmesg-ramoops-0.txt`, the copy ramoops
+kept in DRAM across the reboot, and the two agree on all 46 lines of the
+oops. They did not at first: the `Code:` line ends with a trailing space
+that the kernel emits and the clipboard path dropped, so the block below
+was one byte short until Tuesday 6 October 2026. A difference that does
+not render is the one a reader cannot catch by eye, which is the argument
+for keeping the pstore copy as a file rather than only quoting it.
+
 
 ```
 [ 2057.431067] buggy: triggering null
@@ -116,7 +124,7 @@ The raw oops, as logged:
 [ 2057.693613]  el0_svc+0x50/0xf8
 [ 2057.697440]  el0t_64_sync_handler+0x120/0x130
 [ 2057.702557]  el0t_64_sync+0x190/0x198
-[ 2057.706949] Code: f942e261 d2824682 90000020 9100a000 (f9000022)
+[ 2057.706949] Code: f942e261 d2824682 90000020 9100a000 (f9000022) 
 [ 2057.713783] ---[ end trace 0000000000000000 ]---
 [ 2057.724969] pstore: backend (ramoops) writing error (-28)
 [ 2057.731100] Kernel panic - not syncing: Oops: Fatal exception
