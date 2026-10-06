@@ -120,8 +120,36 @@ echo >&2
 # vmlinux rather than being told a source root that is probably wrong on
 # this machine anyway, since the kernel was built in a BitBake work
 # directory that no longer exists at the same path.
+# --- carriage returns, which cost an hour on Tuesday 6 October 2026 ------
+#
+# A serial console emits CRLF and picocom --logfile records the stream
+# verbatim, so every line of an oops captured that way ends \r\n. The only
+# way logs reach this script on this bench is picocom, so this is the normal
+# case rather than an edge one.
+#
+# decode_stacktrace.sh takes the module name from the last token of the
+# line, "[buggy]", by stripping a leading "[" and then a trailing "]". With
+# a CR sitting after the "]", that second strip matches nothing. The name
+# becomes "buggy]" plus a carriage return, the search becomes
+#
+#     find <modpath> -name $'buggy]\r.ko*'
+#
+# which finds nothing, and the script reports
+#
+#     WARNING! Modules path isn't set, but is needed to parse this symbol
+#
+# The modules path is the one thing that was not wrong. Kernel frames
+# resolve perfectly throughout, because their last token has no brackets and
+# never enters that branch, so the output looks almost right and only the
+# frames you care about are missing.
+crs=$(tr -dc '\r' < "$LOG" | wc -c | tr -d ' ')
+if [ "$crs" -gt 0 ]; then
+	echo "decode.sh: stripped    $crs carriage returns, a serial capture" >&2
+	echo >&2
+fi
+
 if [ -n "$MODULES" ]; then
-	exec "$DECODE" "$VMLINUX" auto "$MODULES" < "$LOG"
+	tr -d '\r' < "$LOG" | "$DECODE" "$VMLINUX" auto "$MODULES"
 else
-	exec "$DECODE" "$VMLINUX" auto < "$LOG"
+	tr -d '\r' < "$LOG" | "$DECODE" "$VMLINUX" auto
 fi
