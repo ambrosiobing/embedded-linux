@@ -25,11 +25,21 @@ which get easier once these workflows are in hand.
 
 ## State
 
-**Everything is written and nothing has been run.** No image has been
-built, no board has been booted, no fault has been triggered. There are no
-measurements in this README, and the rows that will hold them say so.
+**The image is built and the first fault is measured.** As of Tuesday 6
+October 2026 the debug image has been built and booted on a Raspberry Pi 3
+Model B Plus Rev 1.3, the `null` fault has been triggered and decoded, and
+criterion 1 in the table below carries a result rather than a blank. Eight
+of the twelve rows are still blank, and they are blank because nobody has
+taken those measurements yet.
 
-What is proven today, on a laptop:
+Three findings came off those boots that no laptop could have produced:
+the overlays named in `config.txt` were not on the card, `bench-status`
+and the `gpio-led` overlay both claimed GPIO17, and KFENCE reported two
+faults in the USB stack that nothing in this project injected. All three
+are in the journal, and the first two are now checked by
+`scripts/check-overlays.sh` and by an ownership row in `docs/DESIGN.md`.
+
+What was proven on a laptop before any of that, and still is:
 
 | Proven | How |
 |---|---|
@@ -129,7 +139,7 @@ reader will check.
 
 | # | Criterion | Kind | Status |
 |---|---|---|---|
-| 1 | `decode_stacktrace.sh` resolves the NULL dereference to a source line in `buggy.c` | measured | |
+| 1 | `decode_stacktrace.sh` resolves the NULL dereference to a source line in `buggy.c` | measured | met Tuesday 6 October 2026: `fault_null` at `buggy.c:109`, the line holding `victim->magic = 0x1234;`, with `x2 : 0000000000001234` in the register dump agreeing. [notebook/01](notebook/01-oops.md) |
 | 2 | `/sys/fs/pstore/dmesg-ramoops-0` holds the same oops after the reboot, and the SysRq crash makes a second capture | measured | |
 | 3 | gdb stops at a breakpoint in `fault_null`, prints a backtrace with module symbols, and `lx-dmesg` works | measured | |
 | 4 | The irqsoff tracer reports a maximum within 5 percent of 3 s with `fault_lock` in the stack | measured | |

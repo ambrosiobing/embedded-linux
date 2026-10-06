@@ -953,3 +953,68 @@ never matches on a Pi 3, so the width fallback is the normal path rather
 than the exception its own comment calls it. And now thirty lines about a
 service that is not installed. All three are correct reasoning about a
 premise nobody put to a board.
+
+## 23. Tuesday 6 October 2026: the oops decoded, and an hour lost to a carriage return
+
+Acceptance criterion 1 is met. The console carried the NULL dereference,
+`decode.sh` resolved it to `buggy.c:109`, and the line it names is
+`victim->magic = 0x1234;`. Entry 01 of the notebook now holds the raw
+oops, the decoded trace, the tool versions and the conclusion, which makes
+it the first of the six to carry real output end to end.
+
+**The thing that makes the decode trustworthy was not planned.** This
+entry has always warned that decoding against the wrong `vmlinux` does not
+fail: it produces plausible function names from the other build and says
+nothing about it. The register dump settled that by accident. `x2` holds
+`0000000000001234`, and `0x1234` is the constant on line 109. A different
+build would not have put it there, so the symbols and the running kernel
+are the same build on evidence rather than on assumption. Worth copying:
+when a tool cannot verify its own inputs, look for a value in the raw
+output that only the right input could have produced.
+
+**An hour went on a carriage return.** The first decode resolved every
+kernel frame perfectly and neither module frame, reporting that the
+modules path was not set. It was set, `decode.sh` printed it, the
+directory was right and the module in it was unstripped. Three hypotheses
+were formed and all three were wrong, each from reading part of the
+problem rather than running it. `bash -x` answered it in one line:
+
+    module=$'[buggy]\r'
+    module=$'buggy]\r'
+
+A serial console emits CRLF and picocom records the stream verbatim.
+`decode_stacktrace.sh` strips a leading `[` and a trailing `]` from the
+last token, and a carriage return sitting after the `]` makes the second
+strip match nothing. Kernel frames never enter that branch because their
+last token has no brackets, so the output looks almost right and only the
+frames the oops was captured for are missing. `decode.sh` now strips CRs
+before the parser sees the log and reports how many it removed. On this
+bench a log can only arrive as a serial capture, so CRLF is the normal
+case and not an edge one.
+
+**Four things entry 01 said that the run contradicted**, all four written
+when nothing had been run and left standing afterwards. The decode was
+said to run on the authoring laptop, which has no aarch64 binutils and no
+kernel source; it runs on JPTOUPM678. Every command carried `sudo`, which
+does not exist on this image. The check list asked whether the heartbeat
+LED went dark at the panic, when it freezes, and `docs/DESIGN.md` already
+had the right word in its sequence figure. And the board was said to
+reboot after ten seconds, when it reads `panic_on_oops 1` and `panic 0`
+and halts: `CONFIG_PANIC_TIMEOUT` is set nowhere in this layer, so
+`sysctl -w kernel.panic=10` is a runtime step that has to be typed on
+every boot. The run only worked because it was typed.
+
+That last one is a configuration gap and not just a documentation one. A
+halted Raspberry Pi 3B+ can only be restarted by pulling the power, which
+is a cold cycle, and the ramoops region is ordinary DRAM. The image as
+built guarantees that a panic it was configured to capture is lost.
+
+**The README said nothing had been run.** It had said so since the project
+was created and it stayed true for a while. Two boots, three findings and
+a met criterion later it was simply false, and nothing in the repository
+could notice, because no test holds a sentence. Corrected along with the
+notebook README, which carried the same `sudo` and the same ten seconds.
+
+Two frames below the faulting one resolve one line past their call, which
+looks like an off-by-one and is not: a frame holds a return address. Noted
+in entry 01 so the next reader does not spend ten minutes on it.

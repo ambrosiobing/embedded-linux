@@ -4,9 +4,10 @@ Six entries, one per fault and tool. This directory is the deliverable:
 the project produces no product, and what it leaves behind is these files
 with real console output in them.
 
-**Almost nothing here has been run yet.** The one exception is part four
-of [06](06-lockdep-kasan.md), which carries real KFENCE reports from two
-boots and is marked as such. Every output block is empty and marked
+**Two of the six have been run.** [01](01-oops.md) in full, on Tuesday 6
+October 2026, and part four of [06](06-lockdep-kasan.md), which carries
+real KFENCE reports from two boots. Both say so in their first line. The
+remaining entries, and parts one to three of 06, are empty and marked
 `NOT YET RUN`. An empty block is honest. A plausible-looking block written
 from expectation would be the single worst thing this repository could
 contain, because the whole point of the project is learning to tell a
@@ -38,12 +39,25 @@ will want is the one you did not think was interesting.
 
 ## Before each entry
 
-Clear pstore, so an old record cannot be mistaken for a new one:
+Clear pstore, so an old record cannot be mistaken for a new one. There is
+no `sudo` on this image and no password on root, so the commands in these
+entries are written without it:
 
 ```sh
-sudo rm -f /sys/fs/pstore/*
+rm -f /sys/fs/pstore/*
 ```
 
-And make sure the terminal is logging to a file. `panic_on_oops` with a
-ten second timeout means an unlogged session loses the oops you just
-caused, and the board reboots before you finish reading it.
+Make sure the terminal is logging to a file before anything is triggered.
+`panic_on_oops` is set and no panic timeout is, so the board reads
+`panic_on_oops 1` and `panic 0` and **halts** rather than rebooting. An
+unlogged session therefore loses the oops permanently, and the only way to
+restart a halted board is to pull the power, which is a cold cycle that
+also loses the ramoops region. Setting the timeout first is what gets the
+board back warm with its records intact:
+
+```sh
+sysctl -w kernel.panic=10
+```
+
+That is a runtime setting. `CONFIG_PANIC_TIMEOUT` is set nowhere in this
+layer, so it has to be typed on every boot until it is.
