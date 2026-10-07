@@ -228,8 +228,10 @@ Two further limits from the same document sit upstream of that one, and
 together they are the supply chain this measurement actually has:
 
 - page 12: in source meter mode the host's USB port has to supply the
-  DUT's maximum current **plus about 50 mA for the PPK2 itself**, so a
-  500 mA USB 2.0 port leaves under 450 mA for the board
+  DUT's maximum current **plus about 50 mA for the PPK2 itself**, and page
+  9 adds that above 400 mA the PPK2's second socket, `USB POWER ONLY`,
+  wants a supply of 1 A or more. This bench ran a whole session without it
+  and withdrew the figures
 - Table 6, page 16: `VDD_DUT` is 0.8 V to **5.0 V**, which is 300 mV above
   the NEO Air's stated 4.7 V minimum before any lead drop
 

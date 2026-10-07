@@ -131,8 +131,11 @@ does not fail safely: it toggles something else on the header.
 **Power.** Use the official 3 A supply and nothing else on the USB ports
 except the HAT's own cable. Never power the HAT from its micro-USB and the
 header at the same time. Watch `journalctl -k` for undervoltage. The PPK2
-cannot measure this, at 1 A maximum; the instrument for the current profile
-is Project 8's MCC 118 with a low-value shunt.
+cannot measure this; the instrument for the current profile is Project 8's
+MCC 118 with a low-value shunt. The PPK2's ceiling is **1 A in ampere
+meter mode and 600 mA in source meter mode**, user guide Table 7 page 16,
+and this sentence said 1 A without naming a mode until Wednesday 7 October
+2026. Either way it is below a modem's transmit burst.
 
 ---
 

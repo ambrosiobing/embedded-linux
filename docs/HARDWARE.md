@@ -474,7 +474,7 @@ disqualified this programmer. See
 | HAT | Evidence | Notes |
 |---|---|---|
 | SIM7600E-H 4G HAT | `datasheet` and `vendor page` | Project 15, fully read in [its hardware page](../projects/15-lte-router/docs/hardware.md). **Carries a CP2102 and a jumper position that makes it a console adapter for the Pi.** Its two vendor documents give opposite PWRKEY polarities |
-| SIM7070G Cat-M/NB-IoT/GPRS HAT | `NOT READ` | Project 16 |
+| SIM7070G Cat-M/NB-IoT/GPRS HAT | `vendor page` | Project 16, in [its hardware page](../projects/16-nbiot-tracker/docs/hardware.md). **Its host logic voltage is set by a 0 ohm resistor, not a jumper**, and the wiki does not say which way the factory fitted it. No pin table, no PWRKEY polarity, no flight mode pin, no peak current |
 | SIM7020E NB-IoT HAT | `NOT READ` | |
 | MCC 118 DAQ HAT | `NOT READ` | 12-bit, 100 kS/s, 8 single-ended analog inputs |
 | Joy-it RB-Explorer700, DIV56316 | `datasheet` | fully mapped in [project 6's pin map](../projects/06-explorer700/docs/pin-map.md), including three places where the manual contradicts itself about one sensor |

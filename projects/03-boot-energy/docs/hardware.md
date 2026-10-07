@@ -78,31 +78,39 @@ there are two more links upstream of that, and they matter.
 
 **Page 12, section 6.5:** in source meter mode the host's USB power source
 has to support the DUT's maximum current **in addition to approximately
-50 mA for the PPK2 circuitry**.
+50 mA for the PPK2 circuitry**. **Page 9** adds the part that matters
+most: the PPK2 has a **second** micro USB socket, and above 400 mA in
+source meter mode it wants a supply of 1 A or more on it. That is the next
+section.
 
 ```
-   the laptop's USB port                    500 mA on a USB 2.0 port
-          |                                 900 mA on a USB 3.0 port
-          |  micro USB
-          v
-   +--------------------+
-   |       PPK2         |  about 50 mA for its own circuitry   p.12
-   |                    |
-   |   source meter     |  VDD_DUT   0.8 V to 5.0 V   Table 6, p.16
-   |                    |  max DUT   600 mA           Table 7, p.16
-   |             VOUT   o--+
-   +--------------------+  |
-                           |  two jumper leads, some tens of mV at
-                           |  a few hundred mA
-                           v
-                    NanoPi NEO Air          needs 4.7 V to 5.6 V
-                                            vendor recommends 5 V / 2 A
+   the laptop's USB port  --->  [ USB DATA/POWER ]   500 mA on USB 2.0
+                                       |             900 mA on USB 3.0
+                                       |             always connected  p.9
+   a 1 A or more supply   --->  [ USB POWER ONLY ]
+                                       |             needed in source
+                                       |             meter mode over
+                                       v             400 mA           p.9
+                             +--------------------+
+                             |       PPK2         |  about 50 mA of its
+                             |                    |  own               p.12
+                             |   source meter     |  VDD_DUT 0.8 to
+                             |                    |  5.0 V    Table 6, p.16
+                             |                    |  max DUT  600 mA
+                             |             VOUT   o--+        Table 7, p.16
+                             +--------------------+  |
+                                                     | two jumper leads,
+                                                     | tens of mV at a few
+                                                     | hundred mA
+                                                     v
+                                          NanoPi NEO Air   4.7 to 5.6 V
+                                                  vendor says 5 V / 2 A
 
    the narrowest point is whichever of these is reached first, and
    nothing in the rig reports which one it was
 ```
 
-**Read that bottom line twice.** Three separate limits, at three different
+**Read that bottom line twice.** Four separate limits, at four different
 places, and the instrument reports none of them. It reports current. A rig
 that hits any one of them produces a plausible looking current trace.
 
@@ -112,6 +120,60 @@ regulation under a step load is not characterised, at a voltage assumed
 rather than measured, with the board's lower limit 300 mV away. That is
 still a useful measurement, and it is a different claim from "the boot
 energy of a NanoPi NEO Air".
+
+## The second USB connector, which the bench found the hard way and the guide states plainly
+
+**The PPK2 has two micro USB sockets, and they do different jobs.**
+Table 1, page 9:
+
+| Connector | What the guide says it is for |
+|---|---|
+| `USB DATA/POWER` | power and communication with the PPK2; **must always be connected** |
+| `USB POWER ONLY` | extra power to the PPK2, "**Only needed in Source Meter mode (> 400 mA)**" |
+| `VIN` | external power input, **only** used for ampere meter mode |
+| `VOUT`, `GND` | the output to the DUT |
+| `LOGIC PORT` | `VCC`, `GND` and `D0` to `D7` |
+
+And in prose on the same page, section 5.1.2: if the PPK2 is in source
+meter mode and the DUT can draw more than 400 mA, an extra external USB
+supply that can deliver **1 A or more** is recommended.
+
+**This bench already knew, and knew it the expensive way.** Project 3's
+own evidence file
+[`evidence/logic-selftest.txt`](evidence/logic-selftest.txt) records at
+line 87 that `USB POWER ONLY` is required in source meter mode above
+400 mA and that **only `DATA/POWER` was ever connected, in that session
+and every earlier one.** The current figures from those sessions were
+withdrawn.
+[Project 16's design](../../16-nbiot-tracker/docs/DESIGN.md) puts the rule
+first rather than in a troubleshooting section, for exactly that reason.
+
+**What the guide adds to what the bench had worked out.** The bench's
+version was an observation from a line of evidence output. The guide gives
+the threshold, 400 mA, the reason, the PPK2's own circuitry needs headroom
+the data port cannot spare, and the remedy, a supply rated 1 A or more on
+the second socket. So the rule stops being a superstition about cables and
+becomes a number you can check a measurement against.
+
+## The 1233 mA that was already withdrawn, now with a sharper reason
+
+Journal entry 26 of this project records a measured peak of 1233 mA,
+described there as "above the PPK2's 1 A rating", and concludes that the
+peak "cannot be quoted as a property of the board at all". That conclusion
+was right.
+
+**It is now right for a stronger reason.** In source meter mode the limit
+is not 1 A, it is **600 mA**. The measured peak was not 23 per cent over
+the admissible current; it was more than double it, and it was taken with
+only one USB socket connected on a rig whose guide says to connect two
+above 400 mA. Three separate reasons to discard one number, where the
+journal had one.
+
+**The useful general form**, because this will happen again: when a
+measurement is withdrawn for one reason and the instrument's document is
+read afterwards, **check whether the other reasons were there too.** A
+number discarded for the wrong reason is still discarded, and the right
+reason is what stops the next measurement repeating it.
 
 ## What the accuracy actually is, which is better than recorded
 

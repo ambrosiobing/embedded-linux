@@ -67,6 +67,17 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**Two HATs from one vendor are not equally documented, and nothing says
+so.** The SIM7600E-H has a PDF manual and a wiki page; the SIM7070G
+appears to have only a wiki page, and that page carries no pin table, no
+PWRKEY polarity, no flight mode pin and no peak current. It does carry one
+live hazard: the host logic voltage is set by a **0 ohm resistor** rather
+than a jumper, the page does not say which way it is fitted, and there is
+no soldering iron on this bench to move it.
+[Project 16's hardware page](../projects/16-nbiot-tracker/docs/hardware.md)
+records what follows, including that the first action with that board is a
+photograph rather than a download.
+
 **The SIM7600E-H HAT's manual and its wiki disagree about PWRKEY, and the
 disagreement is the finding.** The 2018 manual says to strap `PWR` to
 **GND** to power the module on automatically; the wiki, describing the
@@ -226,7 +237,7 @@ also records the three places it contradicts itself about one sensor.
 | SIM7600E-H 4G HAT manual, Waveshare, Rev 1.0, 8 June 2018 | 4G HAT | project 15 | **yes** | `https://www.waveshare.com/w/upload/6/6d/SIM7600E-H-4G-HAT-Manual-EN.pdf` |
 | Waveshare wiki, SIM7600E-H 4G HAT | the same HAT, a later revision | project 15 | **yes** | `https://www.waveshare.com/wiki/SIM7600E-H_4G_HAT` |
 | SIM7600E-H module manual | the module itself | project 15 | no | `https://fccid.io/2AJYU-8PYA009/User-Manual/User-Manual-4814639.pdf` |
-| SIM7070G wiki | Cat-M, NB-IoT, GPRS HAT | project 16 | **yes** | `https://www.waveshare.com/wiki/SIM7070G_Cat-M/NB-IoT/GPRS_HAT` |
+| Waveshare wiki, SIM7070G Cat-M/NB-IoT/GPRS HAT | Cat-M, NB-IoT, GPRS HAT | project 16 | **yes**, and it answers very little | `https://www.waveshare.com/wiki/SIM7070G_Cat-M/NB-IoT/GPRS_HAT` |
 | SIM7020E wiki | NB-IoT HAT | | no | `https://www.waveshare.com/wiki/SIM7020E_NB-IoT_HAT` |
 | SIMCom SIM7000 series documents | AT command sets | project 16 | no | `https://simcom.ee/documents?dir=SIM7000x` |
 
