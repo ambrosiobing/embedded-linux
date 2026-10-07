@@ -68,6 +68,26 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**One datasheet closed a four project argument with a formula.** The
+Sensirion SHT4x datasheet, version 6.4, bounds the bus capacitance for a
+given pull-up and rise time, `C_b < t_rise / (0.8473 * R_p)`. Put the
+Raspberry Pi's 47 kohm internal pull-up into it and the permitted bus
+capacitance is **7.5 pF in fast mode and 25 pF in standard mode**, against
+the fifty to a hundred that a few centimetres of jumper wire presents. So
+a hand-wired bus on internal pull-ups does not merely look marginal; it
+fails a manufacturer's stated condition by more than an order of
+magnitude. The working is in
+[project 10's hardware page](../projects/10-iio-iks4a1/docs/hardware.md)
+and the consequence for projects 5 and 11 is in
+[theirs](../projects/05-iio-adxl345/docs/hardware.md), where the remedy is
+now a specific purchase: two resistors of about 4.7 kohm.
+
+**That is what reading a datasheet is for.** The claim went from "there
+are no resistors on this module" in September, to "47 kohm, five to twenty
+five times weaker than usual" in the morning, to an inequality that can be
+evaluated and fails, in the afternoon. Three documents from three vendors,
+none of which was about the part that started the argument.
+
 **ST's documents are unreachable and ST's register maps are not.** Every
 PDF fetch from `st.com` has failed on this bench, across several sessions.
 ST also publishes each sensor's register map as a C header in its own
@@ -288,6 +308,7 @@ a desk.
 |---|---|---|---|---|
 | JOY-iT RB-Explorer700 manual, 16 November 2020 | Explorer700 | project 6 | **yes** | `https://www.joy-it.net/files/files/Produkte/RB-Explorer700/RB-Explorer700-Manual-16.11.2020.pdf` |
 | MCC 118 datasheet, DS-MCC-118, Measurement Computing | DAQ HAT | project 8, the external instrument | **yes** | `https://files.digilent.com/datasheets/DS-MCC-118.pdf` |
+| MCC DAQ HAT library, C API reference | the same HAT's software | project 8 | **yes** | `https://mccdaq.github.io/daqhats/c.html` |
 | DS3231 | real time clock on the Explorer700 | project 6 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf` |
 | CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
 | Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
@@ -368,7 +389,7 @@ Project 10's shield. Seven parts, seven documents.
 | LIS2DUXS12 | accelerometer | 3-axis, low power | no | `https://www.st.com/resource/en/datasheet/lis2duxs12.pdf` |
 | LPS22DF | pressure | barometric | no | `https://www.st.com/resource/en/datasheet/lps22df.pdf` |
 | STTS22H | temperature | digital | no | `https://www.st.com/resource/en/datasheet/stts22h.pdf` |
-| SHT40 | humidity and temperature | Sensirion, not ST | no | `https://sensirion.com/media/documents/33FD6951/624C4357/Sensirion_Humidity_Sensors_SHT4x_Datasheet.pdf` |
+| Sensirion SHT4x datasheet, version 6.4, November 2023 | humidity and temperature | Sensirion, not ST | **yes** | `https://sensirion.com/media/documents/33FD6951/6555C40E/Sensirion_Datasheet_SHT4x.pdf` |
 
 **One thing these seven settle that is already known to matter.** A
 project 10 acceptance criterion asks for a 416 Hz output data rate, which

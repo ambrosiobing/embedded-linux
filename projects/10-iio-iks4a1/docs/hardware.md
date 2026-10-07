@@ -72,7 +72,7 @@ rather than a reading.
 | LIS2DUXS12 | `0x31` / `0x33` | **0x18** or **0x19** | `0x0F` | `0x47` |
 | LPS22DF | `0xB9` / `0xBB` | **0x5C** or **0x5D** | `0x0F` | `0xB4` |
 | STTS22H | `0x71`, `0x79`, `0x7D`, `0x7F` | **0x38**, **0x3C**, **0x3E** or **0x3F** | | `0xA0` |
-| SHT40 | Sensirion, not an ST part | **0x44** | | |
+| SHT40 | Sensirion, not an ST part | **0x44** | none; `0x89` reads a per-unit serial number | see below |
 
 Source for every ST row: the `<part>_reg.h` header in the corresponding
 `STMicroelectronics/<part>-pid` repository, read Wednesday 7 October 2026.
@@ -144,6 +144,150 @@ of the rule is:
 Which is still far better than an address, and it is the kind of limit
 worth knowing before a probe is written and trusted.
 
+## The SHT40 is the one sensor here with a real datasheet, and it was worth reading
+
+**Source: Sensirion SHT4x datasheet, version 6.4, November 2023.** Read
+Wednesday 7 October 2026. Sensirion serves PDFs to this bench; ST does
+not. So the one non-ST part on the shield is also the only one whose full
+specification could be read without help.
+
+| Specification | Value | Page |
+|---|---|---|
+| supply voltage | 1.08 V min, 3.3 V typical, 3.6 V max | 9 |
+| **max voltage on any pin** | VSS minus 0.3 V to **VDD plus 0.3 V** | 10 |
+| input thresholds | low below 0.3 x VDD, high above 0.7 x VDD | 9 |
+| idle current | 0.08 microamp typical, 1.0 microamp max at 25 C | 9 |
+| measurement current | 320 microamp typical, 500 microamp max | 9 |
+| measurement duration | 1.3 to 1.6 ms low, 3.7 to 4.5 ms medium, 6.9 to 8.3 ms high repeatability | 10 |
+| power-up time | 0.3 ms typical, 1 ms max | 10 |
+| RH accuracy, SHT40 | plus or minus 1.8 %RH typical | 4 |
+| RH resolution, response time, drift | 0.01 %RH, 4 s, under 0.2 %RH per year | 4 |
+| operating temperature | -40 to 125 C | 10 |
+| clock stretching | **not supported** | 10 |
+
+**Three of those rows change how this project should be written.**
+
+### There is no `WHO_AM_I`, and there is something better and worse
+
+Command **`0x89` reads a serial number**, page 12, stored in one-time
+programmable memory and assigned during production. That is not a part
+identification; it identifies **this individual sensor**.
+
+So the SHT40 row in the table above has no identification value because
+there is none to have. What it has instead distinguishes **this unit from
+another SHT40**, which no other sensor here can do, and does not confirm
+that the part is an SHT40 rather than an SHT41 or SHT45. The three differ
+only in accuracy grade and all answer at `0x44`.
+
+**That is a genuinely awkward identification problem** and it is worth
+naming rather than glossing: nothing on the bus can tell an SHT40 from an
+SHT45. The shield's documentation says which is fitted, and the shield's
+documentation is `NOT READ`.
+
+### Every reading carries a CRC, and nothing else on this shield does
+
+Section 4.4, page 11: each 16-bit value is followed by an 8-bit checksum.
+CRC-8, polynomial `0x31`, initialisation `0xFF`, no input or output
+reflection, final XOR `0x00`, and the datasheet gives a test vector,
+`CRC(0xBEEF) = 0x92`.
+
+**So a corrupted SHT40 reading is detectable**, and a corrupted reading
+from any of the ST sensors is not. On a bench whose recurring complaint is
+that a fault produces plausible numbers instead of an error, that is the
+most valuable property any part here has.
+
+**And it is a test vector, which means the implementation can be proven
+without hardware.** `CRC(0xBEEF) = 0x92` belongs in this project's test
+suite, where it runs in CI and fails if the polynomial or the
+initialisation is ever wrong. That is exactly the shape this repository
+asks for: a check that can fail, proven by breaking it.
+
+### No clock stretching, which decides a device tree question
+
+Page 10, in its own sentence: the sensor does not support clock
+stretching. If it receives a read header while still measuring, it NACKs.
+
+That means a driver must **wait the measurement duration** rather than
+rely on the bus holding, and the durations are in the table above: up to
+8.3 ms for high repeatability. A read issued too early fails cleanly,
+which is the good case, but it fails, and the right fix is a delay rather
+than a retry loop.
+
+## The pull-up arithmetic, finally done properly
+
+This is the most useful thing in the datasheet and it closes a thread that
+has run through four projects.
+
+**Table 4, page 9**, gives a **minimum** pull-up resistance, 390 ohm for
+VDD at or above 1.62 V, and bounds the bus capacitance with a formula:
+
+```
+   C_b  <  t_rise / (0.8473 * R_p)
+
+   where t_rise is 300 ns in fast mode
+                   120 ns in fast mode plus
+```
+
+**Now put the Raspberry Pi's internal pull-up into it.** The Pi 4
+datasheet, Table 3 page 8, gives 47 kohm typical:
+
+```
+   fast mode, 400 kHz:
+      C_b  <  300e-9 / (0.8473 * 47000)  =  7.5 pF
+
+   standard mode, 100 kHz, where t_rise may be 1000 ns:
+      C_b  <  1000e-9 / (0.8473 * 47000)  =  25 pF
+```
+
+**A few centimetres of wire and two devices is fifty to a hundred
+picofarads.** So a bus built on the host's internal pull-ups fails
+Sensirion's own stated condition **by more than an order of magnitude, at
+any standard I2C speed, with any realistic wiring.**
+
+**That is the end of a long argument.** Project 5's page recorded that the
+SEN0032 module carries no resistors at all, so a bus built from it has
+only the host's internal pull-ups, and called that a qualitative worry.
+The Pi 4 datasheet turned it into a number, 47 kohm. This datasheet turns
+the number into a criterion that can be evaluated, and the evaluation
+fails. **The conclusion is no longer "this is probably marginal"; it is
+"this does not meet the manufacturer's condition, and here is the
+arithmetic".**
+
+**Two honest caveats, because the arithmetic is only as good as its
+inputs.**
+
+1. The 47 kohm is the **Pi 4's** figure. The Pi 3B+ publishes none, and
+   this project's board is a Pi 3B+. The conclusion is almost certainly
+   the same, and it is `inferred` for this host.
+2. The criterion is **Sensirion's**, for the SHT4x. It is the ordinary I2C
+   rise-time condition and it is not specific to this part, but quoting it
+   as a general law rather than as this datasheet's requirement would be
+   overreaching.
+
+**And the practical consequence for this project is nil**, which is the
+happy ending. The IKS4A1 is a designed shield; it carries its own
+pull-ups, and the typical application circuit on page 3 of this datasheet
+shows **10 kohm** on SDA and SCL, which is what a sensible board fits.
+This arithmetic matters for the hand-wired buses in projects 5 and 11, not
+for this one. It is recorded here because this is where the formula was
+found.
+
+## And the PPK2 cannot measure this sensor at all
+
+Idle current 0.08 microamp typical. The PPK2 measures from **500 nA**,
+which is 0.5 microamp, and its finest resolution step is 0.2 microamp.
+
+**The SHT40's idle current is below the instrument's floor and below its
+resolution.** Even its average in continuous operation at one measurement
+per second, 2.2 microamp at high repeatability, is only four times the
+floor and eleven resolution steps.
+
+Nothing in this project needs that measurement. It is recorded because
+[project 16's design](../../16-nbiot-tracker/docs/DESIGN.md) reasons
+carefully about what the PPK2 may be asked to claim, and this is the
+clearest example on the bench of a subject the instrument simply cannot
+see: not clipped, not noisy, **below the floor**.
+
 ## What the register headers do not settle, and it matters for wiring
 
 The project's wiring puts `INT1` of the LSM6DSV16X on **GPIO24**, header
@@ -176,7 +320,7 @@ order of value:
 | **UM3239**, getting started with the X-NUCLEO-IKS4A1 | which IMU is strapped to which address, what the shield does between the header and the sensors, and the jumper arrangement |
 | LSM6DSV16X datasheet | the supply range, the absolute maxima, and the `INT1` pin's electrical behaviour |
 | LPS22DF, LIS2MDL, STTS22H, LIS2DUXS12 datasheets | the same, per sensor |
-| SHT40 datasheet, from Sensirion | the one non-ST part, and Sensirion does serve PDFs here, so this one is gettable without help |
+| ~~SHT40 datasheet, from Sensirion~~ | **done**, version 6.4 of November 2023, read Wednesday 7 October 2026 and worked through above |
 
 **UM3239 is the one worth asking for first.** Everything else on the list
 is a per-sensor detail; UM3239 is the only document that describes the

@@ -59,6 +59,32 @@ That is a testable statement. It can be checked by halving the clock and
 seeing whether a flaky bus becomes reliable, which costs one line in a
 device tree overlay and no hardware at all.
 
+**Wednesday 7 October 2026, later the same day: the prediction became
+arithmetic.** Sensirion's SHT4x datasheet, version 6.4 of November 2023,
+page 9, bounds the bus capacitance for a given pull-up and rise time:
+
+```
+   C_b  <  t_rise / (0.8473 * R_p)
+```
+
+Put 47 kohm into it and fast mode's 300 ns rise time comes out at
+**7.5 pF** of permitted bus capacitance; standard mode's 1000 ns comes out
+at **25 pF**. A few centimetres of jumper wire and two devices is fifty to
+a hundred.
+
+So the statement this page could make in the morning, that a bus on
+internal pull-ups is "somewhere between five and twenty five times
+weaker", can now be made properly: **such a bus fails the condition by
+more than an order of magnitude at any standard I2C speed with any
+realistic wiring.** The criterion is Sensirion's, for its own part, and
+the ordinary I2C rise-time condition besides; the working is in
+[project 10's hardware page](../../10-iio-iks4a1/docs/hardware.md).
+
+**Which makes the remedy concrete rather than hopeful.** Two resistors of
+about 4.7 kohm from `SDA` and `SCL` to 3V3 would put the bus inside the
+condition with room to spare. There are none on this bench, and that is
+now a specific shopping item rather than a vague wish.
+
 **And the honest caveat, which matters more than the number.** That figure
 is the **Pi 4's**, from the BCM2711 datasheet. The Raspberry Pi 3 Model B+
 product brief states no GPIO electrical characteristics whatsoever, and

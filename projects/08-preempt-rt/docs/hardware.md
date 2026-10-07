@@ -16,7 +16,7 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 |---|---|---|
 | MCC 118 datasheet, Measurement Computing, `DS-MCC-118` | `datasheet` | **read Wednesday 7 October 2026**, pages 1 to 4 |
 | Raspberry Pi 4 Model B datasheet, release 1.1 | `datasheet` | read; in [docs/HARDWARE.md](../../../docs/HARDWARE.md) |
-| MCC DAQ HAT library documentation | | **`NOT READ`** |
+| MCC DAQ HAT library documentation, C API reference | `vendor page` | **read Wednesday 7 October 2026** |
 
 **Provenance, stated because it is not ideal.** `files.digilent.com`
 returned 403 to two attempts on Wednesday 7 October 2026, so the datasheet
@@ -230,5 +230,51 @@ number that would settle it.
 
 | Document | What it would settle |
 |---|---|
-| MCC DAQ HAT library documentation | whether the library reports an **actual** scan rate distinct from the requested one, which is the nearest thing to a time base check available without a signal generator |
 | a dated revision of this datasheet | whether anything above has changed; the copy read carries no revision |
+
+## The library answers half the time base question, and names the two overruns
+
+**Source: the MCC DAQ HAT library documentation, C API reference.** Read
+Wednesday 7 October 2026.
+
+**There is a function for the actual rate.** `mcc118_a_in_scan_actual_rate()`
+calculates the achievable sampling rate and, in the documentation's own
+words, "will return the actual rate for a requested channel count and
+rate".
+
+**Read what that is carefully, because it is half of what this project
+wants.** It is a **calculation**, not a measurement: it tells you the
+nominal rate the hardware will use when you ask for 100 kS/s with one
+channel, which may not be exactly 100000. It does not say how accurate
+that nominal rate is in seconds, and the datasheet still does not either.
+
+| Question | Answered by |
+|---|---|
+| what nominal rate will the board actually use | `mcc118_a_in_scan_actual_rate()` |
+| how close is that nominal rate to the truth | **nothing available here** |
+
+**And it is free to use, which makes it worth doing now.** If `rt-capture`
+requests 100 kS/s and converts sample indices to seconds by dividing by
+100000, then any difference between the requested and the achievable rate
+is a **systematic scale error on every interval this project reports**.
+Calling the function and dividing by what it returns removes that error
+entirely, costs one line, and is the kind of thing that is obvious once
+somebody reads the API and invisible before.
+
+**The two overrun flags now have names and a distinction.** `rt-capture`
+checks both, as the README says. The library defines them as:
+
+| Flag | What the documentation says it means | Which buffer |
+|---|---|---|
+| `STATUS_HW_OVERRUN`, `0x0001` | "The device scan buffer was not read fast enough and data was lost" | the board's own FIFO, 7168 samples, 71.7 ms at 100 kS/s |
+| `STATUS_BUFFER_OVERRUN`, `0x0002` | "The thread scan buffer was not read by the user fast enough and data was lost" | the library's host-side buffer |
+
+**Those are two different failures in two different places**, and the
+distinction is useful: a hardware overrun points at SPI servicing and at
+whatever is holding the CPU, while a buffer overrun points at the capture
+program's own read loop. `mcc118_a_in_scan_read()` returns them ORed
+together with `STATUS_TRIGGERED` and `STATUS_RUNNING`.
+
+Nothing here changes the conclusion about the edge shortfall. It does
+narrow it: if an overrun had happened, the flags would say which of the
+two it was, and neither fired.
