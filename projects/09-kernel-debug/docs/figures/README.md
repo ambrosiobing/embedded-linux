@@ -1,6 +1,6 @@
 # Figures
 
-Seven drawings, each one file, each compiling on its own.
+Eight drawings, each one file, each compiling on its own.
 
 ```sh
 make                    # every figure to PDF
@@ -17,6 +17,7 @@ make fault-matrix.pdf   # just one
 | `bench.tex` | What is on the table, and why two paths to the board are needed | [DESIGN.md](../DESIGN.md#bench-layout) |
 | `uml-sequence.tex` | The same crash captured twice: after the fact, then live | [DESIGN.md](../DESIGN.md#a-crash-captured-twice) |
 | `uml-components.tex` | What is built where, including the two firsts for this layer | [DESIGN.md](../DESIGN.md#components-and-what-is-new-here) |
+| `uart-mux.tex` | Three bits decide which UART is on pins 8 and 10, and the reset value is neither | [hardware.md](../hardware.md) |
 
 ## Recordings
 
@@ -31,6 +32,19 @@ the repository. Both were measured the same way and agree: two flashes
 of about 100 ms, 0.30 s apart, repeating every 1.22 s in the source and
 1.23 s in the GIF. The clip is a whole number of periods, so the loop
 has no visible join and the pause reads as part of the pattern.
+
+## On copying from vendor documents
+
+**No figure here reproduces a drawing from a datasheet or a vendor page.**
+`uart-mux.tex` is the clearest case: the facts in it come from four tables
+in the Broadcom document, and the drawing is an original arrangement of
+those facts showing one path through them, with the source named in the
+figure itself and in its source comment.
+
+That is a licensing point and also a better drawing. A vendor's table
+answers every question at once; a figure here answers the one question the
+surrounding text is asking. Cite the original by document, publisher,
+date, table and page so a reader can go and check, and draw your own.
 
 `preamble.tex` holds the palette and the styles. The colours carry
 meaning and are the same in every figure: target user space, target

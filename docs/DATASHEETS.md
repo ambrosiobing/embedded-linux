@@ -20,6 +20,37 @@ The **Read** column tracks that honestly:
 | `partial` | opened for one question, not worked through |
 | `no` | listed here and not yet opened |
 
+## How to cite one of these, and what not to copy
+
+**Cite by document, publisher, date, table or section, and page**, so a
+reader can open the original at the right place:
+
+> BCM2835 ARM Peripherals, Broadcom, 6 February 2012, Table 6-31, page 102
+
+A URL alone is not a citation. URLs rot, documents get revised, and page
+numbers move between revisions, which is why the date belongs in the
+citation and the revision belongs in it too when the document carries one.
+
+**Do not copy figures, tables or extended text out of these documents into
+this repository.** They are the manufacturers' copyright, and this is a
+public repository. Three things work better anyway:
+
+- **Redraw it.** The figures under each project's `docs/figures/` are
+  original TikZ, and `uart-mux.tex` in project 9 is the worked example: it
+  takes four tables from the Broadcom document and draws the one path
+  through them that the surrounding text is about. A vendor table answers
+  every question at once; a figure here should answer the question being
+  asked.
+- **Quote the value, not the page.** A specific number, address or
+  register name used to support a claim is ordinary citation. A
+  reproduction of the table it sits in is not.
+- **Photograph the bench instead**, where the bench can answer. A
+  photograph of a chip marking settles a part identification better than
+  any datasheet, and
+  [`projects/01-yocto-image/docs/figures/leds-lit.jpg`](../projects/01-yocto-image/docs/figures/leds-lit.jpg)
+  is the precedent: it corrected a belief that three projects had already
+  been designed around.
+
 ## Hosts and SoCs
 
 | Document | Part | For | Read | URL |

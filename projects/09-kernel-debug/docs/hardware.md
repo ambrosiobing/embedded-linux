@@ -132,6 +132,40 @@ is `000`, plain input.
 So a correctly muxed console contributes `4 << 12` from GPIO14 and
 `4 << 15` from GPIO15, which is **`0x24000` set in GPFSEL1**.
 
+### The same thing as one picture
+
+Also drawn as [`figures/uart-mux.tex`](figures/uart-mux.tex), which
+compiles with `make uart-mux.pdf`. Nothing in the build depends on TeX, so
+here it is in text as well:
+
+```
+            GPFSEL1, bus 0x7E20 0004                 Table 6-1, page 90
+
+  bit    17   16   15 | 14   13   12
+       +----+----+----+----+----+----+
+       |     FSEL15   |    FSEL14    |               Table 6-3, page 92
+       +--------------+--------------+
+              |               |
+              |               +--  000   input, the reset value
+              |               +--  100   ALT0, which is pin_func=4
+              +------------------  010   ALT5
+                                                     Table 6-2, page 92
+  000  ->  nothing on the pin, a GPIO nobody drives
+  100  ->  TXD0 and RXD0, the PL011,    3f201000.serial
+  010  ->  TXD1 and RXD1, the mini UART, 3f215040    Table 6-31, page 102
+
+  header pin 8 = GPIO14          header pin 10 = GPIO15
+```
+
+**The encoding is not sequential**, which is worth pausing on: ALT0 is
+`100` and ALT5 is `010`, so a value that looks like "2" is not alternate
+function 2. And a pin sitting at `000` is not broken; it is still an
+input, which is exactly where this bench's pins were.
+
+All four tables are in BCM2835 ARM Peripherals, Broadcom, 6 February 2012.
+The figure redraws them rather than reproducing them, and names the source
+on its face.
+
 ### 3. The address trap between a Pi 1 and a Pi 3
 
 The datasheet gives **bus** addresses beginning `0x7E...`. The ARM sees

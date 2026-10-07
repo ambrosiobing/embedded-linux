@@ -10,7 +10,7 @@
 # in ASCII and mermaid in the documents as well, so a reader with no TeX
 # loses nothing but the typesetting.
 
-FIGURES := arch schematic bench uml-sequence uml-components decision-tree fault-matrix
+FIGURES := arch schematic bench uml-sequence uml-components decision-tree fault-matrix uart-mux
 PDFS    := $(addsuffix .pdf,$(FIGURES))
 PNGS    := $(addsuffix .png,$(FIGURES))
 

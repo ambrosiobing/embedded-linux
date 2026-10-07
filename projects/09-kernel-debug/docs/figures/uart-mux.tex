@@ -1,0 +1,99 @@
+% Three bits decide which UART is on the header, and a fourth state is
+% what this bench actually had.
+%
+% Drawn here rather than copied from the vendor document. The facts come
+% from BCM2835 ARM Peripherals, Broadcom, 6 February 2012: Table 6-1 on
+% page 90 for the register address, Table 6-3 on page 92 for which bits
+% belong to which pin, Table 6-2 on page 92 for the encoding, and Table
+% 6-31 on page 102 with its legend on page 103 for what each alternate
+% function is. Nothing from that document is reproduced; this is the same
+% information redrawn to show one path through it.
+%
+% The point of the drawing: pins 8 and 10 are not "the UART". They are
+% whichever UART a three bit field says, and their reset value is neither.
+\documentclass[tikz, border=4pt]{standalone}
+\input{preamble}
+
+\begin{document}
+\begin{tikzpicture}[font=\sffamily\small]
+
+  %% ---------------- the register ----------------
+  \node[font=\sffamily\small\bfseries] (reghdr) at (0,0)
+       {GPFSEL1\quad\normalfont\small bus \texttt{0x7E20\,0004}};
+
+  % A strip of bit cells. Only the two fields that matter are coloured.
+  \foreach \i/\x in {17/0, 16/1, 15/2, 14/3, 13/4, 12/5} {
+    \node[cell, minimum width=9mm, minimum height=7mm]
+         (b\i) at (\x*9mm - 22.5mm, -9mm) {\tiny \i};
+  }
+  \begin{scope}[on background layer]
+    \node[fit=(b17)(b15), fill=toolcol, draw=linecol, rounded corners=1pt,
+          inner sep=0.5pt] (f15) {};
+    \node[fit=(b14)(b12), fill=kerncol, draw=linecol, rounded corners=1pt,
+          inner sep=0.5pt] (f14) {};
+  \end{scope}
+  \node[lbl, anchor=south] at ($(f15.north)+(0,1mm)$) {FSEL15, GPIO15};
+  \node[lbl, anchor=south] at ($(f14.north)+(0,1mm)$) {FSEL14, GPIO14};
+  \node[font=\sffamily\scriptsize, anchor=north] at ($(f14.south)!0.5!(f15.south)+(0,-2mm)$)
+       {three bits each, Table 6-3 p.92};
+
+  %% ---------------- the three values ----------------
+  \node[bad, align=left, anchor=north west] (v000)
+       at (-52mm, -26mm) {\texttt{000}\ \ input\\[-1pt]
+                          \scriptsize the reset value};
+  \node[blk, fill=okcol!20, align=left, anchor=north] (v100)
+       at (0mm, -26mm) {\texttt{100}\ \ ALT0\\[-1pt]
+                        \scriptsize \texttt{pin\_func=4}};
+  \node[blk, fill=hwcol, align=left, anchor=north east] (v010)
+       at (52mm, -26mm) {\texttt{010}\ \ ALT5};
+
+  \draw[flow] (f14.south) -- ++(0,-3mm) -| (v000.north);
+  \draw[flow] (f14.south) -- ++(0,-3mm) -| (v100.north);
+  \draw[flow] (f15.south) -- ++(0,-3mm) -| (v010.north);
+
+  %% ---------------- what each one means ----------------
+  \node[quiet, align=center, anchor=north, minimum width=34mm] (nowhere)
+       at ($(v000.south)+(0,-8mm)$)
+       {nothing on the pin\\[-1pt]\scriptsize GPIO, driven by no one};
+
+  \node[kern, align=center, anchor=north, minimum width=34mm] (pl011)
+       at ($(v100.south)+(0,-8mm)$)
+       {\texttt{TXD0} / \texttt{RXD0}\\[-1pt]
+        \scriptsize PL011, \texttt{3f201000.serial}};
+
+  \node[hw, align=center, anchor=north, minimum width=34mm] (mini)
+       at ($(v010.south)+(0,-8mm)$)
+       {\texttt{TXD1} / \texttt{RXD1}\\[-1pt]
+        \scriptsize mini UART, \texttt{3f215040}};
+
+  \draw[flow] (v000) -- (nowhere);
+  \draw[flow] (v100) -- (pl011);
+  \draw[flow] (v010) -- (mini);
+
+  %% ---------------- the pins ----------------
+  \node[hw, align=center, anchor=north, minimum width=56mm] (pins)
+       at ($(pl011.south)+(0,-10mm)$)
+       {header \textbf{pin 8} = GPIO14 \quad \textbf{pin 10} = GPIO15};
+  \draw[flow] (pl011) -- (pins);
+  \draw[flow] (mini.south) |- ($(pins.east)+(6mm,0)$) -- (pins.east);
+  \draw[flow] (nowhere.south) |- ($(pins.west)+(-6mm,0)$) -- (pins.west);
+
+  %% ---------------- what the bench had ----------------
+  \node[bad, align=left, anchor=west] (had)
+       at ($(nowhere.west)+(-34mm,0)$)
+       {\textbf{What this bench had}\\[1pt]
+        \scriptsize \texttt{disable-bt} blanks the pin\\[-2pt]
+        \scriptsize group and the firmware\\[-2pt]
+        \scriptsize never fills it in, so the\\[-2pt]
+        \scriptsize field stayed at reset};
+  \draw[flow, draw=badcol] (had) -- (nowhere);
+
+  \node[umlnote, anchor=north west, text width=74mm] at (-52mm, -62mm)
+       {Redrawn from BCM2835 ARM Peripherals, Broadcom, 6 February 2012,
+        Tables 6-1, 6-2, 6-3 and 6-31, pages 90 to 103. The encoding is
+        not sequential: ALT0 is \texttt{100} and ALT5 is \texttt{010}.
+        A pin at its reset value of \texttt{000} is not broken, it is
+        simply still an input.};
+
+\end{tikzpicture}
+\end{document}
