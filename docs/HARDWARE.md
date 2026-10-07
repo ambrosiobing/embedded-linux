@@ -476,7 +476,7 @@ disqualified this programmer. See
 | SIM7600E-H 4G HAT | `datasheet` and `vendor page` | Project 15, fully read in [its hardware page](../projects/15-lte-router/docs/hardware.md). **Carries a CP2102 and a jumper position that makes it a console adapter for the Pi.** Its two vendor documents give opposite PWRKEY polarities |
 | SIM7070G Cat-M/NB-IoT/GPRS HAT | `vendor page` | Project 16, in [its hardware page](../projects/16-nbiot-tracker/docs/hardware.md). **Its host logic voltage is set by a 0 ohm resistor, not a jumper**, and the wiki does not say which way the factory fitted it. No pin table, no PWRKEY polarity, no flight mode pin, no peak current |
 | SIM7020E NB-IoT HAT | `NOT READ` | |
-| MCC 118 DAQ HAT | `NOT READ` | 12-bit, 100 kS/s, 8 single-ended analog inputs |
+| MCC 118 DAQ HAT | `datasheet` | 12-bit, 8 single-ended inputs, +/-10 V fixed range, 1 Mohm, 150 kHz bandwidth, 100 kS/s **aggregate across configured channels**, 7168 sample FIFO, 0 to 55 C. Uses GPIO 8, 9, 10, 11 for SPI on CE0, `ID_SD` and `ID_SC`, and GPIO 12, 13, 26 for the board address. **Its datasheet states no accuracy for its own scan clock.** Fully read in [project 8's hardware page](../projects/08-preempt-rt/docs/hardware.md) |
 | Joy-it RB-Explorer700, DIV56316 | `datasheet` | fully mapped in [project 6's pin map](../projects/06-explorer700/docs/pin-map.md), including three places where the manual contradicts itself about one sensor |
 | Waveshare 3.5 inch RPi LCD (A) | `NOT READ` | Project 7 |
 | Waveshare RS232/RS485/CAN/CAN FD, WS-28164 | `schematic` | see below |
@@ -693,6 +693,7 @@ together draw 16.5 mA at 3.3 V.
 |---|---|---|
 | nRF PPK2, Power Profiler Kit II | yes | ampere meter, or source meter from 0.8 to 5.0 V, 100 kS/s, resolution 0.2 microamp to 1 mA by range. **Maximum DUT current is 1 A in ampere meter mode and 600 mA in source meter mode** (user guide Table 7, page 16). **Accuracy is 10 per cent up to 50 mA and 15 per cent above it** (Table 9, page 17), not the 20 per cent the overview page advertises. Logic port `VCC` is 1.65 V to 5.5 V (Table 6, page 16) and D0 to D7 are sampled at 100 kHz with a 50 kHz bandwidth (section 8.3.4, page 17). Its own operating range is 5 to 40 C, the narrowest on this bench. It measures current and sources a voltage, and **cannot read the voltage at an arbitrary node**, which is `inferred` rather than stated. Fully worked through in [project 3's hardware page](../projects/03-boot-energy/docs/hardware.md) |
 | multimeter | **no** | the single purchase that unblocks the most acceptance tests |
+| signal generator | no | would give the MCC 118 an external scan clock with a known accuracy, which is the only way to put a number on project 8's time base |
 | oscilloscope | no | |
 | logic analyser | no | |
 | soldering iron | no | |

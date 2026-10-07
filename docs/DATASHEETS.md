@@ -67,6 +67,23 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**The MCC 118 datasheet specifies amplitude to four significant figures
+and its time base not at all.** Gain error, offset, absolute accuracy,
+both temperature coefficients and the noise are all given. The internal
+scan clock gets a rate range and no accuracy and no stability. For a
+project that uses this instrument as its independent time reference, that
+is the missing number, and
+[project 8's hardware page](../projects/08-preempt-rt/docs/hardware.md)
+works out what survives it: the comparison between two kernels does, an
+absolute latency in microseconds does not. Its pin list also confirms,
+from the vendor, every row of that project's "do not touch" table and the
+freedom of the one pin it uses.
+
+**`files.digilent.com` returned 403 twice**, so the datasheet was read from
+a distributor's copy. It carries no revision number or date, which is
+worth recording: there is no way to tell from it whether a newer version
+says anything different.
+
 **Two HATs from one vendor are not equally documented, and nothing says
 so.** The SIM7600E-H has a PDF manual and a wiki page; the SIM7070G
 appears to have only a wiki page, and that page carries no pin table, no
@@ -210,6 +227,7 @@ a desk.
 | Document | Part | For | Read | URL |
 |---|---|---|---|---|
 | JOY-iT RB-Explorer700 manual, 16 November 2020 | Explorer700 | project 6 | **yes** | `https://www.joy-it.net/files/files/Produkte/RB-Explorer700/RB-Explorer700-Manual-16.11.2020.pdf` |
+| MCC 118 datasheet, DS-MCC-118, Measurement Computing | DAQ HAT | project 8, the external instrument | **yes** | `https://files.digilent.com/datasheets/DS-MCC-118.pdf` |
 | DS3231 | real time clock on the Explorer700 | project 6 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf` |
 | CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
 | Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
