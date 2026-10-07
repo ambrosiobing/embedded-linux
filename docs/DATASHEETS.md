@@ -64,7 +64,23 @@ public repository. Three things work better anyway:
 | FriendlyELEC wiki, NanoPi NEO Air, modified 14 November 2023 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/index.php/NanoPi_NEO_Air` |
 | NanoPi NEO Air schematic V1.1 | NEO Air | project 2 | no | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
-| Nordic PPK2 user guide | power profiler | projects 3 and 16, and every current measurement | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
+| PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
+| Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
+
+**The PPK2's HTML guide and its PDF guide are not the same document, and
+the difference changed a design.** The HTML pages give the headline
+figures and nothing else; the PDF's section 8 holds the source meter
+current limit of 600 mA, the per range accuracy, the logic port voltage
+range, the digital sampling rate, the host USB requirement and the
+instrument's own temperature range. Project 3's design had said 1 A, which
+is the ampere meter figure, for a project that runs in source meter mode.
+The correction and its consequences are in
+[project 3's hardware page](../projects/03-boot-energy/docs/hardware.md).
+
+**The lesson is general enough to go in this file.** Where a vendor
+publishes both a web page and a PDF of "the same" document, read the PDF.
+The web version has been the shorter one every time it has been checked
+here, and it never says what it has left out.
 
 **The NanoPi NEO Air wiki is read, and it carried one number worth the
 trip.** FriendlyELEC states an input range of 4.7 V to 5.6 V rather than a

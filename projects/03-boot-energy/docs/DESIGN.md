@@ -125,7 +125,7 @@ signal has in common.
    nRF-PPK2                                        NanoPi NEO Air
    source meter 5.0 V
   +------------------+                            +--------------------------+
-  |            VOUT  o----- 5 V, max 1 A ---------o pin 2   VDD_5V           |
+  |            VOUT  o----- 5 V, max 600 mA ------o pin 2   VDD_5V           |
   |            GND   o----- common ground --------o pin 6   GND              |
   |                  |                            |                          |
   | logic VCC (REF)  o===== 3.3 V reference =======o pin 1   SYS_3.3V         |
@@ -150,7 +150,7 @@ signal has in common.
 |---|---|---|---|
 | 5 V supply | 24-pin header pin 2 (`VDD_5V`) | PPK2 `VOUT` | source-meter mode, 5.0 V |
 | Ground | 24-pin header pin 6 (`GND`) | PPK2 `GND` | common reference |
-| **Logic level reference** | 24-pin header pin 1 (`SYS_3.3V`) | PPK2 logic port `VCC` | **required**, 1.65 to 5.5 V. Without it the level shifter has no reference and D0, D1 and D2 all read nothing |
+| **Logic level reference** | 24-pin header pin 1 (`SYS_3.3V`) | PPK2 logic port `VCC` | **required**, 1.65 to 5.5 V, PPK2 user guide Table 6, page 16. Without it the level shifter has no reference and D0, D1 and D2 all read nothing |
 | Logic ground | 24-pin header pin 6 (`GND`) | PPK2 logic port `GND` | the same ground as the supply |
 | Boot-complete marker | pin 12 (PA6, `gpiochip0` line 6) | PPK2 `D0` | 3.3 V logic, also drives the LED |
 | U-Boot marker | pin 7 (PG11, line 203) | PPK2 `D1` | set by U-Boot preboot |
@@ -217,11 +217,26 @@ ampere-meter mode the PPK2 cannot cut power, an external switch would sit
 in the path, and the interval `[0, t_done]` that the energy figure is
 defined over would have no defined start.
 
-The appendix's caution still applies as a limit rather than as a mode: the
-PPK2 sources at most 1 A, and the NEO Air stays well under that during boot
-as long as nothing is plugged into its USB. The measured peak current is
-reported in every run's summary precisely so that the assumption is checked
-by the data rather than asserted once here.
+The appendix's caution still applies as a limit rather than as a mode, and
+**the limit is tighter than this section said until Wednesday 7 October
+2026.** It read "the PPK2 sources at most 1 A". The PPK2 user guide, v1.0.1,
+document 4461_012, Table 7 on page 16, gives the maximum admissible DUT
+current as **1 A in ampere meter mode and 600 mA in source meter mode**.
+This project uses source meter mode, so the applicable figure is 600 mA.
+
+Two further limits from the same document sit upstream of that one, and
+together they are the supply chain this measurement actually has:
+
+- page 12: in source meter mode the host's USB port has to supply the
+  DUT's maximum current **plus about 50 mA for the PPK2 itself**, so a
+  500 mA USB 2.0 port leaves under 450 mA for the board
+- Table 6, page 16: `VDD_DUT` is 0.8 V to **5.0 V**, which is 300 mV above
+  the NEO Air's stated 4.7 V minimum before any lead drop
+
+The measured peak current is reported in every run's summary precisely so
+that these assumptions are checked by the data rather than asserted once
+here. The full reading is in
+[hardware.md](hardware.md).
 
 ### The assumption in the energy figure
 

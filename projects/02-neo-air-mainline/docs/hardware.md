@@ -54,12 +54,38 @@ very top of what the instrument can do and only **300 mV above the bottom
 of what the board accepts**, before any drop in the leads, the connector
 or the instrument's own output impedance at an inrush.
 
-That is not a verdict. It is the thing to check, and it is cheap:
+That is not a verdict. It is a thing to check, and **the obvious way to
+check it is not available on this bench.** The PPK2 sets an output voltage
+and measures current; it does not measure the voltage present at the
+board. Project 3's own `DESIGN.md` says exactly that, and there is no
+multimeter here. So the direct reading cannot be taken.
 
-1. set the PPK2 source to 5.0 V, not to a round 5 V chosen by habit
-2. read back what the PPK2 reports at the moment of peak boot current
-3. if it sags under 4.7 V, the energy figure is of a board being
-   brown-started, not of a board booting
+What can be done without a voltmeter:
+
+1. set the PPK2 source to 5.0 V deliberately, and record that it was 5.0 V
+   rather than a round 5 V chosen by habit
+2. keep the supply leads short, which project 3 already does because the
+   drop biases the energy figure, and which is now **also a validity
+   requirement** rather than only an accuracy one
+3. look in the recorded current trace for the signature of a board that
+   browned out and restarted: a second inrush peak, or a boot that begins
+   twice
+4. read the console log for a repeated banner, which is the same event
+   seen from the other side
+
+**And then say which it was.** If none of those four shows anything, the
+honest sentence is that no brown-start was observed, not that the board
+stayed above 4.7 V. Those are different claims and this bench cannot yet
+make the second one. It is one more row in the case for buying a
+multimeter.
+
+**What is new here is not the drop, it is what the drop now threatens.**
+Project 3 already names the lead drop as a systematic error in `E`,
+because the energy figure assumes 5.0 V at the header. With 4.7 V known to
+be the floor, the same tens of millivolts are also a question about
+whether the device under test stayed inside its specification while being
+measured. One number turned an accuracy footnote into a validity
+condition, which is a fair return on reading a wiki page.
 
 **Why this was not noticed before.** The DESIGN.md rule says never power
 through the header while micro USB is connected, which is about having one

@@ -660,13 +660,18 @@ stretch:
 | derived Vf | 2.57 V | 1.84 V | 1.77 V | 1.72 V |
 
 **These are the instrument's readout, not four significant figures of
-accuracy.** The PPK2 user guide states accuracy "better than plus or minus
-20 per cent (average currents measurement)", so the milliamp values carry
-that uncertainty and the derived resistance and forward voltage inherit
-it. The comparison between the four modules is still sound, because they
-were measured the same way on the same instrument within minutes; it is
-the absolute values that should not be read as precise. Source: PPK2 user
-guide, Nordic Semiconductor, read Wednesday 7 October 2026.
+accuracy.** This paragraph said plus or minus 20 per cent until Wednesday
+7 October 2026, taken from Nordic's overview page. **The user guide's own
+Table 9, page 17, is more specific and kinder:** 10 per cent accuracy with
+a 2 per cent offset for everything from 100 nA to 50 mA, and 15 per cent
+with a 5 per cent offset from 50 mA to 1 A. Every value in the table above
+lies between 2.94 mA and 15.98 mA, so **all of them carry 10 per cent**,
+and the derived resistance and forward voltage inherit it. The comparison
+between the four modules is still sound, because they were measured the
+same way on the same instrument within minutes; it is the absolute values
+that should not be read as precise. Source: Power Profiler Kit II v1.0.1
+User Guide, document 4461_012, Nordic Semiconductor, read Wednesday 7
+October 2026.
 
 The fraction kept at 3.3 V is `(3.3 - Vf) / (5 - Vf)` and matches all
 four. **This green is the old low-forward-voltage type**, not an InGaN
@@ -679,7 +684,7 @@ together draw 16.5 mA at 3.3 V.
 
 | Instrument | On the bench | What it does and does not do |
 |---|---|---|
-| nRF PPK2, Power Profiler Kit II | yes | ampere meter, or source meter from 0.8 to 5.0 V, current 500 nA to 1 A, 100 kS/s, **accuracy better than plus or minus 20 per cent on average currents**, resolution to 0.2 microamp. It measures current and sources a voltage, and **cannot read the voltage at an arbitrary node**, which is `inferred` rather than stated. Its 8 pin digital port has **no voltage limit stated in the guide** |
+| nRF PPK2, Power Profiler Kit II | yes | ampere meter, or source meter from 0.8 to 5.0 V, 100 kS/s, resolution 0.2 microamp to 1 mA by range. **Maximum DUT current is 1 A in ampere meter mode and 600 mA in source meter mode** (user guide Table 7, page 16). **Accuracy is 10 per cent up to 50 mA and 15 per cent above it** (Table 9, page 17), not the 20 per cent the overview page advertises. Logic port `VCC` is 1.65 V to 5.5 V (Table 6, page 16) and D0 to D7 are sampled at 100 kHz with a 50 kHz bandwidth (section 8.3.4, page 17). Its own operating range is 5 to 40 C, the narrowest on this bench. It measures current and sources a voltage, and **cannot read the voltage at an arbitrary node**, which is `inferred` rather than stated. Fully worked through in [project 3's hardware page](../projects/03-boot-energy/docs/hardware.md) |
 | multimeter | **no** | the single purchase that unblocks the most acceptance tests |
 | oscilloscope | no | |
 | logic analyser | no | |
