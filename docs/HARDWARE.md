@@ -380,6 +380,15 @@ stretch:
 | effective R | 247 ohm | 198 ohm | 246 ohm | 249 ohm |
 | derived Vf | 2.57 V | 1.84 V | 1.77 V | 1.72 V |
 
+**These are the instrument's readout, not four significant figures of
+accuracy.** The PPK2 user guide states accuracy "better than plus or minus
+20 per cent (average currents measurement)", so the milliamp values carry
+that uncertainty and the derived resistance and forward voltage inherit
+it. The comparison between the four modules is still sound, because they
+were measured the same way on the same instrument within minutes; it is
+the absolute values that should not be read as precise. Source: PPK2 user
+guide, Nordic Semiconductor, read Wednesday 7 October 2026.
+
 The fraction kept at 3.3 V is `(3.3 - Vf) / (5 - Vf)` and matches all
 four. **This green is the old low-forward-voltage type**, not an InGaN
 green, so it sits with yellow and red; a prediction that put it beside
@@ -391,7 +400,7 @@ together draw 16.5 mA at 3.3 V.
 
 | Instrument | On the bench | What it does and does not do |
 |---|---|---|
-| nRF PPK2, Power Profiler Kit II | yes | ampere meter, or source meter from 0.8 to 5.0 V up to about 1 A, over USB. It measures current and sources a voltage, and **cannot read the voltage at an arbitrary node** |
+| nRF PPK2, Power Profiler Kit II | yes | ampere meter, or source meter from 0.8 to 5.0 V, current 500 nA to 1 A, 100 kS/s, **accuracy better than plus or minus 20 per cent on average currents**, resolution to 0.2 microamp. It measures current and sources a voltage, and **cannot read the voltage at an arbitrary node**, which is `inferred` rather than stated. Its 8 pin digital port has **no voltage limit stated in the guide** |
 | multimeter | **no** | the single purchase that unblocks the most acceptance tests |
 | oscilloscope | no | |
 | logic analyser | no | |

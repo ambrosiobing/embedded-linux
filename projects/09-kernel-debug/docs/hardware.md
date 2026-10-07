@@ -55,6 +55,15 @@ module alone on the source meter:
 | effective R | 247 ohm | 198 ohm | 246 ohm | 249 ohm |
 | derived Vf | 2.57 V | 1.84 V | 1.77 V | 1.72 V |
 
+**These are the instrument's readout, not four significant figures of
+accuracy.** The PPK2 user guide states accuracy "better than plus or minus
+20 per cent (average currents measurement)", so the milliamp values carry
+that uncertainty and the derived resistance and forward voltage inherit
+it. The comparison between the four modules is still sound, because they
+were measured the same way on the same instrument within minutes; it is
+the absolute values that should not be read as precise. Source: PPK2 user
+guide, Nordic Semiconductor, read Wednesday 7 October 2026.
+
 Any of the four is fine here. A few milliamps from one GPIO is nowhere
 near the pin's limit, and the project only ever lights one.
 

@@ -62,7 +62,7 @@ public repository. Three things work better anyway:
 | Official 7 inch DSI product brief | DSI panel | project 13 | no | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | NanoPi NEO Air schematic V1.1 | NEO Air | project 2 | no | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
-| Nordic PPK2 user guide | power profiler | projects 3 and 16, and every current measurement | no | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
+| Nordic PPK2 user guide | power profiler | projects 3 and 16, and every current measurement | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
 **The BCM2835 peripherals document was the one to read first, and chapter
 6 now is read.** Broadcom, 6 February 2012. Tables 6-1, 6-2, 6-3 and 6-31,
@@ -78,6 +78,35 @@ BCM2835 document while the bench boards are BCM2836 and BCM2837**: the bus
 addresses beginning `0x7E` are the same, but the ARM physical base moves
 from `0x2000 0000` to `0x3F00 0000`, so an address copied straight out of
 the PDF reads the wrong place on a Pi 3 and does so without complaining.
+
+**The PPK2 user guide, Nordic Semiconductor, read Wednesday 7 October
+2026**, and it changed a number this repository had already published.
+
+| Figure | Value |
+|---|---|
+| modes | source meter, which supplies and measures; ampere meter, which measures a board powered elsewhere |
+| source meter output | 0.8 V to 5.0 V, software configurable |
+| current range | 500 nA to 1 A |
+| **accuracy** | **"better than plus or minus 20 per cent (average currents measurement)"** |
+| resolution | down to 0.2 microamp, accurate to about 200 nA |
+| sampling | 100 kS/s |
+| digital port | 8 pin, for digital tracing |
+
+**The accuracy figure matters more than the rest.** Current measurements
+in this repository were being quoted to four significant figures, which
+implies a precision the instrument does not claim. They are the
+instrument's readout, and any value derived from them, a resistance or a
+forward voltage, inherits the same uncertainty. Every such table now says
+so.
+
+**One gap worth naming**: the guide does not state a voltage limit for the
+eight pin digital port. So what may safely be connected to it is `NOT
+READ`, and a 5 V logic signal should not meet it on the strength of
+assumption.
+
+The note that the PPK2 cannot read the voltage at an arbitrary node stays
+`inferred`: it follows from the instrument being a source meter and an
+ampere meter, and the guide does not spell it out.
 
 ## HATs, displays and bridges
 
