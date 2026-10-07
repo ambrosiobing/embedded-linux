@@ -354,6 +354,57 @@ at all without an instrument this bench does not have, and the bench notes
 already record a multimeter as the single purchase that unblocks the most
 work. This is the second time that has been true on the same day.
 
+## There is a console adapter on this bench after all
+
+Added Wednesday 7 October 2026, from reading a document belonging to a
+different project.
+
+This project declined to use the Joy-it ESP8266 programmer as a console
+bridge because **its socket pinout is published nowhere**, and the
+far-end pair is RX and VCC, so a connector one position out puts 5 V onto
+a Raspberry Pi GPIO. That decision stands.
+
+**The SIM7600E-H 4G HAT carries a CP2102 and a jumper that wires it to the
+Raspberry Pi's own UART.** Its manual, Waveshare Rev 1.0 of 8 June 2018,
+lists on page 1 an "Onboard CP2102 USB to UART converter", on page 4 a
+separate micro USB socket "for serial debugging, or login to Raspberry
+Pi", and on page 5 a three position `UART JMP` block whose position **A**
+is "access Raspberry Pi via USB to UART".
+
+```
+   laptop ---- micro USB ----> [ USB TO UART ] -- CP2102 -- UART JMP: A
+                                                                |
+                                                  header pins 8 and 10
+                                                        GPIO14, GPIO15
+```
+
+**Why this is different from the ESP8266 programmer.** The connection is
+made by seating a HAT on a 40 pin header, in exactly one orientation, with
+no loose jumper to misplace, and the jumper that does exist chooses
+between three documented positions rather than between a signal and a
+supply. The failure mode that disqualified the other adapter does not
+exist here.
+
+**The four conditions**, and the fourth is the one that matters most:
+
+1. `UART JMP` in position **A**, not B or C
+2. the `VCCIO` jumper on **3.3 V**, not 5 V
+3. nothing else on the header, since the HAT takes all of it
+4. **`uart0` actually muxed onto GPIO14 and GPIO15**, which is this
+   project's own root cause and which no adapter can fix
+
+Point 4 is the whole lesson of this project restated as a precondition. An
+adapter cannot carry a console off a pin that nothing is driving. That is
+why this is written here as an option to try **after**
+`dtoverlay=uart0,txd0_pin=14,rxd0_pin=15,pin_func=4` is in the image, and
+not as the next thing to reach for when something goes quiet.
+
+Evidence level for the path from that socket to header pins 8 and 10:
+`inferred`. The manual says position A reaches the Raspberry Pi, and a HAT
+reaches it only through the header. The HAT schematic is `NOT READ`. The
+full reading is in
+[project 15's hardware page](../../15-lte-router/docs/hardware.md).
+
 ## Further reading
 
 - [docs/HARDWARE.md](../../../docs/HARDWARE.md), the shared bench reference

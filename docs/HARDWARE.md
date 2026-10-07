@@ -459,6 +459,13 @@ inferred safely, because the far-end pair is RX and VCC, and putting VCC
 onto a Raspberry Pi GPIO that is driving low is a short. **Read the
 silkscreen before using this board as a bridge.**
 
+**And there is a better option on this bench.** The SIM7600E-H 4G HAT
+carries a CP2102 and a documented jumper position that connects it to
+the Raspberry Pi's own UART. It seats on the header in one orientation
+with no loose lead to misplace, which removes exactly the hazard that
+disqualified this programmer. See
+[project 15's hardware page](../projects/15-lte-router/docs/hardware.md).
+
 ## HATs and 40-pin boards
 
 **The exclusivity rule: one HAT at a time.** These all take the whole
@@ -466,7 +473,7 @@ silkscreen before using this board as a bridge.**
 
 | HAT | Evidence | Notes |
 |---|---|---|
-| SIM7600E-H 4G HAT | `NOT READ` | Project 15 |
+| SIM7600E-H 4G HAT | `datasheet` and `vendor page` | Project 15, fully read in [its hardware page](../projects/15-lte-router/docs/hardware.md). **Carries a CP2102 and a jumper position that makes it a console adapter for the Pi.** Its two vendor documents give opposite PWRKEY polarities |
 | SIM7070G Cat-M/NB-IoT/GPRS HAT | `NOT READ` | Project 16 |
 | SIM7020E NB-IoT HAT | `NOT READ` | |
 | MCC 118 DAQ HAT | `NOT READ` | 12-bit, 100 kS/s, 8 single-ended analog inputs |

@@ -67,6 +67,23 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**The SIM7600E-H HAT's manual and its wiki disagree about PWRKEY, and the
+disagreement is the finding.** The 2018 manual says to strap `PWR` to
+**GND** to power the module on automatically; the wiki, describing the
+board after 2021, says `PWR` is strapped to **3V3** by default for the
+same purpose. Both are presumably true of their own revision and neither
+mentions the other. Worked through, with the consequence for anyone
+wiring a Raspberry Pi GPIO to that pin, in
+[project 15's hardware page](../projects/15-lte-router/docs/hardware.md).
+The same reading found that the HAT's CP2102 can be jumpered to the
+Raspberry Pi's own UART, which gives this bench the known-pinout console
+adapter project 9 went without.
+
+**Two documents from one vendor are two sources.** Where both exist, read
+both and diff them. On this HAT the wiki has the pin table and the current
+figures, the manual has the jumper block and the board inventory, and
+neither is sufficient alone.
+
 **The PPK2's HTML guide and its PDF guide are not the same document, and
 the difference changed a design.** The HTML pages give the headline
 figures and nothing else; the PDF's section 8 holds the source meter
@@ -206,7 +223,8 @@ also records the three places it contradicts itself about one sensor.
 
 | Document | Part | For | Read | URL |
 |---|---|---|---|---|
-| SIM7600E-H HAT manual | 4G HAT | project 15 | no | `https://www.waveshare.com/w/upload/6/6d/SIM7600E-H-4G-HAT-Manual-EN.pdf` |
+| SIM7600E-H 4G HAT manual, Waveshare, Rev 1.0, 8 June 2018 | 4G HAT | project 15 | **yes** | `https://www.waveshare.com/w/upload/6/6d/SIM7600E-H-4G-HAT-Manual-EN.pdf` |
+| Waveshare wiki, SIM7600E-H 4G HAT | the same HAT, a later revision | project 15 | **yes** | `https://www.waveshare.com/wiki/SIM7600E-H_4G_HAT` |
 | SIM7600E-H module manual | the module itself | project 15 | no | `https://fccid.io/2AJYU-8PYA009/User-Manual/User-Manual-4814639.pdf` |
 | SIM7070G wiki | Cat-M, NB-IoT, GPRS HAT | project 16 | **yes** | `https://www.waveshare.com/wiki/SIM7070G_Cat-M/NB-IoT/GPRS_HAT` |
 | SIM7020E wiki | NB-IoT HAT | | no | `https://www.waveshare.com/wiki/SIM7020E_NB-IoT_HAT` |
