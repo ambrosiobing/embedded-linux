@@ -68,6 +68,26 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**How to cite an absence.** Project 20 needs to establish that the Pi 3
+has no secure boot, no hardware unique key and no memory firewall, and no
+manufacturer's document says what a part does **not** have. The answer was
+not a datasheet: it was the OP-TEE project's own platform page, which
+states in capitals that the port is not secure, names the missing
+mechanisms, and says the package is for education and prototyping. **When
+the thing to establish is an absence, look for somebody who tried to build
+on the part and documented what they could not do.** For hardware security
+that is a porting project; for a peripheral it is usually a driver's
+comments. Worked through in
+[project 20's hardware page](../projects/20-optee-keystore/docs/hardware.md).
+
+**And two projects rest on a part with no document and no name.** Projects
+1 and 19 both depend on a microSD card, and this repository records the
+make, model, capacity and speed class of **no card at all**. For project 1
+that costs the reproducibility of a timing figure; for project 19, whose
+U-Boot writes a 16 KiB environment on every boot, it leaves a wear
+question that cannot even be asked. Identifying the cards needs no
+download and is the cheapest open item in the index.
+
 **The Raspberry Pi 3 Model B has no product brief and no datasheet.** Its
 product page gives a bullet list, links no PDF, and is the whole of what
 Raspberry Pi publishes about the board that four projects on this bench
@@ -335,6 +355,7 @@ of remembered.
 
 | Document | Part | For | Read | URL |
 |---|---|---|---|---|
+| OP-TEE documentation, Raspberry Pi 3 platform page | the Pi 3 as a TEE host | project 20 | **yes** | `https://optee.readthedocs.io/en/latest/building/devices/rpi3.html` |
 | ADXL345 Rev G | accelerometer | projects 5 and 11 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.pdf` |
 
 **The ADXL345 datasheet could not be fetched on Wednesday 7 October
