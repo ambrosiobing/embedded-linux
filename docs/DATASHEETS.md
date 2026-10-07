@@ -59,6 +59,7 @@ public repository. Three things work better anyway:
 | BCM2711 peripherals | Pi 4 SoC | register level work on the Pi 4 | no | `https://datasheets.raspberrypi.com/bcm2711/bcm2711-peripherals.pdf` |
 | Raspberry Pi 3 Model B+ product brief, published October 2025 | Pi 3 Model B Plus | the Project 9 board | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-product-brief.pdf` |
 | Raspberry Pi 3 Model B+ reduced schematic, V1.0, 19 March 2018 | Pi 3 Model B Plus | header pin functions, power protection | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-reduced-schematics.pdf` |
+| Raspberry Pi 3 Model B product page | Pi 3, the host of projects 6, 18, 19 and 20 | the only document that exists for it | **yes**, and it is a bullet list | `https://www.raspberrypi.com/products/raspberry-pi-3-model-b/` |
 | BCM2835 and BCM2837 peripherals | Pi 3 SoC | GPIO function select, UART, SPI, I2C registers | **partial** | `https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf` |
 | Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | FriendlyELEC wiki, NanoPi NEO Air, modified 14 November 2023 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/index.php/NanoPi_NEO_Air` |
@@ -66,6 +67,20 @@ public repository. Three things work better anyway:
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
+
+**The Raspberry Pi 3 Model B has no product brief and no datasheet.** Its
+product page gives a bullet list, links no PDF, and is the whole of what
+Raspberry Pi publishes about the board that four projects on this bench
+run on. It does name the wireless chip, `BCM43438`, which the 3B+ brief
+does not; the 3B+ brief names the bands, which the Pi 3 page does not.
+Each states exactly what the other omits, which is worked through in
+[project 18's hardware page](../projects/18-edge-ap-mqtt/docs/hardware.md).
+
+**The driver names the part and the manufacturer does not. Four times
+now.** The ILI9486 in project 7, the FT5406 in project 13, the dual-role
+`dwc2` port in project 14 and the BCM43455 in project 18 are all
+identified from Linux rather than from the vendor. It is a reliable
+pattern and it is not a citation, and every one of those rows says so.
 
 **The MCC 118 datasheet specifies amplitude to four significant figures
 and its time base not at all.** Gain error, offset, absolute accuracy,
