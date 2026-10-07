@@ -61,9 +61,22 @@ public repository. Three things work better anyway:
 | Raspberry Pi 3 Model B+ reduced schematic, V1.0, 19 March 2018 | Pi 3 Model B Plus | header pin functions, power protection | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-reduced-schematics.pdf` |
 | BCM2835 and BCM2837 peripherals | Pi 3 SoC | GPIO function select, UART, SPI, I2C registers | **partial** | `https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf` |
 | Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
+| FriendlyELEC wiki, NanoPi NEO Air, modified 14 November 2023 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/index.php/NanoPi_NEO_Air` |
 | NanoPi NEO Air schematic V1.1 | NEO Air | project 2 | no | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
 | Nordic PPK2 user guide | power profiler | projects 3 and 16, and every current measurement | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
+
+**The NanoPi NEO Air wiki is read, and it carried one number worth the
+trip.** FriendlyELEC states an input range of 4.7 V to 5.6 V rather than a
+bare 5 V. Project 3 supplies that board from the PPK2, whose source meter
+tops out at 5.0 V, so the measuring rig starts 300 mV above the bottom of
+the board's range before any lead drop. That is worked through in
+[project 2's hardware page](../projects/02-neo-air-mainline/docs/hardware.md),
+along with the vendor's confirmation of the four pin debug header and the
+twenty four pin header's deliberate and partial resemblance to a
+Raspberry Pi's. The schematic and the Allwinner H3 datasheet remain
+`NOT READ`, and between them they hold the Wi-Fi part number, the antenna
+connector and every GPIO electrical figure.
 
 **There is no Raspberry Pi 3B+ datasheet, and the URL that claimed one is
 dead.** The index carried
