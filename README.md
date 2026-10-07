@@ -222,6 +222,18 @@ hours into a build is expensive.
 [docs/BUILD-HOST.md](docs/BUILD-HOST.md) covers the host in full, including a
 table of every package `./go setup` installs and why each one is needed.
 
+## The bench itself
+
+[docs/HARDWARE.md](docs/HARDWARE.md) is the shared hardware reference: every
+board, HAT, sensor and instrument actually present, where each fact came
+from, and the three physical rules that apply before anything is powered.
+Every claim carries an evidence level, and the ones nobody has read a
+datasheet for say `NOT READ` rather than being filled in plausibly.
+
+Read it before wiring anything and before writing a project's design. A
+project built on a wrong assumption about which parts exist has to be
+rewritten rather than corrected, and that has happened here three times.
+
 ## Keeping a flashable copy
 
 The build tree is disposable by design, which means the image in it is too:
