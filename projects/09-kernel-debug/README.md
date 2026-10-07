@@ -126,6 +126,7 @@ what each step should print, is in
 | File | What |
 |---|---|
 | [docs/DESIGN.md](docs/DESIGN.md) | The drawings, the ownership table, and the fault matrix |
+| [docs/hardware.md](docs/hardware.md) | The parts, from the BCM2835 register tables down to the wire, with what was decided before wiring and what was rewired afterwards |
 | [docs/CONFIG-RATIONALE.md](docs/CONFIG-RATIONALE.md) | Every symbol, its cost, and whether it belongs in production |
 | [docs/BRINGUP.md](docs/BRINGUP.md) | First boot, in order, with the checks that catch the silent failures |
 | [notebook/](notebook/) | Six entries, one per fault and tool, with raw output |

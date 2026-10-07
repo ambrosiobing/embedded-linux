@@ -76,6 +76,36 @@ heartbeat LED, when a project has one: its ground is pin 9 and its signal
 pin 11, both in the odd row, so **green sits directly across the header
 from the LED's ground lead**.
 
+### Which UART those two pins carry is a three bit field
+
+Worth knowing before anything else about the serial console, because it
+makes the rest make sense. **Source: BCM2835 ARM Peripherals, Broadcom, 6
+February 2012**, Table 6-31 on page 102 and its legend on page 103.
+
+| Pin | Default pull | ALT0 | ALT5 |
+|---|---|---|---|
+| GPIO14, header pin 8 | Low | `TXD0`, UART 0 transmit | `TXD1`, mini UART transmit |
+| GPIO15, header pin 10 | Low | `RXD0`, UART 0 receive | `RXD1`, mini UART receive |
+
+UART0 is the PL011. So **the same two header pins carry either the PL011
+or the mini UART, and the only difference is the alternate function
+number.** "The UART" is therefore an ambiguous phrase on this board.
+
+The choice lives in three bits. Table 6-1 on page 90 puts the GPIO
+registers at bus address `0x7E20 0000` with GPFSEL1 at `0x7E20 0004`;
+Table 6-3 on page 92 puts FSEL14 at bits 14 to 12 and FSEL15 at bits 17 to
+15; and Table 6-2 on the same page gives the encoding, in which **ALT0 is
+binary `100`, which is 4**, and the reset value for every pin is `000`,
+plain input. That 4 is where `pin_func=4` in a `config.txt` line comes
+from.
+
+**The address trap.** The datasheet gives bus addresses beginning `0x7E`.
+The ARM physical base is `0x2000 0000` on a BCM2835, which is a Pi 1 or
+Zero, and `0x3F00 0000` on the BCM2836 and BCM2837 of a Pi 2 or Pi 3. So
+GPFSEL1 is at `0x3F20 0004` on every Pi 3 here, and an address copied
+straight from the PDF reads the wrong place without complaining. This row
+is `inferred`: the document predates the Pi 3 and does not say it.
+
 ### The serial console does not currently work on the Raspberry Pi
 
 This is the single most expensive thing on this page, so it is near the
