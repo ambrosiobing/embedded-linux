@@ -55,8 +55,19 @@ the PDF reads the wrong place on a Pi 3 and does so without complaining.
 | JOY-iT RB-Explorer700 manual, 16 November 2020 | Explorer700 | project 6 | **yes** | `https://www.joy-it.net/files/files/Produkte/RB-Explorer700/RB-Explorer700-Manual-16.11.2020.pdf` |
 | DS3231 | real time clock on the Explorer700 | project 6 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf` |
 | CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
-| Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | no | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
+| Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
 | ILI9486 | the LCD's controller | project 7 | no | `https://www.waveshare.com/w/upload/4/4e/ILI9486_Datasheet.pdf` |
+
+**Two things the Waveshare LCD wiki does not say**, read Wednesday 7
+October 2026 and recorded in
+[project 7's hardware page](../projects/07-lcd35-drm/docs/hardware.md).
+It **never names the panel controller**, so the ILI9486 identification in
+that project rests on the kernel driver rather than on the manufacturer.
+And it gives only a partial pin list rather than a table, naming 26 of the
+40 pins as occupied without enumerating all of them.
+
+What it does give: 480 x 320, SPI, `ADS7846` touch, 3.3 V and 5 V both
+used, about 150 mA, and "compatible with any version of Raspberry Pi".
 
 The Explorer700 manual is the one document already worked through, in
 [project 6's pin map](../projects/06-explorer700/docs/pin-map.md), which
@@ -68,9 +79,23 @@ also records the three places it contradicts itself about one sensor.
 |---|---|---|---|---|
 | SIM7600E-H HAT manual | 4G HAT | project 15 | no | `https://www.waveshare.com/w/upload/6/6d/SIM7600E-H-4G-HAT-Manual-EN.pdf` |
 | SIM7600E-H module manual | the module itself | project 15 | no | `https://fccid.io/2AJYU-8PYA009/User-Manual/User-Manual-4814639.pdf` |
-| SIM7070G wiki | Cat-M, NB-IoT, GPRS HAT | project 16 | no | `https://www.waveshare.com/wiki/SIM7070G_Cat-M/NB-IoT/GPRS_HAT` |
+| SIM7070G wiki | Cat-M, NB-IoT, GPRS HAT | project 16 | **yes** | `https://www.waveshare.com/wiki/SIM7070G_Cat-M/NB-IoT/GPRS_HAT` |
 | SIM7020E wiki | NB-IoT HAT | | no | `https://www.waveshare.com/wiki/SIM7020E_NB-IoT_HAT` |
 | SIMCom SIM7000 series documents | AT command sets | project 16 | no | `https://simcom.ee/documents?dir=SIM7000x` |
+
+**The SIM7070G wiki, read Wednesday 7 October 2026**, gives the baud
+rates from 300 to 3,686,400 with the usual 9600 to 115200, a 5 V supply
+with about 41 mA idle, an onboard USB interface that is optional when
+driving it over UART from the Pi, and `AT+CGREG?`, `AT+CGNAPN` and
+`AT+CNACT=0,1` for registration, APN query and network activation.
+
+**Two cautions from it.** There is **no pin table in BCM numbering**: the
+one pin it names, `PWRKEY`, is given as "P7 (wiringPi number)", which is a
+third numbering scheme beside BCM and physical and a reliable source of
+wrong connections. And the logic level is "default 3.3 V, can be set to
+5 V via jumper resistor", so **the level is a board modification rather
+than a fixed property** and should be confirmed before it meets a Pi
+header.
 
 ## STM32 and ST expansion boards
 
@@ -114,6 +139,13 @@ of remembered.
 | Document | Part | For | Read | URL |
 |---|---|---|---|---|
 | ADXL345 Rev G | accelerometer | projects 5 and 11 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.pdf` |
+
+**The ADXL345 datasheet could not be fetched on Wednesday 7 October
+2026.** Two attempts to `analog.com` returned a connection reset and then
+a timeout. The URL is believed good and the failure looks transient, so
+this is a retry rather than a dead end; it is recorded because an
+unexplained `no` in the Read column invites somebody to assume the
+document was simply skipped.
 
 The **SEN0032** is the DFRobot module that carries this part. Its own
 schematic is the source for the board level facts in
