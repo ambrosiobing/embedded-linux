@@ -1250,13 +1250,24 @@ raw output until it has been diffed against its source**, and that is the
 rule this entry exists to establish. `decode.sh` no longer claims CRLF
 means a serial line; it says CRLF and stops there.
 
-**One more thing worth a look later.** The Pi 3 debug image's `config.txt`
-carries `dtoverlay=vc4-kms-dsi-7inch`, a 7 inch DSI panel overlay that
-belongs to the kiosk project on a Pi 4, alongside `vc4-fkms-v3d`, which
-is the other display stack. Commenting it out changed nothing about the
-UART, so it is not today's fault, but a debug image carrying another
-project's display overlay is a leak between kas files and should not be
-there.
+**One more thing worth a look later, and it was wrong.** This entry said
+the Pi 3 debug image's `config.txt` carries `dtoverlay=vc4-kms-dsi-7inch`,
+a 7 inch DSI panel overlay belonging to the kiosk project, and called that
+a leak between kas files that should not be there.
+
+**Corrected Wednesday 7 October 2026.** It is deliberate. Project 13's
+`DESIGN.md` states that the 7 inch panel **is the bench console** and that
+every bench image already drives it, with `CMDLINE` appending
+`console=tty1` so the panel shows kernel messages and a login prompt. So
+the overlay belongs in every image, including this one, and commenting it
+out was removing a console rather than tidying a stray.
+
+The mistake has the shape this whole day has been about: I read a line in
+one project's `config.txt`, did not read the project that put it there,
+and wrote a conclusion about it. The sibling document answers it in one
+sentence. What remains open is only the pairing of `vc4-fkms-v3d` with a
+`vc4-kms-` overlay, which are two different display stacks, and that is a
+question for project 13 rather than a fault here.
 
 ## 27. Tuesday 6 October 2026, minute by minute: an afternoon on a console that was never connected
 

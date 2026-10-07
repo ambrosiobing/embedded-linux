@@ -59,7 +59,7 @@ public repository. Three things work better anyway:
 | BCM2711 peripherals | Pi 4 SoC | register level work on the Pi 4 | no | `https://datasheets.raspberrypi.com/bcm2711/bcm2711-peripherals.pdf` |
 | Raspberry Pi 3B+ datasheet | Pi 3 Model B Plus | the Project 9 board | no | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-datasheet.pdf` |
 | BCM2835 and BCM2837 peripherals | Pi 3 SoC | GPIO function select, UART, SPI, I2C registers | **partial** | `https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf` |
-| Official 7 inch DSI product brief | DSI panel | project 13 | no | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
+| Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | NanoPi NEO Air schematic V1.1 | NEO Air | project 2 | no | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
 | Nordic PPK2 user guide | power profiler | projects 3 and 16, and every current measurement | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
@@ -107,6 +107,26 @@ assumption.
 The note that the PPK2 cannot read the voltage at an arbitrary node stays
 `inferred`: it follows from the instrument being a source meter and an
 ampere meter, and the guide does not spell it out.
+
+**The Touch Display product brief, Raspberry Pi Ltd, April 2024**, read
+Wednesday 7 October 2026 and worked through in
+[project 13's hardware page](../projects/13-wayland-kiosk/docs/hardware.md).
+It gives 800 by 480 on a 7 inch TFT, capacitive multi-touch to ten points,
+and the connection arrangement: an adapter board, power from the GPIO
+port, and a ribbon to the DSI connector.
+
+**It names neither the touch controller nor the backlight arrangement**,
+both of which `DESIGN.md` identifies from the kernel driver instead. That
+is the same pattern as the Waveshare LCD, and worth noticing: for display
+hardware on this bench, the Linux driver has been a better source of part
+identity than the manufacturer's own document. It is still not a citation.
+
+It also carries a manufacturer's instruction worth lifting into the bench
+rules: shut the Raspberry Pi down and disconnect it from external power
+**before** connecting the display. And a condition of use this bench does
+not meet, since the brief requires a suitable enclosure with no part of
+the circuit board accessible in operation, and the panel here sits bare on
+a desk.
 
 ## HATs, displays and bridges
 
