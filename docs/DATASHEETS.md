@@ -68,6 +68,31 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**ST's documents are unreachable and ST's register maps are not.** Every
+PDF fetch from `st.com` has failed on this bench, across several sessions.
+ST also publishes each sensor's register map as a C header in its own
+GitHub repository, `STMicroelectronics/<part>-pid`, containing
+`<part>_reg.h`, and those carry the I2C addresses, the `WHO_AM_I` register
+and the expected identification value. Eight were read on Wednesday
+7 October 2026 and they unblocked projects 10, 12 and 17.
+
+**Two warnings travel with them**, both in
+[project 10's hardware page](../projects/10-iio-iks4a1/docs/hardware.md).
+The headers give **8-bit** addresses, shifted left by one; Linux,
+`i2cdetect` and device tree use **7-bit**, so `0xD5` is `0x6A`. And
+`WHO_AM_I` identifies a **family**, not a part: it separates the two IMUs
+on the IKS4A1 because they are different families, and it would not
+separate an LSM6DSV16X from an LSM6DSV32X, which both answer `0x70`.
+
+**What the headers do not contain is everything electrical.** Supply
+ranges, absolute maxima, timing and noise are in the datasheets and
+nowhere else, and those are still `NOT READ`.
+
+**The three documents to ask Joseph for, in order:** UM3239 for the
+IKS4A1, UM2408 for the Nucleo-144, and the IKS5A1 user manual. All three
+are board-level documents, and the board is where every address strap and
+every level translation actually happens.
+
 **How to cite an absence.** Project 20 needs to establish that the Pi 3
 has no secure boot, no hardware unique key and no memory firewall, and no
 manufacturer's document says what a part does **not** have. The answer was
@@ -336,7 +361,8 @@ Project 10's shield. Seven parts, seven documents.
 
 | Document | Part | What it is | Read | URL |
 |---|---|---|---|---|
-| LSM6DSO16IS | IMU | 6-axis, with ISPU | no | `https://www.st.com/resource/en/datasheet/lsm6dso16is.pdf` |
+| LSM6DSO16IS | IMU | 6-axis, with ISPU | datasheet **no**, register map **yes** | `https://www.st.com/resource/en/datasheet/lsm6dso16is.pdf` |
+| ST register headers, `STMicroelectronics/<part>-pid` | eight sensors | projects 10, 12 and 17 | **yes**, read 7 October 2026 | `https://github.com/STMicroelectronics` |
 | LSM6DSV16X | IMU | 6-axis, with sensor fusion | no | `https://www.st.com/resource/en/datasheet/lsm6dsv16x.pdf` |
 | LIS2MDL | magnetometer | 3-axis | no | `https://www.st.com/resource/en/datasheet/lis2mdl.pdf` |
 | LIS2DUXS12 | accelerometer | 3-axis, low power | no | `https://www.st.com/resource/en/datasheet/lis2duxs12.pdf` |
