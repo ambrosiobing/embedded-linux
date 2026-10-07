@@ -138,11 +138,17 @@ header.
 | X-NUCLEO-IKS5A1 product page | IKS5A1 shield | | no | `https://www.st.com/en/evaluation-tools/x-nucleo-iks5a1.html` |
 | STEVAL-STWINBX1 product page | STWIN.box | project 17 | no | `https://www.st.com/en/evaluation-tools/steval-stwinbx1.html` |
 
-**Note on st.com.** The authoring laptop gets no PDF from st.com directly,
-which is why ST register layouts have previously been taken from ST's own
-header repositories on GitHub instead. With these URLs the documents can be
-fetched another way; where a register layout is quoted from a header rather
-than a datasheet, the project document should say which header file.
+**Note on st.com, updated Wednesday 7 October 2026.** The authoring laptop
+gets no PDF from st.com in a browser, and **the same is true of the fetch
+route used for the other documents here**: three attempts on that day
+returned a connection reset each time. So having the URLs did not solve
+it.
+
+**These need downloading by hand and sending**, the way the two Joy-it
+documents were on Tuesday 6 October 2026, which worked first time. Until
+then, ST register layouts come from ST's own header repositories on
+GitHub, and a project document quoting one should say which header file it
+came from rather than implying a datasheet.
 
 ## Sensors on the X-NUCLEO-IKS4A1
 
