@@ -13,6 +13,54 @@ design.** A project that assumes a part is missing when it is present, or
 present when it is missing, has to be rewritten rather than corrected.
 That has happened here three times.
 
+## Every project has its own hardware sourcing page
+
+This page is the shared reference. **Each project also has a
+`docs/hardware.md`** that does something different: it says where that
+project's own hardware claims came from, which of them are confirmed, and
+which are still waiting on a document that has not been read.
+
+The division is deliberate. This page holds what is true of the bench.
+A project's page holds what is true of that project, including its
+unknowns, which belong next to the work rather than in a shared file.
+
+| Project | Its hardware page is mostly about |
+|---|---|
+| [1, Yocto image](../projects/01-yocto-image/docs/hardware.md) | the drive strength behind "a few milliamps", and why a photograph outranked a datasheet |
+| [2, NEO Air](../projects/02-neo-air-mainline/docs/hardware.md) | an input range of 4.7 to 5.6 V, and a 24 pin header that resembles a Raspberry Pi's and is not one |
+| [3, boot energy](../projects/03-boot-energy/docs/hardware.md) | the PPK2's real limits, including the 600 mA one that corrected this project's design |
+| [4, netboot HIL](../projects/04-netboot-hil/docs/hardware.md) | 300 Mbit/s of Ethernet over USB, and two routes to a power cycle that neither board has here |
+| [5 and 11, ADXL345](../projects/05-iio-adxl345/docs/hardware.md) | module against die, and a 47 kohm pull-up that predicts its own failure |
+| [6, Explorer 700](../projects/06-explorer700/docs/hardware.md) | a host with no datasheet at all, and three HAT parts still unread |
+| [7, LCD 3.5](../projects/07-lcd35-drm/docs/hardware.md) | a panel controller the vendor never names |
+| [8, PREEMPT_RT](../projects/08-preempt-rt/docs/hardware.md) | an instrument whose datasheet specifies everything except its own clock |
+| [9, kernel debug](../projects/09-kernel-debug/docs/hardware.md) | the three bit field under the console, from the register to the wire |
+| [10, IIO IKS4A1](../projects/10-iio-iks4a1/docs/hardware.md) | ST's register maps as code, an 8-bit address trap, and a second IMU nobody listed |
+| [12, sensor hub](../projects/12-sensor-hub/docs/hardware.md) | why moving sensors behind firmware removes most of this bench's hazards, and what it costs |
+| [13, Wayland kiosk](../projects/13-wayland-kiosk/docs/hardware.md) | a touch controller the vendor never names, and a safety instruction worth borrowing |
+| [14, USB gadget](../projects/14-usb-gadget/docs/hardware.md) | a board run knowingly at a third of its specified supply |
+| [15, LTE router](../projects/15-lte-router/docs/hardware.md) | two vendor documents giving opposite PWRKEY polarities |
+| [16, NB-IoT tracker](../projects/16-nbiot-tracker/docs/hardware.md) | a vendor page that answers almost nothing, and a 0 ohm resistor that sets the logic voltage |
+| [17, BLE gateway](../projects/17-ble-gateway/docs/hardware.md) | a link that is a radio, so the peripheral is the primary source |
+| [18, edge AP](../projects/18-edge-ap-mqtt/docs/hardware.md) | two documents that each state exactly what the other omits |
+| [19, RAUC A/B](../projects/19-rauc-ab/docs/hardware.md) | a project whose hardware is a card nobody has identified |
+| [20, OP-TEE](../projects/20-optee-keystore/docs/hardware.md) | how to cite an absence, when no document says what a part lacks |
+
+**Four recurring shapes** came out of writing them, and they are worth
+knowing before reading any one of them.
+
+1. **The driver names the part and the manufacturer does not.** The
+   ILI9486, the FT5406, the dual-role `dwc2` port and the BCM43455 are all
+   identified from Linux. It is reliable and it is not a citation.
+2. **The easily reachable version of a document says least.** Nordic's
+   HTML guide against its PDF, and the Raspberry Pi 3B+ brief against a
+   datasheet that does not exist.
+3. **Two documents from one vendor are two sources.** Where both exist,
+   diff them. On the SIM7600E-H HAT they disagree about a polarity.
+4. **Where the bench can answer, photograph the bench.** A connector, a
+   jumper cap, a 0 ohm resistor and a chip marking have each blocked more
+   than a datasheet could unblock.
+
 ## How to read the evidence column
 
 Every hardware claim in this repository carries one of these. The idea is
@@ -711,6 +759,8 @@ not a gap**, and the rows say so.
 
 ## Where to go next
 
+- **Each project's own `docs/hardware.md`**, indexed at the top of this
+  page. All twenty exist as of Wednesday 7 October 2026.
 - [Project 6's pin map](../projects/06-explorer700/docs/pin-map.md) is the
   worked example of this page's evidence discipline, and the best thing to
   read before writing a new one.

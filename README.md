@@ -234,6 +234,18 @@ Read it before wiring anything and before writing a project's design. A
 project built on a wrong assumption about which parts exist has to be
 rewritten rather than corrected, and that has happened here three times.
 
+[docs/DATASHEETS.md](docs/DATASHEETS.md) is the source index: every
+document this bench works from, whether it has been read, how to cite one,
+and what not to copy out of it.
+
+**And each project has its own `docs/hardware.md`**, indexed at the top of
+`docs/HARDWARE.md`. Those pages carry the setting up and the decisions
+behind each project's wiring: what the datasheet said, what it did not
+say, what was inferred, what was measured, and the reflections on what was
+rewired afterwards and why. All twenty exist. Several of them record
+corrections to this repository's own earlier claims, which is the point of
+writing them down rather than the embarrassment of it.
+
 ## Keeping a flashable copy
 
 The build tree is disposable by design, which means the image in it is too:
