@@ -30,6 +30,50 @@ header and the die that makes two vendor pages give different supply
 ranges and both be right, and there is not a single resistor on the board,
 so a two-wire bus built from it has only the host's internal pull-ups.
 
+## The missing pull-up now has a number, and the number predicts a failure
+
+Added Wednesday 7 October 2026, because this is what reading a document
+is for.
+
+The paragraph above says the module carries no resistors, so a two-wire
+bus built from it has only whatever the host provides internally. That was
+true, useful and entirely qualitative. **Source: Raspberry Pi 4 Model B
+Datasheet, release 1.1, 12 March 2024, Table 3, page 8.** The internal
+pull-up and pull-down on a BCM2711 GPIO is specified as 18 kohm minimum,
+**47 kohm typical**, 73 kohm maximum.
+
+An I2C bus is normally pulled up with something between about 1.8 kohm and
+10 kohm. So the internal pull-up is roughly five to twenty five times
+weaker than the usual value, and the rising edge is correspondingly slow,
+because the line is a capacitor charged through that resistor. What
+follows is a prediction rather than a worry:
+
+- a bus built this way **works** at a low clock rate with short wires and
+  one device
+- it **degrades** as the clock rate goes up, as the wires get longer, or
+  as more devices add capacitance
+- when it fails it fails on the **rising** edge, so the symptom is a stuck
+  or stretched high level and reads that are wrong rather than absent
+
+That is a testable statement. It can be checked by halving the clock and
+seeing whether a flaky bus becomes reliable, which costs one line in a
+device tree overlay and no hardware at all.
+
+**And the honest caveat, which matters more than the number.** That figure
+is the **Pi 4's**, from the BCM2711 datasheet. The Raspberry Pi 3 Model B+
+product brief states no GPIO electrical characteristics whatsoever, and
+this project's wiring has been exercised on a Nucleo as well. So:
+
+| Host | Internal pull-up value | Source |
+|---|---|---|
+| Raspberry Pi 4 | 18 k / 47 k / 73 k ohm | `datasheet`, Table 3 page 8 |
+| Raspberry Pi 3B+ | unknown | the brief does not say; `NOT READ` elsewhere |
+| NUCLEO-H7A3ZI-Q | unknown here | the STM32H7A3 datasheet, `NOT READ` |
+
+Writing "47 kohm" into a Pi 3 or an STM32 context without that line would
+be the same move this bench keeps catching: a number that was true where
+it was read, carried somewhere it was never checked.
+
 ## What the ADXL345 datasheet would settle, and currently does not
 
 These are claims this project relies on that are **not** sourced from the

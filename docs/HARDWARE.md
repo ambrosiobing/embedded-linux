@@ -153,15 +153,294 @@ proxy down with it, which from outside reads as a dead cable.
 
 ## Boards
 
-| Board | On the bench | Notes |
+| Board | On the bench | Evidence | Notes |
+|---|---|---|---|
+| Raspberry Pi 3 | yes | `NOT READ` | no document of its own has been read; the 3B+ brief is the nearest |
+| Raspberry Pi 3 Model B Plus | yes | `vendor page` and `schematic` | the Project 9 board, Rev 1.3; see below |
+| Raspberry Pi 4 | yes | `datasheet` | the only one some HATs support; the only host here with a published electrical specification, see below |
+| NanoPi NEO Air | yes | `NOT READ` | Project 2's target; its supply is the instrument when the profiler is in use |
+| NUCLEO-H7A3ZI-Q | yes | `NOT READ` | STM32H7A3ZI, Nucleo-144; the firmware volume's board |
+| SBC-NodeMCU-ESP32 | yes | `NOT READ` | carries a CP2102 or CH340 |
+| Joy-it SBC-ESP8266-PROG | yes | `datasheet` | carries a CP2102 or CH340; **its socket pinout is published nowhere**, see below |
+
+### The three Raspberry Pi hosts, read from their own documents
+
+Until Wednesday 7 October 2026 this bench had used two Raspberry Pi hosts
+for fourteen projects without once reading what Raspberry Pi says about
+them. That is worth admitting at the top, because the gap it left is not
+the one you would guess. The pinout was never in doubt. **What was missing
+is the electrical specification, and for one of the two boards it is still
+missing, because the manufacturer does not publish it.**
+
+#### What the Pi 3B+ product brief gives
+
+**Source: Raspberry Pi 3 Model B+ product brief, Raspberry Pi Ltd,
+published October 2025**, pages 2 to 4. Read Wednesday 7 October 2026.
+
+| Specification | Value | Page |
 |---|---|---|
-| Raspberry Pi 3 | yes | |
-| Raspberry Pi 3 Model B Plus | yes | the Project 9 board, Rev 1.3 |
-| Raspberry Pi 4 | yes | the only one some HATs support |
-| NanoPi NEO Air | yes | Project 2's target; its supply is the instrument when the profiler is in use |
-| NUCLEO-H7A3ZI-Q | yes | STM32H7A3ZI, Nucleo-144; the firmware volume's board |
-| SBC-NodeMCU-ESP32 | yes | carries a CP2102 or CH340 |
-| Joy-it SBC-ESP8266-PROG | yes | carries a CP2102 or CH340; **its socket pinout is published nowhere**, see below |
+| processor | Broadcom BCM2837B0, Cortex-A53 64-bit SoC at 1.4 GHz | 3 |
+| memory | 1 GB | 3 |
+| input power | 5 V / 2.5 A DC via micro USB; 5 V DC via GPIO header; PoE with a separate HAT | 3 |
+| operating temperature | 0 to 50 C | 3 |
+| MTBF, ground benign | 378 000 hours | 3 |
+| production lifetime | in production until at least January 2028 | 3 |
+| board outline | 85 mm by 56 mm, dimensioned drawing | 4 |
+
+**The part number is `BCM2837B0`, not `BCM2837`.** That matters more than
+it looks. Project 9 reads GPIO function select registers out of the
+*BCM2835 ARM Peripherals* document, and has been right to, but the reason
+had never been written down: that document describes the peripheral block,
+which the later parts inherit, while the ARM physical base address moves
+from `0x2000 0000` on BCM2835 to `0x3F00 0000` on BCM2836 and BCM2837. So
+the register layout transfers and the address does not. Using a document
+whose part number does not match the board is defensible exactly once you
+can say which parts of it transfer.
+
+#### What the Pi 3B+ product brief withholds, which is the finding
+
+A product brief is not a datasheet, and this one is honest about being a
+brief. It contains **no GPIO pinout, no alternate function table, no input
+or output voltage thresholds, no pull-up or pull-down values, and no
+per-pin current figure.**
+
+So: **every electrical claim this bench makes about a Raspberry Pi 3 GPIO
+comes from somewhere other than Raspberry Pi.** Before anyone repeats
+"3.3 V logic, 16 mA per pin, 50 mA in total" as settled, notice that the
+manufacturer's document for this board says none of those three things.
+Two of them can be sourced from the Pi 4 datasheet, with the caveat in the
+next section. The third, the total, cannot be sourced at all.
+
+#### Instructions from the brief that belong in the bench rules
+
+All from page 4, quoted because they are instructions rather than numbers.
+
+- the external supply shall be rated 5 V / 2.5 A and shall comply with the
+  regulations of the country of use
+- operate in a well-ventilated environment, and do not cover the case
+- place it on a stable, flat, **non-conductive** surface, where no
+  conductive item can touch it
+- "The connection of incompatible devices to the GPIO connection may
+  affect compliance, result in damage to the unit, and invalidate the
+  warranty."
+- whilst powered, avoid handling the board, or handle it by the edges, to
+  limit electrostatic discharge
+- **do not expose the printed circuit board to high-intensity light
+  sources, for example a xenon flash or a laser, whilst in operation**
+
+The last one reads like a joke and is not. It belongs in the bench rules
+for a practical reason: **this bench photographs boards**, and several
+questions still open here are waiting on a photograph of a running board.
+Take it with the flash off, or take it powered down.
+
+#### What the Pi 3B+ reduced schematic settles
+
+**Source: Raspberry Pi 3 Model B+ reduced schematic, revision V1.0, sheet
+1 of 1, drawn by Roger Thornton, dated Monday 19 March 2018, copyright
+Raspberry Pi 2018.** Read Wednesday 7 October 2026.
+
+**The console pins are confirmed by the manufacturer.** In the GPIO
+EXPANSION block, the nets running from the SoC symbol `U1C` to `J8`, the
+40 way 0.1 inch header, carry their alternate function names in brackets.
+`GPIO14` is annotated `(TXD0)` and `GPIO15` is annotated `(RXD0)`. Those
+are header pins 8 and 10. Until now project 9 identified them from the
+Broadcom function select table plus the assumption that the header follows
+it; the assumption is now a citation.
+
+**The micro USB input is protected and the header input is not.** The
+POWER IN block shows `J1`, the micro USB connector, feeding `F1`, a
+resettable fuse marked `MF-MSMF250/X`, with `D7`, an `SMBJ5.0A` transient
+voltage suppressor, across the output. That is where the brief's 2.5 A
+figure comes from. The 5 V pins on `J8` sit on the same `5V` net
+downstream of that fuse, which means **feeding 5 V into header pins 2 or 4
+enters the board after the protection, not through it.** Evidence level
+for the protection: `schematic`. Evidence level for the consequence:
+`inferred`, from net naming on a sheet read at page resolution, not from a
+continuity measurement.
+
+**The same thing as a picture.** Redrawn from the POWER IN block, not
+copied from it, and reduced to the three parts that matter to a bench.
+
+```
+    Raspberry Pi 3B+ power in, as drawn on the reduced schematic
+
+      micro USB            F1                            5V net
+         J1  o-----------[ MF-MSMF250/X ]-------+-------------o  to the
+             |            resettable fuse       |                board
+             |                                  |
+             |                           D7  [ SMBJ5.0A ]
+             |                             transient clamp
+             |                                  |
+            GND o------------------------------ o GND
+
+      J8 pin 2  o--+
+                   +------------------------->  the same 5V net,
+      J8 pin 4  o--+                            downstream of both
+
+      in through J1   : fused, and clamped at about 5 V
+      in through J8   : neither
+```
+
+**The two LEDs are driven, not merely connected.** `D6`, the red POWER OK
+LED marked "PWR", and `D5`, the green STATUS LED marked "ACT", are each
+switched by a small transistor from nets named `STATUS_LED_R` and
+`STATUS_LED_G`. **Where those nets originate is not legible on this sheet
+at the resolution read**, so this does not yet prove that a beating ACT
+LED means a live kernel. What it does prove is the weaker and still useful
+statement: the ACT LED is not a bare indicator strapped across a supply
+rail, so when it changes, something is deliberately changing it.
+
+**And the limit of this reading, stated rather than implied.** This is one
+A2 sheet rendered at page size. Net names and reference designators on the
+blocks above were legible. Component values in the fine print near the
+GPIO nets were not. So **"there is nothing between the SoC and header pins
+8 and 10" is not a claim this reading supports**, and nobody should treat
+it as one.
+
+#### What the Pi 4 datasheet gives that nothing else on this bench does
+
+**Source: Raspberry Pi 4 Model B Datasheet, Release 1.1, Raspberry Pi
+(Trading) Ltd.** The release history on page 1 dates release 1 to
+21 June 2019 and release 1.1 to 12 March 2024, describing the latter as an
+update to the obsolescence statement and the electrical specification.
+Read Wednesday 7 October 2026.
+
+**This is the only document on this bench that states what a GPIO pin can
+do electrically.** Four rows from Table 3, DC Characteristics, page 8,
+selected because the bench depends on them and relaid out rather than
+copied; the other eight rows, and the AC characteristics in Table 4, are
+in the document.
+
+| Quantity | Condition | Value |
+|---|---|---|
+| input low voltage, max | VDD_IO = 3.3 V | 0.8 V |
+| input high voltage, min | VDD_IO = 3.3 V | 2.0 V |
+| output current, min | at maximum drive strength, which is 16 mA; the default is 8 mA | 7 mA |
+| internal pull-up or pull-down | | 18 kohm min, 47 kohm typical, 73 kohm max |
+
+Page 7 adds the absolute maximum, a 5 V input between -0.5 V and 6.0 V,
+and one sentence that is the key to the whole table: VDD_IO is the GPIO
+bank voltage and it is tied to the on-board 3.3 V rail. That is what makes
+every row above a 3.3 V row.
+
+**The pull-up row pays for the whole document.** Project 5's page records
+that the SEN0032 module carries no resistors at all, so a two-wire bus
+built from it has only the host's internal pull-ups and nothing else. That
+was a qualitative worry. It now has a number, and the number predicts the
+failure: a 47 kohm pull-up is somewhere between five and twenty five times
+the usual I2C value, so the rising edge is slow, and a bus like that works
+at low clock rates over short wires and stops working as soon as either
+grows. **That is a testable prediction rather than an unease**, which is
+the whole reason to go and read the thing.
+
+**Carry it across carefully, and say when you do.** That figure is the Pi
+4's. The Pi 3B+ brief states no such number, and the ADXL345 work was done
+on a Nucleo and on a Raspberry Pi. Writing "47 kohm" into a Pi 3 or STM32
+context without naming where it came from would be exactly the move this
+bench keeps catching itself making.
+
+**What the datasheet does not say, and is widely believed to.** There is
+no total GPIO current budget anywhere in it. The familiar figure of 50 mA
+across all pins together does not appear. What appears is a per-pin drive
+strength, default 8 mA and maximum 16 mA, in the footnotes to Table 3. If
+a design here ever depends on a total, that total has no source.
+
+#### The alternate function table, and the trap inside it
+
+Table 5, page 10, lists the default pull state and six alternate functions
+for GPIO 0 to 27. For the two pins project 9 cares about it agrees exactly
+with the Broadcom document: `GPIO14` is `TXD0` on ALT0 and `TXD1` on ALT5,
+`GPIO15` is `RXD0` on ALT0 and `RXD1` on ALT5. An independent confirmation
+of a reading that had carried a lot of weight.
+
+**The trap is everything else in the same table.** The Pi 4's ALT4 column
+carries `TXD2` through `TXD5` and `RXD2` through `RXD5`, four extra UARTs
+that BCM2711 added and **that do not exist on the Pi 3.** The datasheet
+says so in its own words on page 9, that extra I2C, UART and SPI
+peripherals have been added to BCM2711 and appear as further mux options.
+So this table is a correct cross-check for ALT0 and ALT5 and a loaded
+question for ALT4: read it while working on a Pi 3 and you can configure,
+in good faith, a UART that is not on the chip.
+
+**One sentence from page 9 is load-bearing for this whole repository.**
+The Pi 4 makes 28 BCM2711 GPIOs available on a standard 40 pin header that
+is backwards compatible with all previous 40-way Raspberry Pi boards. That
+is the licence for a single pin map to serve both hosts, and it is better
+to have it cited than assumed.
+
+Also from the same figure, repeated from the Pi 3B+ schematic: the note
+against `ID_SD` and `ID_SC`, header pins 27 and 28, reserved for the HAT
+identification EEPROM, not to be used for anything else. That is why those
+two rows are blank in every pin map here.
+
+#### The rest of the Pi 4 datasheet, briefly
+
+Power, section 4.1 page 8: a good quality USB-C supply of 5 V at 3 A; a
+5 V 2.5 A supply may be used if attached downstream USB devices draw under
+500 mA. USB, section 5.3 page 11: downstream current limited to roughly
+1.1 A in aggregate across the four sockets. Thermals, section 5.6 page 11:
+recommended ambient 0 to 50 C, with the governor throttling so the CPU
+never exceeds 85 C. Availability, section 6 page 11: until at least
+January 2031.
+
+**And a versioning point worth more than it looks.** Release 1.1 changed
+the electrical specification. A copy of release 1 from 2019 is a different
+document with the same name, and quoting DC characteristics from a stale
+local file is a way to be precisely, confidently wrong. Check the release
+line on page 1 before using a number from any copy of this.
+
+#### Which document answers which question
+
+This is the table to look at first, and it is mostly a table of gaps.
+
+| Question | Pi 3B+ brief | Pi 3B+ schematic | Pi 4 datasheet | BCM2835 peripherals |
+|---|---|---|---|---|
+| 40-pin header pinout | no | yes, with function names | yes, figure 3 | no |
+| alternate function per pin | no | partly, names only | yes, table 5, Pi 4 only | yes, the register view |
+| input thresholds | no | no | yes, table 3 | no |
+| internal pull-up value | no | no | yes, table 3 | no |
+| per-pin drive strength | no | no | yes, table 3 footnotes | no |
+| total GPIO current | no | no | **no** | no |
+| operating temperature | yes | no | yes | no |
+| power input and protection | yes, the rating | yes, the fuse and TVS | yes, the rating | no |
+| production lifetime | yes, January 2028 | no | yes, January 2031 | no |
+
+**And the same thing as a picture, because the ordering is the point.**
+
+```
+     the question you actually have        the document that answers it
+
+   "what is this product, and what         product brief (Pi 3B+)
+    may I plug into it?"                   datasheet sections 1 to 4 (Pi 4)
+            |
+            v
+   "what is physically on the board,       reduced schematic (Pi 3B+ only)
+    and what is each header pin
+    wired to?"
+            |
+            v
+   "what can this pin be turned            BCM2835 ARM Peripherals, 6-31
+    into?"                                 Pi 4 datasheet, table 5
+            |
+            v
+   "what can this pin actually             Pi 4 datasheet, table 3
+    drive, and at what voltage?"           ... and nothing, for a Pi 3
+
+                                           ^
+                                           |
+                             one document, for the other board
+```
+
+The arrow at the bottom is the honest summary of fourteen projects. Every
+question above it has a source. The last one has a source for one of the
+two hosts, and the bench has been quietly using it for both.
+
+**The shape of it.** A board-level document tells you what the product is.
+A SoC document tells you what a pin can be. Only one of these four tells
+you what a pin can drive, and it is the one for the other board. There is
+no document on this bench that states the electrical characteristics of a
+Raspberry Pi 3 GPIO, and the honest thing is to say so in the places that
+depend on it rather than to quietly borrow the Pi 4's numbers.
 
 ### The ESP8266 programmer, and why it is not a drop-in console adapter
 

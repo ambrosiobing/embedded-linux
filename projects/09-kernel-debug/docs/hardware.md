@@ -105,6 +105,36 @@ Same copper, same pins 8 and 10, different peripheral entirely. That is
 the fact underneath `disable-bt`, and it is why "the UART" is an ambiguous
 phrase on this board.
 
+### 1a. The board maker's own confirmation, added later
+
+Everything above comes from the chip vendor. On Wednesday 7 October 2026
+the board vendor was read too, and it agrees.
+
+**Source: Raspberry Pi 3 Model B+ reduced schematic, revision V1.0, sheet
+1 of 1, drawn by Roger Thornton, dated Monday 19 March 2018, copyright
+Raspberry Pi 2018.** In the GPIO EXPANSION block, the nets between the SoC
+symbol `U1C` and `J8`, the 40 way header, carry alternate function names
+in brackets. `GPIO14` is annotated `(TXD0)`. `GPIO15` is annotated
+`(RXD0)`.
+
+**Source: Raspberry Pi 4 Model B Datasheet, release 1.1, 12 March 2024,
+Table 5, page 10.** `GPIO14` is `TXD0` on ALT0 and `TXD1` on ALT5;
+`GPIO15` is `RXD0` on ALT0 and `RXD1` on ALT5. Identical to Broadcom's
+Table 6-31 for the two rows that matter.
+
+**Why bother, when the first source was already clear?** Because this
+project spent an evening on a console that did not work and the wiring was
+never the fault. When a chain of reasoning has cost that much, the cheapest
+thing you can do afterwards is find a second, independent document that
+says the same thing, and either sleep better or find out early. Here it is
+the first.
+
+**One warning that travels with the Pi 4 table.** Its ALT4 column lists
+`TXD2` through `TXD5`, four UARTs that BCM2711 added and **that the Pi 3
+does not have**. The table confirms ALT0 and ALT5 for this board and must
+not be used for anything else on it. The wider version of that point is in
+[docs/HARDWARE.md](../../../docs/HARDWARE.md).
+
 ### 2. The register that holds that choice
 
 From **Table 6-1, page 90**, the GPIO registers begin at bus address
@@ -183,14 +213,15 @@ them at a different physical base depending on the SoC:
 | SoC | Board | ARM physical peripheral base | GPFSEL1 at |
 |---|---|---|---|
 | BCM2835 | Pi 1, Zero | `0x2000 0000` | `0x2020 0004` |
-| BCM2836, BCM2837 | Pi 2, Pi 3, Pi 3B+ | `0x3F00 0000` | `0x3F20 0004` |
+| BCM2836, BCM2837, BCM2837B0 | Pi 2, Pi 3, Pi 3B+ | `0x3F00 0000` | `0x3F20 0004` |
 
 `inferred` from the bus address plus the known peripheral base for this
 family, not stated in this document, which predates the Pi 3. **Worth
 stating explicitly because the datasheet you reach for is the BCM2835
-one and the board on the bench is a BCM2837.** An address copied straight
-out of the PDF reads the wrong place on a Pi 3, and reads it without
-complaining.
+one and the board on the bench is a BCM2837B0**, as the Raspberry Pi 3
+Model B+ product brief of October 2025 states on page 3. An address copied
+straight out of the PDF reads the wrong place on a Pi 3, and reads it
+without complaining.
 
 On this bench the question is academic anyway: `/dev/mem` refuses with
 `Bad address`, so the register cannot be read directly and the kernel's own

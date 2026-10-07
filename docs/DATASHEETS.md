@@ -55,14 +55,34 @@ public repository. Three things work better anyway:
 
 | Document | Part | For | Read | URL |
 |---|---|---|---|---|
-| Raspberry Pi 4 datasheet | Pi 4B | projects using the Pi 4 | no | `https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-datasheet.pdf` |
+| Raspberry Pi 4 Model B datasheet, release 1.1, 12 March 2024 | Pi 4B | projects using the Pi 4 | **yes** | `https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-datasheet.pdf` |
 | BCM2711 peripherals | Pi 4 SoC | register level work on the Pi 4 | no | `https://datasheets.raspberrypi.com/bcm2711/bcm2711-peripherals.pdf` |
-| Raspberry Pi 3B+ datasheet | Pi 3 Model B Plus | the Project 9 board | no | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-datasheet.pdf` |
+| Raspberry Pi 3 Model B+ product brief, published October 2025 | Pi 3 Model B Plus | the Project 9 board | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-product-brief.pdf` |
+| Raspberry Pi 3 Model B+ reduced schematic, V1.0, 19 March 2018 | Pi 3 Model B Plus | header pin functions, power protection | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-reduced-schematics.pdf` |
 | BCM2835 and BCM2837 peripherals | Pi 3 SoC | GPIO function select, UART, SPI, I2C registers | **partial** | `https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf` |
 | Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | NanoPi NEO Air schematic V1.1 | NEO Air | project 2 | no | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
 | Nordic PPK2 user guide | power profiler | projects 3 and 16, and every current measurement | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
+
+**There is no Raspberry Pi 3B+ datasheet, and the URL that claimed one is
+dead.** The index carried
+`https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-datasheet.pdf`
+until Wednesday 7 October 2026, when it returned 404. What Raspberry Pi
+publishes for this board is a five page **product brief** and a one sheet
+**reduced schematic**, both now read and both worked through in
+[docs/HARDWARE.md](HARDWARE.md). The brief states the processor, the
+power input, the temperature range and the warnings; **it states nothing
+at all about GPIO electrical behaviour**, which is the single most useful
+thing this round of reading established.
+
+**Watch the redirects on the Raspberry Pi document host.** Every
+`datasheets.raspberrypi.com` link above now redirects twice, through
+`pip.raspberrypi.com` to `pip-assets.raspberrypi.com`, and the final
+filename carries a document number and a revision, for example
+`RP-008341-DS-1-raspberry-pi-4-datasheet.pdf`. Cite the stable short URL,
+and record the revision from page 1 of the document itself, because the
+revision is the part that changes what the numbers say.
 
 **The BCM2835 peripherals document was the one to read first, and chapter
 6 now is read.** Broadcom, 6 February 2012. Tables 6-1, 6-2, 6-3 and 6-31,
