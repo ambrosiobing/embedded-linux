@@ -32,6 +32,12 @@ so a two-wire bus built from it has only the host's internal pull-ups.
 
 ## The missing pull-up now has a number, and the number predicts a failure
 
+> **Corrected on Thursday 8 October 2026.** The arithmetic in this section
+> is right and its premise is wrong for this bus. Header pins 3 and 5 are
+> not bare GPIOs: the Raspberry Pi fits 1.8 kohm pull-ups on them. Read the
+> next section before acting on anything below, and in particular before
+> buying the resistors this section asks for.
+
 Added Wednesday 7 October 2026, because this is what reading a document
 is for.
 
@@ -99,6 +105,73 @@ this project's wiring has been exercised on a Nucleo as well. So:
 Writing "47 kohm" into a Pi 3 or an STM32 context without that line would
 be the same move this bench keeps catching: a number that was true where
 it was read, carried somewhere it was never checked.
+
+## The pull-up is not missing, because the Pi fits it
+
+Thursday 8 October 2026. The section above evaluates a criterion with the
+wrong resistor in it, and the error is not in the arithmetic.
+
+**Header pins 3 and 5 are not bare GPIOs.** They are the only pair on the
+40-pin header with pull-up resistors fitted on the Raspberry Pi itself.
+**Source: Raspberry Pi 3 Model B+ reduced schematic, Rev V1.0, drawn by
+Roger Thornton, dated Monday 19 March 2018, sheet 1 of 1, the GPIO
+EXPANSION block.** `R23` and `R24`, both **1K8, 1%, 1005**, run from `3V3`
+to the `GPIO3` and `GPIO2` nets, and the junction dots sit on those two
+nets. `ID_SD` and `ID_SC` cross the same wires with no dots, so those are
+not the pulled lines, which is the reading that has to be checked rather
+than assumed because the four nets are drawn adjacent.
+
+So the resistance that matters for this project's bus is **1.8 kohm**, not
+the 47 kohm of a bare BCM GPIO. Same formula, same page of the same
+Sensirion datasheet:
+
+```
+   fast mode, 400 kHz, t_rise 300 ns:
+      C_b  <  300e-9 / (0.8473 * 1800)   =  197 pF
+
+   standard mode, 100 kHz, t_rise 1000 ns:
+      C_b  <  1000e-9 / (0.8473 * 1800)  =  656 pF
+```
+
+A few centimetres of jumper and two devices is fifty to a hundred
+picofarads. **The bus passes the condition at both speeds, with room to
+spare.** If the BCM internal pull-up is also enabled it sits in parallel,
+giving 1.73 kohm and 204 pF, which is slightly more headroom rather than
+less, so it cannot rescue the failing conclusion either.
+
+**What survives from the section above, and what does not.**
+
+| Claim | Status |
+|---|---|
+| the SEN0032 module carries no resistors of its own | stands |
+| the Sensirion inequality and its working | stands, and is reproduced above |
+| 47 kohm typical for a bare BCM2711 GPIO | stands, and is about a different pin |
+| a bus on **internal** pull-ups fails by more than an order of magnitude | stands, for buses that are actually on internal pull-ups |
+| **this** bus is on internal pull-ups | **wrong**, and it is the premise everything else hung from |
+| two 4.7 kohm resistors are a shopping item **for this bus** | **wrong**, nothing needs buying for pins 3 and 5 |
+| 4.7 kohm for any **other** I2C pair on the header | stands, and only GPIO2 and GPIO3 are fitted |
+
+**The Pi 4, which project 11 names, separately.** Its reduced schematic
+does **not** show these resistors: the only three 1K8 parts on that sheet
+are `R21` on `AUDIO_L`, `R24` on `AUDIO_R` and `R52` between `1V8` and
+`3V3`. That is an absence in a reduced drawing and not evidence that the
+board lacks them, so it is not cited here as one. The Pi 4 is fitted, on
+two sources rather than on that PDF: the Raspberry Pi forum thread
+[Pi 4 I2C pull-up resistors](https://forums.raspberrypi.com/viewtopic.php?t=342415),
+where the value is given as 1k8, 1%, 63mW, M1005, the same specification as
+the Pi 3 B+ parts above, and where it is stated that they appear on no
+published schematic; and [pinout.xyz](https://pinout.xyz/pinout/i2c), which
+gives the fixed 1.8 kohm to 3V3 and says only GPIO2 and GPIO3 carry it.
+Both are `secondary`, not a manufacturer drawing, and they are consistent
+with each other and with the 3 B+ sheet.
+
+**The agreement that should have prompted this earlier.** The SEN0032
+returned `0xe5` from `DEVID` first time and gave consistent gravity in two
+orientations on Saturday 3 October 2026. A bus ten times outside its
+rise-time condition does not behave that way; it fails on the rising edge,
+intermittently, with wrong values rather than absent ones, which is exactly
+what the section above predicts. The prediction and the observation
+disagreed for a day and the observation was the older of the two.
 
 ## What the ADXL345 datasheet would settle, and currently does not
 

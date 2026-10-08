@@ -215,6 +215,13 @@ than a retry loop.
 
 ## The pull-up arithmetic, finally done properly
 
+> **Corrected on Thursday 8 October 2026.** The formula, the working and
+> the 47 kohm figure are all right. Two sentences at the end of this
+> section are not: the hand-wired buses in projects 5 and 11 are on header
+> pins 3 and 5, which the Raspberry Pi fits with 1.8 kohm pull-ups of its
+> own, so they are not buses on internal pull-ups either. See the section
+> that follows this one.
+
 This is the most useful thing in the datasheet and it closes a thread that
 has run through four projects.
 
@@ -271,6 +278,55 @@ shows **10 kohm** on SDA and SCL, which is what a sensible board fits.
 This arithmetic matters for the hand-wired buses in projects 5 and 11, not
 for this one. It is recorded here because this is where the formula was
 found.
+
+## Which buses the arithmetic above actually applies to
+
+Thursday 8 October 2026. The section above ends by saying the result
+matters for the hand-wired buses in projects 5 and 11 and not for this
+one. The second half is right for a better reason than it gives, and the
+first half is wrong.
+
+**Header pins 3 and 5 carry fitted pull-ups.** `R23` and `R24`, both 1K8,
+1%, 1005, from `3V3` to the `GPIO3` and `GPIO2` nets. **Source: Raspberry
+Pi 3 Model B+ reduced schematic, Rev V1.0, Roger Thornton, Monday 19 March
+2018, sheet 1 of 1, GPIO EXPANSION block**, where the junction dots are on
+those two nets and not on the adjacent `ID_SD` and `ID_SC`. Put 1.8 kohm
+through the same inequality:
+
+```
+   fast mode, 400 kHz:    C_b  <  300e-9 / (0.8473 * 1800)   =  197 pF
+   standard mode:         C_b  <  1000e-9 / (0.8473 * 1800)  =  656 pF
+```
+
+Against fifty to a hundred picofarads, both pass. So **no bus on pins 3
+and 5 is a bus on internal pull-ups.** Which of this bench's projects use
+that pair rather than another has not been audited here; projects 5 and 11
+do, and this project's shield does.
+
+**Caveat 1 above is answered, and not the way it expected.** It said the
+Pi 3 B+ publishes no pull-up figure and that the failing conclusion was
+`inferred` for that host. The Pi 3 B+ publishes no figure for the
+**internal GPIO** pull-up, which is a different component from the fitted
+resistor, and its schematic states the fitted one plainly. The inference
+was reasonable and it was drawn about the wrong part.
+
+**What this changes for this project: still nil, and now for two reasons
+rather than one.** The shield carries its own pull-ups and the host fits
+1.8 kohm besides. The 10 kohm quoted above is the **typical application
+circuit** on page 3 of the SHT4x datasheet and not a reading of the
+IKS4A1's own schematic, which is `NOT READ`; if the shield's parts are
+that value, the parallel combination with the host's is about 1.5 kohm,
+comfortably above the 390 ohm minimum of Table 4 page 9, so nothing is
+overloaded. A shield fitting something much stiffer is the only case that
+would need checking, and the document that would settle it is the
+IKS4A1 schematic.
+
+**The general rule that survives, unchanged and still worth having:** a
+bus on a host's internal pull-ups fails the condition by more than an
+order of magnitude. It is simply not a description of any bus wired on
+this bench, because the one pair everything here uses is fitted. Any
+**other** pair on the header is bare, and for those the 4.7 kohm remains
+the right answer.
 
 ## And the PPK2 cannot measure this sensor at all
 
