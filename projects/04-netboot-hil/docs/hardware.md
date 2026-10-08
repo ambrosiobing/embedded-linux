@@ -15,7 +15,7 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 | Raspberry Pi 3 Model B+ product brief, October 2025 | `vendor page` | **read**, the DUT |
 | Raspberry Pi 3 Model B+ reduced schematic, V1.0, 19 March 2018 | `schematic` | **read** |
 | Raspberry Pi 4 Model B datasheet, release 1.1, 12 March 2024 | `datasheet` | **read**, the server |
-| Raspberry Pi network boot documentation | `vendor page` | **`NOT READ`**, see below |
+| Raspberry Pi network boot documentation, AsciiDoc source | `vendor page` | **read Thursday 8 October 2026** |
 
 All three read documents are worked through in
 [docs/HARDWARE.md](../../../docs/HARDWARE.md); this page takes only what
@@ -118,11 +118,11 @@ for the DUT's serial console. The power itself comes off `J14`, not the 40
 pin header, but a HAT still sits on the 40 pin header. That is a question
 for the PoE HAT's own documentation and it is `NOT READ`.
 
-## The boot ROM, which is the one claim with no source at all
+## The boot ROM, and the three claims the lab rests on
 
 `DESIGN.md` rests on three statements about the DUT's boot ROM:
 
-| Claim | Where it comes from now |
+| Claim | Where it came from on Wednesday 7 October 2026 |
 |---|---|
 | the boot ROM in OTP runs before anything else, so a soft reboot re-enters network boot | **unsourced** |
 | the Pi 3B+ can network boot without an OTP bit being programmed first | **unsourced** |
@@ -130,26 +130,172 @@ for the PoE HAT's own documentation and it is `NOT READ`.
 
 **None of these is in either board document.** The product brief and the
 datasheet describe products; the boot ROM's behaviour is in Raspberry Pi's
-separate network boot documentation, which was reached on Wednesday
-7 October 2026 and **served a truncated page** that did not include the
-section.
+separate network boot documentation, which on Wednesday 7 October 2026
+**served a truncated page** that did not include the section.
 
 **They are also, all three, working.** `run-log-20-boots.txt` in this
 directory is twenty boots of evidence that the sequence does what the
-design says. So the evidence level here is **`measured`, not `NOT READ`**,
-and that distinction matters: the lab is not resting on an unverified
-belief, it is resting on a verified behaviour whose documentation has not
-been read.
+design says. So the evidence level was **`measured`, not `NOT READ`**, and
+that distinction matters: the lab was not resting on an unverified belief,
+it was resting on a verified behaviour whose documentation had not been
+read.
 
-**What reading the document would add** is the one thing twenty successful
-boots cannot: knowing which of these behaviours is guaranteed and which is
-incidental to this board revision and this bootloader version. A lab built
-on an incidental behaviour works until a firmware update, and then stops
-working for a reason nobody can look up.
+**That documentation was read on Thursday 8 October 2026**, from its
+AsciiDoc source rather than the rendered page, and the section below works
+through what it settles and what it does not. The short version: the
+second claim is specified in one sentence, the DHCP half of the third is
+specified, and the other two remain measurements with no sentence anywhere
+to back them.
 
 So this stays on the list, and the right form of the open question is not
 "does network boot work" but **"which parts of what we observe are
 specified"**.
+
+## The network boot documentation is read, and it settles one claim of three
+
+**Source: Raspberry Pi documentation, "Network boot your Raspberry Pi",
+read Thursday 8 October 2026** from the project's own source at
+`raspberrypi/documentation`, file
+`documentation/asciidoc/computers/remote-access/network-boot-raspberry-pi.adoc`
+on the `master` branch.
+
+**Provenance, because the first attempt failed.** The rendered page at
+`raspberrypi.com/documentation/computers/remote-access.html` returned a
+truncated document twice on Wednesday 7 October 2026, with the network
+boot section missing. The AsciiDoc source is the same text before
+rendering, it is complete, and it is version controlled, which makes it a
+better citation than the page. **Where a vendor publishes its
+documentation as source, read the source.**
+
+### Claim 2 is settled outright, and the answer is that nothing is needed
+
+This page listed three claims the lab rests on and marked all three
+unsourced. The second was whether the Pi 3B+ can network boot without an
+OTP bit being programmed first.
+
+> This section only applies to the Raspberry Pi 3 Model B, as network boot
+> is enabled on the Raspberry Pi 3 Model B+ at the factory.
+
+**So there is nothing to do.** The `program_usb_boot_mode=1` dance, the
+reboot, the `vcgencmd otp_dump` check and the removal of the line
+afterwards are all for the plain Model B. The DUT here is a **3B+**, and
+it arrives able to do this.
+
+That matters more than a settled footnote usually does, because **the
+procedure for the wrong board is destructive in a particular way**: the
+OTP is one-time programmable, so a bit set on a board that did not need it
+cannot be unset. Reading this before following a tutorial written for the
+other board is the whole value.
+
+**And the check for the other board is worth recording anyway**, in case
+the DUT is ever swapped for a plain Model B: after programming,
+`vcgencmd otp_dump | grep 17:` should read `17:3020000a`.
+
+### Claim 3 is half settled, and the document gives the other half away
+
+The third claim was that the board sends a DHCP vendor class and reads
+option 43, then fetches from a TFTP directory named after its serial
+number.
+
+**The DHCP half is confirmed**, in dnsmasq's own terms. The document's
+server configuration is:
+
+```
+   port=0
+   dhcp-range=<broadcast address>,proxy
+   log-dhcp
+   enable-tftp
+   tftp-root=/tftpboot
+   pxe-service=0,"Raspberry Pi Boot"
+```
+
+Two things follow that the design should state explicitly. It is a
+**proxy** DHCP arrangement, so the existing network keeps handing out
+addresses and this server answers only the boot part. And the match is on
+a **PXE service string**, `"Raspberry Pi Boot"`, which is how dnsmasq
+expresses the vendor class and option 43 exchange that `DESIGN.md`
+describes.
+
+**The serial-number directory is not documented**, and the document hands
+you the answer without stating it. It says to note the serial number "so
+that the board can be identified by the TFTP/DHCP server", and gives the
+command to find it:
+
+```
+   grep Serial /proc/cpuinfo | cut -d ' ' -f 2 | cut -c 9-16
+```
+
+**That `cut -c 9-16` produces exactly the eight hexadecimal characters
+this lab uses as a directory name.** The document then walks the reader
+through a **flat** `/tftpboot` with no per-board subdirectory at all, and
+never says what the eight characters are for.
+
+So the status of that half is: **`measured`, over twenty boots, with the
+vendor's own command producing exactly the string the lab uses, and no
+sentence anywhere saying the bootloader looks there.** That is better than
+it was and it is not a citation. The honest form is that the behaviour is
+real, reproducible, and apparently undocumented.
+
+### Claim 1 is still only measured, and that is now a positive statement
+
+The first claim was that the boot ROM in OTP runs before anything else, so
+a soft reboot re-enters network boot.
+
+**The document does not say it.** What it says is that the OTP bit
+"enables network booting", and that a Pi 3B so programmed "attempts to
+boot from USB, and from the network, if it can't boot from the SD card".
+That describes a boot order, not what happens on a warm reset.
+
+**So claim 1 remains `measured`**, and
+[`run-log-20-boots.txt`](run-log-20-boots.txt) is the evidence. Twenty
+soft reboots that re-entered network boot is strong, and the risk it
+leaves is the one this page already named: a behaviour that is incidental
+rather than specified can change in a firmware update, and nobody can look
+up whether it was promised.
+
+### Two warnings from the document worth carrying
+
+**The vendor hedges on networking equipment**, in a note before anything
+else:
+
+> Due to the huge range of networking devices and routers available, we
+> can't guarantee that network booting will work with any device. We have
+> had reports that, if you cannot get network booting to work, disabling
+> STP frames on your network might help.
+
+**This lab has already avoided that entirely, by accident.** Its network
+is `192.168.7.0/24` with exactly two hosts and a cable between them: no
+switch, no router, no spanning tree, nothing to send an STP frame. The
+isolation that `DESIGN.md` chose for determinism also removes the
+commonest reported cause of network boot failing.
+
+That is worth writing down as a reason the design is right, rather than
+leaving it as a coincidence somebody later undoes by putting a switch in
+the middle.
+
+**And the Pi 4 does this differently.** On a Pi 4 the boot order lives in
+the bootloader EEPROM, set through `raspi-config` and verified with
+`vcgencmd bootloader_config` reading `0xf21`, rather than in OTP. In this
+lab the Pi 4 is the **server** and never network boots, so none of that
+applies; it is recorded because the two mechanisms share a name and not an
+implementation, and a note about "the boot order" means different things
+on the two boards in this lab.
+
+### What this changes about the open item
+
+The page's open question was stated as "which parts of what we observe are
+specified". It now has an answer for each of the three:
+
+| Claim | Status after reading |
+|---|---|
+| the boot ROM runs before anything else, so a soft reboot re-enters network boot | **`measured`**, twenty boots. Not stated in the document |
+| the 3B+ network boots without programming anything | **specified**, in one sentence, and the opposite procedure is irreversible on the wrong board |
+| DHCP vendor class and option 43 | **specified**, as `pxe-service=0,"Raspberry Pi Boot"` with a proxy DHCP range |
+| the TFTP directory named after the serial number | **`measured`**, with the vendor's own command producing exactly that string and no sentence explaining it |
+
+**Two of four are now sourced and two are honestly labelled.** That is the
+useful outcome: the lab was not resting on anything false, and it now
+knows which of its foundations are promises and which are observations.
 
 ## Two small things from the brief that belong in the bring-up notes
 
@@ -170,6 +316,6 @@ about.
 
 | Document | What it would settle |
 |---|---|
-| Raspberry Pi network boot documentation | all three boot ROM claims above, and whether they are specified or incidental |
+| ~~Raspberry Pi network boot documentation~~ | **read Thursday 8 October 2026.** Two of the claims are specified, two are measured and apparently undocumented; the table above says which |
 | the official PoE HAT's documentation | whether header pins 6, 8 and 10 stay reachable under it, which decides whether route two is usable here |
 | the Pi 3B+'s Ethernet controller datasheet | whether the 300 Mbit/s figure is a bus limit or a controller limit, which decides whether it can ever be improved |

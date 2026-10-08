@@ -60,6 +60,7 @@ public repository. Three things work better anyway:
 | Raspberry Pi 3 Model B+ product brief, published October 2025 | Pi 3 Model B Plus | the Project 9 board | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-product-brief.pdf` |
 | Raspberry Pi 3 Model B+ reduced schematic, V1.0, 19 March 2018 | Pi 3 Model B Plus | header pin functions, power protection | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-reduced-schematics.pdf` |
 | Raspberry Pi 3 Model B product page | Pi 3, the host of projects 6, 18, 19 and 20 | the only document that exists for it | **yes**, and it is a bullet list | `https://www.raspberrypi.com/products/raspberry-pi-3-model-b/` |
+| Raspberry Pi network boot documentation, AsciiDoc source on `master` | the boot ROM | project 4 | **yes** | `https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/remote-access/network-boot-raspberry-pi.adoc` |
 | BCM2835 and BCM2837 peripherals | Pi 3 SoC | GPIO function select, UART, SPI, I2C registers | **partial** | `https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf` |
 | Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | FriendlyELEC wiki, NanoPi NEO Air, modified 14 November 2023 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/index.php/NanoPi_NEO_Air` |
@@ -67,6 +68,24 @@ public repository. Three things work better anyway:
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
+
+**Where a vendor publishes its documentation as source, read the source.**
+Raspberry Pi's rendered network boot page served a truncated document
+twice, with the section project 4 needed missing. The same text lives as
+AsciiDoc in `raspberrypi/documentation`, where it is complete and version
+controlled. Note the branch: that repository's default is `master`, and
+`main` and `develop` both return 404.
+
+**It settled two of project 4's four boot claims and left two labelled.**
+Network boot is enabled on the Raspberry Pi 3 Model B+ **at the factory**,
+so the OTP programming step is for the plain Model B only, which matters
+because the OTP is one time programmable and the wrong procedure cannot be
+undone. The DHCP side is specified as a proxy range with
+`pxe-service=0,"Raspberry Pi Boot"`. The soft-reboot behaviour and the
+serial-numbered TFTP directory are **not stated anywhere**, and the
+document hands you the eight character serial with `cut -c 9-16` and then
+walks you through a flat directory without ever saying what those
+characters are for. Both remain `measured`, over twenty boots.
 
 **The same resistor passed and failed on one afternoon, and the difference
 is the lesson.** The Raspberry Pi's 47 kohm internal pull-up fails an I2C
