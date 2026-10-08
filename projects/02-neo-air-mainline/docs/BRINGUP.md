@@ -126,14 +126,47 @@ hour:
   rather than infer it from the fact that something came up:
 
 ```
-uname -r
 cat /etc/os-release
+uname -a
+cat /proc/device-tree/model
 findmnt /
 ```
 
 `6.12.0` and Debian bookworm are ours. Anything else is the vendor image,
 and the answer to "why does my change have no effect" is that you are
 looking at a different operating system.
+
+**Four commands, in that order, and the block is shared.** The sibling kit
+labs volume asks the same four, so two books by the same author stop
+asking different questions about the same board. They answer four separate
+things and none of them answers another's: the distribution, from
+operating system identification data that says nothing about the kernel
+(https://man7.org/linux/man-pages/man5/os-release.5.html); the kernel; the
+board; and the root filesystem, from the kernel mount table, by default
+`/proc/self/mountinfo` (https://man7.org/linux/man-pages/man8/findmnt.8.html).
+
+Two of them changed when the two volumes were harmonised. `uname -r`
+became `uname -a`, which prints sysname, nodename, release, version and
+machine on one line, so the release this project checks for is still there
+and the version field comes with it
+(https://pubs.opengroup.org/onlinepubs/9699919799/utilities/uname.html).
+That field is already load-bearing here, because `rt-run` decides
+`realtime=yes` by looking for `PREEMPT_RT` in `uname -v`. Keeping both
+spellings of "which kernel" would have preserved the disagreement the
+harmonisation was for. And `cat /proc/device-tree/model` joined, which this
+block lacked: it is the board string, and on this host it reads
+`FriendlyARM NanoPi NEO Air`.
+
+This block is a **capture**, not a check. The acceptance criteria in this
+project's README stay as they are: criterion 2 pairs the model string with
+`uname -r` as a predicate against `toolchain.env`, and criterion 4 uses
+`findmnt /` for the eMMC root. A predicate is allowed to be narrower than
+the capture that surrounds it.
+
+`findmnt` is util-linux and is present on the Debian bookworm rootfs this
+project ships. If a later image is BusyBox only, the same question is
+`awk '$2=="/"' /proc/self/mountinfo`, which does not belong in the block
+unless an image actually lacks `findmnt`.
 
 Card in, antenna on, `picocom` already running, then power.
 
