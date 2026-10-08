@@ -68,6 +68,25 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**The two NXP parts on the Explorer700 are read, and the smaller one held
+the larger finding.** The PCF8574's outputs sink 10 mA and source 100
+microamps, a ratio of a hundred to one, so every load on it is driven
+active low, which is the opposite of the LK-LED10 convention everywhere
+else on this bench. Writing 0 to a line something else is driving high can
+damage the part, which is the mechanism behind a caution project 6 already
+had for the right reasons. And the part is Standard-mode only, so it caps
+its whole bus at 100 kHz.
+
+**The PCF8591 returns the previous conversion.** Its datasheet says so in
+section 8.4: the conversion is executed while the result of the previous
+one is transmitted. So a read that follows a channel change reports the
+old channel, successfully, with a plausible number. Combined with four
+unterminated analog inputs that project 6 already documents, that part has
+two independent ways to report a believable wrong value. Both are in
+[project 6's hardware page](../projects/06-explorer700/docs/hardware.md),
+along with the exact kernel file that would say whether the driver already
+handles it.
+
 **One datasheet closed a four project argument with a formula.** The
 Sensirion SHT4x datasheet, version 6.4, bounds the bus capacitance for a
 given pull-up and rise time, `C_b < t_rise / (0.8473 * R_p)`. Put the
@@ -309,6 +328,8 @@ a desk.
 | JOY-iT RB-Explorer700 manual, 16 November 2020 | Explorer700 | project 6 | **yes** | `https://www.joy-it.net/files/files/Produkte/RB-Explorer700/RB-Explorer700-Manual-16.11.2020.pdf` |
 | MCC 118 datasheet, DS-MCC-118, Measurement Computing | DAQ HAT | project 8, the external instrument | **yes** | `https://files.digilent.com/datasheets/DS-MCC-118.pdf` |
 | MCC DAQ HAT library, C API reference | the same HAT's software | project 8 | **yes** | `https://mccdaq.github.io/daqhats/c.html` |
+| NXP PCF8574; PCF8574A, revision 5, 27 May 2013 | I/O expander on the Explorer700 | project 6 | **yes** | `https://www.nxp.com/docs/en/data-sheet/PCF8574_PCF8574A.pdf` |
+| NXP PCF8591, revision 7, 27 June 2013 | ADC and DAC on the Explorer700 | project 6 | **yes** | `https://www.nxp.com/docs/en/data-sheet/PCF8591.pdf` |
 | DS3231 | real time clock on the Explorer700 | project 6 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf` |
 | CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
 | Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
