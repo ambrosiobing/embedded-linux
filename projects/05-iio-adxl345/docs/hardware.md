@@ -28,7 +28,10 @@ the short version is that the silkscreen pad order and the schematic's own
 `J1` numbering disagree, there is a `BL8555-30` regulator between the
 header and the die that makes two vendor pages give different supply
 ranges and both be right, and there is not a single resistor on the board,
-so a two-wire bus built from it has only the host's internal pull-ups.
+so whatever pulls this bus up is on the host rather than on the module.
+On header pins 3 and 5 that is not the internal GPIO pull-up but a fitted
+1.8 kohm, which is two sections below and changes the conclusion that was
+drawn here.
 
 ## The missing pull-up now has a number, and the number predicts a failure
 
