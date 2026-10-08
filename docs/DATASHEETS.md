@@ -68,6 +68,31 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**An identification register is not always a part number, and project 7 is
+the case that proves it.** The ILI controller datasheet is read, and it
+defines two identification commands, `04h` and `D3h`, and publishes an
+expected value for **neither**: both are given as `XX`. Its own
+description says why. `ID1` is the **LCD module's manufacturer** ID, not
+the controller's, so the value is whatever the module maker programmed.
+The BMP280 answers `0x58` because Bosch says so; this part answers
+whatever Waveshare put there, and Waveshare does not say. **So project 7's
+identification question cannot be closed by reading a datasheet**, and the
+page now says that rather than leaving the document on a list it would
+never satisfy.
+
+**Two smaller findings came with it.** The index's URL was dead, pointing
+at `/4/4e/` where the live file is `/7/78/`; corrected above. And the file
+Waveshare serves as `ILI9486_Datasheet.pdf` is a datasheet for the
+**ILI9486L**, a different part number, on all 219 of its pages. Three
+names are now in play for one chip: `ILI9486` in the design, `ili9486.c`
+in the kernel, and `ILI9486L` in the vendor's own file.
+
+**This document also carries the sharpest copyright notice met so far**, on
+every page, forbidding reproduction in whole or in part without written
+permission. The citation convention in this file exists for exactly that,
+and project 7's section is written to it: command codes, section numbers,
+page numbers, and no reproduced table.
+
 **Project 6's four component datasheets are all read, and none said what
 was expected of it.** The DS3231 gave the 2 ppm that justifies fitting it
 and the warning that its temperature sensor is plus or minus 3 C, so it is
@@ -353,7 +378,7 @@ a desk.
 | NXP PCF8591, revision 7, 27 June 2013 | ADC and DAC on the Explorer700 | project 6 | **yes** | `https://www.nxp.com/docs/en/data-sheet/PCF8591.pdf` |
 | CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
 | Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
-| ILI9486 | the LCD's controller | project 7 | no | `https://www.waveshare.com/w/upload/4/4e/ILI9486_Datasheet.pdf` |
+| ILI9486**L**, ILI Technology Corp., version 0.06 | the LCD's controller, probably | project 7 | **yes** | `https://www.waveshare.com/w/upload/7/78/ILI9486_Datasheet.pdf` |
 
 **Two things the Waveshare LCD wiki does not say**, read Wednesday 7
 October 2026 and recorded in

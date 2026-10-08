@@ -80,25 +80,31 @@ document's Table 6-31 gives the same column for the earlier part, which is
 the better source here and is already cited in
 [project 9's hardware page](../../09-kernel-debug/docs/hardware.md).
 
-## The HAT's own silicon is still unsourced
+## The HAT's own silicon, which is now sourced
 
 The pin map is complete about **which line goes where**. It is explicitly
-not a source for **what each part does**, because the three component
-datasheets have not been read.
+not a source for **what each part does**. Until Thursday 8 October 2026
+nothing was: this section used to be headed "still unsourced" and listed
+what three unread datasheets would settle. All four parts are now read and
+each has its own section below.
 
-| Part | Role on the HAT | What its datasheet would settle |
+| Part | Role on the HAT | Document |
 |---|---|---|
-| DS3231 | real time clock | **read Thursday 8 October 2026**, revision 10 of March 2015, worked through below |
-| PCF8574 | 8-bit I2C expander | **read Thursday 8 October 2026**, revision 5 of 27 May 2013, worked through below |
-| PCF8591 | 8-bit I2C ADC and DAC | **read Thursday 8 October 2026**, revision 7 of 27 June 2013, worked through below |
+| DS3231 | real time clock | revision 10, March 2015, **read Thursday 8 October 2026** |
+| PCF8574 | 8-bit I2C expander | revision 5, 27 May 2013, **read Thursday 8 October 2026** |
+| PCF8591 | 8-bit I2C ADC and DAC | revision 7, 27 June 2013, **read Thursday 8 October 2026** |
+| BMP280 | pressure and temperature | revision 1.26, October 2021, **read Thursday 8 October 2026** |
 
-**The PCF8574 row was the one worth reading first, and it has now been
-read.** The reasoning for putting it first was that a quasi-bidirectional
+**The PCF8574 was the one this page said to read first, and the reasoning
+was right for the wrong size of reason.** It said a quasi-bidirectional
 output cannot sink and source like a normal GPIO, so code that drives it
 as though it could works for LEDs and fails for anything needing a strong
-high. That turned out to understate it: the ratio between the two
-directions is a hundred to one, and one of the two directions can damage
-the part. The next section is what the datasheet says.
+high. That understated it twice over: the ratio between the two directions
+is a hundred to one, and one of the two directions can damage the part.
+
+**The BMP280 was not on that list at all**, and it turned out to carry the
+single most useful byte on the board. Reading the three you expect to need
+and then reading the fourth anyway is the whole lesson of this afternoon.
 
 ## The PCF8574 is read, and it is an asymmetric driver
 
