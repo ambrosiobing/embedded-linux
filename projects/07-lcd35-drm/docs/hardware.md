@@ -196,13 +196,173 @@ for that rule**, and the sections above are written to it: command codes,
 section numbers, page numbers and the one short sentence that explains why
 `ID1` is not a part number. No table is reproduced.
 
+## The ADS7846 is read, and it confirms three numbers in the overlay
+
+**Source: Texas Instruments ADS7846 Touch Screen Controller, document
+`SBAS125H`, September 1999, revised January 2005**, a Burr-Brown product.
+Read Thursday 8 October 2026. TI serves PDFs to this bench without
+difficulty.
+
+This is the other half of what this page said the datasheets would settle,
+and unlike the controller it delivers exactly what was expected of it.
+
+### The SPI clock the overlay sets is the datasheet's own operating point
+
+`bench-lcd35a-overlay.dts` gives the touch node
+`spi-max-frequency = <2000000>`.
+
+**The datasheet's Electrical Characteristics are specified at `f_SAMPLE` =
+125 kHz with `f_CLK` = 16 x `f_SAMPLE` = 2 MHz, 12-bit mode**, page 3, and
+the throughput rate's maximum is 125 kHz.
+
+So 2 MHz is not a cautious guess or a copied vendor value: **it is the
+exact clock at which this part's specification is written**, and it is the
+clock that produces the maximum specified throughput. Nothing about it
+needs changing, and now nobody has to wonder whether it could be raised.
+The answer is that raising it takes the part outside the conditions its
+numbers are quoted under.
+
+The conversion itself takes **12 clock cycles maximum** with a **3 cycle
+minimum acquisition time**, page 3, which is where the factor of 16
+comes from.
+
+### `ti,keep-vref-on` has a price, and here it is
+
+The overlay sets `ti,keep-vref-on`. The datasheet explains both the option
+and its cost.
+
+The part has an **internal 2.5 V reference**, 2.45 V minimum, 2.55 V
+maximum, with 15 ppm per degree of drift, and the description on page 1
+says the reference "can also be powered down when not used to conserve
+power".
+
+| Quiescent current, page 3 | Value |
+|---|---|
+| internal reference **off** | 280 microamp |
+| internal reference **on** | 780 microamp |
+
+**So keeping the reference on costs about 500 microamps**, continuously,
+for the benefit of not waiting for it to settle on every touch.
+
+For a mains-powered panel on a desk that is the right trade and it is
+invisible. It is written down because **project 16's design reasons
+carefully about microamps**, and a 500 microamp standing cost is the sort
+of thing that is chosen once for convenience and then inherited by a
+battery-powered design that cannot afford it.
+
+### PENIRQ needs a pull-up, and the Pi's internal one is the right size
+
+The digital levels table on page 3 has a separate row for `PENIRQ`,
+specifying its output low voltage as 0.8 V **with a 50 kohm pull-up**.
+
+`bench-lcd35a-overlay.dts` sets `brcm,pull = <2 0 0>`, a pull-up on
+GPIO17, and `DESIGN.md`'s wiring table also notes a pull-up on the panel
+itself.
+
+**The Raspberry Pi's internal pull-up is 47 kohm typical**, from the Pi 4
+datasheet Table 3 page 8. That is within six per cent of the value TI
+specifies `PENIRQ` against.
+
+**And that is worth pausing on, because the same resistor failed badly
+somewhere else on this bench.** The pull-up arithmetic in
+[project 10's page](../../10-iio-iks4a1/docs/hardware.md) shows a 47 kohm
+pull-up permitting about 7.5 pF of bus capacitance in I2C fast mode, which
+is an order of magnitude short of any real wiring.
+
+| Line | Pull-up | Verdict |
+|---|---|---|
+| an I2C bus at 100 or 400 kHz | 47 kohm internal | **fails**, by more than an order of magnitude |
+| `PENIRQ` on this touch controller | 47 kohm internal | **fine**, and almost exactly the datasheet's own test condition |
+
+**Same resistor, opposite verdicts, and the difference is what the line
+does.** `PENIRQ` is an interrupt that falls once when a finger lands and
+has microseconds of slack; an I2C bus has to make a clean rising edge
+inside a clock period, thousands of times a second. A pull-up is not
+strong or weak in the abstract; it is strong or weak **against a rise time
+budget**.
+
+That is the kind of distinction worth having written down once, because
+the opposite mistake, treating a figure that failed in one place as a
+figure that fails everywhere, is just as expensive as the original.
+
+### The absolute maximum pattern, refined once more
+
+This bench has now read five parts' limiting values, and the picture is
+finally clear enough to state properly.
+
+| Part | Supply pin | Signal pins |
+|---|---|---|
+| PCF8574 | -0.5 V to +7 V | VSS - 0.5 V to VDD + 0.5 V |
+| SHT4x | | VSS - 0.3 V to VDD + 0.3 V |
+| **ADS7846** | **-0.3 V to +6 V** | **-0.3 V to VCC + 0.3 V**, analog and digital alike |
+| DS3231 | | **-0.3 V to +6.0 V on any pin**, flat |
+| ADXL345 | | `inferred`, still unread |
+
+**Four of the five reference their signal pins to the supply.** The
+DS3231 is the exception and it is a real one: it says "any pin" and gives
+a flat figure.
+
+The project 6 page said this morning that "a pattern that holds three
+times is a good reason to expect the fourth and not a citation for it",
+and then found the fourth breaking it. **The fifth restores it.** The
+useful form is now: **expect a signal-pin maximum referenced to the
+supply, check it anyway, and note that at least one common part does
+something else.**
+
+### The switch drivers, and one warning with teeth
+
+The part excites the resistive panel through on-chip switches: 5 ohm on
+`Y+` and `X+`, 6 ohm on `Y-` and `X-`, page 3. The drive current row gives
+**50 mA for a 100 ms duration**, with a footnote worth quoting because of
+what it admits:
+
+> Ensured by design, but not tested. Exceeding 50mA source current may
+> result in device degradation.
+
+**An untested maximum with a degradation warning is a limit to stay well
+away from**, and nothing in this project goes near it: a resistive touch
+panel's plate resistance is tens of ohms and the controller sources into
+it briefly. It is recorded because "ensured by design, but not tested" is
+a phrase worth recognising in any datasheet. It means the number is a
+calculation, not a measurement, which is exactly the distinction this
+repository applies to its own claims.
+
+### The rest, for the record
+
+| Quantity | Value, page 3 unless noted |
+|---|---|
+| resolution | 12 bits, with no missing codes to 11 bits minimum |
+| integral linearity error | plus or minus 2 LSB maximum |
+| offset error | plus or minus 6 LSB |
+| gain error | plus or minus 4 LSB with an external reference |
+| supply, specified performance | 2.7 V to 3.6 V |
+| supply, operating range | 2.2 V to 5.25 V |
+| reference input range | 1.0 V to `+VCC` |
+| power-down current | 3 microamp |
+| data format | straight binary |
+| operating temperature | -40 to +85 C, page 2 |
+| `X+`, `X-` plate resistance assumed by the overlay | `ti,x-plate-ohms = 60`, which is a property of the **panel**, not of this part, and the datasheet cannot confirm it |
+
+**The last row is the one still open.** The overlay tells the driver the
+panel's plate resistance so that it can turn a pressure reading into
+something meaningful. That number describes the glass, not the chip, and
+no datasheet read here says anything about it. It comes from Waveshare's
+own overlay or from convention, and it is `inferred`.
+
+**Which means the pressure axis is the one output of this touchscreen that
+is not sourced.** X and Y come out of a 12-bit converter whose linearity
+is specified. Pressure is computed from a resistance nobody has measured.
+That is fine for detecting a touch and it is not a measurement, and
+anything in this project that reports `ABS_PRESSURE` as a number should
+say so.
+
 ## What is still `NOT READ`
 
 | Document | Why it matters here |
 |---|---|
 | ~~ILI9486 datasheet~~ | **read Thursday 8 October 2026.** It gives the command set and the timing. It does **not** give an identification value, because there is none to give |
 | `drivers/gpu/drm/tiny/ili9486.c` | what the driver assumes about the part, which is what `DESIGN.md`'s analysis actually rests on. Not a datasheet, and the best remaining source |
-| ADS7846 datasheet | the conversion timing and the reference arrangement behind the touch driver's settings |
+| ~~ADS7846 datasheet~~ | **read Thursday 8 October 2026**, `SBAS125H`. It confirmed the overlay's 2 MHz clock, priced `ti,keep-vref-on` at about 500 microamps, and left `ti,x-plate-ohms` unsourced because that describes the glass |
 
 Both are listed in [docs/DATASHEETS.md](../../../docs/DATASHEETS.md) with
 their URLs.

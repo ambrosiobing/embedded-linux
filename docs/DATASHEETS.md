@@ -68,6 +68,21 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**The same resistor passed and failed on one afternoon, and the difference
+is the lesson.** The Raspberry Pi's 47 kohm internal pull-up fails an I2C
+bus by more than an order of magnitude, as project 10's arithmetic shows.
+TI specifies the ADS7846's `PENIRQ` output low voltage **with a 50 kohm
+pull-up**, so the same 47 kohm is within six per cent of that part's own
+test condition and is entirely right there. A pull-up is not strong or
+weak in the abstract; it is strong or weak against a rise time budget, and
+an interrupt that falls once when a finger lands has no such budget. Both
+verdicts, side by side, are in
+[project 7's hardware page](../projects/07-lcd35-drm/docs/hardware.md).
+
+**Treating a figure that failed in one place as a figure that fails
+everywhere is as expensive as the original mistake**, which is why both
+are recorded rather than only the alarming one.
+
 **An identification register is not always a part number, and project 7 is
 the case that proves it.** The ILI controller datasheet is read, and it
 defines two identification commands, `04h` and `D3h`, and publishes an
@@ -379,6 +394,7 @@ a desk.
 | CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
 | Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
 | ILI9486**L**, ILI Technology Corp., version 0.06 | the LCD's controller, probably | project 7 | **yes** | `https://www.waveshare.com/w/upload/7/78/ILI9486_Datasheet.pdf` |
+| TI ADS7846, `SBAS125H`, revised January 2005 | the LCD's touch controller | project 7 | **yes** | `https://www.ti.com/lit/ds/symlink/ads7846.pdf` |
 
 **Two things the Waveshare LCD wiki does not say**, read Wednesday 7
 October 2026 and recorded in
