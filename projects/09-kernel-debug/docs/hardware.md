@@ -388,7 +388,11 @@ exist here.
 **The four conditions**, and the fourth is the one that matters most:
 
 1. `UART JMP` in position **A**, not B or C
-2. the `VCCIO` jumper on **3.3 V**, not 5 V
+2. the `VCCIO` jumper on **3.3 V**, not 5 V. The CP2102's own logic is
+   3.3 V from its on-chip regulator, and the four-way level check against
+   a Raspberry Pi GPIO is worked out in
+   [docs/HARDWARE.md](../../../docs/HARDWARE.md): all four directions
+   clear, tightest margin 0.4 V
 3. nothing else on the header, since the HAT takes all of it
 4. **`uart0` actually muxed onto GPIO14 and GPIO15**, which is this
    project's own root cause and which no adapter can fix

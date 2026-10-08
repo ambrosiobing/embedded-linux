@@ -69,6 +69,23 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**The CP2102 is read, and a Raspberry Pi pairing is finally arithmetic.**
+All four directions between a Pi GPIO and a CP2102 UART pin clear their
+thresholds, with the tightest margin 0.4 V, checked across two datasheets
+rather than assumed. That puts numbers behind project 9's plan to use the
+4G HAT's CP2102 as the console adapter it went without. `silabs.com`
+returned 403, so it was read from a distributor's copy carrying Silicon
+Labs' own revision line.
+
+**It also ends an argument this file was half having.** Six parts now
+state a maximum input voltage, and they do it in three different shapes:
+supply-referenced for the PCF8574, SHT4x and ADS7846; one flat figure for
+any pin on the DS3231; and, on the CP2102, **a flat I/O limit of 5.8 V
+that is higher than its own supply's 4.2 V maximum**, which is what 5 V
+tolerant I/O means and cannot be written as "the supply plus a bit". The
+rule that survives three readings is the dull one: read the row, every
+time, and quote which row it was.
+
 **Where a vendor publishes its documentation as source, read the source.**
 Raspberry Pi's rendered network boot page served a truncated document
 twice, with the section project 4 needed missing. The same text lives as
@@ -410,7 +427,7 @@ a desk.
 | Bosch BMP280, `BST-BMP280-DS001-26`, revision 1.26, October 2021 | pressure sensor on the Explorer700 | project 6 | **yes** | `https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf` |
 | NXP PCF8574; PCF8574A, revision 5, 27 May 2013 | I/O expander on the Explorer700 | project 6 | **yes** | `https://www.nxp.com/docs/en/data-sheet/PCF8574_PCF8574A.pdf` |
 | NXP PCF8591, revision 7, 27 June 2013 | ADC and DAC on the Explorer700 | project 6 | **yes** | `https://www.nxp.com/docs/en/data-sheet/PCF8591.pdf` |
-| CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
+| Silicon Labs CP2102/9, revision 1.6, December 2013 | USB to UART bridge | console adapters, and the 4G HAT | **yes** | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
 | Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
 | ILI9486**L**, ILI Technology Corp., version 0.06 | the LCD's controller, probably | project 7 | **yes** | `https://www.waveshare.com/w/upload/7/78/ILI9486_Datasheet.pdf` |
 | TI ADS7846, `SBAS125H`, revised January 2005 | the LCD's touch controller | project 7 | **yes** | `https://www.ti.com/lit/ds/symlink/ads7846.pdf` |

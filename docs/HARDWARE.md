@@ -199,6 +199,111 @@ that looks exactly like line noise; and the adapter **renumbers between
 `/dev/ttyUSB0` and `/dev/ttyUSB1`** whenever it re-enumerates, taking the
 proxy down with it, which from outside reads as a dead cable.
 
+### The CP2102, which is on three things here and checked against a Pi at last
+
+**Source: Silicon Laboratories CP2102/9 Single-Chip USB to UART Bridge,
+revision 1.6, December 2013.** Read Thursday 8 October 2026.
+`silabs.com` returned 403, so this was read from a distributor's copy that
+carries Silicon Labs' own revision line on every page.
+
+This part appears three times on this bench: on the Joy-it SBC-ESP8266-PROG,
+on the SBC-NodeMCU-ESP32, and on the SIM7600E-H 4G HAT, where
+[project 15's page](../projects/15-lte-router/docs/hardware.md) found a
+jumper position that wires it to the Raspberry Pi's own UART.
+
+**One caveat before any of the numbers.** The two Joy-it boards are
+recorded above as carrying "a CP2102 or CH340", which is not the same
+thing: a CH340 is a different manufacturer's part with its own levels and
+its own driver. **Everything below applies to a CP2102 and to nothing
+else.** On the 4G HAT the part is named outright, in that manual's board
+inventory, so the numbers apply there without doubt.
+
+#### What it is
+
+| | |
+|---|---|
+| interface | USB 2.0 full speed, 12 Mbit/s |
+| clock and transceiver | both on chip; no crystal and no external resistors |
+| regulator | on chip, **3.3 V output on the CP2102**, 3.45 V on the CP2109 |
+| buffers | 576 byte receive, 640 byte transmit |
+| baud rates | 300 bps to 1 Mbit/s, with **921600 bps** the specified maximum in Table 4 |
+| data formats | 5, 6, 7 or 8 data bits; 1, 1.5 or 2 stop bits; odd, even, mark, space or no parity |
+| supply | 3.0 to 3.6 V self-powered, 4.0 to 5.25 V USB bus powered |
+| supply current | 20 mA typical and 26 mA maximum in normal operation; 80 to 100 microamp suspended |
+| temperature | -40 to +85 C |
+
+#### The pairing with a Raspberry Pi, checked in both directions
+
+This is the useful part, and until now it had been assumed rather than
+worked out. Pi figures from the Raspberry Pi 4 datasheet Table 3 page 8;
+CP2102 figures from Table 4 page 8 of its own datasheet.
+
+| Direction | Driver guarantees | Receiver needs | Margin |
+|---|---|---|---|
+| Pi `TXD0` high into CP2102 `RXD` | at least `VDD_IO - 0.4` = **2.9 V** at 2 mA | `V_IH` at least **2.0 V** | 0.9 V |
+| Pi `TXD0` low into CP2102 `RXD` | at most **0.4 V** at 2 mA | `V_IL` at most **0.8 V** | 0.4 V |
+| CP2102 `TXD` high into Pi `RXD0` | `VDD - 0.1` = **3.2 V** into a 10 microamp load | `V_IH` at least **2.0 V** | 1.2 V |
+| CP2102 `TXD` low into Pi `RXD0` | at most **0.1 V** at 10 microamp | `V_IL` at most **0.8 V** | 0.7 V |
+
+**All four directions clear, with the tightest margin 0.4 V.** A Raspberry
+Pi GPIO and a CP2102 are a clean pairing and now that is arithmetic across
+two datasheets rather than a convention everybody follows.
+
+**And 115200 baud is nowhere near any limit**, at an eighth of the
+specified maximum.
+
+This matters most for the plan in
+[project 9's hardware page](../projects/09-kernel-debug/docs/hardware.md),
+which proposes using the 4G HAT's CP2102 as the console adapter that
+project went without. Its second precondition was "the `VCCIO` jumper must
+be on 3.3 V, not 5 V, because the other side is a Raspberry Pi GPIO". That
+precondition now has a reason with numbers behind it: **the CP2102's own
+logic is 3.3 V, derived from its on-chip regulator**, and that is exactly
+what a Pi expects.
+
+#### The absolute maximum that breaks the pattern for good
+
+This bench has been watching how parts state their limiting values, and
+the CP2102 settles the question by doing something no other part here
+does. **Table 2, page 6:**
+
+| Parameter | Limit |
+|---|---|
+| voltage on `VDD` | -0.3 V to **4.2 V** |
+| voltage on **any I/O pin**, `VBUS` or `RST` | -0.3 V to **5.8 V** |
+| maximum total current through `VDD` and `GND` | 500 mA |
+| maximum output current sunk by `RST` or any I/O pin | 100 mA |
+
+**The I/O limit is higher than the supply limit.** 5.8 V on a pin against
+4.2 V on the rail. That is deliberate: it is what "5 V tolerant I/O"
+means, and it is impossible to express as "the supply plus a bit".
+
+So the running tally of how six parts state the same kind of limit:
+
+| Shape | Parts |
+|---|---|
+| signal pins referenced to the supply | PCF8574, SHT4x, ADS7846 |
+| one flat figure for any pin | DS3231 |
+| **signal pins flat and above the supply's own maximum** | **CP2102** |
+
+**Three shapes among five parts that state it.** The convention this
+bench half-formulated on Thursday morning, that signal maxima are
+supply-referenced, is a convention and not a law, and it took three
+successive readings to say so properly. The rule that survives is the
+dull one: **read the row, every time, and quote which row it was.**
+
+#### What is still unknown, and it is the part number
+
+The two Joy-it boards may carry a CH340 instead. Nothing read so far
+settles which, and the settling move is the same as everywhere else on
+this bench: **look at the chip.** A CP2102 is a 28-pin QFN of 5 by 5 mm,
+per the ordering information on page 1; a CH340 in these products is
+usually a 16-pin SOP, which is visibly a different package before any
+marking is read.
+
+That is one more line for the photograph list, and it is the cheapest one
+on it: a package shape, not a marking, visible without magnification.
+
 ## Boards
 
 | Board | On the bench | Evidence | Notes |
