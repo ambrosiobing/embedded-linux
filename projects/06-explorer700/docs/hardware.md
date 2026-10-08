@@ -24,7 +24,8 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 | NXP PCF8574; PCF8574A, revision 5, 27 May 2013 | `datasheet` | **read Thursday 8 October 2026** |
 | Raspberry Pi 3 Model B product page | `vendor page` | **read Wednesday 7 October 2026**, and it is thin, see below |
 | Raspberry Pi 4 Model B datasheet, release 1.1 | `datasheet` | **read**, and it is the nearest thing to an electrical specification this host has |
-| DS3231 datasheet, the real time clock on the HAT | `datasheet` | **`NOT READ`** |
+| Maxim DS3231, document 19-5170, revision 10, March 2015 | `datasheet` | **read Thursday 8 October 2026** |
+| Bosch BMP280, `BST-BMP280-DS001-26`, revision 1.26, October 2021 | `datasheet` | **read Thursday 8 October 2026** |
 | NXP PCF8591, revision 7, 27 June 2013 | `datasheet` | **read Thursday 8 October 2026** |
 
 ## The host of this project is the one board with no document of its own
@@ -87,7 +88,7 @@ datasheets have not been read.
 
 | Part | Role on the HAT | What its datasheet would settle |
 |---|---|---|
-| DS3231 | real time clock | the I2C address, the alarm registers, the temperature sensor's resolution, and the ageing offset; also its own accuracy, which is the only reason to fit a DS3231 rather than anything cheaper |
+| DS3231 | real time clock | **read Thursday 8 October 2026**, revision 10 of March 2015, worked through below |
 | PCF8574 | 8-bit I2C expander | **read Thursday 8 October 2026**, revision 5 of 27 May 2013, worked through below |
 | PCF8591 | 8-bit I2C ADC and DAC | **read Thursday 8 October 2026**, revision 7 of 27 June 2013, worked through below |
 
@@ -392,6 +393,252 @@ records AOUT as leaving the board at screw terminal position 5, marked
 borrowed during A/D conversion, with a track and hold circuit to free it,
 which is why the two functions cannot run at full speed at once.
 
+## The DS3231 is read, and it refines a pattern this page stated too confidently
+
+**Source: Maxim Integrated DS3231, "Extremely Accurate I2C-Integrated
+RTC/TCXO/Crystal", document 19-5170, revision 10, March 2015.** Read
+Thursday 8 October 2026.
+
+**Provenance.** `analog.com` timed out again, as it has in every session.
+The datasheet was read from a copy served by Adafruit. It carries Maxim's
+own document number and revision on page 1, which is what makes that
+acceptable and what any other copy can be checked against.
+
+### Why a DS3231 and not anything cheaper, in one number
+
+This page used to say its accuracy "is the only reason to fit a DS3231
+rather than anything cheaper", without a figure. Here is the figure, from
+the Electrical Characteristics on page 3, with the aging offset at `00h`:
+
+| Temperature range | Frequency stability |
+|---|---|
+| 0 to +40 C | **plus or minus 2 ppm** |
+| above +40 to +70 C, and -40 to below 0 C | plus or minus 3.5 ppm |
+
+**Two parts per million is about 63 seconds per year.** A plain crystal
+oscillator without temperature compensation drifts by tens of ppm, which
+is minutes per month. That is the whole argument for the part, and it is
+now a number rather than an adjective.
+
+The compensation is the reason the temperature sensor exists at all, which
+leads directly to the next point.
+
+### The temperature reading is a by-product, and it is not a thermometer
+
+The features list on page 1 gives "Digital Temp Sensor Output: plus or
+minus 3 C Accuracy", and page 3's table confirms temperature accuracy of
+-3 to +3 C.
+
+**Three degrees is poor**, and it is fine, because the sensor exists to
+compensate a crystal rather than to measure a room.
+
+**This matters for this project specifically.** The Explorer700 also
+carries a BMP280, and project 6 binds the DS3231 through `rtc`, which on
+Linux exposes its temperature under `hwmon` alongside everything else.
+**Two temperature readings will appear, from two parts, and they are not
+of comparable quality.** Anything that reports a bench temperature should
+use the BMP280 and say so; the DS3231's number belongs next to the clock
+it compensates.
+
+That is the kind of thing nobody decides wrongly on purpose. It gets
+decided by whichever `hwmon` entry a script happens to find first.
+
+### The bus speed story completes, and the slowest part wins
+
+Page 1: the DS3231 has a **Fast (400 kHz) I2C Interface**.
+
+Put that beside the two NXP parts above and the Explorer700's bus has a
+clear ranking:
+
+| Part | Maximum I2C speed | Source |
+|---|---|---|
+| DS3231 | **400 kHz** | features, page 1 |
+| PCF8591 | no clock of its own; converts as fast as the bus reads it | features, page 1 |
+| **PCF8574** | **100 kHz, Standard-mode only** | Table 6, page 14 |
+
+**So the bus runs at 100 kHz, and two of the three parts could go four
+times faster.** The expander is the constraint, and it constrains an ADC
+whose sample rate is nothing but the bus speed.
+
+**Nothing here is wrong and nothing needs changing.** A clock, a joystick
+and four screw terminals do not need 400 kHz. The value of knowing it is
+that if anybody ever wants the ADC faster, **the thing to remove is the
+expander**, which is not where they would look.
+
+### The limit this page got slightly wrong
+
+The PCF8574 section above observed that three parts from three
+manufacturers state a maximum input voltage of the form "VSS minus a bit
+to VDD plus a bit", and concluded that a pattern holding three times is a
+reason to expect a fourth and not a citation for it. **The fourth part
+does something else**, and the difference is instructive.
+
+| Document | What it states |
+|---|---|
+| Absolute Maximum Ratings, page 2 | voltage on any pin relative to ground: **-0.3 V to +6.0 V**, a flat figure, not referenced to VCC |
+| Recommended Operating Conditions, page 2 | `V_IH` minimum 0.7 x VCC, **maximum VCC plus 0.3 V** |
+
+**Both are true and they are different questions.** The absolute maximum
+is where the part is damaged; the recommended operating condition is where
+it is guaranteed to work. The DS3231 survives 6 V on a pin at any supply
+and is only specified to work up to VCC plus 0.3 V.
+
+**So the pattern holds for the recommended condition and not for the
+absolute maximum**, and this page's three-attestation paragraph was
+reasoning about two different rows as though they were one. Corrected
+here rather than quietly: **when carrying a rule of this shape between
+parts, carry the row it came from as well.**
+
+### The rest, briefly, and one thing for the instrument
+
+From pages 2 and 3:
+
+| Quantity | Value |
+|---|---|
+| supply voltage `V_CC` | 2.3 V min, 3.3 V typical, 5.5 V max |
+| battery voltage `V_BAT` | 2.3 V min, 3.0 V typical, 5.5 V max |
+| power-fail voltage `V_PF`, where it switches to battery | 2.45 to 2.70 V, 2.575 V typical |
+| active supply current | 200 microamp max at 3.63 V |
+| standby supply current | 110 microamp max at 3.63 V |
+| temperature conversion current | 575 microamp max at 3.63 V |
+| **timekeeping battery current** | **0.84 microamp typical, 3.0 microamp max** at 3.63 V |
+| data retention current, oscillator stopped | 100 nanoamp |
+| output frequency | 32.768 kHz |
+| crystal aging | plus or minus 1.0 ppm in the first year, plus or minus 5.0 ppm over 0 to 10 years |
+| operating temperature | 0 to +70 C for the DS3231S, -40 to +85 C for the DS3231SN |
+
+**The battery current is right at the edge of what this bench can
+measure**, which makes it a useful calibration of the instrument's own
+limits. The PPK2 measures from 500 nanoamp with a 0.2 microamp step in its
+finest range, so 0.84 microamp is measurable and **carries roughly a
+quarter of its own value as quantisation**. Compare the SHT40's 0.08
+microamp idle current, recorded in
+[project 10's page](../../10-iio-iks4a1/docs/hardware.md), which is below
+the floor entirely. Three parts, three verdicts: the LEDs at milliamps are
+comfortably measured, this is marginally measured, and that one cannot be
+measured at all.
+
+**Which variant is fitted is unknown**, and it decides the operating
+temperature range. `DS3231S` is the commercial part at 0 to +70 C and
+`DS3231SN` the industrial one at -40 to +85 C. Nothing on this bench
+depends on the difference, and it is a line of silkscreen on the chip if
+it ever does.
+
+## The BMP280 settles the manual's own contradiction, in one register
+
+**Source: Bosch Sensortec BMP280 data sheet, document
+`BST-BMP280-DS001-26`, revision 1.26, October 2021.** Read Thursday
+8 October 2026.
+
+### The contradiction, restated
+
+[pin-map.md](pin-map.md) records that the JOY-iT manual says three
+different things about this part: a component callout on page 2 saying
+**BMP280**, a block diagram on page 3 saying **BMP 180** at address
+`0x76`, and a chapter heading and code on page 11 saying **BMP280** and
+using Adafruit's BMP280 library. The overlay ships `bosch,bmp280` at
+`0x76` because two of the three say so, including the one that actually
+talks to the part, and the pin map notes that `bmp280` in the kernel
+handles both and a change would be one line.
+
+**That is a sound decision made without a source. Here is the source.**
+
+### The test, from section 4.3.1 on page 24
+
+> The "id" register contains the chip identification number chip_id[7:0],
+> which is 0x58. This number can be read as soon as the device finished
+> the power-on-reset.
+
+The register is at address **`0xD0`**, from the memory map in Table 18 on
+the same page, which also gives its reset state as `0x58`.
+
+So:
+
+```
+   i2cget -y 1 0x76 0xD0
+
+     0x58   ->  it is a BMP280.  The manual's page 2 and page 11 are
+                right and its page 3 block diagram is wrong.
+
+     anything else  ->  it is not a BMP280, and identifying what it
+                        actually is needs that part's own datasheet,
+                        which is not read here.
+```
+
+**One command, one byte, and a three-way contradiction becomes a fact.**
+This is the strongest form of what [docs/DATASHEETS.md](../../../docs/DATASHEETS.md)
+calls a check that can fail: it has a published expected value, it
+distinguishes the right answer from every wrong one, and it costs nothing.
+
+**Note what it does and does not prove.** Reading `0x58` confirms a
+BMP280. Reading something else refutes it without saying what is there
+instead, because this reading did not cover any other Bosch part's
+identification value. That asymmetry is worth stating, because a
+disappointed test tempts people to guess.
+
+### Where this sits beside the rest of the bench
+
+This is the fourth identification register now sourced on this bench, and
+the pattern across them is worth seeing together:
+
+| Part | Register | Expected | Where it came from |
+|---|---|---|---|
+| BMP280, project 6 | `0xD0` | `0x58` | Bosch datasheet, section 4.3.1 |
+| LSM6DSV16X, project 10 | `0x0F` | `0x70` | ST's own register header |
+| LSM6DSO16IS, project 10 | `0x0F` | `0x22` | the same |
+| LIS2MDL, project 10 | `0x4F` | `0x40` | the same |
+| SHT40, project 10 | none | a per-unit serial via `0x89` | Sensirion datasheet |
+| ADXL345, projects 5 and 11 | **unknown** | **unknown** | nowhere; still `NOT READ` |
+| the LCD controller, project 7 | **unknown** | **unknown** | nowhere; the vendor never names the part |
+
+**The last two rows are the open ones**, and they are open for different
+reasons: Analog Devices' document cannot be fetched from this bench, and
+Waveshare simply does not say what its panel controller is.
+
+### Two numbers from the interface table, page 31
+
+**Table 26** gives an internal pull-up of **70 kohm minimum, 120 kohm
+typical, 190 kohm maximum** to `VDDIO`. The table's condition column does
+not say which pins that applies to in the part read, so it is recorded
+without a claim about `SDA` and `SCL`.
+
+It also gives the **I2C bus load capacitance as 400 pF maximum** on `SDI`
+and `SCK`, which is the ordinary I2C figure.
+
+**Put that beside the arithmetic in
+[project 10's page](../../10-iio-iks4a1/docs/hardware.md)** and the
+picture is complete: the bus is permitted 400 pF, and a host's 47 kohm
+internal pull-up permits 7.5 pF. The two numbers are from different
+manufacturers about different things and they bracket the problem exactly.
+A designed board fits 10 kohm and lives comfortably inside 400 pF; a
+hand-wired bus on internal pull-ups does not.
+
+### The registers the overlay depends on, for the record
+
+From section 4.2, Table 18, page 24, and sections 4.3.3 to 4.3.7:
+
+| Register | Address | What it is |
+|---|---|---|
+| `id` | `0xD0` | chip identification, `0x58` |
+| `reset` | `0xE0` | writing `0xB6` performs a full power-on reset; any other value does nothing, and it always reads `0x00` |
+| `status` | `0xF3` | bit 3 `measuring`, bit 0 `im_update` |
+| `ctrl_meas` | `0xF4` | temperature and pressure oversampling, and the power mode |
+| `config` | `0xF5` | standby time, IIR filter time constant, and a 3-wire SPI enable |
+| `press` | `0xF7` to `0xF9` | 20-bit raw pressure |
+| `temp` | `0xFA` to `0xFC` | 20-bit raw temperature |
+| calibration | `0xA1` to `0xA8` and others | per-device calibration data |
+
+**Nothing in this project writes any of them.** The kernel's `bmp280`
+driver owns the part entirely, which is the design's whole point. The
+table is here so that a reader debugging with `i2cget` knows which
+addresses are safe to read and which one, `0xE0`, resets the device if
+written carelessly.
+
+**And the calibration row is the reason not to write any of them.** The
+part carries per-device calibration data that the driver reads at probe
+and uses in every conversion. A raw pressure register read without it is
+not a pressure.
+
 ## Reflections on the wiring, which there is almost none of
 
 **This is the project with the least wiring on the bench and the most
@@ -409,11 +656,27 @@ testing, because there is nothing to test continuity on.
 advice on this bench: where there are leads, suspect the leads; where
 there are none, suspect the document.
 
+## What the four component datasheets each turned out to be for
+
+All four were unread on Wednesday 7 October 2026 and all four are read.
+None of them said what was expected of it, which is the argument for
+reading rather than skimming.
+
+| Part | What it was expected to settle | What it actually gave |
+|---|---|---|
+| PCF8574 | the address straps and the quasi-bidirectional output | a hundred to one drive asymmetry, the one write that can damage the part, and a 100 kHz cap on the whole bus |
+| PCF8591 | the reference arrangement and the conversion time | that a read returns the **previous** conversion, which is the worst defect on this HAT |
+| DS3231 | the alarm registers and the ageing offset | the 2 ppm that justifies the part, and that its temperature sensor is plus or minus 3 C and therefore not a thermometer |
+| BMP280 | nothing; it was not even on the list | **the one byte that settles the manual's three way contradiction about which part this is** |
+
+**The BMP280 is the one worth dwelling on.** It was not in the "still
+unread" table at all, because the pin map had already made a sound
+decision about it from the manual's internal majority. Reading it anyway
+turned a well-reasoned guess into a one-command test.
+
 ## Still `NOT READ`
 
 | Document | Why it matters |
 |---|---|
-| DS3231 datasheet | project 6's `rtc` binding, and whether the temperature reading is usable |
-| ~~PCF8574 datasheet~~ | **done.** It turned out to say more than expected, including the one move that can damage the part |
-| ~~PCF8591 datasheet~~ | **done**, and it carried the worst defect on this HAT: a read returns the previous conversion |
+| the BMP180 datasheet | would say what `0xD0` returns on that part, so that a failed BMP280 identification could name what is there instead rather than only what it is not |
 | a Raspberry Pi 3 Model B electrical specification | does not exist; the gap is permanent and should be named rather than closed |

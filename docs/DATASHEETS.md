@@ -68,6 +68,25 @@ public repository. Three things work better anyway:
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
+**Project 6's four component datasheets are all read, and none said what
+was expected of it.** The DS3231 gave the 2 ppm that justifies fitting it
+and the warning that its temperature sensor is plus or minus 3 C, so it is
+not a bench thermometer. The BMP280, which was not even on the unread
+list, gave the one byte that settles the JOY-iT manual's three way
+contradiction about which part is on the board: register `0xD0` returns
+`0x58` on a BMP280 and the test costs one `i2cget`.
+
+**`analog.com` timed out again**, so the DS3231 was read from a copy
+served by Adafruit. It carries Maxim's own document number and revision on
+page 1, which is what makes that acceptable.
+
+**And the bus speed story on that HAT completes.** The DS3231 does 400
+kHz, the PCF8591 has no clock of its own and converts as fast as the bus
+reads it, and the PCF8574 is Standard-mode only. So the bus runs at 100
+kHz, two of the three parts could go four times faster, and the thing to
+remove if the ADC is ever wanted faster is the expander, which is not
+where anybody would look.
+
 **The two NXP parts on the Explorer700 are read, and the smaller one held
 the larger finding.** The PCF8574's outputs sink 10 mA and source 100
 microamps, a ratio of a hundred to one, so every load on it is driven
@@ -328,9 +347,10 @@ a desk.
 | JOY-iT RB-Explorer700 manual, 16 November 2020 | Explorer700 | project 6 | **yes** | `https://www.joy-it.net/files/files/Produkte/RB-Explorer700/RB-Explorer700-Manual-16.11.2020.pdf` |
 | MCC 118 datasheet, DS-MCC-118, Measurement Computing | DAQ HAT | project 8, the external instrument | **yes** | `https://files.digilent.com/datasheets/DS-MCC-118.pdf` |
 | MCC DAQ HAT library, C API reference | the same HAT's software | project 8 | **yes** | `https://mccdaq.github.io/daqhats/c.html` |
+| Maxim DS3231, document 19-5170, revision 10, March 2015 | real time clock on the Explorer700 | project 6 | **yes** | `https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf` |
+| Bosch BMP280, `BST-BMP280-DS001-26`, revision 1.26, October 2021 | pressure sensor on the Explorer700 | project 6 | **yes** | `https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmp280-ds001.pdf` |
 | NXP PCF8574; PCF8574A, revision 5, 27 May 2013 | I/O expander on the Explorer700 | project 6 | **yes** | `https://www.nxp.com/docs/en/data-sheet/PCF8574_PCF8574A.pdf` |
 | NXP PCF8591, revision 7, 27 June 2013 | ADC and DAC on the Explorer700 | project 6 | **yes** | `https://www.nxp.com/docs/en/data-sheet/PCF8591.pdf` |
-| DS3231 | real time clock on the Explorer700 | project 6 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/DS3231.pdf` |
 | CP2102 | USB to UART bridge | console adapters | no | `https://www.silabs.com/documents/public/data-sheets/CP2102-9.pdf` |
 | Waveshare 3.5 inch RPi LCD (A) wiki | LCD | project 7 | **yes** | `https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)` |
 | ILI9486 | the LCD's controller | project 7 | no | `https://www.waveshare.com/w/upload/4/4e/ILI9486_Datasheet.pdf` |
