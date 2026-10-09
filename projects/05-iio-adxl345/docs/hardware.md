@@ -446,7 +446,7 @@ the library's open fails with `ENOENT`, which reads as" a different fault.
 It was right about the message and attributed it to the device tree alone;
 the packaging is a second, independent cause of the same message.
 
-### Three ways to fix it, and this page does not choose
+### Three ways to fix it, and which was chosen
 
 **This is a build-affecting change and the decision is Joseph's.** All
 three work; they differ in blast radius.
@@ -464,9 +464,17 @@ design, it is absent from the board entirely, which is a different and
 unintended outcome. If the reason for `=m` cannot be made to hold, the
 reason should change rather than the outcome persist.
 
-**Whatever is chosen, the check that proves it** is the one that failed
-here: `modprobe i2c-dev` on a freshly flashed board, or `ls /dev/i2c-1`
-after enabling the controller. It fires today and must stop firing after.
+**Joseph chose A on Friday 9 October 2026**, and `bench.cfg` now carries
+`CONFIG_SPI_SPIDEV=y` and `CONFIG_I2C_CHARDEV=y` with the reasoning above
+rewritten into the fragment's own comment, so the next reader of that
+file meets the defect and not only the setting.
+
+**The check that proves it** is the one that failed here: on a freshly
+flashed image whose `config.txt` carries `dtparam=i2c_arm=on`,
+`ls /dev/i2c-1` exists with no `modprobe`. It failed on Friday 9 October
+2026 and it must not fail on the next build of `bench-adxl345-image`. A
+check that has never failed is not known to work; this one has, which is
+the only reason to trust it when it passes.
 
 ### What this says about the wiring, which is nothing
 
