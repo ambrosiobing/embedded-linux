@@ -24,14 +24,15 @@
  * the hardware, which makes mainline a control for every measurement this
  * project takes, on the same board and the same afternoon.
  *
- * WHAT IS NOT HERE YET
+ * WHERE THIS STANDS
  *
  * This file first compiled on Friday 9 October 2026, against the 6.6.63
  * kernel of the bench image, after four edits for the difference between
- * that kernel and the v6.12 it was written from. No board has loaded it:
- * the overlay that would bind it is deliberately absent until the
- * breakout's wiring has been read. The project README's acceptance table
- * says which of those two states each criterion is in.
+ * that kernel and the v6.12 it was written from. The same night it bound
+ * to the part on the bench through the overlay in bench-adxl345-dt, read
+ * gravity, set and read back its rate, and took its interrupt once INT1
+ * was wired. The project README's acceptance table says which criteria
+ * are measured and which are still only configured.
  */
 
 #include <linux/bitfield.h>
@@ -78,6 +79,16 @@ struct bench_adxl345 {
 	struct device *dev;
 	const char *name;
 	int irq;
+
+	/*
+	 * The hardware watermark the next buffer enable will program,
+	 * written through buffer/watermark by the IIO core's set_watermark
+	 * hook. It started life as a fixed constant, and Project 10's
+	 * iio-rate, which writes that attribute and then proves a hardware
+	 * FIFO by the interrupt rate, would have measured a part that
+	 * ignored it.
+	 */
+	unsigned int watermark;
 
 	/*
 	 * The buffer handed to iio_push_to_buffers_with_timestamp must be
@@ -228,9 +239,19 @@ static int bench_adxl345_write_raw(struct iio_dev *indio_dev,
 	return -EINVAL;
 }
 
+static int bench_adxl345_set_watermark(struct iio_dev *indio_dev,
+				       unsigned int val);
+
+/*
+ * The watermark hook sits in iio_info, which is where this kernel's IIO
+ * core looks when buffer/watermark is written; the buffer setup ops
+ * below carry only the enable and disable halves. No hwfifo_* attributes
+ * are provided; iio-rate looks for buffer/watermark second and uses it.
+ */
 static const struct iio_info bench_adxl345_info = {
 	.read_raw = bench_adxl345_read_raw,
 	.write_raw = bench_adxl345_write_raw,
+	.hwfifo_set_watermark = bench_adxl345_set_watermark,
 };
 
 /*
@@ -323,13 +344,36 @@ static int bench_adxl345_buffer_postenable(struct iio_dev *indio_dev)
 			   FIELD_PREP(BENCH_ADXL345_FIFO_CTL_MODE,
 				      BENCH_ADXL345_FIFO_STREAM) |
 			   FIELD_PREP(BENCH_ADXL345_FIFO_CTL_SAMPLES,
-				      BENCH_ADXL345_WATERMARK_DEFAULT));
+				      st->watermark));
 	if (ret)
 		return ret;
 
 	return regmap_update_bits(st->regmap, BENCH_ADXL345_INT_ENABLE,
 				  BENCH_ADXL345_INT_WATERMARK,
 				  BENCH_ADXL345_INT_WATERMARK);
+}
+
+/*
+ * Called by the IIO core when buffer/watermark is written. The value is
+ * remembered and programmed at the next enable rather than written to
+ * FIFO_CTL here, because FIFO_CTL also carries the mode and a write
+ * while streaming would restart the FIFO under the reader.
+ *
+ * Clamped to the FIFO's depth less one: a watermark of 32 on a 32-deep
+ * FIFO leaves no room to service the interrupt before an overrun, which
+ * is the reason the default sits at 24. Zero would never interrupt, so
+ * the floor is one. Added Friday 9 October 2026, the night the FIFO
+ * path first ran, so that the rate iio-rate asks for is the rate the
+ * part is given, and a watermark of 8 interrupts three times as often as
+ * one of 24 rather than exactly as often.
+ */
+static int bench_adxl345_set_watermark(struct iio_dev *indio_dev,
+				       unsigned int val)
+{
+	struct bench_adxl345 *st = iio_priv(indio_dev);
+
+	st->watermark = clamp_val(val, 1U, BENCH_ADXL345_FIFO_DEPTH - 1U);
+	return 0;
 }
 
 static int bench_adxl345_buffer_predisable(struct iio_dev *indio_dev)
@@ -382,6 +426,7 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	st->dev = dev;
 	st->name = name;
 	st->irq = fwnode_irq_get(dev_fwnode(dev), 0);
+	st->watermark = BENCH_ADXL345_WATERMARK_DEFAULT;
 
 	/*
 	 * Ask the part who it is before configuring anything. An I2C

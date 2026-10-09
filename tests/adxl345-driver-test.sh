@@ -140,10 +140,16 @@ has "the SPI file builds one" "$SPI" 'devm_regmap_init_spi'
 
 # Both bus files must import the namespace the core exports into, or the
 # module loads and its probe symbol is unresolved.
-core_ns=$(sed -n 's/.*EXPORT_SYMBOL_NS_GPL([^,]*, *"\([^"]*\)").*/\1/p' "$CORE")
+# The namespace is a bare identifier, not a quoted string. It was quoted
+# until Friday 9 October 2026, which is the spelling kernels from 6.13
+# take; 6.6 stringifies the argument itself, so the quotes would have
+# become part of the name. This test kept expecting the quotes for most
+# of that day and turned CI red from b20546d, because it was not rerun
+# after the driver changed.
+core_ns=$(sed -n 's/.*EXPORT_SYMBOL_NS_GPL([^,]*, *\([A-Z_][A-Z0-9_]*\)).*/\1/p' "$CORE")
 check "the core exports into a namespace" "$core_ns" "BENCH_ADXL345"
-has "the I2C file imports it" "$I2C" "MODULE_IMPORT_NS(\"$core_ns\")"
-has "the SPI file imports it" "$SPI" "MODULE_IMPORT_NS(\"$core_ns\")"
+has "the I2C file imports it" "$I2C" "MODULE_IMPORT_NS($core_ns)"
+has "the SPI file imports it" "$SPI" "MODULE_IMPORT_NS($core_ns)"
 
 # ------------------------------------------- every register is defined once
 
