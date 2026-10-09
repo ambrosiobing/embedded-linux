@@ -175,6 +175,30 @@ case $out in
 	ok "the refusal no longer claims the hardware lacks a FIFO" ;;
 esac
 
+# ----------------------------------------- the rate attribute's two names
+#
+# A driver that declares its rate shared by type exposes
+# in_accel_sampling_frequency and no device-level sampling_frequency.
+# Mainline's ADXL345 driver and Project 5's both do, and on Friday
+# 9 October 2026 this program wrote to the name that was not there and
+# died with "Permission denied" on a file that did not exist.
+
+build_device
+echo 0 >"$DEV/buffer/watermark"
+rm -f "$DEV/sampling_frequency"
+echo 0 >"$DEV/in_accel_sampling_frequency"
+out=$(run_fifo 480 64 || true)
+contains "a per-type rate attribute is found when the device-level one is absent" 	"$out" "in_accel_sampling_frequency"
+check "and it receives the rate" "$(cat "$DEV/in_accel_sampling_frequency")" "480"
+
+build_device
+echo 0 >"$DEV/buffer/watermark"
+rm -f "$DEV/sampling_frequency"
+status=0
+out=$(run_fifo 480 64) || status=$?
+check "no rate attribute of either name is a refusal" "$status" "1"
+contains "and the refusal names both names" "$out" "Looked for sampling_frequency and in_"
+
 # ------------------------------------------------ every channel, not one
 #
 # A buffer holding a timestamp and no data channel is not a buffer the

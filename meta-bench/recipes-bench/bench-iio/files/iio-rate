@@ -82,6 +82,32 @@ device_path() {
        missing from the image or merely unbound."
 }
 
+# TWO NAMES FOR THE SAME KNOB, and this program knew only one until it
+# met Project 5's driver on Friday 9 October 2026.
+#
+# A driver that declares its rate shared by all channels exposes
+# sampling_frequency at the device level; the ST drivers do. One that
+# declares it shared by type exposes in_<type>_sampling_frequency instead;
+# mainline's ADXL345 driver does, and Project 5's copies mainline so that
+# the two present the same files to the same tools. Writing to the first
+# name on the second kind of device fails with "Permission denied", which
+# reads like a privilege problem and is a missing file.
+rate_attr_of() {
+	_dev=$1
+	if [ -w "$_dev/sampling_frequency" ]; then
+		printf '%s' "$_dev/sampling_frequency"
+		return 0
+	fi
+	for _f in "$_dev"/in_*_sampling_frequency; do
+		if [ -w "$_f" ]; then
+			printf '%s' "$_f"
+			return 0
+		fi
+	done
+	die "$(basename "$_dev") exposes no writable rate attribute.
+       Looked for sampling_frequency and in_*_sampling_frequency."
+}
+
 # ------------------------------------------------------------ accounting
 
 # The reader's own CPU time, not the system's.
@@ -244,7 +270,9 @@ do_fifo() {
 	note "rate       ${hz} Hz"
 	note "watermark  $watermark via $(basename "$(dirname "$wm_attr")")/$(basename "$wm_attr")"
 
-	echo "$hz" >"$dev/sampling_frequency"
+	rate_attr=$(rate_attr_of "$dev")
+	echo "$hz" >"$rate_attr"
+	note "rate via   $(basename "$rate_attr")"
 
 	# THE LENGTH BEFORE THE WATERMARK. The IIO core requires the
 	# watermark to be no larger than the buffer length and rejects

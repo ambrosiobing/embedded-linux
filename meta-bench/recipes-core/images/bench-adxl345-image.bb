@@ -49,8 +49,13 @@ IMAGE_INSTALL:append = " \
 # bench-iio is Project 10's tooling: iio-probe, iio-trigger, iio-rate and
 # iio-decode. None of it knows anything about an ADXL345, which is the
 # point of installing it here. iio-rate takes a device name, iio-decode
-# reads scan_elements and computes offsets from the sysfs description, so
-# both read this driver's buffer without a line of change. That is the
+# reads scan_elements and computes offsets from the sysfs description.
+# "Without a line of change" was the claim here until Friday 9 October
+# 2026, when iio-rate met this driver and wrote the rate to a file that
+# does not exist on it: this driver, like mainline's, declares the rate
+# shared by type, so the attribute is in_accel_sampling_frequency rather
+# than the device-level sampling_frequency the ST drivers expose. One
+# line changed, in the tool, which now looks for both names. That is the
 # dependency the repository README claims when it says Project 5 writes a
 # driver Project 10 exercises, and installing the tools next to the driver
 # is what turns the claim into something runnable.
