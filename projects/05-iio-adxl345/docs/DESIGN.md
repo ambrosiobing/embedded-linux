@@ -194,11 +194,20 @@ single row:
 GND  VCC  CS  INT1  INT2  SDO  SDA  SCL
 ```
 
-### The wiring as built
+### The wiring, as observed, with the date of each observation
 
-Every lead to the Raspberry Pi 3 Model B+ 40-pin header, which is the board
-this project specifies. Observed on hostname `eplepi` on Saturday 3 October
-2026 and recorded in
+**This section used to be titled "as built", and that title was false
+for six days.** A wiring table records what somebody saw on a date, not
+a standing state of the bench. On Friday 9 October 2026 the same breakout
+on the same board was found with four of the seven leads below; the two
+straps and the interrupt lead had come off, nothing in any document knew,
+and the first scans of the day showed the part drifting between `0x53`
+and `0x1d` exactly as the datasheet says a floating `SDO` will. The table
+further down is what was wired that evening. Read the dates.
+
+**Saturday 3 October 2026.** Every lead to the Raspberry Pi 3 Model B+
+40-pin header, which is the board this project specifies. Observed on
+hostname `eplepi` and recorded in
 `projects/11-adxl345-userspace/docs/evidence/flat-and-tilted-2026-10-03.txt`.
 
 | Colour | Pad | Header pin | Signal there | Direction |
@@ -226,6 +235,33 @@ those three are unavailable while it is attached.
   pin 16  GPIO23 <---------- purple ---------  INT1
                                                INT2  not connected
 ```
+
+**Friday 9 October 2026, evening.** Read off the board pin by pin before
+anything was changed: `VCC` on pin 1, `GND` on pin 9, `SDA` on pin 3,
+`SCL` on pin 5, and `CS`, `SDO`, `INT1` and `INT2` connected to nothing.
+Twenty-one scans in that state: mostly empty, `0x53` on some, `0x1d` on
+some, and twice a block of thirty or more phantom addresses, which is a
+data line held at the wrong level for a moment. Then, with power off, the
+two straps were fitted and every jumper pressed home:
+
+| Pad | Header pin | Signal there | Colour |
+|---|---|---|---|
+| `VCC` | 1 | 3V3 | red, as on 3 October |
+| `GND` | 9 | GND | black, as on 3 October |
+| `SDA` | 3 | GPIO2, SDA1 | blue, as on 3 October |
+| `SCL` | 5 | GPIO3, SCL1 | yellow, as on 3 October |
+| `CS` | 17 | 3V3 | not recorded |
+| `SDO` | **6** | GND | not recorded |
+| `INT1` | not connected | | |
+| `INT2` | not connected | | |
+
+Three scans after that showed `0x53` and nothing else, and register
+`0x00` read `0xe5`. **`SDO` is on pin 6 rather than the 3 October pin 14**,
+which means the serial console's ground is not on pin 6 as the earlier
+table says; where its three leads sit was not read that evening and is
+an open row. With `INT1` unconnected, the driver's probe takes its
+"no interrupt, so sysfs only and no buffer" path, and criterion 5 waits
+on that lead being refitted.
 
 ### The three questions this section used to hold open
 

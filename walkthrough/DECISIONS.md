@@ -3856,7 +3856,9 @@ present because it comes from a different variable.
 
 **What was happening.** kas writes the `local_conf_header` sections of
 a configuration and its includes into `local.conf` in sorted order of
-their names. The shared section in `bench-rpi4.yml` is `bench`. Project
+their names. That is read from kas's own source on the build host, kas
+5.1, `kas/config.py`: `for key, value in sorted(self._config.get(
+header_name, {}).items())`, reached from `get_local_conf_header`. The shared section in `bench-rpi4.yml` is `bench`. Project
 5's is `adxl345`, which sorts before it, so the shared plain assignment
 of `RPI_EXTRA_CONFIG` came later in the file and won. Projects 6, 7 and
 10 use sections named `explorer`, `lcd35a` and `iio`, which sort after

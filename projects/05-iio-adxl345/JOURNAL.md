@@ -361,3 +361,47 @@ scan. That is a candidate, not a diagnosis. The wiring is being read off
 the board by eye before anything else is concluded, which is the rule
 this bench learned from a mechanism invented about a HAT that did not
 seat.
+
+## 9. The part answers, and the record was six days stale
+
+Friday 9 October 2026, late. Twenty-one scans of bus 1 before any wire
+was touched: mostly empty, `0x53` on some, `0x1d` on two, and twice a
+block of thirty or more phantom addresses. The datasheet gives the part
+exactly those two addresses, chosen by `SDO`, so a part showing both in
+one sitting has that pin connected to nothing; the empty scans fit a
+floating `CS`, which page 17 says leaves the interface mode undefined;
+the blocks fit a contact, not a device. That reading was written down
+before the wiring was asked for, so it could be wrong.
+
+It was not. Read off the board: `VCC` on pin 1, `GND` on 9, `SDA` on 3,
+`SCL` on 5, and nothing on `CS`, `SDO`, `INT1` or `INT2`. The design
+document's wiring table, headed "as built", showed seven leads including
+both straps, copied from project 11's evidence of Saturday 3 October
+2026 on this same board. Six days later four of them were there. The
+heading is corrected to say what a wiring table is: an observation with
+a date.
+
+With power off, `CS` went to pin 17 and `SDO` to pin 6, and every jumper
+was pressed home. Three scans: `0x53`, nothing else. Then
+
+    i2cget -y 1 0x53 0x00
+    0xe5
+
+the device identification value the datasheet fixes. The part, both
+straps, both bus leads and the supply are good, at 100 kHz on this card.
+
+**Two slips of my own in the record.** The hand-over put `SDO` on pin 6
+without first reading the table that says the console sits on pins 6, 8
+and 10; the console kept working, so the console's ground is elsewhere,
+and where is an open row. And the colours of the two strap wires were
+not asked for at the time they were fitted, so they are open too. Both
+are recorded as open rather than filled in.
+
+**What the day proved, in order.** A device node on a fresh image with
+nothing loaded by hand; a recipe scheduled that never had been; a driver
+compiled against the kernel it runs on; a card whose config lines match
+its kas file, for every project that had been winning by alphabet; and
+a sensor identified by its own register. What it did not reach: the
+overlay that binds the project 5 driver to the part. That is next, and
+with `INT1` unconnected the probe will take its sysfs-only path, which
+is the honest state until that lead is refitted.

@@ -4,7 +4,8 @@ Both projects use the same part, so this page serves both: project 5
 writes an in-kernel IIO driver for it, project 11 a packaged userspace
 library.
 
-[docs/DESIGN.md](DESIGN.md) already carries the wiring as built, the pad
+[docs/DESIGN.md](DESIGN.md) already carries the wiring as observed on two
+dated occasions, the pad
 order, both address and mode straps, and the reasoning about the 3V3
 supply. **This page does not repeat that.** It answers where each claim
 comes from, and separates two things that are easy to run together: facts
@@ -476,17 +477,62 @@ flashed image whose `config.txt` carries `dtparam=i2c_arm=on`,
 check that has never failed is not known to work; this one has, which is
 the only reason to trust it when it passes.
 
-### What this says about the wiring, which is nothing
+### What this said about the wiring, and what the board then said
 
-**The six leads to the SEN0032 remain completely untested.** Every command
-above exercised the kernel's own view of itself. Nothing has yet put a
-signal on `SDA`, and the identification read that would is still waiting
-on a bus.
+This section stood for most of Friday 9 October 2026 saying the six
+leads to the SEN0032 remained completely untested, because every command
+above had exercised only the kernel's view of itself. That evening the
+rebuilt image reached the board and the wire was finally asked.
 
-That is the second time this bench has diagnosed a silent peripheral
-without touching a wire, after project 9's console, and both times the
-rule held: **ask the source whether it is driving before asking the wire
-whether it is carrying.**
+**The first answer was that the record was wrong.** Read off the board
+pin by pin: four leads, not seven. `VCC`, `GND`, `SDA` and `SCL` where
+the 3 October table puts them; `CS`, `SDO`, `INT1` and `INT2` connected
+to nothing. The straps whose necessity page 17 of the datasheet is
+quoted for, twelve paragraphs above this one, were not fitted.
+
+**The scans showed what page 17 predicts, before the wiring was read.**
+Twenty-one scans of bus 1 in that state:
+
+| What a scan showed | How often | What the datasheet says it is |
+|---|---|---|
+| nothing at all | most of them | `CS` floating: no defined interface mode, so the part may be in SPI mode and silent on I2C |
+| `0x53` alone | several | `SDO` drifted low: the address this bench expects |
+| `0x1d` alone | two in a row | `SDO` drifted high: the other address the part has, and the one that confirms the pin is floating |
+| a block of thirty or more addresses | twice | a data line held at the wrong level for a moment, which is a contact, not a device; the breakout sits in a breadboard under a cushion |
+
+A part that answers at both of its possible addresses in one sitting has
+an address pin connected to nothing. That inference was made from the
+scans and the datasheet before the wiring was read, and the wiring then
+confirmed it.
+
+**With power off, `CS` to pin 17 and `SDO` to pin 6, every jumper
+pressed home.** Three scans: `0x53` each time, nothing else. Then the one
+command this page said could fail:
+
+```
+i2cget -y 1 0x53 0x00
+0xe5
+```
+
+Which, by the table in the identification section above, means the part,
+the address strap, the interface strap, both bus leads and the supply
+are all good, at 100 kHz, on this card. The 400 kHz line is absent from
+this card for the reason in decision 119 and the test does not depend
+on it.
+
+**Two rows stay open from that evening**, recorded as open rather than
+filled in: the colours of the two strap wires, and the three header pins
+the serial console's leads sit on, which are not pins 6, 8 and 10 as the
+3 October table says, because pin 6 now carries `SDO` and the console
+kept working.
+
+**What this is worth.** The rule above, ask the source whether it is
+driving before asking the wire whether it is carrying, held again: the
+kernel side was proved on a fresh image before a single scan, so the
+scans could only be about wire. And the rule it adds is the one in the
+design document's wiring section: a wiring table is an observation with
+a date, never a standing state. This one was six days stale and said
+"as built".
 
 ## The one purchase that would change this project
 
