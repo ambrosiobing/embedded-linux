@@ -260,3 +260,36 @@ absent it wants 25 GB on the Windows drive, the cost measured today. With
 `build/tmp` resident it wants a floor of 5 GB, a figure chosen rather than
 measured, and the script prints which model applied so the number can be
 argued with.
+
+## 6. The recipe BitBake never scheduled
+
+Friday 9 October 2026, later. With the disk freed and `bench-iio` fixed,
+the image assembled for twenty minutes and `do_rootfs` refused three
+packages: this project's own driver, `kernel-module-bench-adxl345-core`,
+`-i2c` and `-spi`. The in-tree `kernel-module-adxl345-i2c` and `-spi`
+were found. The first thought was a module that built under another
+name, so the work directory was the place to look, and it did not exist.
+`bitbake -g` then showed the recipe list for the image: `bench-iio` and
+`linux-raspberrypi` on it, `bench-adxl345` not.
+
+The mechanism is in decision 118. In one sentence: the packages exist
+only after packaging, so at parse time BitBake matches their names
+against dynamic patterns, the kernel declares the same pattern as every
+module recipe and is a preferred provider, so the kernel won all three
+and this recipe was never built. Project 9's `bench-buggy` carries the
+one line that prevents it, `RPROVIDES:${PN}`, with a comment calling it
+a convenience.
+
+**The fix is that line, three names long**, and the comment in
+`bench-buggy` corrected to say what the line is for. The linter gained
+`check_module_rprovides`, which reads a module recipe's Makefile for its
+`obj-m` targets and requires each as a provides; it fired three times
+with the block removed and was quiet with it restored.
+
+**What the sibling rule did and did not do here.** Reading `bench-buggy`
+first found the difference in one pass, which is the rule working. Its
+own comment then pointed away from the answer, which is the limit of the
+rule: a sibling's explanation of itself is a claim like any other.
+
+The image has still not been assembled. Next is a rebuild with the recipe
+scheduled, then the flash and the three checks on the board.

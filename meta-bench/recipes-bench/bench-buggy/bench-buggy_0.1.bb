@@ -41,10 +41,17 @@ SRC_URI = "\
 # S = "${UNPACKDIR}"; it is the only line in the layer that has to move.
 S = "${WORKDIR}"
 
-# So that an image or another recipe can depend on the capability by a
-# name that does not change if the .ko is ever renamed, and so the name
-# appears in "bitbake -e" next to the real package rather than only in
-# the kernel-module-split output.
+# This line is what gets the recipe scheduled, not a convenience, and the
+# earlier version of this comment said otherwise. kernel-module-buggy
+# exists only after do_package runs the module split, so at parse time no
+# recipe declares it and BitBake falls back to PACKAGES_DYNAMIC patterns.
+# The kernel declares the same kernel-module-.* pattern as this recipe and
+# is the preferred provider of virtual/kernel, so without an exact
+# RPROVIDES the name resolves to the kernel, this recipe is never built,
+# and the image fails at do_rootfs. Project 5's bench-adxl345 lacked the
+# line and did exactly that on Friday 9 October 2026; the comment there
+# has the full mechanism. scripts/lint.py check_module_rprovides now
+# requires the line in every module recipe.
 RPROVIDES:${PN} += "kernel-module-buggy"
 
 # The module is useless without somewhere to put its trigger file, and

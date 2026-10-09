@@ -52,6 +52,30 @@ EXTRA_OEMAKE = "KDIR=${STAGING_KERNEL_DIR}"
 #   kernel-module-bench-adxl345-i2c
 #   kernel-module-bench-adxl345-spi
 #
+# THE LINE BELOW IS WHAT GETS THIS RECIPE BUILT AT ALL, and the comment
+# above was not enough. Those three packages exist only after do_package
+# runs the module split, so at parse time no recipe declares them. BitBake
+# then matches the names against PACKAGES_DYNAMIC patterns instead, and
+# every recipe that packages kernel modules declares the same pattern,
+# kernel-module-.*, the kernel included. Among several matches BitBake
+# prefers a recipe that is a PREFERRED_PROVIDER of something, and the
+# kernel is the preferred provider of virtual/kernel. So all three names
+# resolved to linux-raspberrypi, which built, packaged its own modules,
+# and never produced these; this recipe was not scheduled, had no work
+# directory, and the image failed at do_rootfs with "No match for
+# argument" on Friday 9 October 2026 after a twenty minute assembly. The
+# resolution is logged at debug level only, so neither run warned.
+#
+# An exact RPROVIDES wins over a pattern. bench-buggy carries the same
+# line and its comment called it a convenience; it is the mechanism.
+# scripts/lint.py check_module_rprovides now requires one entry per
+# obj-m in a module recipe's Makefile.
+RPROVIDES:${PN} += "\
+    kernel-module-bench-adxl345-core \
+    kernel-module-bench-adxl345-i2c \
+    kernel-module-bench-adxl345-spi \
+"
+
 # Nothing autoloads. KERNEL_MODULE_AUTOLOAD would insert these at boot
 # whether or not the device tree describes the part, and a driver loaded
 # with nothing to bind to is indistinguishable from a driver that failed

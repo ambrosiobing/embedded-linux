@@ -3802,3 +3802,45 @@ is never read as "lintian had nothing to say".
 The warnings stay printed and unscored. Printing them is what made this
 decision possible: for one day the suite reported a count with the text
 withheld, and in that state nobody could have triaged anything.
+
+## 118. A module recipe names its packages at parse time, because BitBake otherwise gives them to the kernel
+
+**Context.** Friday 9 October 2026, the first assembly of the project 5
+image. `bench-adxl345-image` lists three packages from the out-of-tree
+driver, `kernel-module-bench-adxl345-core`, `-i2c` and `-spi`, exactly as
+decision 75 requires. The assembly ran for twenty minutes and `do_rootfs`
+failed with "No match for argument" on all three. The module recipe had
+no work directory at all: `bitbake -g` confirmed that `bench-adxl345` was
+absent from the image's recipe list while `bench-iio` and the kernel were
+on it.
+
+**What was happening.** Those packages exist only after `do_package`
+runs the module split, so at parse time no recipe declares them. BitBake
+then matches the names against `PACKAGES_DYNAMIC` patterns, and every
+recipe that packages kernel modules declares the same `kernel-module-.*`
+pattern, the kernel included. Among several matches it prefers a recipe
+that is a `PREFERRED_PROVIDER` of something, and the kernel is the
+preferred provider of `virtual/kernel`. All three names resolved to
+`linux-raspberrypi`, which built, packaged its own modules, and produced
+none of these. The choice is logged at debug level only, so neither run
+printed a warning.
+
+Project 9's `bench-buggy` never had the problem, because it carries
+`RPROVIDES:${PN} += "kernel-module-buggy"`, and an exact provides wins
+over a pattern. Its comment described that line as a convenience for
+`bitbake -e` readers. It is the mechanism, and the comment now says so.
+
+**Decision.** Every recipe that inherits `module` names each package it
+will produce in `RPROVIDES:${PN}`, one `kernel-module-<name>` per `obj-m`
+in its Makefile. `scripts/lint.py` has `check_module_rprovides`, which
+derives the expected names from the Makefile the way the split class
+derives them from the `.ko` files, and refuses a recipe that omits one.
+Proved by removing the block from `bench-adxl345` and watching three
+findings, then restoring it and watching none.
+
+**Consequence.** Decision 75 is unchanged and was necessary: an image
+must name its module packages. This entry is the other half, which 75
+could not see: naming a package in an image is not enough when nothing
+declares the package at parse time. The two checks together close both
+ends. A module recipe added without a Makefile in `files/` is also
+refused, because then nothing here can say what it produces.

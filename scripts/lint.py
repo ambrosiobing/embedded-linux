@@ -327,6 +327,54 @@ def check_pkgconfig_inherit() -> None:
             fail(recipe, "runs pkg-config but does not inherit pkgconfig")
 
 
+def check_module_rprovides() -> None:
+    """A module recipe must RPROVIDE every kernel-module-* it will produce.
+
+    The split packages exist only after do_package, so at parse time no
+    recipe declares them and BitBake matches the names against
+    PACKAGES_DYNAMIC patterns. The kernel declares the same kernel-module-.*
+    pattern as every module recipe and is the preferred provider of
+    virtual/kernel, so without an exact RPROVIDES an image's request for
+    kernel-module-foo resolves to the kernel, the module recipe is never
+    scheduled, and do_rootfs fails with "No match for argument" after the
+    whole image has been assembled. bench-adxl345 did that on Friday
+    9 October 2026; bench-buggy had the line and called it a convenience.
+
+    The expected names come from the Makefile's obj-m lines, the way the
+    split class derives them from the .ko file names: underscores become
+    hyphens. A recipe that inherits module and has no Makefile in files/
+    is reported too, because then nothing here can say what it produces.
+    """
+    objm = re.compile(r"^\s*obj-m\s*[:+]?=\s*(.+?)\s*$", re.M)
+    for recipe in ROOT.rglob("*.bb"):
+        if ".git" in recipe.parts:
+            continue
+        body = text(recipe)
+        if not re.search(r"^\s*inherit\b.*\bmodule\b", body, re.M):
+            continue
+        makefile = recipe.parent / "files" / "Makefile"
+        if not makefile.is_file():
+            fail(recipe, "inherits module but files/Makefile is missing, so "
+                         "its kernel-module-* packages cannot be checked")
+            continue
+        wanted = []
+        for value in objm.findall(text(makefile)):
+            for obj in value.split():
+                if obj.endswith(".o"):
+                    wanted.append(
+                        "kernel-module-" + obj[:-2].replace("_", "-").lower()
+                    )
+        provided = " ".join(
+            re.findall(r'RPROVIDES:\$\{PN\}\s*\+?=\s*"([^"]*)"', body)
+        ).replace(chr(92), " ").split()
+        for name in wanted:
+            if name not in provided:
+                fail(recipe, f"Makefile builds {name} and RPROVIDES:${{PN}} "
+                             "does not name it, so BitBake resolves the "
+                             "package to the kernel and never schedules "
+                             "this recipe")
+
+
 def shell_files() -> list[Path]:
     """Every file CI runs shellcheck over, found the way CI finds them.
 
@@ -949,6 +997,7 @@ def main() -> int:
         check_image_packages,
         check_systemd_units,
         check_pkgconfig_inherit,
+        check_module_rprovides,
         check_license_headers,
         check_kas,
         check_layer_conf,
