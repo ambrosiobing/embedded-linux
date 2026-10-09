@@ -10,15 +10,15 @@
 #   the address in the overlay    == the one read off the bus, 0x53
 #   the .dtbo name the recipe deploys == the name the image copies
 #                                     == the name config.txt requests
-#   the overlay declares no interrupt while INT1 is not wired
+#   the interrupt in the overlay    == the pin the design's wiring table
+#                                      says INT1 is on
 #
-# Each of those is a claim written when it was true. The last one is the
-# one that will change: when INT1 is refitted to header pin 16 the overlay
-# gains an interrupts property, docs/DESIGN.md's wiring table gains the
-# row, and the assertion below is replaced by its opposite. Until then a
-# node that names a GPIO nothing drives probes cleanly, reads cleanly
-# through sysfs, and never fills a buffer, which is the failure this
-# assertion exists to refuse.
+# Each of those is a claim written when it was true. The last one has
+# already changed once: it was written as its opposite, no interrupt
+# property while INT1 was unwired, and inverted the night the wire went
+# on. A node that names a GPIO nothing drives probes cleanly, reads
+# cleanly through sysfs, and never fills a buffer, which is why the two
+# files are held to each other rather than either being trusted alone.
 #
 #   sh tests/adxl345-overlay-test.sh
 #
@@ -78,9 +78,9 @@ done
 
 # Comments removed before any absence check, for the reason
 # tests/explorer-overlay-test.sh gives at length: the overlay's own
-# comment explains why there is no interrupts property and shows the two
-# lines to add, and a rule that cannot tell use from mention would flag
-# the documentation of the decision it protects.
+# comment quotes mainline's compatible string while explaining why the
+# node does not use it, and a rule that cannot tell use from mention
+# would flag the documentation of the decision it protects.
 code_of() {
 	out=$WORK/$(basename "$1").code
 	case $2 in
@@ -122,13 +122,18 @@ has "the image copies overlays/bench-adxl345.dtbo onto the card" "$IMG" 'IMAGE_B
 has "and waits for the deploy before assembling" "$IMG" 'do_image\[depends\] += "bench-adxl345-dt:do_deploy"'
 has "the image installs the overlay recipe" "$IMG" '^    bench-adxl345-dt \\'
 has "config.txt requests dtoverlay=bench-adxl345" "$KAS" 'dtoverlay=bench-adxl345'
-hasnt "and requests it through :append, never a plain assignment" "$KAS" '^    RPI_EXTRA_CONFIG = '
+hasnt "and requests it through an override, never a plain assignment" "$KAS" '^    RPI_EXTRA_CONFIG = '
 
-echo "--- no interrupt while INT1 is not wired"
+echo "--- the interrupt, now that INT1 is wired"
 
-hasnt "the node declares no interrupts property" "$DTS_CODE" 'interrupts = '
-hasnt "nor an interrupt parent" "$DTS_CODE" 'interrupt-parent'
-has "and the design's wiring table says INT1 is not connected" "$DESIGN" '| `INT1` | not connected |'
+# This group was its own opposite until late on Friday 9 October 2026:
+# no interrupts property while the design's wiring table said INT1 was
+# not connected. The wire went onto header pin 16 that night, the
+# property went into the node, and the three assertions inverted. The
+# overlay's own comment carries the reasoning for level high.
+has "the node names the gpio controller as its interrupt parent" "$DTS_CODE" 'interrupt-parent = <&gpio>;'
+has "and asks for GPIO23, level high" "$DTS_CODE" 'interrupts = <23 4>;'
+has "and the design's wiring table puts INT1 on pin 16" "$DESIGN" '| `INT1` | 16 | GPIO23 |'
 
 echo
 echo "passed $pass, failed $fail"

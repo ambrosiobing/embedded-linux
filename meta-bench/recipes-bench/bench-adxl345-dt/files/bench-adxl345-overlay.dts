@@ -27,24 +27,25 @@
  * interface mode undefined. Both straps are now fitted: CS to header pin
  * 17, SDO to header pin 6. docs/hardware.md has the scan pattern.
  *
- * NO INTERRUPT PROPERTY, AND THAT IS DELIBERATE.
+ * THE INTERRUPT, DECLARED ONLY ONCE THE WIRE WAS THERE.
  *
- * INT1 was wired to GPIO23 on Saturday 3 October 2026 and was found
- * disconnected on Friday 9 October 2026. The driver's probe asks the
- * node for an interrupt and, finding none, registers the device with the
- * sysfs path only: raw readings, scale and sampling rate work, the
- * buffered FIFO path does not and cannot. When INT1 is refitted to header
- * pin 16, add to the node:
- *
- *     interrupt-parent = <&gpio>;
- *     interrupts = <23 4>;
+ * INT1 was wired to GPIO23 on Saturday 3 October 2026, found
+ * disconnected on Friday 9 October 2026, and refitted to header pin 16
+ * late that same night. The first overlay carried no interrupt property
+ * on purpose: the driver's probe asks the node for one and, finding
+ * none, registers the sysfs path only, which was the honest description
+ * of an unwired pin. Declaring a GPIO that is not wired would have been
+ * worse than leaving it out, because a driver waiting on a line nothing
+ * drives probes cleanly, reads cleanly through sysfs, and never fills a
+ * buffer. Four criteria were measured in that state before this
+ * property was added.
  *
  * Level high rather than rising edge, for the reason Project 10 measured
  * on its IMU: the ADXL345's INT1 stays asserted while the FIFO is above
- * its watermark, and an edge request counts every bounce on a long
- * unterminated jumper. Declaring a GPIO that is not wired would be worse
- * than leaving it out: a driver waiting on a line nothing drives probes
- * cleanly, reads cleanly through sysfs, and never fills a buffer.
+ * its watermark, the threaded handler drains the FIFO and the line falls,
+ * and an edge request would count every bounce on a long unterminated
+ * jumper instead. The driver passes no trigger type of its own, so this
+ * cell is the whole decision.
  *
  * SPDX-License-Identifier: MIT
  */
@@ -77,6 +78,8 @@
 			accel: adxl345@53 {
 				compatible = "bench,adxl345";
 				reg = <0x53>;
+				interrupt-parent = <&gpio>;
+				interrupts = <23 4>;	/* GPIO23, header pin 16, LEVEL HIGH */
 			};
 		};
 	};

@@ -252,16 +252,17 @@ two straps were fitted and every jumper pressed home:
 | `SCL` | 5 | GPIO3, SCL1 | yellow, as on 3 October |
 | `CS` | 17 | 3V3 | not recorded |
 | `SDO` | **6** | GND | not recorded |
-| `INT1` | not connected | | |
+| `INT1` | 16 | GPIO23 | not recorded; refitted later the same night, after four criteria had been measured without it |
 | `INT2` | not connected | | |
 
 Three scans after that showed `0x53` and nothing else, and register
 `0x00` read `0xe5`. **`SDO` is on pin 6 rather than the 3 October pin 14**,
 which means the serial console's ground is not on pin 6 as the earlier
 table says; where its three leads sit was not read that evening and is
-an open row. With `INT1` unconnected, the driver's probe takes its
-"no interrupt, so sysfs only and no buffer" path, and criterion 5 waits
-on that lead being refitted.
+an open row. While `INT1` was unconnected the driver's probe took its
+"no interrupt, so sysfs only and no buffer" path, and criteria 2 to 4
+were measured in that state; the lead went back on pin 16 late the same
+night and the overlay declares it from that build on.
 
 ### The three questions this section used to hold open
 
