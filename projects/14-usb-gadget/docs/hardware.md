@@ -15,7 +15,7 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 | Document | Evidence | Status |
 |---|---|---|
 | Raspberry Pi 4 Model B datasheet, release 1.1, 12 March 2024 | `datasheet` | **read Wednesday 7 October 2026** |
-| BCM2711 peripherals | `datasheet` | **`NOT READ`** |
+| BCM2711 ARM Peripherals, release 4, 18 January 2022 | `datasheet` | **read Friday 9 October 2026**, and it has no USB chapter |
 | the USB Type-C specification's CC pull-down requirements | | **`NOT READ`** |
 
 ## The datasheet does not know this project is possible
@@ -148,11 +148,85 @@ tight and which are not is most of what a hardware page is for. The tight
 one is the input supply. The downstream one has three orders of magnitude
 of room.
 
+## The BCM2711 peripherals document is read, and it has no USB chapter
+
+**Source: Raspberry Pi Ltd, "BCM2711 ARM Peripherals", release 4,
+18 January 2022, build-date 2022-01-18, githash `cfcff44-clean`.** Read
+Friday 9 October 2026, from the URL Joseph supplied that day, which
+redirects twice through `pip.raspberrypi.com` to `pip-assets`.
+
+This was the document expected to settle whether the USB-C port's
+controller is `dwc2` and dual-role capable. **It cannot, because it does
+not mention USB.**
+
+### What the table of contents contains
+
+Thirteen chapters, pages 2 and 3: Introduction, Auxiliaries (UART1, SPI1
+and SPI2), BSC, DMA Controller, General Purpose I/O, Interrupts, PCM/I2S
+Audio, Pulse Width Modulator, SPI, System Timer, UART, Timer (ARM side),
+and ARM Mailboxes. The table ends at section 13.2 on page 163.
+
+**No USB chapter. No `dwc2`. No DWC_OTG. No XHCI.** The same absence as
+in the Pi 4 datasheet, which describes the USB-C connector only as a
+power input.
+
+### So the dual-role claim is now sourced from neither Raspberry Pi document
+
+| Document | What it says about the USB-C port's controller |
+|---|---|
+| Raspberry Pi 4 Model B datasheet, release 1.1 | nothing; the connector is "power" in section 4.1 |
+| **BCM2711 ARM Peripherals, release 4** | **nothing; there is no USB chapter** |
+| the kernel's device tree for the Pi 4 | `dwc2` at `fe980000`, which is where this project's `DESIGN.md` got it |
+
+**That is the fifth instance of the pattern this bench has been
+cataloguing**, after the ILI9486, the FT5406, the BCM43455 and this same
+port's earlier entry: **the Linux driver names the hardware and the
+manufacturer's documents do not.** It is reliable, it has worked for every
+gadget this project has built, and it is not a citation, and it now cannot
+become one from any Raspberry Pi document that exists.
+
+**The honest evidence level for "the USB-C port is `dwc2` in peripheral
+mode" is `measured`.** The gadget enumerates on a host. That is stronger
+than a datasheet sentence would have been and it is a different kind of
+thing, and the page should say which.
+
+### Two things the colophon says that matter elsewhere
+
+**The document is derived.** Its own first sentence: "BCM2711 ARM
+Peripherals, based in large part on the earlier BCM2835 ARM Peripherals
+documentation." That is Raspberry Pi stating in writing the thing
+[project 9's hardware page](../../09-kernel-debug/docs/hardware.md) had
+to argue for: that the BCM2835 document is the right one to read for the
+peripheral block across the whole family, with only the base address
+moving.
+
+**And two of its four releases are corrections of exactly the kind this
+bench watches for.** Release 2 of 24 September 2020 "Corrected GPIO base
+address". Release 4 of 18 January 2022 "Updated GPIO_PUP_PDN_CNTRL register
+reset values" and "Updated UART GPIO mapping table". So a reader of
+release 1 or 3 would have the wrong GPIO base address, or the wrong
+default pull values, or the wrong UART pin table, and would not know it.
+**Cite the release.** The same rule the Pi 4 datasheet taught on Wednesday
+7 October 2026, from the same vendor, a second time.
+
+### What this page's open table now says
+
+| Document | Status |
+|---|---|
+| ~~BCM2711 peripherals~~ | **read, and silent on the question.** The USB-C controller's identity stays `measured`, from the gadget enumerating, and there is no Raspberry Pi document left that could change that |
+| a Raspberry Pi 4 schematic | still the only thing that would settle the VBUS to header 5 V topology behind the back-feed warning |
+| the USB Type-C specification | still the only thing that would turn the revision 1.1 cable warning into an explanation |
+
+**None of those blocks the project**, which was true before and is true
+now. What changed is that one of the three has gone from "unread" to
+"read and empty", which is a better state to be in: a reader no longer
+has to wonder whether the answer is in there.
+
 ## Still `NOT READ`
 
 | Document | What it would settle |
 |---|---|
-| BCM2711 peripherals | that the USB-C port's controller is `dwc2` and dual-role capable, which is currently known from the kernel rather than from a document |
+| ~~BCM2711 peripherals~~ | **read.** It contains no USB chapter, so it cannot settle this and nothing from Raspberry Pi can; see the section above |
 | a Raspberry Pi 4 schematic | the VBUS to header 5 V topology, which the back-feed warning depends on and which is currently carried across from the Pi 3B+ |
 | the USB Type-C specification | why a shared CC pull-down breaks e-marked cables, which would turn the revision 1.1 warning into an explanation rather than a rule |
 

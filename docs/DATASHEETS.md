@@ -56,7 +56,7 @@ public repository. Three things work better anyway:
 | Document | Part | For | Read | URL |
 |---|---|---|---|---|
 | Raspberry Pi 4 Model B datasheet, release 1.1, 12 March 2024 | Pi 4B | projects using the Pi 4 | **yes** | `https://datasheets.raspberrypi.com/rpi4/raspberry-pi-4-datasheet.pdf` |
-| BCM2711 peripherals | Pi 4 SoC | register level work on the Pi 4 | no | `https://datasheets.raspberrypi.com/bcm2711/bcm2711-peripherals.pdf` |
+| BCM2711 ARM Peripherals, release 4, 18 January 2022 | Pi 4 SoC | register level work on the Pi 4 | **yes**, the contents and colophon; **no USB chapter exists** | `https://datasheets.raspberrypi.com/bcm2711/bcm2711-peripherals.pdf` |
 | Raspberry Pi 3 Model B+ product brief, published October 2025 | Pi 3 Model B Plus | the Project 9 board | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-product-brief.pdf` |
 | Raspberry Pi 3 Model B+ reduced schematic, V1.0, 19 March 2018 | Pi 3 Model B Plus | header pin functions, power protection | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-reduced-schematics.pdf` |
 | Raspberry Pi 3 Model B product page | Pi 3, the host of projects 6, 18, 19 and 20 | the only document that exists for it | **yes**, and it is a bullet list | `https://www.raspberrypi.com/products/raspberry-pi-3-model-b/` |
@@ -247,6 +247,21 @@ that costs the reproducibility of a timing figure; for project 19, whose
 U-Boot writes a 16 KiB environment on every boot, it leaves a wear
 question that cannot even be asked. Identifying the cards needs no
 download and is the cheapest open item in the index.
+
+**The BCM2711 peripherals document has no USB chapter, so project 14's
+central claim can never be sourced from Raspberry Pi.** Thirteen chapters,
+none of them USB. The Pi 4 datasheet calls the USB-C connector a power
+input and stops. So "the USB-C port is `dwc2` in peripheral mode" rests on
+the kernel's device tree and on the gadget enumerating, which is
+`measured`, stronger than a sentence and a different kind of thing. Fifth
+instance of the driver naming what the vendor does not.
+
+**Its colophon says in writing what project 9 had to argue for**: the
+document is "based in large part on the earlier BCM2835 ARM Peripherals
+documentation", so reading the BCM2835 one for the family's peripheral
+block is the vendor's own practice. And two of its four releases are
+corrections to the GPIO base address, the pull register reset values and
+the UART pin table. **Cite the release**, a second time from this vendor.
 
 **The Allwinner H3 is read, and it is marked confidential on every page.**
 Chapter 9 gives the NEO Air's GPIO figures at last: input high 0.7 times
