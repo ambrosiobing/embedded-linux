@@ -294,6 +294,39 @@ def check_systemd_units() -> None:
                 fail(recipe, f"SYSTEMD_SERVICE lists {unit}, not in files/")
 
 
+def check_pkgconfig_inherit() -> None:
+    """A recipe that runs pkg-config in a task must inherit pkgconfig.
+
+    Without the class there is no pkg-config in the recipe's native sysroot,
+    and the failure is silent in the worst way: the shell prints "not
+    found", substitutes an empty string, and the compiler runs on without
+    the library's flags until the linker reports every symbol as undefined.
+    bench-iio shipped that way and the sstate cache hid it until Friday
+    9 October 2026, when build/tmp was recreated and the recipe compiled
+    from source for the first time in this tree.
+
+    Comment lines are skipped, because bench-iio's own comment names the
+    tool, and a rule that matches its own explanation silences nothing.
+    """
+    for recipe in ROOT.rglob("*.bb"):
+        if ".git" in recipe.parts:
+            continue
+        body = text(recipe)
+        uses = any(
+            "pkg-config" in line
+            for line in body.splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        if not uses:
+            continue
+        inherits = any(
+            re.match(r"\s*inherit\b.*\bpkgconfig\b", line)
+            for line in body.splitlines()
+        )
+        if not inherits:
+            fail(recipe, "runs pkg-config but does not inherit pkgconfig")
+
+
 def shell_files() -> list[Path]:
     """Every file CI runs shellcheck over, found the way CI finds them.
 
@@ -915,6 +948,7 @@ def main() -> int:
         check_src_uri_installed,
         check_image_packages,
         check_systemd_units,
+        check_pkgconfig_inherit,
         check_license_headers,
         check_kas,
         check_layer_conf,

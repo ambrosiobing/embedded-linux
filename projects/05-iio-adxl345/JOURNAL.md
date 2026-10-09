@@ -192,3 +192,55 @@ message, so every form came back FLAGGED including the legitimate ones.
 for a defect that no check on the authoring machine can see, because there
 is no shellcheck on it. The widened rule closes exactly that gap: it is the
 part of shellcheck's judgement that can be reproduced without shellcheck.
+
+## 5. A rebuild that could not start, then a recipe that had never compiled
+
+Friday 9 October 2026. The i2c-dev packaging fix of the morning needed a
+rebuilt image, and the build script refused before BitBake ran: the
+Windows drive behind WSL had 16 GB free and the guard wants 25. The two
+things the script's own warnings named, a stray build tree inside the
+checkout and a stray layer clone, measured 4 KB and 7.9 MB. They were not
+the problem.
+
+**Where the space was.** The virtual disk file was 86.48 GB of the 109 GB
+in the Windows profile's AppData. Inside it the guest used 80 GB, of which
+`~/bench` held 55: `build/tmp` 16 GB, `downloads` 17, `sstate-cache` 17,
+archived images 2.8, project 2's NEO Air root filesystem 3.4. Only
+`build/tmp` is reproducible, and it held one image not yet archived, the
+project 9 debug image of Monday 5 October 2026, which was archived first.
+
+**What returned the space.** `rm -rf ~/bench/build/tmp`, then
+`sudo fstrim -av`, then `wsl --shutdown` as the owning user with
+`wsl --list --running` printing none, then `diskpart` with the file
+attached read-only and `compact vdisk`. C: went from 15.44 to 26.2 GB
+free and the file from 86.48 to 75.7 GB. On Friday 2 October 2026 the
+same compaction returned 0.14 GB, and the difference is the trim: ext4
+reports freed blocks on `fstrim`, not on `rm`, and the file size does not
+move at the trim, so the trim looks like it did nothing until the
+compaction collects it.
+
+**Then the build found a defect the cache had been hiding.** With
+`build/tmp` gone, `bench-iio` compiled from source for the first time in
+this tree, and its link failed on every libiio symbol. The first line of
+the log was the cause: `pkg-config: not found`. The recipe runs pkg-config
+in `do_compile` and never inherited the `pkgconfig` class, so no native
+pkg-config was in its sysroot; the shell substituted an empty string and
+the compiler ran on without the flags. Three sibling recipes inherit the
+class. This one had a comment explaining why pkg-config was the right
+choice and no line making it available.
+
+Fixed with `inherit pkgconfig`, and `scripts/lint.py` gained
+`check_pkgconfig_inherit`: a recipe whose non-comment lines run pkg-config
+must have an inherit line naming the class. Proved in both directions. The
+first version of the rule flagged nine recipes, because the regex written
+through a heredoc had lost its backslashes and `\b` had become a backspace
+byte, which the linter's own control-byte rule reported in the same run.
+Rebuilt with `chr(92)`, the rule flagged exactly `bench-iio` and no other,
+which is the whole-tree check: the other seven recipes that run pkg-config
+all inherit the class. After the fix it is quiet.
+
+**One provenance note.** The archive made before the deletion was stamped
+`2026-10-09_a4c0c08-dirty`, the checkout at archive time, not `c246665`,
+the commit the image was built from. `scripts/archive.sh` records the
+commit it finds, not the commit the build recorded. A late archive
+therefore mislabels itself, and that is an open item for the script.

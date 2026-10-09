@@ -28,6 +28,14 @@ S = "${WORKDIR}"
 # which is the right place for it to fail.
 DEPENDS = "libiio"
 
+# The class is what puts a pkg-config into this recipe's native sysroot.
+# Without it the backtick below prints "pkg-config: not found", expands
+# to nothing, and the link fails on every libiio symbol. The sstate cache
+# hid that until Friday 9 October 2026, when build/tmp was recreated and
+# this recipe compiled from source for the first time in the tree.
+# scripts/lint.py now refuses a recipe that runs pkg-config without it.
+inherit pkgconfig
+
 do_compile() {
     # pkg-config rather than -liio, because libiio's dependencies differ
     # between builds: a libiio with the network backend pulls in libxml2
