@@ -361,6 +361,125 @@ Raspberry Pi. A silent SEN0032 is a wiring or contact question and never a
 dead part question, and no debugging here should spend a step on replacing
 it.
 
+## The bring-up tools are built and shipped to no board
+
+**Found on Friday 9 October 2026**, by trying to use one of them, which is
+the only way this class of defect ever surfaces.
+
+### What happened
+
+The SEN0032 was wired to the Raspberry Pi 3B+ and `i2cget -y 1 0x53 0x00`
+returned `Could not open file /dev/i2c-1`. Two read-only commands located
+the fault without touching a lead:
+
+| Command | Answer | Reading |
+|---|---|---|
+| `ls /sys/bus/i2c/devices/` | empty | no I2C controller had probed |
+| `cat /proc/device-tree/soc/i2c@7e804000/status` | `disabled` | the firmware had been told nothing, so the controller stayed off |
+| `grep -i i2c /boot/config.txt` | four commented template lines | this image writes no `dtparam=i2c_arm=on` |
+| `ls /sys/bus/platform/drivers/ \| grep i2c` | `i2c-bcm2835` | the controller driver **is** in this kernel |
+
+So the device tree was the only thing holding the bus off, and adding
+`dtparam=i2c_arm=on` and `dtparam=i2c_arm_baudrate=400000` to
+`/boot/config.txt` enabled it. Then:
+
+```
+   modprobe i2c-dev
+   modprobe: FATAL: Module i2c-dev not found in directory /lib/modules/6.6.63-v8
+```
+
+### The defect
+
+`meta-bench/recipes-kernel/linux/files/bench.cfg` is added to the kernel
+unconditionally, for every image in the tree, and it contains:
+
+```
+   CONFIG_SPI_SPIDEV=m
+   CONFIG_I2C_CHARDEV=m
+```
+
+with a comment saying they are raw SPI and I2C access from user space, for
+bring-up before a driver exists, and that they are modules rather than
+built in because "they are debugging tools, not part of the running
+system. (Projects 3, 6, 11)".
+
+**No image in this tree installs them.** `kernel-modules` appears in
+exactly one image recipe, `bench-kiosk-image.bb`, which needs the whole
+set for its graphics drivers. Every other image installs only the specific
+`kernel-module-` packages it names, and none of them names these two.
+
+**So both tools are configured, compiled, packaged and never shipped.**
+
+### Why it went unnoticed for so long
+
+**Because the userspace half is present everywhere.** `i2c-tools` is in
+`bench-image.bb`, the base every image requires, so `i2cget`,
+`i2cdetect` and `i2cset` are on every board on this bench. The command
+exists, runs, and fails with a message about a missing file, which reads
+as a wiring or configuration problem rather than a packaging one.
+
+**That is the sharpest form of this repository's recurring complaint.** A
+check that cannot run looks exactly like a check that fails, and here the
+tool that would do the checking is the thing that is missing.
+
+**And this bench has met the shape before.** `bench-gadget-image.bb`
+carries a comment headed "no kernel-modules line here, and that is the
+finding", about project 14. The same omission, found a second time, in a
+different place, by a different route.
+
+### Who else this affects
+
+The fragment's own comment names **projects 3, 6 and 11**, and the attempt
+that found it was for **project 5**. Four projects expect a tool that
+reaches no board.
+
+| Project | What it expects | What it would get |
+|---|---|---|
+| 3, boot energy | `spidev` for bring-up | `/dev/spidev*` absent |
+| 5, IIO driver | `/dev/i2c-1` to probe before the driver exists | `ENOENT` |
+| 6, Explorer 700 | raw I2C to check eleven peripherals by hand | the same |
+| 11, userspace library | `/dev/i2c-1`, which its own kas file names | the same |
+
+**Project 11's recipe predicted the message.** `kas/bench-userdrv.yml`
+says in a comment that without the dtparam "there is no `/dev/i2c-1` and
+the library's open fails with `ENOENT`, which reads as" a different fault.
+It was right about the message and attributed it to the device tree alone;
+the packaging is a second, independent cause of the same message.
+
+### Three ways to fix it, and this page does not choose
+
+**This is a build-affecting change and the decision is Joseph's.** All
+three work; they differ in blast radius.
+
+| Option | Change | Cost |
+|---|---|---|
+| **A** | `CONFIG_I2C_CHARDEV=y` and `CONFIG_SPI_SPIDEV=y` in `bench.cfg` | one fragment, every image, no packaging question. Contradicts the fragment's stated reason for choosing `=m`, which deserves rewriting rather than ignoring |
+| **B** | add `kernel-module-i2c-dev` and `kernel-module-spidev` to the images that need them | precise, and repeated in four or more recipes, each of which can be forgotten |
+| **C** | add `kernel-modules` to those images | one line each, pulls every module built, and inflates the rootfs this bench works hard to keep small |
+
+**The argument for A**, which is the one worth writing down: the fragment
+chose `=m` so the tools would not be "part of the running system". A
+module that no image installs is not absent from the running system by
+design, it is absent from the board entirely, which is a different and
+unintended outcome. If the reason for `=m` cannot be made to hold, the
+reason should change rather than the outcome persist.
+
+**Whatever is chosen, the check that proves it** is the one that failed
+here: `modprobe i2c-dev` on a freshly flashed board, or `ls /dev/i2c-1`
+after enabling the controller. It fires today and must stop firing after.
+
+### What this says about the wiring, which is nothing
+
+**The six leads to the SEN0032 remain completely untested.** Every command
+above exercised the kernel's own view of itself. Nothing has yet put a
+signal on `SDA`, and the identification read that would is still waiting
+on a bus.
+
+That is the second time this bench has diagnosed a silent peripheral
+without touching a wire, after project 9's console, and both times the
+rule held: **ask the source whether it is driving before asking the wire
+whether it is carrying.**
+
 ## The one purchase that would change this project
 
 **A soldering iron and one 8-pin 2.54 mm male header.** With a fitted
