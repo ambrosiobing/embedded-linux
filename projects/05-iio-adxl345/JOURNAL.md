@@ -494,3 +494,36 @@ now.
 Four of eight criteria measured, on the first evening this driver has
 run. The card carries a hand-edited `config.txt`; the next flash makes
 the 100 kHz line the image's own.
+
+## 12. The card that needs no hand edit
+
+Friday 9 October 2026, late. The image at `ef8ef05` was built, archived
+and flashed. The flash-time check requested two overlays, `bench-adxl345`
+and `vc4-fkms-v3d`, and no DSI line: the `:forcevariable` did what the
+`:remove` had not, and the linter's new refusal of `:remove` on that
+variable now has a card behind it. The card's `config.txt` carries the
+100 kHz line as the image's own, with no hand edit anywhere on it.
+
+The board booted and the probe bound at 7.39 s on its own, with the SPI
+id nag gone. `of_node/clock-frequency` read 100000. `iio:device0`
+exists. At 100 kHz that is two clean boots against one failed; the
+failed one stays on record as an event.
+
+**The rebuild aborted once more before this, and the second observation
+changed the diagnosis.** The pseudo abort in `do_package` of
+`bench-adxl345` came back on a rebuild that followed a one-line source
+edit, with no other configuration run in between and no kernel
+recompile. So the earlier account, that the kernel's recompile was the
+trigger, was at best half of it; what both aborts share is a rebuild of
+this one recipe into a work directory that `RM_WORK_EXCLUDE` had kept,
+while the kernel, kept the same way, rebuilt twice without complaint.
+The mechanism inside pseudo is not established. The exclusion for the
+module is dropped, with the reason that the files it kept for
+inspection are on every card and in every archive, and the kas file
+says in its own comment what would prove that change wrong: the same
+abort on the next rebuild after it. The remedy that worked both times,
+`cleansstate` on the recipe, is recorded for that case.
+
+Four criteria measured, three images on the card today, and the next
+work is wire rather than software: `INT1` back on pin 16 for the FIFO
+path, and shorter leads before 400 kHz is tried again.

@@ -82,7 +82,18 @@ local_conf_header:
 
     # The kernel's work directory has to survive, because ./go kconfig
     # reads the .config it produced and that is how the symbols in
-    # adxl345.cfg are shown to have arrived. bench-adxl345 is kept for the
-    # same reason one step down: when a module does not load, the first
-    # question is whether the .ko was built at all.
-    RM_WORK_EXCLUDE += "linux-raspberrypi bench-adxl345"
+    # adxl345.cfg are shown to have arrived.
+    #
+    # bench-adxl345 is NOT kept, and it was until Friday 9 October 2026.
+    # Twice that day a rebuild of the module into its kept work directory
+    # ended in pseudo aborting do_package with "path mismatch [2 links]"
+    # on the three .ko.xz files, once after a kernel recompile and once
+    # after a one-line source edit with nothing else changed, while the
+    # kernel rebuilt into its own kept directory without complaint both
+    # times. The mechanism inside pseudo is not established; the remedy
+    # each time was cleansstate on the recipe and a rebuild. The reason
+    # the directory was kept, inspecting the .ko when a module does not
+    # load, is served by the card and by every archive, which carry the
+    # files. If a rebuild after this change aborts the same way, the
+    # exclusion was not the cause and this comment is wrong.
+    RM_WORK_EXCLUDE += "linux-raspberrypi"
