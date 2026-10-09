@@ -58,7 +58,12 @@ local_conf_header:
     # over loose jumper wire: above it the errors are NACKs that read like
     # driver bugs, and the first debugging step is to drop back to 100 kHz
     # and see whether they go away.
-    RPI_EXTRA_CONFIG = "dtparam=i2c_arm_baudrate=400000\ndtoverlay=bench-iks4a1"
+    #
+    # A remove and an append rather than an assignment: kas writes the
+    # sections in sorted name order, and this one kept its line only
+    # because "iio" sorts after the shared "bench". See kas/bench-adxl345.yml.
+    RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
+    RPI_EXTRA_CONFIG:append = "\ndtparam=i2c_arm_baudrate=400000\ndtoverlay=bench-iks4a1"
 
     # The kernel's work directory has to survive, because ./go kconfig
     # reads the .config it produced and that is how the driver symbols in

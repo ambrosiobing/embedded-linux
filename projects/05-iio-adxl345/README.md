@@ -110,7 +110,7 @@ means a board did.
 
 | # | Criterion | Evidence | State |
 |---|---|---|---|
-| 1 | The driver compiles as an out-of-tree module against the image's kernel | `./go adxl345` completing, and three `.ko` in the work directory | **Not started.** No kernel tree on the authoring machine, so this has never been attempted |
+| 1 | The driver compiles as an out-of-tree module against the image's kernel | `./go adxl345` completing, and three `.ko` in the work directory | **Measured**, Friday 9 October 2026: `./go adxl345` completed at commit `b20546d` and the flashed card carries `bench-adxl345-core.ko.xz`, `-i2c` and `-spi` under `lib/modules/6.6.63-v8/updates/`. The first attempt stopped on four differences between the v6.12 the driver was written from and the 6.6 it runs on; journal section 7 |
 | 2 | The part is identified before it is configured: probe reads `DEVID` and refuses on anything but `0xe5` | `dmesg` on a board with the part, and on one without | Configured. `bench_adxl345_core_probe` reads `DEVID` first and returns `-ENODEV` on a mismatch |
 | 3 | `in_accel_x_raw` and its siblings read, and `in_accel_scale` reports a value that turns one g into 9.81 m/s^2 | the four sysfs files, and a reading with the board flat | Configured, and the arithmetic is asserted: `tests/adxl345-driver-test.sh` recomputes the scale from 3.9 mg/LSB and 9.80665 and fails on drift |
 | 4 | The output data rate can be set and read back through `sampling_frequency` | write 100, read 100, and the same for 3200 | Configured. Nine rates, written with `regmap_update_bits` so the low power bit survives |

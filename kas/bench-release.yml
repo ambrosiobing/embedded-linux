@@ -40,4 +40,11 @@ local_conf_header:
 
     # Buildhistory already records what each image contained; committing it
     # means the release record is a diff against the previous release.
-    BUILDHISTORY_COMMIT = "1"
+    #
+    # The forcevariable override rather than an assignment: the shared
+    # "bench" section in bench-rpi4.yml sets the same value, so nothing
+    # was ever lost here, but kas writes sections in sorted name order
+    # and a plain assignment of a shared variable is refused by
+    # scripts/lint.py whichever way the names sort. See
+    # kas/bench-adxl345.yml.
+    BUILDHISTORY_COMMIT:forcevariable = "1"

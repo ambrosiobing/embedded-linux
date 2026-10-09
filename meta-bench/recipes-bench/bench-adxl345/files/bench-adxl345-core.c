@@ -26,9 +26,12 @@
  *
  * WHAT IS NOT HERE YET
  *
- * This file has never been compiled. There is no kernel tree on the
- * machine it was written on, and no board has run it. The project README
- * says so in its acceptance table rather than leaving it to be assumed.
+ * This file first compiled on Friday 9 October 2026, against the 6.6.63
+ * kernel of the bench image, after four edits for the difference between
+ * that kernel and the v6.12 it was written from. No board has loaded it:
+ * the overlay that would bind it is deliberately absent until the
+ * breakout's wiring has been read. The project README's acceptance table
+ * says which of those two states each criterion is in.
  */
 
 #include <linux/bitfield.h>

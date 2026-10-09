@@ -99,7 +99,18 @@ local_conf_header:
     # The offsets are the same ones recorded in bench-status/files/leds.conf,
     # which is where this bench's wiring lives. tests/ab-config-test.sh
     # asserts the two still agree, because nothing else connects them.
-    RPI_EXTRA_CONFIG = "dtoverlay=gpio-led,gpio=17,label=slot-a\ndtoverlay=gpio-led,gpio=27,label=slot-b\ndtoverlay=gpio-led,gpio=22,label=ab-busy"
+    #
+    # A remove and an append rather than an assignment, and this file is
+    # the second place the difference was found to matter. kas writes the
+    # local_conf_header sections in sorted name order; this section is
+    # "ab" and the shared one in bench-rpi4.yml is "bench", so the shared
+    # assignment came later and won, and no card built from the plain
+    # assignment ever carried these three overlay lines. Found by
+    # scripts/lint.py check_kas_shared_overrides on Friday 9 October 2026,
+    # the day the same defect was read off a project 5 card. See
+    # kas/bench-adxl345.yml.
+    RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=gpio-led,gpio=17,label=slot-a\ndtoverlay=gpio-led,gpio=27,label=slot-b\ndtoverlay=gpio-led,gpio=22,label=ab-busy"
 
     # rm_work is inherited and would delete the two source trees this
     # project actually gets debugged in. The boot script is the artefact

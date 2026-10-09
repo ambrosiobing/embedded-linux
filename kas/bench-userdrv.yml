@@ -38,7 +38,13 @@ local_conf_header:
     # and makes a 32-entry FIFO burst take four times as long as it
     # needs to. 1 MHz is possible on short wires and is not set here
     # because nothing has measured this board's wiring yet.
-    RPI_EXTRA_CONFIG = "dtparam=i2c_arm_baudrate=400000"
+    #
+    # A remove and an append rather than an assignment: kas writes the
+    # sections in sorted name order, and this one kept its line only
+    # because "userdrv" sorts after the shared "bench". See
+    # kas/bench-adxl345.yml.
+    RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
+    RPI_EXTRA_CONFIG:append = "\ndtparam=i2c_arm_baudrate=400000"
 
     # The library's work directory survives, because when a register
     # write does not land the first useful thing is to read the built

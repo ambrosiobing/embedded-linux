@@ -3844,3 +3844,43 @@ could not see: naming a package in an image is not enough when nothing
 declares the package at parse time. The two checks together close both
 ends. A module recipe added without a Makefile in `files/` is also
 refused, because then nothing here can say what it produces.
+
+## 119. A project kas file never plainly assigns a variable the shared section sets, because kas orders sections by name
+
+**Context.** Friday 9 October 2026. The first project 5 card was flashed
+and the flash script's own overlay check reported `vc4-kms-dsi-7inch`
+requested, the 7 inch panel overlay that `kas/bench-adxl345.yml` says it
+replaces. Reading the card's `config.txt` confirmed it: the DSI line
+present, the 400 kHz baud rate line absent, and `dtparam=i2c_arm=on`
+present because it comes from a different variable.
+
+**What was happening.** kas writes the `local_conf_header` sections of
+a configuration and its includes into `local.conf` in sorted order of
+their names. The shared section in `bench-rpi4.yml` is `bench`. Project
+5's is `adxl345`, which sorts before it, so the shared plain assignment
+of `RPI_EXTRA_CONFIG` came later in the file and won. Projects 6, 7 and
+10 use sections named `explorer`, `lcd35a` and `iio`, which sort after
+`bench`, and kept their lines by that accident. Project 19's section is
+`ab`, so its three LED overlay lines were never written to any of its
+cards either; that one was found by the linter rule below on its first
+run over the tree, not by a card.
+
+**Decision.** A project section never plainly assigns a variable that a
+shared section plainly assigns. To change a value it uses `:remove` and
+`:append`, which apply at expansion time whatever the file order; to
+replace one it uses `:forcevariable`, the override BitBake applies last.
+`scripts/lint.py` has `check_kas_shared_overrides`, which reads the
+plain assignments in `bench-rpi4.yml` and `bench-rpi3.yml` and refuses
+one of the same variable in any other kas file, whichever way the names
+sort. The three that won by alphabet are refused too, because a rule
+that passed them would be teaching the mechanism it exists to remove.
+Proved by restoring one assignment and watching the rule fire, then
+removing it and watching the rule go quiet; the first whole-tree run
+found four more, one of them project 19's real loss.
+
+**Consequence.** Eight kas files changed; their intended `config.txt`
+output is unchanged except for project 5 and project 19, which now get
+the lines they always described. The card flashed today for project 5
+still runs its bus at the 100 kHz default and the record says so; the
+rebuild that carries the 400 kHz line waits until the wiring question
+is settled, because the sensor answers at either rate or at neither.

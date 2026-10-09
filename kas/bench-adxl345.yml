@@ -45,7 +45,19 @@ local_conf_header:
     # properties of how the breakout is wired, and this bench's DFRobot
     # SEN0032 has not been read yet. A node with a guessed interrupt does
     # not fail safely; it drives whatever else is on that pin.
-    RPI_EXTRA_CONFIG = "dtparam=i2c_arm_baudrate=400000"
+    #
+    # Written as a remove and an append rather than an assignment, and the
+    # reason is the card flashed on Friday 9 October 2026. kas writes the
+    # local_conf_header sections in sorted order of their names. This
+    # section is "adxl345", the shared one in bench-rpi4.yml is "bench",
+    # so the shared assignment came later in local.conf and won: the card
+    # carried the DSI overlay line and not the baud rate line. Projects 6,
+    # 7 and 10 use the same assignment and keep their lines only because
+    # "explorer", "lcd35a" and "iio" sort after "bench". A remove and an
+    # append apply at expansion time whatever the order, and
+    # scripts/lint.py check_kas_shared_overrides refuses the assignment.
+    RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
+    RPI_EXTRA_CONFIG:append = "\ndtparam=i2c_arm_baudrate=400000"
 
     # The kernel's work directory has to survive, because ./go kconfig
     # reads the .config it produced and that is how the symbols in

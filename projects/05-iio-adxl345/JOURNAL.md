@@ -326,3 +326,38 @@ name, matched each other, and loaded. A reader of `modinfo` would then
 have seen a namespace with quotes in it and wondered what the author
 meant. It was fixed because the version difference was known once the
 other three had named the kernel, not because anything reported it.
+
+## 8. The card, the board, and a line the alphabet removed
+
+Friday 9 October 2026, evening. The image built at `b20546d`, was
+archived with the right commit this time, and was flashed to the Pi 3B+
+card over the project 9 image. Before the card left the reader the root
+partition was mounted read-only and listed: the three project 5 modules
+under `updates/`, mainline's three in the kernel tree, `i2c-dev` and
+`spidev` in the builtin list, and the three tools. The credential file
+was written as a derived key rather than a passphrase.
+
+**The flash script found a defect before the board did.** Its overlay
+check reported `vc4-kms-dsi-7inch` requested, which this project's kas
+file says it replaces. The card's `config.txt` had the DSI line, had
+`dtparam=i2c_arm=on`, and did not have the 400 kHz line. Decision 119
+has the mechanism: kas orders the sections by name, `adxl345` sorts
+before the shared `bench`, so the shared assignment won. The fix is a
+remove and an append, a linter rule, and the same conversion in seven
+other kas files, one of which, project 19's, had lost its lines the
+same way. This card runs the bus at 100 kHz and that is recorded here;
+the rebuild waits.
+
+**On the board, three answers.** `/dev/i2c-1` exists on a freshly
+flashed image with nothing loaded by hand, which is the proving check
+written into the kernel fragment that morning and it passes. The scan
+of bus 1 shows no device at any address. The read at 0x53 fails.
+
+So the bus is up and nothing on it answers, and the question moves from
+software to the eight pins of the breakout. The datasheet, revision G,
+requires `CS` high for I2C mode and `SDO` low for address 0x53; a `CS`
+left unconnected puts the part in SPI mode, which produces exactly this
+scan. That is a candidate, not a diagnosis. The wiring is being read off
+the board by eye before anything else is concluded, which is the rule
+this bench learned from a mechanism invented about a HAT that did not
+seat.

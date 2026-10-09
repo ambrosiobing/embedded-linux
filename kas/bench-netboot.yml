@@ -24,7 +24,13 @@ local_conf_header:
     # A tarball rather than a disk image. Set here as well as in the image
     # recipe because bench-rpi4.yml, which this inherits through
     # bench-rpi3.yml, sets IMAGE_FSTYPES for the whole build.
-    IMAGE_FSTYPES = "tar.bz2"
+    #
+    # The forcevariable override rather than an assignment: kas writes the
+    # sections in sorted name order, and this one won over the shared
+    # "bench" section only because "netboot" sorts after it. forcevariable
+    # is the override BitBake applies last whatever the order. See
+    # kas/bench-adxl345.yml.
+    IMAGE_FSTYPES:forcevariable = "tar.bz2"
 
     # The kernel is the thing that gets debugged when a board will not
     # netboot, so keep its work directory.

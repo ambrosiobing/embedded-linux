@@ -47,7 +47,13 @@ local_conf_header:
     # the header and no DSI display, and Project 8 measured what an overlay
     # for absent hardware costs, which is a deferred probe retrying for
     # ever.
-    RPI_EXTRA_CONFIG = "dtoverlay=bench-lcd35a"
+    #
+    # A remove and an append rather than an assignment: kas writes the
+    # sections in sorted name order, and this one kept its line only
+    # because "lcd35a" sorts after the shared "bench". See
+    # kas/bench-adxl345.yml.
+    RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
+    RPI_EXTRA_CONFIG:append = "\ndtoverlay=bench-lcd35a"
 
     # The console on the panel, which is acceptance criterion 2.
     #

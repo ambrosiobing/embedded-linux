@@ -575,6 +575,63 @@ def check_kas() -> None:
             fail(path, "tab character in YAML")
 
 
+KAS_SHARED = ("bench-rpi4.yml", "bench-rpi3.yml")
+KAS_SECTION = re.compile(r"^  ([A-Za-z0-9_-]+): \|\n((?:(?:    .*|)\n)*)", re.M)
+KAS_PLAIN_ASSIGN = re.compile(r"^\s*([A-Z][A-Z0-9_]*)\s*=\s*\"", re.M)
+
+
+def kas_sections(path: Path) -> dict[str, str]:
+    """The local_conf_header sections of a kas file, name to body."""
+    body = text(path)
+    start = body.find("\nlocal_conf_header:")
+    if start < 0:
+        return {}
+    block = body[start:]
+    end = re.search(r"\n[A-Za-z]", block[1:])
+    if end:
+        block = block[: end.start() + 1]
+    return {m.group(1): m.group(2) for m in KAS_SECTION.finditer(block)}
+
+
+def check_kas_shared_overrides() -> None:
+    """A project kas file never plainly assigns a variable the shared one sets.
+
+    kas writes local_conf_header sections into local.conf in sorted order
+    of their names, so which of two plain assignments wins is decided by
+    the alphabet. The shared section in bench-rpi4.yml is "bench". Project
+    5's section "adxl345" sorts before it, so its RPI_EXTRA_CONFIG was
+    overridden and the card flashed on Friday 9 October 2026 carried the
+    DSI panel overlay and not the baud rate line. Projects 6, 7 and 10
+    kept their lines only because "explorer", "lcd35a" and "iio" sort
+    after "bench", which is not a design.
+
+    A :remove and an :append apply at expansion time whatever the order,
+    so a project section uses those. Any plain assignment of a variable
+    that a shared section also plainly assigns is refused, whichever way
+    the names sort, because a rule that passed the lucky three would be
+    teaching the mechanism it exists to remove.
+    """
+    shared: dict[str, str] = {}
+    for name in KAS_SHARED:
+        path = ROOT / "kas" / name
+        if not path.is_file():
+            continue
+        for section, body in kas_sections(path).items():
+            for var in KAS_PLAIN_ASSIGN.findall(body):
+                shared[var] = f"{name} section {section}"
+    for path in sorted((ROOT / "kas").glob("*.yml")):
+        if path.name in KAS_SHARED:
+            continue
+        for section, body in kas_sections(path).items():
+            for var in KAS_PLAIN_ASSIGN.findall(body):
+                if var in shared:
+                    fail(path, f"section {section} assigns {var}, which "
+                               f"{shared[var]} also assigns; kas orders "
+                               "sections by name, so one silently wins. "
+                               "Use :remove and :append to change the "
+                               "value, or :forcevariable to replace it")
+
+
 def check_layer_conf() -> None:
     path = ROOT / "meta-bench" / "conf" / "layer.conf"
     body = text(path)
@@ -1000,6 +1057,7 @@ def main() -> int:
         check_module_rprovides,
         check_license_headers,
         check_kas,
+        check_kas_shared_overrides,
         check_layer_conf,
         check_line_length,
         check_exec_bits,
