@@ -66,7 +66,7 @@ public repository. Three things work better anyway:
 | Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | FriendlyELEC wiki, NanoPi NEO Air, modified 14 November 2023 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/index.php/NanoPi_NEO_Air` |
 | NanoPi NEO Air schematic V1.1 1708, thirteen sheets, 13 October 2017 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
-| Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
+| Allwinner H3 Datasheet, Version 1.2, 23 April 2015 | NEO Air SoC | project 2 | **yes**, chapter 9 | `https://linux-sunxi.org/images/4/4b/Allwinner_H3_Datasheet_V1.2.pdf` |
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
 
@@ -247,6 +247,23 @@ that costs the reproducibility of a timing figure; for project 19, whose
 U-Boot writes a 16 KiB environment on every boot, it leaves a wear
 question that cannot even be asked. Identifying the cards needs no
 download and is the cheapest open item in the index.
+
+**The Allwinner H3 is read, and it is marked confidential on every page.**
+Chapter 9 gives the NEO Air's GPIO figures at last: input high 0.7 times
+the I/O rail, output high the rail minus 0.2 V, and an internal pull-up of
+100 kohm typical, the weakest on the bench by a factor of two. It gives
+the output drive no current figure at all, only a 40 mA absolute maximum,
+and it sets `VCC_IO`'s recommended maximum equal to its absolute maximum,
+3.6 V both, so that rail has no margin between working and damaged. The
+document's own declaration requires written approval for reproduction; the
+citation convention in this file is what makes reading it usable, and
+[project 2's hardware page](../projects/02-neo-air-mainline/docs/hardware.md)
+cites values with their table and page and reproduces nothing.
+
+**The wiki's operating temperature was the SoC's.** FriendlyELEC's "-20 to
+70 C" is Allwinner's Table 9-2 recommended ambient, carried onto the
+board's page unchanged. A chip rating is not a board rating, and the
+board's regulators and radio were never separately rated.
 
 **FriendlyELEC publishes a full schematic where Raspberry Pi publishes a
 reduced one, and it shows.** Thirteen sheets, read Friday 9 October 2026,

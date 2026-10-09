@@ -15,7 +15,7 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 |---|---|---|
 | FriendlyELEC wiki, "NanoPi NEO Air", last modified 14 November 2023 | `vendor page` | **read Wednesday 7 October 2026** |
 | Schematic NanoPi-NEO-Air V1.1 1708, thirteen sheets, 13 October 2017 | `schematic` | **read Friday 9 October 2026** |
-| Allwinner H3 datasheet Rev 1.2 | `datasheet` | **`NOT READ`** |
+| Allwinner H3 Datasheet, Version 1.2, 23 April 2015, chapter 9 | `datasheet` | **read Friday 9 October 2026** |
 
 The ordering is deliberate and it is the opposite of the ordering used on
 the ADXL345 module, where the schematic came first. Here the wiki is the
@@ -209,7 +209,7 @@ rather than to leave it unmentioned, which reads as "nobody checked".
 | the Wi-Fi and Bluetooth part number | the driver and the firmware blob depend on it | **closed Friday 9 October 2026**: `AP6212`, from the schematic |
 | the antenna connector type | `DESIGN.md` requires the antenna attached before first power | **closed Friday 9 October 2026**: one `IPX` connector, `ANT1`, shared by both radios |
 | current drawn, idle or peak | project 3 measures this, so it has no figure to be checked against | open; nowhere, and it is a measurement this bench can make |
-| GPIO voltage thresholds and drive | the same gap as on the Raspberry Pi 3 | open; the Allwinner H3 datasheet, `NOT READ` |
+| GPIO voltage thresholds and drive | the same gap as on the Raspberry Pi 3 | **closed Friday 9 October 2026**: H3 datasheet Table 9-3, page 609, worked through below |
 | the console baud rate | established by measurement here, not by document | open, and no document will close it |
 
 **The second row said it was the one to close first and that it needed no
@@ -406,6 +406,117 @@ no such LED.
 named, the antenna connector is named, and the current consumption remains
 what it always was: a measurement this bench can make rather than a
 document to find.
+
+## The Allwinner H3 datasheet is read, and the last open row closes
+
+**Source: Allwinner Technology, "Allwinner H3 Datasheet, Quad-Core OTT
+Box Processor", Version 1.2, 23 April 2015, 614 pages.** Chapter 9,
+Electrical Characteristics, pages 607 to 609, read Friday 9 October 2026
+from the linux-sunxi mirror Joseph supplied that day.
+
+**Provenance, stated with more care than usual.** Every page of this
+document carries a diagonal "confidential" watermark, and its declaration
+on page 2 says reproduction in whole or in part must obtain Allwinner's
+written approval. The linux-sunxi community hosts it as the reference for
+mainline work on this family, and it is the only source for these
+figures. This page therefore does what
+[docs/DATASHEETS.md](../../../docs/DATASHEETS.md) requires of every
+document and nothing more: it cites individual values with their table
+and page, reproduces no table, and quotes no passage. A reader who needs
+the full tables goes to the document.
+
+**Its revision history, page 3:** V1.0 of 18 November 2014, V1.1 of
+26 January 2015 correcting the PWM description, V1.2 of 23 April 2015
+adding the crypto engine programming guide. The electrical chapter is
+unchanged across those, which is the one thing a reader of an older copy
+would want to know.
+
+### The GPIO figures, at last
+
+The NEO Air schematic shows every I/O rail as `VDD_SYS_3.3V`, so the
+H3's `VCC_IO`, `VCC_PD` and `VCC_PG` are all at 3.3 V on this board, and
+Table 9-3 on page 609 resolves to:
+
+| Quantity | Specified as | At 3.3 V |
+|---|---|---|
+| input high, `V_IH` minimum | 0.7 x `VCC_IO` | **2.31 V** |
+| input low, `V_IL` maximum | 0.3 x `VCC_IO` | **0.99 V** |
+| output high, `V_OH` minimum | `VCC_IO` minus 0.2 | **3.1 V** |
+| output low, `V_OL` maximum | 0.2 V | 0.2 V |
+| input leakage, `I_IH` and `I_IL` | 10 microamp maximum | |
+| **internal pull-up, `R_PU`** | **50 kohm minimum, 100 kohm typical, 150 kohm maximum** | |
+| internal pull-down, `R_PD` | the same | |
+| input and output capacitance | 5 pF maximum each | |
+
+And from Table 9-1, Absolute Maximum Ratings, page 607: **in or out
+current on any I/O, -40 to +40 mA**; `VCC_IO` -0.3 to 3.6 V.
+
+**The output drive has no current figure.** `V_OH` and `V_OL` are given
+with no test current beside them, unlike every other part read on this
+bench. The only current in the chapter is the absolute maximum of 40 mA,
+which is a damage threshold and not a drive specification. So "how much
+can an H3 pin source" has no answer in this document, and the honest
+figure to design against is "well under 40 mA, by an unstated margin".
+
+### What this settles for the rest of the bench
+
+**The console, both directions.** Project 2 drives `UART0` into a 3.3 V
+USB to TTL cable. The H3 guarantees at least 3.1 V high and at most 0.2 V
+low. The cable's receiver is not specified anywhere on this bench, so
+only the board's half of this check is cited; it is the generous half.
+
+**The PPK2's logic inputs, in project 3.** The design puts `GPIOA6` and
+`GPIOG11` on the PPK2's `D0` and `D1`, with the logic port's `VCC` tied to
+the board's 3.3 V. The H3 drives at least 3.1 V. The PPK2's threshold for
+a 1 is 0.65 x `VCC`, which is 2.15 V, a figure recorded in
+[project 3's page](../../03-boot-energy/docs/hardware.md) as second hand
+from a Nordic forum answer rather than from the guide. **Margin of about
+0.95 V on the board's side of a threshold whose own citation is weak.**
+That is the right way round: the uncertain number is the one with the
+room.
+
+**The internal pull-up, which is weaker still.** 100 kohm typical, 150
+kohm maximum. Put into the Sensirion formula from
+[project 10's page](../../10-iio-iks4a1/docs/hardware.md), a 100 kohm
+pull-up permits about **3.5 pF** of bus capacitance in I2C fast mode. The
+NEO Air's own pull-ups on its I2C pins are not shown on the sheets read,
+and this board is not currently on any I2C duty, so this is recorded as a
+number and not as a problem. It is the weakest internal pull-up on the
+bench by a factor of two.
+
+### Two things the recommended conditions say that the wiki repeated
+
+**Table 9-2, page 608**, gives the ambient operating temperature as
+**-20 to +70 C**. The FriendlyELEC wiki's "working temperature -20 C to
+70 C", recorded on this page on Wednesday 7 October 2026, is **the SoC's
+own recommended range**, carried onto the board's page unchanged. So that
+figure is a chip rating and not a board measurement, which is the ordinary
+state of affairs and worth knowing because it means the board's regulators
+and the AP6212 were never separately rated.
+
+**And `VCC_IO`'s recommended maximum equals its absolute maximum.** Table
+9-2 gives 3.6 V as the top of the operating range; Table 9-1 gives 3.6 V
+as the damage threshold. **There is no margin between "works" and
+"damaged" at the top of this rail.** That is a fourth shape for the
+running tally in [docs/HARDWARE.md](../../../docs/HARDWARE.md) of how
+parts state their limits, and it is the least forgiving: a 3.3 V rail with
+a few per cent of overshoot is already at the absolute maximum.
+
+**On this board that rail is `VDD_SYS_3.3V` from the RT8059 buck**, whose
+regulation and overshoot are not specified anywhere read. So the one
+number that would say whether this is comfortable or not is the one
+nobody has.
+
+### What is still `NOT READ`
+
+| Document | What it would settle |
+|---|---|
+| AP6212 datasheet | the radio's supply and timing, and whether `WIFI_32K` is required |
+| the RT8059 datasheet | overshoot on `VDD_SYS_3.3V`, which is the number the previous section needs |
+
+**The H3 was the last structural gap on this page**, and it has closed.
+What remains is two component datasheets for parts the schematic named,
+and both are gettable without help.
 
 ## Reflections on the wiring, and on not rewiring it
 

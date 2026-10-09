@@ -423,8 +423,9 @@ So the running tally of how six parts state the same kind of limit:
 | signal pins referenced to the supply | PCF8574, SHT4x, ADS7846 |
 | one flat figure for any pin | DS3231 |
 | **signal pins flat and above the supply's own maximum** | **CP2102** |
+| **absolute maximum equal to the recommended maximum**, no margin at all | **Allwinner H3**, `VCC_IO` at 3.6 V in both tables |
 
-**Three shapes among five parts that state it.** The convention this
+**Four shapes among six parts that state it.** The convention this
 bench half-formulated on Thursday morning, that signal maxima are
 supply-referenced, is a convention and not a law, and it took three
 successive readings to say so properly. The rule that survives is the
