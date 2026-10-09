@@ -65,7 +65,7 @@ public repository. Three things work better anyway:
 | BCM2835 and BCM2837 peripherals | Pi 3 SoC | GPIO function select, UART, SPI, I2C registers | **partial** | `https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf` |
 | Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | FriendlyELEC wiki, NanoPi NEO Air, modified 14 November 2023 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/index.php/NanoPi_NEO_Air` |
-| NanoPi NEO Air schematic V1.1 | NEO Air | project 2 | no | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
+| NanoPi NEO Air schematic V1.1 1708, thirteen sheets, 13 October 2017 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/images/7/70/Schematic_NanoPi-NEO-Air-V1.1_1708.pdf` |
 | Allwinner H3 datasheet Rev 1.2 | NEO Air SoC | project 2 | no | `https://archive.org/details/allwinner-h3-datasheet` |
 | PPK2 user guide v1.0.1, document 4461_012, PDF | power profiler | projects 3 and 16, and every current measurement | **yes**, sections 6 and 8 | `https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/7735/PPK2_User_Guide.pdf` |
 | Nordic PPK2 user guide, HTML | the same guide, abridged | see the warning in project 3 | **yes** | `https://docs.nordicsemi.com/bundle/ug_ppk2/page/UG/ppk/PPK_user_guide_Intro.html` |
@@ -247,6 +247,21 @@ that costs the reproducibility of a timing figure; for project 19, whose
 U-Boot writes a 16 KiB environment on every boot, it leaves a wear
 question that cannot even be asked. Identifying the cards needs no
 download and is the cheapest open item in the index.
+
+**FriendlyELEC publishes a full schematic where Raspberry Pi publishes a
+reduced one, and it shows.** Thirteen sheets, read Friday 9 October 2026,
+closed three of project 2's four open rows at once: the Wi-Fi and
+Bluetooth part is an **AP6212**, the antenna is a single **IPX**
+connector shared by both radios, and every net on both expansion headers
+matches the wiki's tables under the same names. It also answers, on the
+face of the drawing, the question the Pi 3B+ reduced schematic could not:
+which GPIO drives the status LED. `GPIOA10`, through a 1 kohm resistor.
+
+**And one contrast worth carrying.** On that board Bluetooth sits on
+`UART3` while the debug console sits on `UART0`, so a serial console and a
+working radio do not compete. On every Raspberry Pi here they do, which is
+the whole subject of project 9. Same function, two boards, and the
+difference is visible only once somebody reads both schematics.
 
 **The ADXL345 is read at last, and it closed five rows and opened one
 constraint.** `analog.com` has timed out in every session since Tuesday

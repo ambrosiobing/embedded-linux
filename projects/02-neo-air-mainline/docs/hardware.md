@@ -14,7 +14,7 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 | Document | Evidence | Status |
 |---|---|---|
 | FriendlyELEC wiki, "NanoPi NEO Air", last modified 14 November 2023 | `vendor page` | **read Wednesday 7 October 2026** |
-| Schematic NanoPi-NEO-Air V1.1, 2017 | `schematic` | **`NOT READ`** |
+| Schematic NanoPi-NEO-Air V1.1 1708, thirteen sheets, 13 October 2017 | `schematic` | **read Friday 9 October 2026** |
 | Allwinner H3 datasheet Rev 1.2 | `datasheet` | **`NOT READ`** |
 
 The ordering is deliberate and it is the opposite of the ordering used on
@@ -202,22 +202,210 @@ the supply. **Nothing in this project uses this header**, and the right
 treatment for an unused header carrying a supply is to say so in writing
 rather than to leave it unmentioned, which reads as "nobody checked".
 
-## What the wiki does not say
+## What the wiki does not say, and what has since answered it
 
-| Question | Why it matters | Where it might be answered |
+| Question | Why it matters | Status |
 |---|---|---|
-| the Wi-Fi and Bluetooth part number | the driver and the firmware blob depend on it | the V1.1 schematic, `NOT READ` |
-| the antenna connector type | `DESIGN.md` requires the antenna attached before first power | the schematic, or a photograph of the board |
-| current drawn, idle or peak | project 3 measures this, so it has no figure to be checked against | nowhere; it is a measurement this bench can make |
-| GPIO voltage thresholds and drive | the same gap as on the Raspberry Pi 3 | the Allwinner H3 datasheet, `NOT READ` |
-| the console baud rate | established by measurement here, not by document | the schematic will not say; the H3 datasheet will not either |
+| the Wi-Fi and Bluetooth part number | the driver and the firmware blob depend on it | **closed Friday 9 October 2026**: `AP6212`, from the schematic |
+| the antenna connector type | `DESIGN.md` requires the antenna attached before first power | **closed Friday 9 October 2026**: one `IPX` connector, `ANT1`, shared by both radios |
+| current drawn, idle or peak | project 3 measures this, so it has no figure to be checked against | open; nowhere, and it is a measurement this bench can make |
+| GPIO voltage thresholds and drive | the same gap as on the Raspberry Pi 3 | open; the Allwinner H3 datasheet, `NOT READ` |
+| the console baud rate | established by measurement here, not by document | open, and no document will close it |
 
-**The second row is the one to close first, and it needs no document.**
-The antenna rule in `DESIGN.md` is right for a good reason, that running a
-transmitter into an open circuit is avoidable. But the rule as written
-cannot be checked by anyone who has not already seen the board. A
-photograph of the connector, with the part of the board it sits on, turns
-a rule into an instruction.
+**The second row said it was the one to close first and that it needed no
+document.** That was half right: a photograph would have done it, and so
+did the schematic, which arrived first. The rule in `DESIGN.md` is right
+for a good reason, that running a transmitter into an open circuit is
+avoidable, and it could not previously be checked by anyone who had not
+already seen the board. Now it can, because the connector has a name.
+
+**And the fourth row's phrasing is now wrong in an instructive way.** It
+calls the GPIO gap "the same gap as on the Raspberry Pi 3". The Raspberry
+Pi 3 gap turned out not to exist: the figures are in the GPIO section of
+Raspberry Pi's documentation, as
+[docs/HARDWARE.md](../../../docs/HARDWARE.md) records. **The NEO Air gap
+is real**, and the lesson from the Raspberry Pi applies to it anyway:
+before concluding a fact is unpublished, check that the search was for the
+fact and not for a document type.
+
+## The schematic is read, and it closes three of the four open rows
+
+**Source: FriendlyELEC, "NanoPi NEO Air", schematic revision V1.1 1708,
+thirteen sheets, title block dated Friday 13 October 2017.** Read Friday
+9 October 2026, from the URL Joseph supplied that day.
+
+Its own revision history, on sheet 1:
+
+| Revision | Change |
+|---|---|
+| 1608 | first release |
+| 18 May 2017 | rename net `PWM1/GPIOA6` to `GPIOA6` |
+| 1708 | change the TF card; add the 2.54 mm audio header |
+
+**The first of those is worth noticing**, because it means the board on
+this bench may have `PWM1` on that net or may not, depending on which
+revision it is. The wiki's 24 pin table lists pin 12 as `GPIOA6` with no
+PWM, which matches 1708.
+
+### The Wi-Fi part, which the wiki would not name
+
+**`U19` is an `AP6212`**, on sheet 13, whose title block names the sheet
+"14:AP6212". The block diagram on sheet 2 says the same, with the part
+sitting on the H3's `SDIO`.
+
+That closes the first row of this page's open table. The wiki gives
+"802.11 b/g/n" and "Bluetooth 4.0 dual mode" and never names the chip;
+the schematic names it twice.
+
+**It also explains the architecture.** One part carries both radios: the
+Wi-Fi side goes to the H3 over **SDIO**, four data lines plus clock and
+command, with `R145`, a 22 ohm series resistor, on the clock. The
+Bluetooth side goes over **UART3**, with hardware flow control, plus a
+`PCM` group for audio.
+
+### Bluetooth has its own UART here, which is the opposite of project 9
+
+This is the finding worth carrying off this board.
+
+On a Raspberry Pi, Bluetooth takes the PL011, which is why `disable-bt`
+exists and why [project 9](../../09-kernel-debug/docs/hardware.md) spent
+an evening on a console that was never muxed.
+
+**On the NEO Air there is no such contest.** Sheet 13 wires the AP6212's
+Bluetooth to **`UART3_TX`, `UART3_RX`, `UART3_RTS` and `UART3_CTS`**. The
+debug console is on **`UART0`**, on its own four pin header. Two different
+peripherals, two different pin groups, nothing to disable.
+
+**So a serial console and working Bluetooth coexist on this board without
+a device tree argument**, which is not true of any Raspberry Pi here. If
+project 17's BLE gateway ever wanted a host whose console is not in
+tension with its radio, this is that host.
+
+### The antenna connector is `IPX`, and there is one of it
+
+Sheet 13: **`ANT1`, an `IPX` connector**, its signal pin carrying the net
+`WL_BT_ANT` from pin 2 of the AP6212, with its two shield tabs to ground.
+
+Two things follow, and both matter for the rule in `DESIGN.md` that the
+antenna is attached before the board is first powered.
+
+1. **`IPX` is the U.FL-compatible miniature coaxial family.** It mates by
+   pressing straight down, it is rated for very few mating cycles, and it
+   is removed by lifting vertically with a proper tool or by the plug
+   body, never by pulling the cable.
+2. **There is exactly one connector and it is shared.** The net is
+   `WL_BT_ANT`: Wi-Fi and Bluetooth come out of the same pin into the same
+   antenna. So the rule protects both radios at once, and there is no
+   second connector anybody could mistake it for.
+
+**That closes the second open row**, and it does so in a way that was
+asked for: this page said the rule "cannot be checked by anyone who has
+not already seen the board". Now it can. The connector has a name, a
+designator and a count.
+
+### The rails, and one number project 3 should have
+
+Sheet 8, "POWER 02": `VDD_SYS_3.3V` is generated from `VDD_5V` by **`U6`,
+an `RT8059` switching regulator**, with the net annotated **3.3 V / 1 A**.
+
+So the 3.3 V that reaches the 24 pin header's pins 1 and 17, and every
+sensor hung off it, comes from a 1 A buck converter rather than from the
+input directly.
+
+**The micro USB input is protected, but differently from a Raspberry
+Pi's.** Sheet 8 shows the connector's lines going through four
+`AVRL5V0A5R1KTB` parts, which are 5 V chip varistors, and then `VDD_5V` is
+reached through `Q1`, an `AO3415A` P-channel MOSFET, with a `BCM856BS`
+transistor pair and 10 kohm resistors around it. `U5`, an `SY6280` current
+limited load switch with `R241` setting the limit, sits on the `VBUS` path
+driven by `GPIOL2/USB0-DRVVBUS`.
+
+**What this page will not claim.** The Raspberry Pi's equivalent is simple
+to read: one polyfuse, one transient suppressor, in series. This
+arrangement is a MOSFET and two transistors whose exact function, ideal
+diode, reverse polarity protection, OTG VBUS switching, or some
+combination, **is not something a page-resolution read of one sheet
+settles**. What is certain is that varistors are present on the connector
+and that the path to `VDD_5V` is active rather than a plain wire.
+
+**For project 3, which feeds `VDD_5V` at header pin 2**, the practical
+consequence is the same shape as on the Raspberry Pi: that supply enters
+**after** whatever the micro USB path does, not through it. Evidence level
+`inferred`, from net naming across two sheets.
+
+### Both headers confirmed, net by net
+
+Sheet 10 draws `CON1`, the 24 pin header, and `CON2`, the 12 pin header,
+with every net labelled. **Every row of the wiki's two tables, which this
+page reproduced on Wednesday 7 October 2026, appears on the schematic
+under the same name.** `I2C0_SDA` and `I2C0_SCL` on pins 3 and 5,
+`GPIOG11` on 7, `UART1_TX/GPIOG6` and `UART1_RX/GPIOG7` on 8 and 10, the
+`UART2` group, the `SPI0` group on 19, 21, 23 and 24, and `VDD_SYS_3.3V`
+on pin 1 with `VDD_5V` on pin 2.
+
+**A vendor page confirmed by that vendor's own schematic is the strongest
+agreement available short of a measurement**, and it is worth saying so
+rather than quietly upgrading the evidence column.
+
+**One thing could not be resolved.** The connector's footprint annotation
+beside `CON1` read as `HDR-2.54mm-2x13P` at page resolution, which would
+be twenty six positions, while the drawn pins run 1 to 24 and the wiki
+lists twenty four. Either the annotation is `2x12P` and was misread, or
+there are two unused positions. **Counting the pins on the board settles
+it in a second** and nothing depends on the answer.
+
+### The debug header, confirmed a third time
+
+Sheet 10's `DBG` block shows `GND`, `VDD_5V`, `UART0_TX` and `UART0_RX`,
+in that order, with `R98`, a 4.7 kohm resistor, on the receive side.
+
+So the four pin table in `DESIGN.md` Figure 2 is now confirmed by the
+wiki **and** by the schematic, and the schematic adds the series resistor
+the wiki does not mention.
+
+**The pin 2 warning on this page stands undisturbed**, and is now sourced
+from the drawing as well: pin 2 is `VDD_5V` and pins 3 and 4 are UART0 at
+3.3 V. The red lead stays taped.
+
+### Both LEDs are GPIO driven, and the schematic says which GPIO
+
+Sheet 11:
+
+| LED | Colour | Net | Resistor |
+|---|---|---|---|
+| `PWR` | red | `GPIOL10/PWR-LED` | `R206`, 1 kohm, from `VDD_SYS_3.3V` |
+| `STAT` | green | `GPIOA10/STATUS-LED` | `R203`, 1 kohm, from the same rail |
+
+**Compare this with the Raspberry Pi.** Project 19's page records that the
+Pi 3B+ schematic shows its two LEDs switched by transistors from nets
+called `STATUS_LED_R` and `STATUS_LED_G`, and that **where those nets
+originate was not legible**. Here the equivalent question is answered on
+the face of the drawing: the green LED is driven by `GPIOA10` and nothing
+else.
+
+**So on this board a beating status LED is a GPIO being toggled**, and the
+software that toggles it can be found. That is a stronger statement than
+anything available for the Raspberry Pi, and it is available because
+FriendlyELEC publishes a full schematic where Raspberry Pi publishes a
+reduced one.
+
+**And it is directly useful to project 3**, which hangs an LK-LED10 on the
+board as a visible marker. There is already a GPIO driven green LED on
+`GPIOA10`. Whether to use it instead of a module is a design question this
+page does not settle; what it removes is the assumption that the board had
+no such LED.
+
+### What is still `NOT READ`
+
+| Document | What it would settle |
+|---|---|
+| Allwinner H3 datasheet | the GPIO voltage thresholds and drive currents, which no FriendlyELEC document gives. Joseph supplied four mirror URLs on Friday 9 October 2026 |
+| AP6212 datasheet | the radio's own supply and timing, and whether `WIFI_32K` on `LPO` is required or optional |
+
+**Everything else on this page's open list is closed.** The Wi-Fi part is
+named, the antenna connector is named, and the current consumption remains
+what it always was: a measurement this bench can make rather than a
+document to find.
 
 ## Reflections on the wiring, and on not rewiring it
 
