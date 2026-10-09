@@ -242,6 +242,19 @@ that is accepted, produces numbers, and produces worse numbers than the
 reader believes. Any acceptance figure from this project should record the
 I2C clock alongside the ODR, because one bounds the other.
 
+**And this project already sets the clock, which makes the ceiling
+800 Hz.** `kas/bench-adxl345.yml` carries
+`RPI_EXTRA_CONFIG = "dtparam=i2c_arm_baudrate=400000"`, and so do
+`kas/bench-userdrv.yml` for project 11 and `kas/bench-iio.yml` for project
+10. At 400 kHz the datasheet's recommended maximum output data rate is
+**800 Hz**, not the 200 Hz a default 100 kHz bus would give.
+
+**That is what the recipe sets, which is not the same as what is running.**
+The clock on a particular card is whatever image was flashed onto it, and
+[docs/HARDWARE.md](../../../docs/HARDWARE.md) carries the general rule:
+a document records what was built, not what is connected now. `i2cdetect
+-y 1` and the kernel log settle the running case.
+
 ### The electrical check against a Pi 3B+, both directions
 
 The host's figures now come from the right document and the right board:
