@@ -9,6 +9,7 @@ LICENSE = "MIT"
 
 IMAGE_INSTALL:append = " \
     bench-iio \
+    bench-adxl345-dt \
     kernel-module-bench-adxl345-core \
     kernel-module-bench-adxl345-i2c \
     kernel-module-bench-adxl345-spi \
@@ -53,3 +54,15 @@ IMAGE_INSTALL:append = " \
 # dependency the repository README claims when it says Project 5 writes a
 # driver Project 10 exercises, and installing the tools next to the driver
 # is what turns the claim into something runnable.
+
+# The overlay reaches the boot partition rather than the rootfs, because
+# the firmware reads it before there is a rootfs. bench-adxl345-dt deploys
+# it into overlays/ and this line copies it onto the card; the do_image
+# dependency makes sure it was deployed before the image was assembled.
+# Added Friday 9 October 2026, once the part had been read off the bus at
+# 0x53 and the node could be written from a measurement rather than a
+# guess. The same evening showed what the line in kas/bench-adxl345.yml
+# that requests it is worth: scripts/check-overlays.sh runs at flash time
+# and refuses a config.txt that names an overlay the card does not carry.
+IMAGE_BOOT_FILES:append = " overlays/bench-adxl345.dtbo;overlays/bench-adxl345.dtbo"
+do_image[depends] += "bench-adxl345-dt:do_deploy"

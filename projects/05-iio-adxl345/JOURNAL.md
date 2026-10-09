@@ -405,3 +405,41 @@ a sensor identified by its own register. What it did not reach: the
 overlay that binds the project 5 driver to the part. That is next, and
 with `INT1` unconnected the probe will take its sysfs-only path, which
 is the honest state until that lead is refitted.
+
+## 10. The overlay, written from a measurement
+
+Friday 9 October 2026, night. The kas file had held the overlay line
+back with a sentence: the node needs an address and an interrupt GPIO
+that are properties of how the breakout is wired, and a guessed
+interrupt does not fail safely. Both properties were read off the board
+this evening, so the sentence has done its job and the overlay exists.
+
+One node on `i2c1`, `adxl345@53`, compatible `bench,adxl345`, no
+interrupt property. The address is the one three clean scans and a
+`0xe5` confirmed. The absent interrupt is the honest description of a
+breakout whose `INT1` pin is connected to nothing; the driver's probe
+asks the node for one, finds none, and registers the sysfs path only.
+The overlay's own comment carries the two lines to add when `INT1` is
+back on pin 16, level-triggered for the reason project 10 measured on
+its IMU.
+
+The recipe is project 10's, copied rather than varied: `dtc-native`,
+`allarch`, a deploy task into `overlays/`, an empty package. The image
+gained the recipe in its install list and the two lines that copy the
+`.dtbo` onto the boot partition before assembly. The kas file's
+`:append` gained `dtoverlay=bench-adxl345`.
+
+`tests/adxl345-overlay-test.sh` holds the four files to their
+agreements with no dtc, kernel or board: the compatible in the overlay
+equals the one the bus file matches, the address equals the measured
+one, the `.dtbo` name is the same in recipe, image and config.txt, and
+the node declares no interrupt while the design's wiring table says
+`INT1` is not connected. Sixteen assertions; flipping the compatible to
+mainline's string in place made two of them fail and restoring it made
+all sixteen pass. The last group is the one written to be replaced: when
+`INT1` is refitted the assertion inverts, and the test says so.
+
+What the board will say next is the first thing this project's driver
+has ever been asked: whether its probe reads `0xe5` itself and
+registers an IIO device. That is criterion 2, and the flash-time overlay
+check will have already said whether the `.dtbo` reached the card.

@@ -1,0 +1,83 @@
+/*
+ * bench-adxl345: one ADXL345 on I2C1, bound to Project 5's own driver.
+ *
+ * Declarative only. Nothing here probes, configures or reads anything: it
+ * tells the kernel which driver owns which address and the driver does
+ * the rest. Applied with "dtoverlay=bench-adxl345" in config.txt, which
+ * kas/bench-adxl345.yml puts there through RPI_EXTRA_CONFIG:append.
+ *
+ * THE COMPATIBLE STRING IS THE A/B SWITCH.
+ *
+ * The kernel's own driver claims "adi,adxl345". This project's driver
+ * claims "bench,adxl345" and nothing else, so with both installed in the
+ * same image, which one owns the part is decided by one word here and a
+ * reboot, never by module load order. Change the string below to
+ * "adi,adxl345", reboot, and the same part on the same wires is driven by
+ * mainline: that is the control every measurement in this project is
+ * taken against. docs/DESIGN.md, "A compatible string of our own".
+ *
+ * THE ADDRESS WAS READ OFF THE BUS, NOT ASSUMED.
+ *
+ * 0x53 is the ADXL345 with SDO strapped low, confirmed on Friday
+ * 9 October 2026 by three clean scans and a read of register 0x00
+ * returning 0xe5, the identification value the datasheet fixes. Earlier
+ * the same evening the part drifted between 0x53 and 0x1d because SDO
+ * was connected to nothing; the datasheet, revision G, page 17, says a
+ * floating SDO leaves the address undefined and a floating CS leaves the
+ * interface mode undefined. Both straps are now fitted: CS to header pin
+ * 17, SDO to header pin 6. docs/hardware.md has the scan pattern.
+ *
+ * NO INTERRUPT PROPERTY, AND THAT IS DELIBERATE.
+ *
+ * INT1 was wired to GPIO23 on Saturday 3 October 2026 and was found
+ * disconnected on Friday 9 October 2026. The driver's probe asks the
+ * node for an interrupt and, finding none, registers the device with the
+ * sysfs path only: raw readings, scale and sampling rate work, the
+ * buffered FIFO path does not and cannot. When INT1 is refitted to header
+ * pin 16, add to the node:
+ *
+ *     interrupt-parent = <&gpio>;
+ *     interrupts = <23 4>;
+ *
+ * Level high rather than rising edge, for the reason Project 10 measured
+ * on its IMU: the ADXL345's INT1 stays asserted while the FIFO is above
+ * its watermark, and an edge request counts every bounce on a long
+ * unterminated jumper. Declaring a GPIO that is not wired would be worse
+ * than leaving it out: a driver waiting on a line nothing drives probes
+ * cleanly, reads cleanly through sysfs, and never fills a buffer.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/*
+	 * "brcm,bcm2835" is the compatible every Raspberry Pi overlay
+	 * uses, including on the BCM2837 of a 3B+. It matches the SoC
+	 * family rather than the part, and the firmware accepts it.
+	 */
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&i2c1>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			/*
+			 * Redundant with ENABLE_I2C, which puts
+			 * dtparam=i2c_arm=on in config.txt, and kept anyway so
+			 * that this overlay describes a working bus on its
+			 * own.
+			 */
+			status = "okay";
+
+			accel: adxl345@53 {
+				compatible = "bench,adxl345";
+				reg = <0x53>;
+			};
+		};
+	};
+};

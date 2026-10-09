@@ -31,8 +31,8 @@ local_conf_header:
     # exist and the overlay's node has no parent to attach to.
     ENABLE_I2C = "1"
 
-    # And the rest of config.txt, which REPLACES the line inherited from
-    # bench-rpi4.yml rather than adding to it.
+    # And the rest of config.txt, which removes the one line inherited from
+    # bench-rpi4.yml and adds this project's own.
     #
     # The inherited value loads the 7 inch DSI panel overlay. There is no
     # DSI panel on this board, and an overlay for absent hardware is not
@@ -40,11 +40,13 @@ local_conf_header:
     # log and delays everything ordered after it. Projects 6 and 10 both
     # replace it for the same reason and both say so here.
     #
-    # The overlay line is deliberately absent until the board has been
-    # read. bench,adxl345 needs an address and an interrupt GPIO that are
-    # properties of how the breakout is wired, and this bench's DFRobot
-    # SEN0032 has not been read yet. A node with a guessed interrupt does
-    # not fail safely; it drives whatever else is on that pin.
+    # The overlay line was deliberately absent until the board had been
+    # read, because bench,adxl345 needs an address and an interrupt GPIO
+    # that are properties of how the breakout is wired, and a node with a
+    # guessed interrupt does not fail safely. The board was read on
+    # Friday 9 October 2026: 0x53 answered 0xe5, and INT1 was connected
+    # to nothing. So the overlay declares the address and no interrupt,
+    # and the driver takes its sysfs-only path until INT1 is refitted.
     #
     # Written as a remove and an append rather than an assignment, and the
     # reason is the card flashed on Friday 9 October 2026. kas writes the
@@ -57,7 +59,7 @@ local_conf_header:
     # append apply at expansion time whatever the order, and
     # scripts/lint.py check_kas_shared_overrides refuses the assignment.
     RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
-    RPI_EXTRA_CONFIG:append = "\ndtparam=i2c_arm_baudrate=400000"
+    RPI_EXTRA_CONFIG:append = "\ndtparam=i2c_arm_baudrate=400000\ndtoverlay=bench-adxl345"
 
     # The kernel's work directory has to survive, because ./go kconfig
     # reads the .config it produced and that is how the symbols in
