@@ -320,12 +320,20 @@ transistor pair and 10 kohm resistors around it. `U5`, an `SY6280` current
 limited load switch with `R241` setting the limit, sits on the `VBUS` path
 driven by `GPIOL2/USB0-DRVVBUS`.
 
-**What this page will not claim.** The Raspberry Pi's equivalent is simple
-to read: one polyfuse, one transient suppressor, in series. This
-arrangement is a MOSFET and two transistors whose exact function, ideal
-diode, reverse polarity protection, OTG VBUS switching, or some
-combination, **is not something a page-resolution read of one sheet
-settles**. What is certain is that varistors are present on the connector
+**What this page will not claim.** This arrangement is a MOSFET and two
+transistors whose exact function, ideal diode, reverse polarity
+protection, OTG VBUS switching, or some combination, **is not something a
+page-resolution read of one sheet settles**.
+
+**And a comparison this paragraph made on Friday 9 October 2026 was
+wrong within the hour.** It said the Raspberry Pi's equivalent is "simple
+to read: one polyfuse, one transient suppressor, in series". That
+described the 3B+ sheet as read. The Pi 3 Model B reduced schematic, read
+later the same day, shows a `DMG2305UX` P-channel MOSFET with a `BCM857BS`
+pair between its fuse and its suppressor, which is the same shape as this
+board's. The contrast is withdrawn in
+[docs/HARDWARE.md](../../../docs/HARDWARE.md); both boards use a MOSFET
+stage, and neither sheet settles what it does. What is certain is that varistors are present on the connector
 and that the path to `VDD_5V` is active rather than a plain wire.
 
 **For project 3, which feeds `VDD_5V` at header pin 2**, the practical

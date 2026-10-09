@@ -447,7 +447,7 @@ on it: a package shape, not a marking, visible without magnification.
 
 | Board | On the bench | Evidence | Notes |
 |---|---|---|---|
-| Raspberry Pi 3 | yes | `vendor page` | no datasheet exists, but its **GPIO electrical specification does**, in the GPIO documentation; see below |
+| Raspberry Pi 3 | yes | `vendor page` and `schematic` | no datasheet exists, but its **GPIO electrical specification does**, in the GPIO documentation, and its reduced schematic is read; see below |
 | Raspberry Pi 3 Model B Plus | yes | `vendor page` and `schematic` | the Project 9 board, Rev 1.3; see below |
 | Raspberry Pi 4 | yes | `datasheet` | the only one some HATs support; the only host here with a published electrical specification, see below |
 | NanoPi NEO Air | yes | `NOT READ` | Project 2's target; its supply is the instrument when the profiler is in use |
@@ -594,6 +594,61 @@ blocks above were legible. Component values in the fine print near the
 GPIO nets were not. So **"there is nothing between the SoC and header pins
 8 and 10" is not a claim this reading supports**, and nobody should treat
 it as one.
+
+#### The Pi 3 Model B reduced schematic, and what it does and does not show
+
+**Source: Raspberry Pi 3 Model B reduced schematic, revision 1.2, sheet
+1 of 1, drawn by James Adams, dated Monday 4 April 2016, copyright
+Raspberry Pi 2015.** Read Friday 9 October 2026, from the URL Joseph
+supplied that day. One A2 sheet at page resolution, with the same limits
+as the 3B+ sheet: reference designators and net names legible, fine print
+not.
+
+**This is the board projects 6, 18, 19 and 20 run on**, and until today
+nothing of its own had been read beyond a product page.
+
+**The 1.8 kohm pair is on the ID bus, on this board too.** `R23` and
+`R24`, 1.8 kohm at one per cent from `3V3`, feed `ID_SD` and `ID_SC`
+beside `U1C`, exactly as on the 3B+. The GPIO EXPANSION block annotates
+header pins 3 and 5 as `(SDA1)` and `(SCL1)` and **shows no resistor pair
+on them at this resolution.** So the second reduced schematic says the
+same as the first: the HAT identification bus has fitted 1.8 kohm
+pull-ups, and whatever GPIO2 and GPIO3 carry is either not drawn on a
+reduced sheet or not legible. The documentation's statement that they
+have fixed pull-ups stands; the value recorded on this bench as 1.8 kohm
+remains uncited by either drawing.
+
+**The micro USB input has a MOSFET stage, which this file understated.**
+`J1` feeds `F1`, the `MF-MSMF250/X` polyfuse, then **`Q3`, a `DMG2305UX`
+P-channel MOSFET, with `U14`, a `BCM857BS` transistor pair, and `R2` and
+`R3`**, before `D5`, the `SMBJ5.0A` suppressor. That is the same shape as
+the NanoPi NEO Air's input stage recorded in
+[project 2's page](../projects/02-neo-air-mainline/docs/hardware.md),
+which this file had contrasted with "one polyfuse, one transient
+suppressor, in series" on the Raspberry Pi. **That description came from
+the 3B+ sheet, where no MOSFET was noted at page resolution, and it does
+not describe the 3B.** The contrast is withdrawn: both boards use a
+MOSFET arrangement on the input, and neither sheet read here settles its
+exact function.
+
+**The red PWR LED is driven by a supply supervisor, not by the SoC.**
+`D1`, red, is switched by `Q1` from `U4`, an **`APX803-46SAG`**, whose
+`RST` output also appears as `PWR_LOW_N`. An APX803 is a voltage
+supervisor; its threshold is in its own datasheet, `NOT READ`, and the
+`46` in the part number is where that datasheet would say to look. **So
+on a Pi 3B the PWR LED going out is a brownout indication from a
+dedicated part**, which is why it is the one LED on the board whose
+meaning does not depend on software. That matters to
+[project 19](../projects/19-rauc-ab/docs/hardware.md), where power loss
+is the experiment.
+
+**The green ACT LED, `D2`, is switched by `Q6` from a net called
+`STATUS_LED`**, whose origin is not legible, as on the 3B+. Two reduced
+schematics, same answer, same gap.
+
+**And the console pins are confirmed a third time.** `GPIO14` is annotated
+`(TXD0)` and `GPIO15` `(RXD0)` on `J8`. The ID_SD and ID_SC warning box is
+present word for word.
 
 #### What the Pi 4 datasheet gives that nothing else on this bench does
 
