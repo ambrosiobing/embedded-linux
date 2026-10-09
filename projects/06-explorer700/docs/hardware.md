@@ -28,12 +28,22 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 | Bosch BMP280, `BST-BMP280-DS001-26`, revision 1.26, October 2021 | `datasheet` | **read Thursday 8 October 2026** |
 | NXP PCF8591, revision 7, 27 June 2013 | `datasheet` | **read Thursday 8 October 2026** |
 
-## The host of this project is the one board with no document of its own
+## The host of this project, and a correction to what this page said about it
 
-This project runs on a **Raspberry Pi 3**, not a 3B+. And the Raspberry Pi
-3 Model B has **no product brief and no datasheet**. Its product page
-gives a bulleted specification list and nothing else; it does not even
-link a PDF, only two package change notices.
+This project runs on a **Raspberry Pi 3**, not a 3B+. The Raspberry Pi 3
+Model B has **no product brief and no datasheet**: its product page gives
+a bulleted specification list and nothing else, and does not even link a
+PDF, only two package change notices.
+
+**This page then drew the wrong conclusion from that, on Wednesday
+7 October 2026, and carried it for two days.** It said that every
+electrical claim about a Pi 3 GPIO therefore has to come from the Pi 4
+datasheet or from the Broadcom peripherals document. **Corrected Friday
+9 October 2026:** Raspberry Pi publishes the Pi 3's GPIO electrical
+specification in the **GPIO section of its documentation**, which names
+BCM2835, BCM2836, BCM2837 and RP3A0 explicitly. The figures and the full
+correction are in [docs/HARDWARE.md](../../../docs/HARDWARE.md). The
+mistake was searching for a datasheet rather than for the fact.
 
 | What the product page states | Value |
 |---|---|
@@ -46,20 +56,19 @@ link a PDF, only two package change notices.
 | power | switched micro USB source up to 2.5 A |
 | production | until at least January 2028 |
 
-**So every electrical claim about a Raspberry Pi 3 GPIO on this bench
-comes from the Pi 4 datasheet**, which is a different SoC, or from the
-BCM2835 peripherals document, which is a different part again and gives
-registers rather than volts. That is already recorded in
-[docs/HARDWARE.md](../../../docs/HARDWARE.md); it matters here because
-this project puts eleven peripherals on one header and reasons about pull
-state and drive on several of them.
+**So the right figures for this board are the Pi 3 ones**, not the Pi 4's,
+and they differ where it matters: input high is 1.6 V minimum on a Pi 3
+against 2.0 V on a Pi 4, and output high is stated outright as 3.0 V
+minimum at 2 mA. That matters here because this project puts eleven
+peripherals on one header and reasons about pull state and drive on
+several of them.
 
-**The practical form of that gap**, for this project specifically: the
-I2C bus on GPIO2 and GPIO3 relies on pull-ups, and whether those are the
-HAT's or the SoC's internal ones is a question the pin map answers from
-the HAT's schematic. If it were ever answered from the host side, the only
-number available would be the Pi 4's 47 kohm typical, which is **not a
-figure for this board** and would have to be labelled so.
+**And the I2C question is settled in the project's favour.** The GPIO
+documentation states that **GPIO2 and GPIO3 have fixed pull-up
+resistors**, which is header pins 3 and 5, the bus this HAT uses. So that
+bus is never on an internal pull-up, whatever the HAT does or does not
+fit. If the HAT fits its own as well, the two sit in parallel and the bus
+is pulled harder rather than more weakly, which is the safe direction.
 
 ## What the Pi 4 datasheet adds that this project can use safely
 
@@ -685,4 +694,4 @@ turned a well-reasoned guess into a one-command test.
 | Document | Why it matters |
 |---|---|
 | the BMP180 datasheet | would say what `0xD0` returns on that part, so that a failed BMP280 identification could name what is there instead rather than only what it is not |
-| a Raspberry Pi 3 Model B electrical specification | does not exist; the gap is permanent and should be named rather than closed |
+| ~~a Raspberry Pi 3 Model B electrical specification~~ | **it exists**, in the GPIO documentation rather than in a datasheet, and was found on Friday 9 October 2026 after this page spent two days calling the gap permanent |

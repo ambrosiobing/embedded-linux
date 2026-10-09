@@ -199,6 +199,144 @@ that looks exactly like line noise; and the adapter **renumbers between
 `/dev/ttyUSB0` and `/dev/ttyUSB1`** whenever it re-enumerates, taking the
 proxy down with it, which from outside reads as a dead cable.
 
+### The Raspberry Pi 3 electrical specification exists, and this file said it did not
+
+**Correction, Friday 9 October 2026.** For three days this file, and four
+project pages following it, said that the Raspberry Pi 3 Model B has no
+electrical specification, that the gap was permanent, and that every claim
+about a Pi 3 GPIO therefore had to be borrowed from the Pi 4 datasheet.
+
+**All of that was wrong.** The specification is published, in the GPIO
+section of Raspberry Pi's own documentation rather than in a datasheet,
+and it covers exactly the parts this bench uses.
+
+**Source: Raspberry Pi documentation, "GPIO", AsciiDoc source at
+`documentation/asciidoc/computers/raspberry-pi/gpio-on-raspberry-pi.adoc`
+on the `master` branch of `raspberrypi/documentation`.** Read Friday
+9 October 2026.
+
+Its "Voltage specifications" section carries **two** tables, and names
+whose they are:
+
+> The table below gives the various voltage specifications for the GPIO
+> pins for BCM2835, BCM2836, BCM2837 and RP3A0-based products (for
+> example, Raspberry Pi Zero or Raspberry Pi 3+).
+
+and then a second for "BCM2711-based products (4-series devices)".
+
+**How the mistake happened, because it is worth not repeating.** The
+search was for a *datasheet*, and the question asked was "does Raspberry
+Pi publish a Pi 3 datasheet". The answer to that question is still no.
+The answer to the question that mattered, "does Raspberry Pi publish the
+Pi 3's GPIO electrical characteristics", is yes, and in a place a
+datasheet search does not reach. **The name of the document is not the
+name of the fact.**
+
+### What the Pi 3 table actually says
+
+For BCM2835, BCM2836, BCM2837 and RP3A0, which is the Pi Zero, Pi 1,
+Pi 2, Pi 3 and **Pi 3B+**:
+
+| Symbol | Parameter | Condition | Value |
+|---|---|---|---|
+| `V_IL` | input low voltage | | 0.9 V maximum |
+| `V_IH` | input high voltage, hysteresis enabled | | **1.6 V minimum** |
+| `I_IL` | input leakage current | TA = +85 C | 5 microamp maximum |
+| `C_IN` | input capacitance | | 5 pF maximum |
+| `V_OL` | output low voltage, default drive | `I_OL` = -2 mA | 0.14 V maximum |
+| `V_OH` | output high voltage, default drive | `I_OH` = 2 mA | **3.0 V minimum** |
+| `I_OL` | output low current, maximum drive | `V_O` = 0.4 V | 18 mA minimum |
+| `I_OH` | output high current, maximum drive | `V_O` = 2.3 V | 17 mA minimum |
+| `R_PU` | pull-up resistor | | **50 to 65 kohm** |
+| `R_PD` | pull-down resistor | | 50 to 65 kohm |
+
+with default drive strength 8 mA and maximum 16 mA.
+
+### And the two Raspberry Pi documents disagree about the Pi 4
+
+The same page's second table is for BCM2711, which is the Pi 4. Put it
+beside the Pi 4 datasheet, Table 3 page 8, which this bench read on
+Wednesday 7 October 2026:
+
+| Quantity | Pi 4 **datasheet**, release 1.1 | GPIO **documentation**, BCM2711 table |
+|---|---|---|
+| pull-up resistor | 18 / 47 / 73 kohm | **33 to 73 kohm**, no typical |
+| default drive strength | **8 mA** | **4 mA** |
+| maximum drive strength | **16 mA** | **8 mA** |
+| `I_OH`, maximum drive | 7 mA minimum at `V_O` = 2.3 V | 7 mA minimum at `V_O` = **2.6 V** |
+
+**Two documents from one vendor, about one chip, giving different
+numbers.** This file already carries that rule for Waveshare and for
+Nordic; it now carries it for Raspberry Pi, who had been treated as the
+one source here that did not need diffing.
+
+**No attempt is made to say which is right.** The datasheet is dated and
+revision controlled, release 1.1 of 12 March 2024, and says its electrical
+specification was updated in that revision. The documentation page is
+undated in its source. Where a design depends on one of these numbers,
+**cite which document, and prefer the more conservative figure**: 4 mA of
+guaranteed default drive rather than 8, and a pull-up that might be 73
+kohm rather than 47.
+
+### GPIO2 and GPIO3 have fixed pull-ups, which reverses a conclusion
+
+From the same page, in its second paragraph:
+
+> Pins GPIO2 and GPIO3 have fixed pull-up resistors, but for other pins
+> this can be configured in software.
+
+**That is header pins 3 and 5, the primary I2C bus.** Those two pins are
+not on the internal pull-up at all; they have resistors fitted to the
+board.
+
+**This reverses the arithmetic in
+[project 10's page](../projects/10-iio-iks4a1/docs/hardware.md) for the
+case that matters most.** That working put the host's internal pull-up,
+47 kohm, into Sensirion's bus capacitance formula and found it short by
+more than an order of magnitude. The arithmetic is right. **What was wrong
+was assuming it applied to a Raspberry Pi's I2C bus**, because a
+Raspberry Pi's I2C bus does not use the internal pull-up.
+
+Where it still applies, unchanged:
+
+| Case | Does the arithmetic apply? |
+|---|---|
+| an I2C bus on a Pi's GPIO2 and GPIO3 | **no**, fixed resistors are fitted |
+| a bit-banged I2C bus on other Pi GPIOs | **yes** |
+| an I2C bus on a host that fits no pull-ups | **yes** |
+| any slow signal, such as a pen-down interrupt | no, and [project 7's page](../projects/07-lcd35-drm/docs/hardware.md) says why |
+
+**And the shopping item is withdrawn.** Project 5's page recommended
+buying two resistors of about 4.7 kohm so that the SEN0032's bus would
+meet the condition. On a Raspberry Pi that purchase buys nothing, because
+the board already fits them.
+
+**The value of the fitted resistors is recorded on this bench as 1.8
+kohm**, and that figure is not in the documentation, which says only that
+they exist. The Pi 3B+ reduced schematic does show a 1.8 kohm pair at one
+per cent tolerance, but in the `ID_SD` and `ID_SC` area, which is the HAT
+identification bus and **a different bus**, so that reading does not
+confirm the value for GPIO2 and GPIO3. **Existence: `vendor page`. Value:
+recorded here, not yet cited.**
+
+### What this changes about the rest of this file
+
+The Pi 3 figures above should be used wherever a Pi 3 or Pi 3B+ number was
+previously borrowed from the Pi 4 datasheet, and the two differ in ways
+that matter:
+
+- **`V_IH` is 1.6 V on a Pi 3 and 2.0 V on a Pi 4.** A Pi 3 is the more
+  tolerant input, so any level check that passed on the Pi 4 figure passes
+  on a Pi 3 with more room.
+- **`V_OH` is 3.0 V minimum at 2 mA on a Pi 3**, stated outright, rather
+  than the Pi 4 datasheet's `VDD_IO - 0.4`.
+
+**Applied to the CP2102 check above**, whose relevant board in project 9
+is a Pi 3B+ rather than a Pi 4: the Pi drives at least 3.0 V into a part
+needing 2.0 V, a margin of 1.0 V rather than the 0.9 V computed from the
+Pi 4 figure. The conclusion is unchanged and the citation is now the right
+one for the board.
+
 ### The CP2102, which is on three things here and checked against a Pi at last
 
 **Source: Silicon Laboratories CP2102/9 Single-Chip USB to UART Bridge,
@@ -308,7 +446,7 @@ on it: a package shape, not a marking, visible without magnification.
 
 | Board | On the bench | Evidence | Notes |
 |---|---|---|---|
-| Raspberry Pi 3 | yes | `NOT READ` | no document of its own has been read; the 3B+ brief is the nearest |
+| Raspberry Pi 3 | yes | `vendor page` | no datasheet exists, but its **GPIO electrical specification does**, in the GPIO documentation; see below |
 | Raspberry Pi 3 Model B Plus | yes | `vendor page` and `schematic` | the Project 9 board, Rev 1.3; see below |
 | Raspberry Pi 4 | yes | `datasheet` | the only one some HATs support; the only host here with a published electrical specification, see below |
 | NanoPi NEO Air | yes | `NOT READ` | Project 2's target; its supply is the instrument when the profiler is in use |
@@ -357,12 +495,18 @@ brief. It contains **no GPIO pinout, no alternate function table, no input
 or output voltage thresholds, no pull-up or pull-down values, and no
 per-pin current figure.**
 
-So: **every electrical claim this bench makes about a Raspberry Pi 3 GPIO
-comes from somewhere other than Raspberry Pi.** Before anyone repeats
-"3.3 V logic, 16 mA per pin, 50 mA in total" as settled, notice that the
-manufacturer's document for this board says none of those three things.
-Two of them can be sourced from the Pi 4 datasheet, with the caveat in the
-next section. The third, the total, cannot be sourced at all.
+So: **nothing in this brief supports an electrical claim about a
+Raspberry Pi 3 GPIO.** Before anyone repeats "3.3 V logic, 16 mA per pin,
+50 mA in total" as settled, notice that the brief says none of those three
+things.
+
+**That used to be the end of the paragraph, and the sentence that followed
+it was wrong.** It said every such claim therefore comes from somewhere
+other than Raspberry Pi. On Friday 9 October 2026 the figures turned up in
+the GPIO section of Raspberry Pi's own documentation, which names BCM2835,
+BCM2836, BCM2837 and RP3A0 explicitly. They are set out below, with the
+correction and how the mistake was made. The 50 mA total still has no
+source anywhere.
 
 #### Instructions from the brief that belong in the bench rules
 

@@ -80,9 +80,17 @@ the card.
 dedicated SD card socket supports 1.8 V DDR50 mode at a peak bandwidth of
 50 megabytes per second.
 
-**This project's board is a Raspberry Pi 3, not a Pi 4**, and the Pi 3 has
-no datasheet to give an equivalent figure. So the 50 MB/s number is
-`inferred` for this board and should not be used for a timing claim here.
+**This project's board is a Raspberry Pi 3, not a Pi 4**, and no Raspberry
+Pi document gives an equivalent card interface figure for it. So the
+50 MB/s number is `inferred` for this board and should not be used for a
+timing claim here.
+
+**One nearby claim on this page was wrong and is corrected.** It said the
+Pi 3 has no electrical specification at all. It has one, for its GPIO
+pins, in the GPIO section of Raspberry Pi's documentation, found on
+Friday 9 October 2026; see [docs/HARDWARE.md](../../../docs/HARDWARE.md).
+What that document does **not** cover is the SD card interface, so this
+particular gap is real and the sentence above stands.
 
 What it does bound usefully, as an order of magnitude: writing a whole
 root partition during `rauc install` is the heaviest single operation in

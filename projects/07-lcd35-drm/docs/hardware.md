@@ -259,20 +259,32 @@ specifying its output low voltage as 0.8 V **with a 50 kohm pull-up**.
 GPIO17, and `DESIGN.md`'s wiring table also notes a pull-up on the panel
 itself.
 
-**The Raspberry Pi's internal pull-up is 47 kohm typical**, from the Pi 4
-datasheet Table 3 page 8. That is within six per cent of the value TI
-specifies `PENIRQ` against.
+**This project's board is a Raspberry Pi 3B+**, so the right figure is the
+BCM283x one: **50 to 65 kohm**, from Raspberry Pi's GPIO documentation.
+That brackets the 50 kohm TI specifies `PENIRQ` against, with the minimum
+landing on it exactly.
 
-**And that is worth pausing on, because the same resistor failed badly
-somewhere else on this bench.** The pull-up arithmetic in
-[project 10's page](../../10-iio-iks4a1/docs/hardware.md) shows a 47 kohm
-pull-up permitting about 7.5 pF of bus capacitance in I2C fast mode, which
-is an order of magnitude short of any real wiring.
+**This paragraph said 47 kohm until Friday 9 October 2026**, taken from
+the Pi 4 datasheet, which is the wrong board for this project. The
+conclusion is unchanged and slightly strengthened: 50 to 65 kohm against a
+50 kohm test condition is a better match than 47 was.
+
+**And it is worth pausing on, because the same kind of pull-up failed
+badly somewhere else on this bench.** The arithmetic in
+[project 10's page](../../10-iio-iks4a1/docs/hardware.md) shows an
+internal pull-up of this size permitting about 7.5 pF of bus capacitance
+in I2C fast mode, an order of magnitude short of any real wiring.
 
 | Line | Pull-up | Verdict |
 |---|---|---|
-| an I2C bus at 100 or 400 kHz | 47 kohm internal | **fails**, by more than an order of magnitude |
-| `PENIRQ` on this touch controller | 47 kohm internal | **fine**, and almost exactly the datasheet's own test condition |
+| a **bit-banged** I2C bus on ordinary GPIOs | the internal one, 50 to 65 kohm | **fails**, by more than an order of magnitude |
+| an I2C bus on GPIO2 and GPIO3 | **not the internal one**; fixed resistors are fitted to the board | passes, and the arithmetic never applied |
+| `PENIRQ` on this touch controller | the internal one | **fine**, and it brackets the datasheet's own test condition |
+
+**The middle row was missing until Friday 9 October 2026**, and its
+absence made the first row look like a general verdict on Raspberry Pi
+I2C. It was not. The correction is in
+[docs/HARDWARE.md](../../../docs/HARDWARE.md).
 
 **Same resistor, opposite verdicts, and the difference is what the line
 does.** `PENIRQ` is an interrupt that falls once when a finger lands and

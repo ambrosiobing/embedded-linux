@@ -267,10 +267,20 @@ inputs.**
 **And the practical consequence for this project is nil**, which is the
 happy ending. The IKS4A1 is a designed shield; it carries its own
 pull-ups, and the typical application circuit on page 3 of this datasheet
-shows **10 kohm** on SDA and SCL, which is what a sensible board fits.
-This arithmetic matters for the hand-wired buses in projects 5 and 11, not
-for this one. It is recorded here because this is where the formula was
-found.
+shows **10 kohm** on SDA and SCL, which is what a sensible board fits. It
+is recorded here because this is where the formula was found.
+
+**A third caveat, added Friday 9 October 2026, and it is the one that
+matters.** This section originally ended by saying the arithmetic matters
+for the hand-wired buses in projects 5 and 11. **It does not, where those
+buses run on a Raspberry Pi.** Raspberry Pi's GPIO documentation states
+that GPIO2 and GPIO3 have **fixed pull-up resistors**, so the primary I2C
+bus is never on the internal pull-up and the 47 kohm never applied to it.
+
+The arithmetic stands and its scope was wrong. Where it still applies: a
+bit-banged bus on other GPIOs, and a host that fits none. The correction,
+and what it withdrew from project 5, is in
+[docs/HARDWARE.md](../../../docs/HARDWARE.md).
 
 ## And the PPK2 cannot measure this sensor at all
 

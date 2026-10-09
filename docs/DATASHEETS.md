@@ -61,6 +61,7 @@ public repository. Three things work better anyway:
 | Raspberry Pi 3 Model B+ reduced schematic, V1.0, 19 March 2018 | Pi 3 Model B Plus | header pin functions, power protection | **yes** | `https://datasheets.raspberrypi.com/rpi3/raspberry-pi-3-b-plus-reduced-schematics.pdf` |
 | Raspberry Pi 3 Model B product page | Pi 3, the host of projects 6, 18, 19 and 20 | the only document that exists for it | **yes**, and it is a bullet list | `https://www.raspberrypi.com/products/raspberry-pi-3-model-b/` |
 | Raspberry Pi network boot documentation, AsciiDoc source on `master` | the boot ROM | project 4 | **yes** | `https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/remote-access/network-boot-raspberry-pi.adoc` |
+| Raspberry Pi GPIO documentation, AsciiDoc source on `master` | **the Pi 3's and Pi 4's GPIO electrical specification** | every project with a GPIO | **yes** | `https://github.com/raspberrypi/documentation/blob/master/documentation/asciidoc/computers/raspberry-pi/gpio-on-raspberry-pi.adoc` |
 | BCM2835 and BCM2837 peripherals | Pi 3 SoC | GPIO function select, UART, SPI, I2C registers | **partial** | `https://datasheets.raspberrypi.com/bcm2835/bcm2835-peripherals.pdf` |
 | Raspberry Pi Touch Display product brief, April 2024 | DSI panel | project 13 | **yes** | `https://datasheets.raspberrypi.com/display/7-inch-display-product-brief.pdf` |
 | FriendlyELEC wiki, NanoPi NEO Air, modified 14 November 2023 | NEO Air | project 2 | **yes** | `https://wiki.friendlyelec.com/wiki/index.php/NanoPi_NEO_Air` |
@@ -246,6 +247,25 @@ that costs the reproducibility of a timing figure; for project 19, whose
 U-Boot writes a 16 KiB environment on every boot, it leaves a wear
 question that cannot even be asked. Identifying the cards needs no
 download and is the cheapest open item in the index.
+
+**The Raspberry Pi 3 has a GPIO electrical specification after all, and
+this file said for two days that it did not.** Corrected Friday 9 October
+2026. It is in the **GPIO section of Raspberry Pi's documentation**, whose
+voltage tables name BCM2835, BCM2836, BCM2837 and RP3A0 explicitly, and it
+gives input and output thresholds, drive currents and a pull-up range of
+50 to 65 kohm. The mistake was searching for a *datasheet* and concluding
+from its absence that the *fact* was unpublished. **The name of the
+document is not the name of the fact.**
+
+**Two further things came out of the same page**, both in
+[docs/HARDWARE.md](HARDWARE.md). **GPIO2 and GPIO3 have fixed pull-up
+resistors**, so a Raspberry Pi's primary I2C bus is never on the internal
+pull-up, which withdraws a shopping item from project 5 and narrows the
+scope of an arithmetic result that was itself correct. And the GPIO page
+and the Pi 4 datasheet **disagree about the Pi 4**: 33 to 73 kohm against
+18 / 47 / 73, and 4 mA default drive against 8. Two documents from one
+vendor are two sources, and Raspberry Pi had been the one vendor here
+treated as not needing a diff.
 
 **The Raspberry Pi 3 Model B has no product brief and no datasheet.** Its
 product page gives a bullet list, links no PDF, and is the whole of what

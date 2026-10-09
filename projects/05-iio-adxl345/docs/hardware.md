@@ -80,10 +80,30 @@ realistic wiring.** The criterion is Sensirion's, for its own part, and
 the ordinary I2C rise-time condition besides; the working is in
 [project 10's hardware page](../../10-iio-iks4a1/docs/hardware.md).
 
-**Which makes the remedy concrete rather than hopeful.** Two resistors of
-about 4.7 kohm from `SDA` and `SCL` to 3V3 would put the bus inside the
-condition with room to spare. There are none on this bench, and that is
-now a specific shopping item rather than a vague wish.
+**Which made the remedy look concrete.** Two resistors of about 4.7 kohm
+from `SDA` and `SCL` to 3V3 would put the bus inside the condition with
+room to spare, and this page listed them as a shopping item.
+
+**Withdrawn on Friday 9 October 2026, for the Raspberry Pi case.**
+Raspberry Pi's GPIO documentation states that **GPIO2 and GPIO3 have
+fixed pull-up resistors**, which is header pins 3 and 5, the primary I2C
+bus. A Raspberry Pi's I2C bus is therefore never on the internal pull-up,
+the arithmetic above never applied to it, and buying those two resistors
+for a Pi would buy nothing. The full correction is in
+[docs/HARDWARE.md](../../../docs/HARDWARE.md).
+
+**Where the arithmetic does still apply**, unchanged: a bit-banged I2C bus
+on any other Pi GPIO, and any host that fits no pull-ups of its own. This
+module has been exercised on a Nucleo as well as on a Pi, and what the
+Nucleo fits is `NOT READ`.
+
+**The shape of the error is worth more than the error.** The working was
+sound, the formula was the manufacturer's, the number was the right number
+for an internal pull-up, and the conclusion was still wrong, because
+nobody had asked whether the bus in question used the internal pull-up at
+all. **An arithmetic result inherits every assumption in its inputs**, and
+the assumption here was never written down, which is exactly why it went
+unexamined.
 
 **And the honest caveat, which matters more than the number.** That figure
 is the **Pi 4's**, from the BCM2711 datasheet. The Raspberry Pi 3 Model B+
