@@ -85,4 +85,4 @@ module_spi_driver(bench_adxl345_spi_driver);
 MODULE_AUTHOR("Joseph Ambrose Pagaran");
 MODULE_DESCRIPTION("ADXL345 over SPI, bench IIO driver");
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS("BENCH_ADXL345");
+MODULE_IMPORT_NS(BENCH_ADXL345);

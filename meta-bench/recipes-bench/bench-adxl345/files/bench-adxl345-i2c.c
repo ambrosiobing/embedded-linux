@@ -75,4 +75,4 @@ module_i2c_driver(bench_adxl345_i2c_driver);
 MODULE_AUTHOR("Joseph Ambrose Pagaran");
 MODULE_DESCRIPTION("ADXL345 over I2C, bench IIO driver");
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS("BENCH_ADXL345");
+MODULE_IMPORT_NS(BENCH_ADXL345);

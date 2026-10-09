@@ -293,3 +293,36 @@ rule: a sibling's explanation of itself is a claim like any other.
 
 The image has still not been assembled. Next is a rebuild with the recipe
 scheduled, then the flash and the three checks on the board.
+
+## 7. The driver meets the kernel it will run on
+
+Friday 9 October 2026, later still. With the recipe scheduled, the three
+sources compiled against a real kernel tree for the first time, and the
+core file stopped on three errors. Section 2 of this journal records
+that the driver was written with Linux v6.12 as its cited reference. The
+image carries 6.6.63. Every one of the three, and a fourth the compiler
+had not reached, is a difference between those two kernels:
+
+| Line | What 6.12 accepts | What 6.6 needs |
+|---|---|---|
+| the scan timestamp | the `aligned_s64` typedef | `s64` with `__aligned(8)`, which is how 6.6's own drivers write it |
+| `dev_fwnode` and `fwnode_irq_get` | reached through another header | `linux/property.h` named directly |
+| `devm_iio_kfifo_buffer_setup` | reached through another header | `linux/iio/kfifo_buf.h` named directly |
+| the symbol namespace | a quoted string, which is the spelling from 6.13 | a bare identifier; 6.6 stringifies the argument itself, so the quotes would have become part of the name on the export and both imports |
+
+The two bus files compiled; their only change is the namespace spelling,
+which has to match the core's.
+
+**None of this was knowable on the authoring laptop**, which has no
+kernel tree and is not allowed to compile, and the file's own header has
+said since it was written that it had never been compiled. That sentence
+stays until a build proves it false; it is the next thing this journal
+expects to record.
+
+The fourth row is the one worth a sentence. It would not have stopped the
+compile. With 6.6 stringifying a quoted argument, the export and the two
+imports would all have carried the quote characters inside the namespace
+name, matched each other, and loaded. A reader of `modinfo` would then
+have seen a namespace with quotes in it and wondered what the author
+meant. It was fixed because the version difference was known once the
+other three had named the kernel, not because anything reported it.

@@ -37,11 +37,13 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 
 #include <linux/iio/buffer.h>
 #include <linux/iio/events.h>
 #include <linux/iio/iio.h>
+#include <linux/iio/kfifo_buf.h>
 #include <linux/iio/sysfs.h>
 
 #include "bench-adxl345.h"
@@ -80,10 +82,16 @@ struct bench_adxl345 {
 	 * axes and the timestamp adjacent and the whole thing aligned to
 	 * 8. Getting this wrong does not fail on arm64, it produces a
 	 * timestamp that is occasionally torn, which is worse.
+	 *
+	 * Spelled as s64 with __aligned(8) rather than the aligned_s64
+	 * typedef, because the typedef is newer than the 6.6 kernel this
+	 * image carries and the first compile against that kernel, on
+	 * Friday 9 October 2026, stopped on it. The in-tree drivers of
+	 * 6.6 write it this way; the two forms mean the same thing.
 	 */
 	struct {
 		s16 axis[BENCH_ADXL345_AXES];
-		aligned_s64 timestamp;
+		s64 timestamp __aligned(8);
 	} scan;
 };
 
@@ -460,7 +468,14 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 
 	return devm_iio_device_register(dev, indio_dev);
 }
-EXPORT_SYMBOL_NS_GPL(bench_adxl345_core_probe, "BENCH_ADXL345");
+/*
+ * The namespace is an identifier, not a string. Kernels from 6.13 take a
+ * quoted string here; 6.6, which this image carries, stringifies the
+ * argument itself, so a quoted spelling would have made the quotes part
+ * of the namespace name on both the export and the two imports. The
+ * bus files spell it the same way for the same reason.
+ */
+EXPORT_SYMBOL_NS_GPL(bench_adxl345_core_probe, BENCH_ADXL345);
 
 MODULE_AUTHOR("Joseph Ambrose Pagaran");
 MODULE_DESCRIPTION("ADXL345 three axis accelerometer, bench IIO driver");
