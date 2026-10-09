@@ -623,6 +623,18 @@ def check_kas_shared_overrides() -> None:
         if path.name in KAS_SHARED:
             continue
         for section, body in kas_sections(path).items():
+            # :remove cannot work on RPI_EXTRA_CONFIG. The lines in its
+            # value are joined by a literal backslash and n, which
+            # rpi-config's echo turns into line breaks only when config.txt
+            # is written, so the whole value is one whitespace-free token
+            # and :remove, which removes whole tokens, removes nothing. Six
+            # kas files carried one on Friday 9 October 2026 and the card
+            # flashed from them still requested the DSI overlay.
+            if re.search(r"^\s*RPI_EXTRA_CONFIG:remove\b", body, re.M):
+                fail(path, f"section {section} uses RPI_EXTRA_CONFIG:remove, "
+                           "which removes nothing because the value is one "
+                           "token joined by literal backslash-n; use "
+                           ":forcevariable to replace the value")
             for var in KAS_PLAIN_ASSIGN.findall(body):
                 if var in shared:
                     fail(path, f"section {section} assigns {var}, which "

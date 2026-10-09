@@ -59,12 +59,19 @@ local_conf_header:
     # which is the opposite trade from Project 17 and the reason the two
     # are not the same image.
     #
-    # A remove and an append rather than an assignment: kas writes the
+    # Not a plain assignment: kas writes the
     # sections in sorted name order, and this one kept its lines only
     # because "explorer" sorts after the shared "bench". See
     # kas/bench-adxl345.yml.
-    RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
-    RPI_EXTRA_CONFIG:append = "\ndtoverlay=disable-bt\ndtoverlay=bench-explorer700"
+    # forcevariable, after a remove-and-append pair was tried and did not
+    # work: the newline between the lines is the two characters backslash
+    # and n in BitBake's value, which rpi-config's echo turns into a line
+    # break only when config.txt is written. So the whole value is one
+    # whitespace-free token and :remove, which removes whole tokens, found
+    # nothing to remove; the card flashed at 76d1e89 on Friday 9 October
+    # 2026 still requested the DSI overlay. forcevariable is the override
+    # BitBake applies last, whatever the section order.
+    RPI_EXTRA_CONFIG:forcevariable = "dtoverlay=disable-bt\ndtoverlay=bench-explorer700"
 
     # GPIO_IR is deliberately NOT set. meta-raspberrypi turns it into
     # "dtoverlay=gpio-ir,gpio_pin=N", which binds a second gpio-ir-recv.

@@ -66,7 +66,15 @@ static const struct of_device_id bench_adxl345_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, bench_adxl345_of_match);
 
+/*
+ * Two names. The SPI core derives a fallback id from the compatible by
+ * dropping the vendor prefix, so for "bench,adxl345" it looks for
+ * "adxl345" and logs "has no spi_device_id for bench,adxl345" when the
+ * table lacks it, which it did on the first boot of Friday 9 October
+ * 2026. The nag is harmless; the entry makes it true.
+ */
 static const struct spi_device_id bench_adxl345_spi_id[] = {
+	{ "adxl345" },
 	{ "bench-adxl345" },
 	{ }
 };

@@ -48,18 +48,37 @@ local_conf_header:
     # to nothing. So the overlay declares the address and no interrupt,
     # and the driver takes its sysfs-only path until INT1 is refitted.
     #
-    # Written as a remove and an append rather than an assignment, and the
-    # reason is the card flashed on Friday 9 October 2026. kas writes the
+    # Not a plain assignment, and the reason is the card flashed on
+    # Friday 9 October 2026. kas writes the
     # local_conf_header sections in sorted order of their names. This
     # section is "adxl345", the shared one in bench-rpi4.yml is "bench",
     # so the shared assignment came later in local.conf and won: the card
     # carried the DSI overlay line and not the baud rate line. Projects 6,
     # 7 and 10 use the same assignment and keep their lines only because
-    # "explorer", "lcd35a" and "iio" sort after "bench". A remove and an
-    # append apply at expansion time whatever the order, and
+    # "explorer", "lcd35a" and "iio" sort after "bench", and
     # scripts/lint.py check_kas_shared_overrides refuses the assignment.
-    RPI_EXTRA_CONFIG:remove = "dtoverlay=vc4-kms-dsi-7inch"
-    RPI_EXTRA_CONFIG:append = "\ndtparam=i2c_arm_baudrate=400000\ndtoverlay=bench-adxl345"
+    # forcevariable, after a remove-and-append pair was tried and did not
+    # work: the newline between the lines is the two characters backslash
+    # and n in BitBake's value, which rpi-config's echo turns into a line
+    # break only when config.txt is written. So the whole value is one
+    # whitespace-free token and :remove, which removes whole tokens, found
+    # nothing to remove; the card flashed at 76d1e89 on Friday 9 October
+    # 2026 still requested the DSI overlay. forcevariable is the override
+    # BitBake applies last, whatever the section order.
+    #
+    # 100 kHz, NOT the 400 kHz the design wanted, and the reason is a
+    # measurement. On the first card carrying this overlay, Friday
+    # 9 October 2026, the bus at 400 kHz answered nothing: two empty
+    # scans and a failed register read where the same part had answered
+    # at 100 kHz an hour earlier. With the baud rate line removed by hand
+    # and nothing else touched, 0x53 and 0xe5 came back and the driver
+    # bound. The breakout sits in a breadboard on six jumpers and two
+    # straps; kas/bench-iio.yml already records 400 kHz as the limit over
+    # loose jumper wire with NACKs as the symptom. The ADXL345 datasheet
+    # bounds the output data rate at 100 kHz to 200 Hz, which is enough
+    # for criteria 3 and 4 and not for the FIFO rates in criterion 5;
+    # the way back to 400 kHz is shorter wires, not a config change.
+    RPI_EXTRA_CONFIG:forcevariable = "dtparam=i2c_arm_baudrate=100000\ndtoverlay=bench-adxl345"
 
     # The kernel's work directory has to survive, because ./go kconfig
     # reads the .config it produced and that is how the symbols in

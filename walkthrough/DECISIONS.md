@@ -3880,6 +3880,16 @@ Proved by restoring one assignment and watching the rule fire, then
 removing it and watching the rule go quiet; the first whole-tree run
 found four more, one of them project 19's real loss.
 
+**Amended the same night: `:remove` cannot do this, `:forcevariable`
+can.** The card flashed at `76d1e89` still requested the DSI overlay
+beside the new one. The lines of `RPI_EXTRA_CONFIG` are joined by the two
+characters backslash and n, which rpi-config's `echo` turns into line
+breaks only when `config.txt` is written, so inside BitBake the value is
+one whitespace-free token and `:remove`, which removes whole tokens,
+removes nothing. The `:append` half had worked for the same reason. All
+six files now use `:forcevariable`, and the linter refuses an
+`RPI_EXTRA_CONFIG:remove` outright.
+
 **Consequence.** Eight kas files changed; their intended `config.txt`
 output is unchanged except for project 5 and project 19, which now get
 the lines they always described. The card flashed today for project 5

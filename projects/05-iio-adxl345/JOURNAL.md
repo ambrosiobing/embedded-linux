@@ -443,3 +443,54 @@ What the board will say next is the first thing this project's driver
 has ever been asked: whether its probe reads `0xe5` itself and
 registers an IIO device. That is criterion 2, and the flash-time overlay
 check will have already said whether the `.dtbo` reached the card.
+
+## 11. The driver binds, reads, and sets its rate; the bus speed does not survive the wiring
+
+Friday 9 October 2026, night. The card at `76d1e89` carried the overlay,
+and the flash-time check said so: `bench-adxl345` requested and present.
+It also said the DSI overlay was still requested, which the `:remove` in
+the kas file was supposed to prevent. It could not: the lines of that
+variable are joined by a literal backslash and n that only rpi-config's
+`echo` turns into line breaks, so to BitBake the value is one token and
+`:remove` found nothing. Decision 119 is amended; six kas files use
+`:forcevariable` and the linter refuses the `:remove`.
+
+**On the board, the overlay did everything an overlay does.** The device
+`1-0053` existed, udev loaded all three modules unasked, and the probe
+ran and asked the part for its identification. The part answered with a
+NACK. At 400 kHz, which this card was the first to carry, two scans
+showed nothing and `i2cget` failed where the same part had read `0xe5`
+at 100 kHz an hour earlier. The baud rate line was removed by hand on
+the card and nothing else was touched: `53` twice, `0xe5`. The kernel's
+view of the bus, read from `of_node/clock-frequency`, was 400000 before
+and 100000 after. So the speed was the variable, on this wiring. The
+kas file now says 100 kHz, with the datasheet's consequence stated: the
+output data rate at that bus speed tops out at 200 Hz, which serves
+criteria 3 and 4 and not the FIFO rates of criterion 5. The way back to
+400 kHz is shorter wires.
+
+**The probe then failed once more and succeeded twice.** On the 100 kHz
+boot the read at 7.09 s was a NACK while the same read from the shell
+at 355 s succeeded, and a `bind` from sysfs probed cleanly: `no
+interrupt, so sysfs only and no buffer`, `iio:device0`. A reboot with
+nothing changed probed cleanly at 7.07 s. One failure in two boots at
+this speed is an event, not a mechanism, and no retry goes into the
+probe on its strength. Every further boot is an observation.
+
+**Then three criteria in three commands.** `name` `bench-adxl345`,
+`in_accel_scale` `0.038245935`, axes `-8`, `46`, `242` with the board
+flat, which is 0.95 g on z. `in_accel_sampling_frequency` took 100 and
+gave back `100.000000`, took 3200 and gave back `3200.000000`. The
+acceptance table had named that file `sampling_frequency`, which does
+not exist because the channel declares its rate shared by type; the row
+is corrected, and the prefix is the one mainline's driver uses, which
+the A/B comparison will want.
+
+**One nag, fixed.** The SPI bus file logged "no spi_device_id for
+bench,adxl345": the SPI core derives a fallback id by dropping the
+vendor prefix and looks for `adxl345`, which the table lacked. It has it
+now.
+
+Four of eight criteria measured, on the first evening this driver has
+run. The card carries a hand-edited `config.txt`; the next flash makes
+the 100 kHz line the image's own.
