@@ -505,6 +505,31 @@ emit() {
 	note "row        $csv"
 }
 
+# -d SEC, anywhere after the mode. The usage line has promised it since
+# the program was written and nothing read it until Friday 9 October
+# 2026, when two five second captures on Project 5's card each ran for
+# the ten second default and said so in their own output. The option
+# overrides BENCH_IIO_DURATION, which stays for the tests.
+args=""
+while [ $# -gt 0 ]; do
+	case $1 in
+	-d)
+		[ $# -ge 2 ] || usage
+		case $2 in
+		'' | *[!0-9]*) die "-d wants a whole number of seconds, not '$2'" ;;
+		esac
+		DURATION=$2
+		shift 2
+		;;
+	*)
+		args="$args $1"
+		shift
+		;;
+	esac
+done
+# shellcheck disable=SC2086
+set -- $args
+
 case ${1:-} in
 poll) shift; [ $# -ge 1 ] || usage; do_poll "$@" ;;
 trigger) shift; [ $# -ge 2 ] || usage; do_trigger "$@" ;;

@@ -229,6 +229,19 @@ echo 0 >"$DEV/buffer/watermark"
 out=$(BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results BENCH_IIO_DURATION=1 	sh "$SUT" fifo lsm6dsv16x_accel 480 64 2>&1 || true)
 contains "and falls back to lsm6 for the ST driver, which names its line otherwise" 	"$out" 'matching "lsm6"'
 
+# The -d option, promised by the usage line and implemented on Friday
+# 9 October 2026 after two "-d 5" captures each ran for the ten second
+# default. The environment variable stays for these tests; the option
+# must win over it, since the operator typed it.
+build_device
+echo 0 >"$DEV/buffer/watermark"
+out=$(BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results BENCH_IIO_DURATION=9 	BENCH_IIO_IRQ=lsm6 sh "$SUT" fifo lsm6dsv16x_accel 480 64 -d 1 2>&1 || true)
+contains "-d SEC sets the capture length and beats the environment" "$out" "in 1s)"
+status=0
+out=$(BENCH_IIO_ROOT=$WORK sh "$SUT" fifo lsm6dsv16x_accel 480 64 -d five 2>&1) || status=$?
+check "a non-numeric -d is refused" "$status" "1"
+contains "and the refusal says what it wanted" "$out" "whole number of seconds"
+
 # ------------------------------------------------ every channel, not one
 #
 # A buffer holding a timestamp and no data channel is not a buffer the
