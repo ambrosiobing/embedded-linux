@@ -248,6 +248,31 @@ U-Boot writes a 16 KiB environment on every boot, it leaves a wear
 question that cannot even be asked. Identifying the cards needs no
 download and is the cheapest open item in the index.
 
+**The ADXL345 is read at last, and it closed five rows and opened one
+constraint.** `analog.com` has timed out in every session since Tuesday
+6 October 2026; the document was read from a mirror on Friday 9 October
+2026 and carries "Rev. G" on every page, which is the revision this index
+has always named. Four of the five claims projects 5 and 11 had marked
+`inferred` were right. **The fifth had the wrong constant**: the digital
+pin maximum is VDD I/O plus 0.3 V or **3.9 V**, whichever is less, not
+3.6 V, and at a 3.3 V rail the two branches happen to give the same answer
+so the error was invisible. An inference can be right in structure and
+wrong in a constant, and one test case can agree with both.
+
+**The constraint nobody knew about:** the maximum output data rate is
+limited by the I2C clock, 200 Hz at 100 kHz and 800 Hz at 400 kHz, and
+exceeding it is documented to cause missing samples and extra noise rather
+than an error. Any acceptance figure from project 5 should record the bus
+clock beside the data rate.
+
+**And `DEVID` at `0x00` reads `0xE5`**, so that project now has the one
+command identification test project 7 cannot have.
+
+**When a host refuses, say which host and try a mirror.** Three vendors
+have now refused this bench: `analog.com`, `st.com` and `silabs.com`. Two
+of the three were readable from mirrors carrying the vendor's own revision
+line on every page, which is what makes a mirror citable.
+
 **The Raspberry Pi 3 has a GPIO electrical specification after all, and
 this file said for two days that it did not.** Corrected Friday 9 October
 2026. It is in the **GPIO section of Raspberry Pi's documentation**, whose
@@ -541,7 +566,7 @@ of remembered.
 | Document | Part | For | Read | URL |
 |---|---|---|---|---|
 | OP-TEE documentation, Raspberry Pi 3 platform page | the Pi 3 as a TEE host | project 20 | **yes** | `https://optee.readthedocs.io/en/latest/building/devices/rpi3.html` |
-| ADXL345 Rev G | accelerometer | projects 5 and 11 | no | `https://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.pdf` |
+| Analog Devices ADXL345, data sheet **Rev. G** | accelerometer | projects 5 and 11 | **yes**, from a mirror | `https://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.pdf` |
 
 **The ADXL345 datasheet could not be fetched on Wednesday 7 October
 2026.** Two attempts to `analog.com` returned a connection reset and then

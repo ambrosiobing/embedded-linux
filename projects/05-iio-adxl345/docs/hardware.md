@@ -19,7 +19,7 @@ index: [docs/DATASHEETS.md](../../../docs/DATASHEETS.md).
 | Layer | Part | Primary source | Status |
 |---|---|---|---|
 | the module | DFRobot SEN0032 | DFRobot's own schematic | read, Tuesday 6 October 2026 |
-| the die | Analog Devices ADXL345 | ADXL345 Rev G datasheet | **`NOT READ`** |
+| the die | Analog Devices ADXL345 | ADXL345 Rev G datasheet | **read Friday 9 October 2026** |
 
 **Nearly every surprise on this bench has been at the module layer**, not
 the die layer, which is why the schematic was worth reading first. The
@@ -134,14 +134,187 @@ manufacturer's document. Each is marked with where it actually comes from.
 | the available output data rates and the g ranges | the IIO attributes the driver exposes | not stated anywhere in this project |
 
 **None of these is likely to be wrong.** That is not the point. The point
-is that a reader cannot currently check any of them, and the project's own
+was that a reader could not check any of them, and the project's own
 `DESIGN.md` is scrupulous about marking its other inferences, so these
-should be marked too rather than passing as settled.
+were marked too rather than passing as settled.
 
-**The datasheet could not be fetched.** Three attempts to
-`analog.com` on Wednesday 7 October 2026 returned a connection reset and
-two timeouts. The URL is in the index and is believed good; this reads as
-rate limiting rather than a dead link.
+**That caution was worth its keep.** When the datasheet finally arrived,
+four of the five were right and **one had the wrong constant in it**. The
+next section has all five with page numbers.
+
+**The datasheet could not be fetched until Friday 9 October 2026.** Three
+attempts to `analog.com` on Wednesday 7 October 2026 returned a connection
+reset and two timeouts, and a fourth on Friday timed out again. It was
+read from a mirror that day.
+
+## The ADXL345 datasheet is read, and it closes every open row
+
+**Source: Analog Devices ADXL345, "3-Axis, +/-2 g/+/-4 g/+/-8 g/+/-16 g
+Digital Accelerometer", data sheet Rev. G, 36 pages.** Read Friday
+9 October 2026.
+
+**Provenance.** `analog.com` timed out again, as it has in every session
+since Tuesday 6 October 2026. Joseph supplied the route on Friday
+9 October 2026: the document is mirrored, and the copy read carries
+"Rev. G" and "analog.com" on every page footer, which is the revision this
+repository's source index has always named.
+
+### The five rows, settled
+
+This page listed five claims the project relies on and marked them all
+`inferred` or unsourced. All five are now cited, and **one of them was
+wrong**.
+
+| Claim as this page stated it | Verdict |
+|---|---|
+| a digital pin's absolute maximum is VDD I/O plus 0.3 V, **or 3.6 V**, whichever is less | **right in shape, wrong in the constant.** Table 2, page 5: "-0.3 V to VDD I/O + 0.3 V or **3.9 V**, whichever is less" |
+| `SDO` low selects one I2C address and high the other | **confirmed**, page 17: ALT ADDRESS high gives 7-bit `0x1D`, grounding `SDO`/ALT ADDRESS gives `0x53` |
+| `CS` high selects I2C rather than four-wire SPI | **confirmed**, page 17: "With `CS` tied high to VDD I/O, the ADXL345 is in I2C mode" |
+| the device identification register and its fixed value | **confirmed**, Table 19 page 23: `DEVID` at address `0x00`, read only, reset value `11100101`, which is **`0xE5`** |
+| the available output data rates and the g ranges | **confirmed**, and bounded by the bus rather than the part; see below |
+
+### The one that was wrong, and why it still gave the right answer
+
+This page said the limit is "VDD I/O plus 0.3 V, or **3.6 V**, whichever is
+less". The datasheet says **3.9 V**.
+
+**And the practical conclusion was right anyway.** With VDD I/O at 3.3 V,
+the two branches are 3.6 V and 3.9 V, and "whichever is less" picks 3.6 V.
+So the wrong constant happened to equal the right answer **at this
+particular supply voltage**, which is exactly the kind of coincidence that
+keeps an error alive.
+
+**Where it would have bitten:** at any VDD I/O below 3.6 V the two branches
+separate, and a reader using the misremembered rule would compute a limit
+too low rather than too high. That is the safe direction, which is the
+only reason this is a correction rather than an incident.
+
+**The general form, which this bench keeps meeting:** an inference can be
+right in structure and wrong in a constant, and a single test case can
+agree with both. The fix is not to be more careful about remembering; it
+is to mark the row `inferred` and read the document, which is what this
+page did.
+
+### What `CS` and `SDO` turn out to be, which is stronger than "selects"
+
+Page 17, and this is worth quoting because it changes the straps from a
+configuration choice into a requirement:
+
+> There are no internal pull-up or pull-down resistors for any unused
+> pins; therefore, there is no known state or default state for the `CS`
+> or ALT ADDRESS pin if left floating or unconnected. It is required that
+> the `CS` pin be connected to VDD I/O and that the ALT ADDRESS pin be
+> connected to either VDD I/O or GND when using I2C.
+
+**So the orange and brown leads are not optional and not merely
+conventional.** A floating `CS` leaves the part with no defined interface
+mode, and a floating `SDO` leaves it with no defined address. `DESIGN.md`
+straps both, which was right, and the reason is now the manufacturer's
+rather than this bench's.
+
+**And it interacts with the friction-contact warning on this page.** The
+module's header is not soldered, so any one of six contacts can be open at
+any moment. Two of those six are the straps. **An intermittent strap does
+not produce intermittent data; it produces a part in an undefined mode**,
+which is a different and worse symptom than a missing reading.
+
+### The output data rate is limited by the bus, not by the part
+
+Page 17, in its own words: the maximum output data rate when using 400 kHz
+I2C is **800 Hz**, and it scales linearly with the communication speed, so
+100 kHz I2C limits the maximum ODR to **200 Hz**. Operating above the
+recommended maximum "may result in undesirable effect on the acceleration
+data, including missing samples or additional noise".
+
+| I2C clock | Maximum ODR the datasheet recommends |
+|---|---|
+| 100 kHz | 200 Hz |
+| 400 kHz | 800 Hz |
+
+**This is a constraint the project did not have.** The IIO driver will
+happily expose output data rates up to 3200 Hz, because the part supports
+them over SPI. **Over I2C at 100 kHz, anything above 200 Hz is outside the
+manufacturer's recommendation**, and the failure mode named is missing
+samples and extra noise rather than an error.
+
+**That is this repository's favourite failure shape again**: a setting
+that is accepted, produces numbers, and produces worse numbers than the
+reader believes. Any acceptance figure from this project should record the
+I2C clock alongside the ODR, because one bounds the other.
+
+### The electrical check against a Pi 3B+, both directions
+
+The host's figures now come from the right document and the right board:
+Raspberry Pi's GPIO documentation, BCM283x table, which covers the Pi 3B+.
+The sensor's come from Table 11, page 17, at VDD I/O = 3.3 V.
+
+| Direction | Driver guarantees | Receiver needs | Margin |
+|---|---|---|---|
+| Pi `SDA`/`SCL` high into the ADXL345 | 3.0 V minimum at 2 mA | `V_IH` 0.7 x VDD I/O = **2.31 V** | 0.69 V |
+| Pi `SDA`/`SCL` low into the ADXL345 | 0.14 V maximum at 2 mA | `V_IL` 0.3 x VDD I/O = **0.99 V** | 0.85 V |
+| ADXL345 pulls `SDA` low | **400 mV maximum** at 3 mA | Pi `V_IL` 0.9 V maximum | 0.5 V |
+| ADXL345 `INT1` high into GPIO23 | 0.8 x VDD I/O = **2.64 V** at 150 microamp | Pi `V_IH` **1.6 V** minimum | 1.04 V |
+| ADXL345 `INT1` low into GPIO23 | 0.2 x VDD I/O = **0.66 V** at 300 microamp | Pi `V_IL` 0.9 V maximum | 0.24 V |
+
+**All five clear.** The tightest is the interrupt's low level at 0.24 V,
+and it is tight because the interrupt pin is weak: Table 13 page 19 gives
+its drive as 300 microamp sinking and 150 microamp sourcing, three orders
+of magnitude less than a Raspberry Pi pin.
+
+**Two consequences of that weakness.** `INT1` must drive nothing except
+that one Pi input, and a long lead costs real time: the datasheet gives a
+rise time of 210 ns into a 150 pF load, and the pin itself contributes
+8 pF. For an interrupt that is irrelevant; it is recorded so that nobody
+later hangs an LED on it.
+
+**And the interrupt pins are push-pull**, page 19, not open drain, with
+the default polarity **active high**, changeable by `INT_INVERT` in
+`DATA_FORMAT` at address `0x31`. So no pull-up belongs on that line, and
+any device tree that declares the interrupt active low is asking for a
+register write the driver must actually perform.
+
+### The pull-up question, finally closed from the sensor's side as well
+
+Page 17: "External pull-up resistors, `R_P`, are necessary for proper I2C
+operation." Table 12, page 18, bounds the bus: `C_b` 400 pF maximum per
+line, rise time 300 ns maximum when receiving, `f_SCL` 400 kHz maximum.
+
+**The wiring as built satisfies this and the reason is the host.** The
+leads run to header pins 3 and 5, GPIO2 and GPIO3, and Raspberry Pi's GPIO
+documentation states those two pins have **fixed pull-up resistors fitted
+to the board**. The external pull-ups the datasheet requires are already
+there.
+
+**This is where the shopping item died.** This page recommended buying two
+resistors of about 4.7 kohm on Thursday 8 October 2026 and withdrew the
+recommendation on Friday 9 October 2026. The sensor's own datasheet agrees
+with the withdrawal: it asks for external pull-ups, and the board fits
+them.
+
+### The identification test, which is one command and can fail
+
+`DEVID` is at `0x00` and reads `0xE5`. The device is at `0x53` because
+`SDO` is grounded. So:
+
+```
+   i2cget -y 1 0x53 0x00
+```
+
+| Result | Meaning |
+|---|---|
+| `0xe5` | an ADXL345 is answering at `0x53`. The part, the address strap, the interface strap, both bus leads and the supply are all good |
+| any other value | something answered and it is not an ADXL345 |
+| a read error | nothing is answering; suspect the supply first, then the six friction contacts |
+
+**This is the probe this page has been asking for since it was written.**
+It replaces "the connections are in place" with a value from the vendor's
+own register map, and unlike the panel controller in project 7, this part
+publishes the constant.
+
+**One thing it does not prove**, and the distinction matters on this
+module: a successful `DEVID` read exercises `SDA`, `SCL`, `CS`, `SDO`, the
+supply and ground. It does **not** exercise `INT1`, which is the sixth
+lead and the one project 5's driver depends on for its trigger.
 
 ## What the module's schematic settles that no datasheet could
 
@@ -183,16 +356,18 @@ whole class of intermittent failures above. There is no soldering iron on
 this bench. A multimeter ranks ahead of it overall, but for this project
 specifically the header is the thing.
 
-## What to do when the datasheet arrives
+## What was to be done when the datasheet arrived, and what was done
 
-In order, because each one makes the next cheaper:
+This page carried a three item list for the day the document turned up.
+It arrived on Friday 9 October 2026 and all three are done.
 
-1. Fill the five rows in the table above, with page numbers, and change
-   their basis from `inferred` to `datasheet`.
-2. Check the absolute maximum against the actual rail. `DESIGN.md`
-   reasons that `INT1` cannot be driven above 3V3 because the module is
-   powered from 3V3; the datasheet is what turns that from a good argument
-   into a cited one.
-3. Record the identification register and its value, so that a probe
-   becomes a measurement rather than an impression, exactly as project 7
-   needs for its display controller.
+| Planned | Outcome |
+|---|---|
+| fill the five rows with page numbers and change `inferred` to `datasheet` | **done**, and one of the five had the wrong constant |
+| check the absolute maximum against the actual rail | **done.** `DESIGN.md` reasoned that `INT1` cannot be driven above 3V3 because the module is powered from 3V3. Table 2 page 5 gives the digital pin maximum as VDD I/O plus 0.3 V or 3.9 V, whichever is less, so at a 3.3 V rail the limit is 3.6 V and the argument is now cited rather than merely good |
+| record the identification register so a probe becomes a measurement | **done**: `DEVID` at `0x00` reads `0xE5`, and the one line command is in the section above |
+
+**The fourth thing was not on the list and is the most useful.** The
+datasheet bounds the output data rate by the I2C clock, 200 Hz at 100 kHz
+and 800 Hz at 400 kHz, which is a constraint this project did not know it
+had and which no amount of careful wiring would have revealed.
