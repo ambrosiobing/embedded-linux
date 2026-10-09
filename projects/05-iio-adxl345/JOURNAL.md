@@ -244,3 +244,19 @@ all inherit the class. After the fix it is quiet.
 the commit the image was built from. `scripts/archive.sh` records the
 commit it finds, not the commit the build recorded. A late archive
 therefore mislabels itself, and that is an open item for the script.
+
+**The second run was refused by the guard the first run had satisfied.**
+Recreating `build/tmp` for this configuration grew the virtual disk by
+about 17 GB: the 11.7 GB of slack inside it first, then 6 GB of the
+Windows drive, which went from 26.2 to 20 GB free. The second run needed
+one recipe and an image assembly on a `tmp` that was now resident, and the
+guard demanded 25 GB for it, the figure for a build from nothing. Nothing
+left inside the guest could clear that, which is the shape the bench has
+learned to distrust: a guard whose remedy cannot be run from where the
+operator stands gets switched off.
+
+So `scripts/build.sh` now asks which case it is in. With `build/tmp`
+absent it wants 25 GB on the Windows drive, the cost measured today. With
+`build/tmp` resident it wants a floor of 5 GB, a figure chosen rather than
+measured, and the script prints which model applied so the number can be
+argued with.
