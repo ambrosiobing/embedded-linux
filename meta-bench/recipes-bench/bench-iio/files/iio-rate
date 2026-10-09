@@ -334,7 +334,25 @@ capture() {
 
 	echo "${BENCH_IIO_BUFLEN:-256}" >"$dev/buffer/length"
 
-	irq_before=$(irq_count_of "${BENCH_IIO_IRQ:-lsm6}")
+	# WHICH LINE OF /proc/interrupts IS THE DEVICE'S is a property of the
+	# driver, not of the device: st_lsm6dsx names its line "lsm6dsx",
+	# Project 5's driver names its line after the IIO device. The old
+	# default here was "lsm6", which counted nothing for any other driver
+	# and reported 0.00 interrupts per second against a buffer that was
+	# plainly filling, on Friday 9 October 2026. The default is now the
+	# device name, "lsm6" stays as the fallback for the ST driver, and
+	# BENCH_IIO_IRQ still overrides both. The pattern used is printed,
+	# so a zero can be read against the line it looked for.
+	irq_match=${BENCH_IIO_IRQ:-}
+	if [ -z "$irq_match" ]; then
+		if grep -q "$name" "$PROC/interrupts" 2>/dev/null; then
+			irq_match=$name
+		else
+			irq_match=lsm6
+		fi
+	fi
+	note "irq line   matching \"$irq_match\" in /proc/interrupts"
+	irq_before=$(irq_count_of "$irq_match")
 	raw=$(mktemp)
 	# shellcheck disable=SC2064
 	trap "rm -f '$raw'; buffer_off '$dev'" EXIT INT TERM
@@ -365,7 +383,7 @@ capture() {
 	[ "$_elapsed" -gt 0 ] || _elapsed=1
 	echo 0 >"$dev/buffer/enable"
 
-	irq_after=$(irq_count_of "${BENCH_IIO_IRQ:-lsm6}")
+	irq_after=$(irq_count_of "$irq_match")
 	irqs=$((irq_after - irq_before))
 
 	# An interrupt counter cannot go backwards during a run. When it does,
@@ -431,7 +449,7 @@ emit() {
 	irq_rate=$(awk -v i="$irqs" -v s="$seconds" \
 		'BEGIN { printf "%.2f", (s > 0) ? i / s : 0 }')
 	printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
-		"$(date -Iseconds)" "$path" "$device" "$rate" "$samples" \
+		"$(date +%Y-%m-%dT%H:%M:%S%z)" "$path" "$device" "$rate" "$samples" \
 		"$seconds" "$irqs" "$irq_rate" "${cpu_pct:-0}" "$ts_sd" \
 		"$ts_source" >>"$csv"
 

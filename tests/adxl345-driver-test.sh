@@ -151,6 +151,16 @@ check "the core exports into a namespace" "$core_ns" "BENCH_ADXL345"
 has "the I2C file imports it" "$I2C" "MODULE_IMPORT_NS($core_ns)"
 has "the SPI file imports it" "$SPI" "MODULE_IMPORT_NS($core_ns)"
 
+# The FIFO path's timestamps and its interrupt line, both found wanting
+# by the first capture on Friday 9 October 2026: every sample in a batch
+# carried the interrupt time, and the line in /proc/interrupts carried
+# the bus address, which no tool was looking for.
+has "FIFO samples are timestamped back from the interrupt at the period" 	"$CORE" 'timestamp - (s64)(entries - 1 - i) \* st->period_ns'
+has "the period is cached when the rate is written" "$CORE" 'st->period_ns = bench_adxl345_period_ns(i)'
+has "the interrupt line is named after the IIO device" "$CORE" 'indio_dev->name, indio_dev'
+has "buffer/watermark reaches the driver" "$CORE" '.hwfifo_set_watermark = bench_adxl345_set_watermark'
+
+
 # ------------------------------------------- every register is defined once
 
 undefined=0

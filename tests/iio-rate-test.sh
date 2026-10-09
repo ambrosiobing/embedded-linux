@@ -188,7 +188,8 @@ echo 0 >"$DEV/buffer/watermark"
 rm -f "$DEV/sampling_frequency"
 echo 0 >"$DEV/in_accel_sampling_frequency"
 out=$(run_fifo 480 64 || true)
-contains "a per-type rate attribute is found when the device-level one is absent" 	"$out" "in_accel_sampling_frequency"
+contains "a per-type rate attribute is found when the device-level one is absent" \
+	"$out" "in_accel_sampling_frequency"
 check "and it receives the rate" "$(cat "$DEV/in_accel_sampling_frequency")" "480"
 
 build_device
@@ -198,6 +199,35 @@ status=0
 out=$(run_fifo 480 64) || status=$?
 check "no rate attribute of either name is a refusal" "$status" "1"
 contains "and the refusal names both names" "$out" "Looked for sampling_frequency and in_"
+
+# ------------------------------------- BusyBox, and the interrupt line
+#
+# The bench images are BusyBox userlands. date -I is a GNU extension and
+# BusyBox prints its usage text instead, which is what the first FIFO
+# capture on Project 5's card did on Friday 9 October 2026, mid-run. The
+# same run counted zero interrupts because the line in /proc/interrupts
+# was matched against "lsm6", the name st_lsm6dsx gives its line, while
+# Project 5's driver names its line after the IIO device.
+
+if grep -q 'date -I' "$SUT"; then
+	no "the program does not use date -I, which BusyBox lacks"
+else
+	ok "the program does not use date -I, which BusyBox lacks"
+fi
+
+build_device
+echo 0 >"$DEV/buffer/watermark"
+echo bench-adxl345 >"$DEV/name"
+printf '%s
+' 	' 185:   10   11   12   13  pinctrl-bcm2835  23 Level  bench-adxl345' 	>"$WORK/proc/interrupts"
+out=$(BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results BENCH_IIO_DURATION=1 	sh "$SUT" fifo bench-adxl345 100 8 2>&1 || true)
+contains "the interrupt line is matched by the device name when it is there" 	"$out" 'matching "bench-adxl345"'
+contains "and the four columns are summed" "$out" "interrupts 0"
+
+build_device
+echo 0 >"$DEV/buffer/watermark"
+out=$(BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results BENCH_IIO_DURATION=1 	sh "$SUT" fifo lsm6dsv16x_accel 480 64 2>&1 || true)
+contains "and falls back to lsm6 for the ST driver, which names its line otherwise" 	"$out" 'matching "lsm6"'
 
 # ------------------------------------------------ every channel, not one
 #

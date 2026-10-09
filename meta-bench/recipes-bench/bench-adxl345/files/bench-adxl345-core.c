@@ -39,6 +39,7 @@
 #include <linux/bits.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
+#include <linux/math64.h>
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
 #include <linux/property.h>
@@ -89,6 +90,14 @@ struct bench_adxl345 {
 	 * ignored it.
 	 */
 	unsigned int watermark;
+
+	/*
+	 * The sample period at the configured rate, in nanoseconds, kept
+	 * here so the interrupt thread can spread a batch of FIFO samples
+	 * back from the interrupt time without a bus read per interrupt.
+	 * Set at probe from the part's reset rate and on every rate write.
+	 */
+	u64 period_ns;
 
 	/*
 	 * The buffer handed to iio_push_to_buffers_with_timestamp must be
@@ -150,6 +159,20 @@ static const int bench_adxl345_rates[][2] = {
 };
 
 #define BENCH_ADXL345_RATE_FIRST	0x7
+
+/*
+ * The period of one table entry, in nanoseconds. The table carries the
+ * rate as hertz plus microhertz so that 12.5 Hz has a row; one second
+ * in femtoseconds over the rate in microhertz gives nanoseconds exactly
+ * for every row: 100 Hz is 10 000 000 ns, 12.5 Hz is 80 000 000 ns.
+ */
+static u64 bench_adxl345_period_ns(int index)
+{
+	u64 uhz = (u64)bench_adxl345_rates[index][0] * 1000000ULL +
+		  bench_adxl345_rates[index][1];
+
+	return div64_u64(1000000000000000ULL, uhz);
+}
 
 static int bench_adxl345_read_axis(struct bench_adxl345 *st, int index,
 				   int *val)
@@ -215,7 +238,7 @@ static int bench_adxl345_write_raw(struct iio_dev *indio_dev,
 				   int val, int val2, long mask)
 {
 	struct bench_adxl345 *st = iio_priv(indio_dev);
-	int i;
+	int i, ret;
 
 	if (mask != IIO_CHAN_INFO_SAMP_FREQ)
 		return -EINVAL;
@@ -230,10 +253,14 @@ static int bench_adxl345_write_raw(struct iio_dev *indio_dev,
 		 * low power bit, and writing the byte would clear it
 		 * without saying so.
 		 */
-		return regmap_update_bits(st->regmap,
-					  BENCH_ADXL345_BW_RATE,
-					  BENCH_ADXL345_BW_RATE_MASK,
-					  i + BENCH_ADXL345_RATE_FIRST);
+		ret = regmap_update_bits(st->regmap,
+					 BENCH_ADXL345_BW_RATE,
+					 BENCH_ADXL345_BW_RATE_MASK,
+					 i + BENCH_ADXL345_RATE_FIRST);
+		if (ret)
+			return ret;
+		st->period_ns = bench_adxl345_period_ns(i);
+		return 0;
 	}
 
 	return -EINVAL;
@@ -320,8 +347,20 @@ static irqreturn_t bench_adxl345_irq_thread(int irq, void *private)
 		if (ret)
 			break;
 
+		/*
+		 * The FIFO holds entries samples taken one period apart,
+		 * the newest at the interrupt. Each is pushed with the
+		 * time it was taken, counted back from the interrupt time
+		 * at the configured rate, which is what docs/DESIGN.md
+		 * promised for the FIFO path and what the first capture on
+		 * Friday 9 October 2026 showed was not happening: every
+		 * sample in a batch carried the interrupt time and the
+		 * timestamp spread came out as the batch period. These are
+		 * assigned times, not measured ones; iio-rate labels the
+		 * column accordingly.
+		 */
 		iio_push_to_buffers_with_timestamp(indio_dev, &st->scan,
-						   timestamp);
+			timestamp - (s64)(entries - 1 - i) * st->period_ns);
 
 		/*
 		 * The datasheet asks for at least 5 us between reads of
@@ -427,6 +466,8 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	st->name = name;
 	st->irq = fwnode_irq_get(dev_fwnode(dev), 0);
 	st->watermark = BENCH_ADXL345_WATERMARK_DEFAULT;
+	/* BW_RATE resets to 0x0a, 100 Hz; the table index of that rate. */
+	st->period_ns = bench_adxl345_period_ns(0x0a - BENCH_ADXL345_RATE_FIRST);
 
 	/*
 	 * Ask the part who it is before configuring anything. An I2C
@@ -494,7 +535,7 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 		ret = devm_request_threaded_irq(dev, st->irq, NULL,
 						bench_adxl345_irq_thread,
 						IRQF_ONESHOT,
-						dev_name(dev), indio_dev);
+						indio_dev->name, indio_dev);
 		if (ret)
 			return dev_err_probe(dev, ret,
 					     "cannot request irq %d\n",
