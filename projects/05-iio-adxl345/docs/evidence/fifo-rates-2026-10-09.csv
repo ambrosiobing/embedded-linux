@@ -1,0 +1,3 @@
+timestamp,path,device,samples_per_s,samples,seconds,irqs,irqs_per_s,cpu_pct,ts_sd_us,ts_source
+2026-10-09T19:45:17+0000,fifo,bench-adxl345,96,960,10,40,4.00,0.10,1725.509,driver-interpolated
+2026-10-09T19:45:29+0000,fifo,bench-adxl345,96,960,10,120,12.00,0.10,964.382,driver-interpolated

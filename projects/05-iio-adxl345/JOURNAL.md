@@ -527,3 +527,52 @@ abort on the next rebuild after it. The remedy that worked both times,
 Four criteria measured, three images on the card today, and the next
 work is wire rather than software: `INT1` back on pin 16 for the FIFO
 path, and shorter leads before 400 kHz is tried again.
+
+## 13. INT1 wired, and the FIFO path measured in two rounds
+
+Friday 9 October 2026, 21:00 to 21:45. `INT1` went onto header pin 16,
+GPIO23. The overlay gained its interrupt, level high for the reason
+project 10 measured on its IMU, and the no-board test inverted its last
+group: it now holds the overlay's interrupt to the design's wiring
+table instead of asserting there is none.
+
+**First round, image `5a97fe5`.** The probe took the interrupt: no
+"no interrupt" line, and `buffer`, `scan_elements` and `dev` under the
+device. `iio-rate fifo` at 100 Hz delivered 960 samples in ten seconds
+at both watermarks, which is the FIFO path working on its first run.
+Around that measurement, four things were wrong and none was in it:
+
+1. the tool died at `date -I` mid-run, a GNU option BusyBox does not
+   have; project 10 had only ever run on a Raspberry Pi OS card
+2. it counted zero interrupts, because it looked for `lsm6`, the name
+   the ST driver gives its line; ours was named after the bus address
+3. the timestamp spread was 49 and 27 milliseconds, every sample in a
+   batch carrying the interrupt time, where the design promises each
+   spread back at the period
+4. `buffer/watermark` was accepted and ignored: the driver had no hook,
+   so the part ran at 24 whatever was written
+
+And one before any of those: the tool wrote the rate to
+`sampling_frequency`, which this driver, like mainline's, does not have;
+its file is `in_accel_sampling_frequency`. The image recipe's "without
+a line of change" was retired.
+
+**Second round, image `6d41adc`.** Interrupt line named after the IIO
+device, the tool matching it by default and saying so, the date spelled
+out as a format, the hook in `iio_info` where this kernel looks for it,
+and each FIFO sample pushed at the interrupt time minus its distance
+from the newest at the cached period. Then the two runs that could fail:
+40 interrupts at watermark 24 against 4.17 per second expected, 120 at
+watermark 8 against 12.50, ratio 1.0 both, spread 1.7 and 0.96
+milliseconds. The rows are in `docs/evidence/fifo-rates-2026-10-09.csv`.
+Criterion 5 is measured.
+
+**One more found by the run itself.** Both captures were asked for five
+seconds and ran ten: the usage line had promised `-d SEC` since the
+program was written and nothing read it. Parsed now, with a test.
+
+Five of eight criteria measured. Open on the driver side: the tap and
+free-fall events of criterion 6, which need the interrupt and now have
+it, the A/B comparison of criterion 7, and the symbol check of
+criterion 8. Open on the bench: the `INT1` wire colour, the console's
+three pins, and shorter leads before 400 kHz.
