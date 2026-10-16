@@ -291,6 +291,78 @@ check "and the marker sits directly above CONFIG_ADXL345" \
 has "the input driver for the same part is off" \
 	"$FRAG" '^# CONFIG_INPUT_ADXL34X is not set'
 
+echo "--- the events, which were pushed by a handler nothing could reach"
+
+# THE CHECK THAT WOULD HAVE CAUGHT IT. Until Friday 16 October 2026 the
+# interrupt handler pushed three IIO events and no code anywhere set the
+# matching bits in INT_ENABLE, so the part never ran the tap or free
+# fall function at all: page 17 of the datasheet, Revision 0, says only
+# data ready, watermark and overrun are always enabled, and that for
+# every other bit INT_ENABLE enables the function itself. The acceptance
+# table called criterion 6 "Configured" for two weeks.
+#
+# So: every event direction this file names must also be declared in an
+# iio_event_spec. A fourth push added without a spec fires this.
+for d in $(grep -o 'IIO_EV_DIR_[A-Z_0-9]*' "$CORE" | sort -u); do
+	if grep -q "\.dir = $d," "$CORE"; then
+		ok "$d is declared in an event spec, not only pushed"
+	else
+		no "$d is pushed but no event spec declares it" \
+			"user space gets no attribute, and the part is never told to detect it"
+	fi
+done
+
+has "enabling an event writes INT_ENABLE" "$CORE" \
+	'regmap_update_bits(st->regmap, BENCH_ADXL345_INT_ENABLE'
+has "and the enable path is the only one that arms a gesture" "$CORE" \
+	'static int bench_adxl345_write_event_config'
+
+# Three registers whose reset value of zero disables the very function
+# the events depend on, so probe has to write all three.
+for r in DUR LATENT WINDOW THRESH_TAP THRESH_FF TIME_FF TAP_AXES; do
+	has "probe writes $r" "$CORE" "{ BENCH_ADXL345_$r,"
+done
+
+for r in DUR LATENT WINDOW; do
+	v=$(sed -n "s/^#define BENCH_ADXL345_${r}_DEFAULT[[:space:]]*\(0x[0-9a-fA-F]*\).*/\1/p" "$HDR")
+	case $v in
+	"" | 0x0 | 0x00)
+		no "the $r default is not zero" \
+			"zero disables tap or double tap, datasheet page 15" ;;
+	*)
+		ok "the $r default is not zero, so tap detection can run" ;;
+	esac
+done
+
+# The two values the datasheet does recommend a range for, checked
+# against the range rather than against whatever was typed. Page 15 for
+# the threshold, page 16 for the time, both Revision 0.
+ff=$(sed -n 's/^#define BENCH_ADXL345_THRESH_FF_DEFAULT[[:space:]]*0x\([0-9a-fA-F]*\).*/\1/p' "$HDR")
+ffd=$(printf '%d' "0x$ff" 2>/dev/null || echo -1)
+if [ "$ffd" -ge 5 ] && [ "$ffd" -le 9 ]; then
+	ok "the free fall threshold is inside the recommended 0x05 to 0x09"
+else
+	no "the free fall threshold is inside the recommended 0x05 to 0x09" "got 0x$ff"
+fi
+
+tf=$(sed -n 's/^#define BENCH_ADXL345_TIME_FF_DEFAULT[[:space:]]*0x\([0-9a-fA-F]*\).*/\1/p' "$HDR")
+tfd=$(printf '%d' "0x$tf" 2>/dev/null || echo -1)
+if [ "$tfd" -ge 20 ] && [ "$tfd" -le 70 ]; then
+	ok "the free fall time is inside the recommended 0x14 to 0x46"
+else
+	no "the free fall time is inside the recommended 0x14 to 0x46" "got 0x$tf"
+fi
+
+# Nothing is armed at probe: the operator enables an event or it does
+# not fire. setup_events writes parameters only.
+if sed -n '/^static int bench_adxl345_setup_events/,/^}/p' "$CORE" |
+	grep -q INT_ENABLE; then
+	no "probe arms no event behind the operator" \
+		"setup_events touches INT_ENABLE"
+else
+	ok "probe arms no event behind the operator"
+fi
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

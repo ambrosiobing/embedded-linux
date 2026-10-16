@@ -557,3 +557,65 @@ It arrived on Friday 9 October 2026 and all three are done.
 datasheet bounds the output data rate by the I2C clock, 200 Hz at 100 kHz
 and 800 Hz at 400 kHz, which is a constraint this project did not know it
 had and which no amount of careful wiring would have revealed.
+
+## The event registers, read a week later and a revision apart
+
+**Source: ADXL345 datasheet, Analog Devices, Revision 0, pages 15, 16
+and 17.** Read Friday 16 October 2026 from SparkFun's mirror, which
+serves a 24-page Revision 0 printing. The rest of this page cites
+Revision G, read Friday 9 October 2026; the register scale factors are
+the same in both and every citation below names the revision it came
+from rather than borrowing the other one's page numbers.
+
+**Why it was fetched at all.** Project 5's driver had pushed three IIO
+events since it was written, and criterion 6 called that "configured".
+Nothing in this repository recorded what the event registers mean, so
+there was no way to write the thresholds without inventing numbers.
+
+| Register | Scale factor | What the datasheet recommends |
+|---|---|---|
+| `THRESH_TAP` 0x1D | 62.5 mg per count, unsigned, page 15 | nothing; 0 "may result in undesirable behavior" with tap enabled |
+| `DUR` 0x21 | 625 us per count, page 15 | nothing; **0 disables tap and double tap** |
+| `Latent` 0x22 | 1.25 ms per count, page 15 | nothing; **0 disables double tap** |
+| `Window` 0x23 | 1.25 ms per count, page 15 | nothing; **0 disables double tap** |
+| `THRESH_FF` 0x28 | 62.5 mg per count, page 15 | **0x05 to 0x09**, 300 mg to 600 mg |
+| `TIME_FF` 0x29 | 5 ms per count, page 16 | **0x14 to 0x46**, 100 ms to 350 ms |
+
+Three of those reset to zero and zero is not a neutral setting for any
+of them, which is the first reason a tap would never have fired even
+with the interrupt enabled.
+
+### The sentence that explains why no tap could ever have arrived
+
+**Page 17, on `INT_ENABLE`:** setting a bit enables that function to
+generate interrupts and clearing it prevents the function from doing
+so, and then the exception that matters here, quoted because the
+distinction is the whole point:
+
+> The DATA_READY, watermark, and overrun bits enable only the interrupt
+> output; the functions are always enabled.
+
+So for those three the function runs whatever `INT_ENABLE` says, and
+`INT_SOURCE` sets their bits "regardless of the INT_ENABLE register
+settings". **For every other bit, including the two taps and free fall,
+a clear enable bit means the detection function itself does not run.**
+A driver that reads `INT_SOURCE` in its handler and pushes events for
+those bits is therefore not merely missing an interrupt; it is waiting
+for a function the part was never asked to perform.
+
+### One ordering fact worth having before per-axis reporting is tried
+
+**Page 16, on `ACT_TAP_STATUS` 0x2B:** the register holds which axis
+was involved, and "should be read before clearing the interrupt". The
+interrupt is cleared by reading `INT_SOURCE`, which this driver's
+handler does first. Reporting a tap per axis therefore means reading
+`ACT_TAP_STATUS` ahead of `INT_SOURCE`, not simply adding a read. This
+driver reports `IIO_MOD_X_OR_Y_OR_Z` and does not read that register at
+all, which is why the ordering costs nothing today.
+
+### What the same pages confirmed in passing
+
+`BW_RATE` 0x2C resets to 0x0A, which is 100 Hz, page 16. The driver
+assumes exactly that when it caches the sample period at probe, and the
+assumption was written from the kernel's side before this page was
+read.

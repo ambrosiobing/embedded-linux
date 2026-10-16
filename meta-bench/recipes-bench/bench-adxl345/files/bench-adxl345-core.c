@@ -134,12 +134,200 @@ struct bench_adxl345 {
 	},								\
 }
 
+/*
+ * THE THREE EVENTS, AND WHY THEY SIT ON A CHANNEL OF THEIR OWN.
+ *
+ * The part reports a tap on whichever axis saw it, in ACT_TAP_STATUS,
+ * and this driver does not read that register, so it reports the three
+ * axes together: IIO_MOD_X_OR_Y_OR_Z, which is what the handler has
+ * always pushed. An event code only reaches user space as a named
+ * attribute if some channel declares it with the same modifier, so the
+ * declaration has to carry that modifier too, and no scan channel does.
+ * Hence a channel with no scan index: it adds nothing to the buffer and
+ * exists to give the three events a home.
+ *
+ * If per-axis reporting is ever wanted, ACT_TAP_STATUS is the register
+ * and the datasheet's page 16 carries the order it has to be read in:
+ * before INT_SOURCE, because reading INT_SOURCE clears the event.
+ *
+ * Single tap carries the threshold, THRESH_TAP, which the part shares
+ * between single and double tap, so double tap carries only its enable
+ * rather than a second attribute writing the same register. Free fall
+ * carries its own threshold, THRESH_FF.
+ */
+static const struct iio_event_spec bench_adxl345_events[] = {
+	{
+		.type = IIO_EV_TYPE_GESTURE,
+		.dir = IIO_EV_DIR_SINGLETAP,
+		.mask_separate = BIT(IIO_EV_INFO_ENABLE) |
+				 BIT(IIO_EV_INFO_VALUE),
+	}, {
+		.type = IIO_EV_TYPE_GESTURE,
+		.dir = IIO_EV_DIR_DOUBLETAP,
+		.mask_separate = BIT(IIO_EV_INFO_ENABLE),
+	}, {
+		.type = IIO_EV_TYPE_THRESH,
+		.dir = IIO_EV_DIR_FALLING,
+		.mask_separate = BIT(IIO_EV_INFO_ENABLE) |
+				 BIT(IIO_EV_INFO_VALUE),
+	},
+};
+
 static const struct iio_chan_spec bench_adxl345_channels[] = {
 	BENCH_ADXL345_CHANNEL(0, X),
 	BENCH_ADXL345_CHANNEL(1, Y),
 	BENCH_ADXL345_CHANNEL(2, Z),
 	IIO_CHAN_SOFT_TIMESTAMP(3),
+	{
+		/*
+		 * LAST ON PURPOSE. probe drops this channel when there is
+		 * no interrupt, by registering one channel fewer, because
+		 * an event attribute on a board whose INT1 is not wired
+		 * can be enabled and will never fire.
+		 */
+		.type = IIO_ACCEL,
+		.modified = 1,
+		.channel2 = IIO_MOD_X_OR_Y_OR_Z,
+		.scan_index = -1,
+		.event_spec = bench_adxl345_events,
+		.num_event_specs = ARRAY_SIZE(bench_adxl345_events),
+	},
 };
+
+/*
+ * The INT_ENABLE bit behind an event, or zero for a combination this
+ * driver does not have. INT_ENABLE, INT_MAP and INT_SOURCE share one
+ * layout, so the same bit enables the function, routes it and reads
+ * back as its cause.
+ */
+static unsigned int bench_adxl345_event_bit(enum iio_event_type type,
+					    enum iio_event_direction dir)
+{
+	if (type == IIO_EV_TYPE_GESTURE && dir == IIO_EV_DIR_SINGLETAP)
+		return BENCH_ADXL345_INT_SINGLE_TAP;
+	if (type == IIO_EV_TYPE_GESTURE && dir == IIO_EV_DIR_DOUBLETAP)
+		return BENCH_ADXL345_INT_DOUBLE_TAP;
+	if (type == IIO_EV_TYPE_THRESH && dir == IIO_EV_DIR_FALLING)
+		return BENCH_ADXL345_INT_FREE_FALL;
+	return 0;
+}
+
+/*
+ * The threshold register behind an event's value, or zero for one that
+ * has none. Zero is unambiguous as "none" here because register 0x00 is
+ * DEVID and is not a threshold.
+ */
+static unsigned int bench_adxl345_event_value_reg(enum iio_event_type type,
+						  enum iio_event_direction dir,
+						  enum iio_event_info info)
+{
+	if (info != IIO_EV_INFO_VALUE)
+		return 0;
+	if (type == IIO_EV_TYPE_GESTURE && dir == IIO_EV_DIR_SINGLETAP)
+		return BENCH_ADXL345_THRESH_TAP;
+	if (type == IIO_EV_TYPE_THRESH && dir == IIO_EV_DIR_FALLING)
+		return BENCH_ADXL345_THRESH_FF;
+	return 0;
+}
+
+static int bench_adxl345_read_event_config(struct iio_dev *indio_dev,
+					   const struct iio_chan_spec *chan,
+					   enum iio_event_type type,
+					   enum iio_event_direction dir)
+{
+	struct bench_adxl345 *st = iio_priv(indio_dev);
+	unsigned int bit, regval;
+	int ret;
+
+	bit = bench_adxl345_event_bit(type, dir);
+	if (!bit)
+		return -EINVAL;
+
+	ret = regmap_read(st->regmap, BENCH_ADXL345_INT_ENABLE, &regval);
+	if (ret)
+		return ret;
+
+	return !!(regval & bit);
+}
+
+/*
+ * Enabling an event enables the function, not merely its output pin.
+ * The datasheet, Revision 0 page 17, says that of the eight bits in
+ * INT_ENABLE only data ready, watermark and overrun "enable only the
+ * interrupt output; the functions are always enabled". So with the tap
+ * bit clear the part never detects a tap at all, which is the state
+ * this driver shipped in until Friday 16 October 2026: three
+ * iio_push_event calls that no hardware could ever reach.
+ */
+static int bench_adxl345_write_event_config(struct iio_dev *indio_dev,
+					    const struct iio_chan_spec *chan,
+					    enum iio_event_type type,
+					    enum iio_event_direction dir,
+					    int state)
+{
+	struct bench_adxl345 *st = iio_priv(indio_dev);
+	unsigned int bit;
+
+	bit = bench_adxl345_event_bit(type, dir);
+	if (!bit)
+		return -EINVAL;
+
+	return regmap_update_bits(st->regmap, BENCH_ADXL345_INT_ENABLE,
+				  bit, state ? bit : 0);
+}
+
+/*
+ * The thresholds are reported and taken in the part's own counts, not
+ * in the channel's units, and that is a deliberate limit rather than an
+ * oversight. THRESH_TAP and THRESH_FF are 62.5 mg per count while the
+ * channel reads 3.9 mg per count in full resolution; converting would
+ * mean a ratio of 16.03 that the datasheet does not bless, and a value
+ * that reads back as something other than what was written. A count and
+ * its scale factor are honest and are in the header beside the
+ * register. The page is 15 in Revision 0.
+ */
+static int bench_adxl345_read_event_value(struct iio_dev *indio_dev,
+					  const struct iio_chan_spec *chan,
+					  enum iio_event_type type,
+					  enum iio_event_direction dir,
+					  enum iio_event_info info,
+					  int *val, int *val2)
+{
+	struct bench_adxl345 *st = iio_priv(indio_dev);
+	unsigned int reg, regval;
+	int ret;
+
+	reg = bench_adxl345_event_value_reg(type, dir, info);
+	if (!reg)
+		return -EINVAL;
+
+	ret = regmap_read(st->regmap, reg, &regval);
+	if (ret)
+		return ret;
+
+	*val = regval;
+	return IIO_VAL_INT;
+}
+
+static int bench_adxl345_write_event_value(struct iio_dev *indio_dev,
+					   const struct iio_chan_spec *chan,
+					   enum iio_event_type type,
+					   enum iio_event_direction dir,
+					   enum iio_event_info info,
+					   int val, int val2)
+{
+	struct bench_adxl345 *st = iio_priv(indio_dev);
+	unsigned int reg;
+
+	reg = bench_adxl345_event_value_reg(type, dir, info);
+	if (!reg)
+		return -EINVAL;
+
+	if (val < 0 || val > 0xff)
+		return -EINVAL;
+
+	return regmap_write(st->regmap, reg, val);
+}
 
 /*
  * The output data rate table, index into BW_RATE bits 3:0. Only the upper
@@ -279,6 +467,10 @@ static const struct iio_info bench_adxl345_info = {
 	.read_raw = bench_adxl345_read_raw,
 	.write_raw = bench_adxl345_write_raw,
 	.hwfifo_set_watermark = bench_adxl345_set_watermark,
+	.read_event_config = bench_adxl345_read_event_config,
+	.write_event_config = bench_adxl345_write_event_config,
+	.read_event_value = bench_adxl345_read_event_value,
+	.write_event_value = bench_adxl345_write_event_value,
 };
 
 /*
@@ -440,6 +632,35 @@ static const struct iio_buffer_setup_ops bench_adxl345_buffer_ops = {
 	.predisable = bench_adxl345_buffer_predisable,
 };
 
+/*
+ * Thresholds and timings, written once at probe. The values and the
+ * reasoning behind each are in bench-adxl345.h beside the registers.
+ */
+static int bench_adxl345_setup_events(struct regmap *regmap)
+{
+	static const struct {
+		unsigned int reg;
+		unsigned int val;
+	} setup[] = {
+		{ BENCH_ADXL345_TAP_AXES, BENCH_ADXL345_TAP_AXES_XYZ },
+		{ BENCH_ADXL345_THRESH_TAP, BENCH_ADXL345_THRESH_TAP_DEFAULT },
+		{ BENCH_ADXL345_DUR, BENCH_ADXL345_DUR_DEFAULT },
+		{ BENCH_ADXL345_LATENT, BENCH_ADXL345_LATENT_DEFAULT },
+		{ BENCH_ADXL345_WINDOW, BENCH_ADXL345_WINDOW_DEFAULT },
+		{ BENCH_ADXL345_THRESH_FF, BENCH_ADXL345_THRESH_FF_DEFAULT },
+		{ BENCH_ADXL345_TIME_FF, BENCH_ADXL345_TIME_FF_DEFAULT },
+	};
+	int i, ret;
+
+	for (i = 0; i < ARRAY_SIZE(setup); i++) {
+		ret = regmap_write(regmap, setup[i].reg, setup[i].val);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static void bench_adxl345_powerdown(void *data)
 {
 	struct regmap *regmap = data;
@@ -505,6 +726,20 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	if (ret)
 		return dev_err_probe(dev, ret, "cannot reset the FIFO\n");
 
+	/*
+	 * The event parameters, so that enabling an event from sysfs is
+	 * enough to make it fire. Two of these registers reset to zero
+	 * and zero is not a neutral value for either: DUR of zero
+	 * disables tap detection outright, and Latent or Window of zero
+	 * disables double tap, which the datasheet says on page 15 of
+	 * Revision 0. Nothing here touches INT_ENABLE, so no event is
+	 * armed until userspace asks for one.
+	 */
+	ret = bench_adxl345_setup_events(regmap);
+	if (ret)
+		return dev_err_probe(dev, ret,
+				     "cannot set the event parameters\n");
+
 	ret = regmap_update_bits(regmap, BENCH_ADXL345_POWER_CTL,
 				 BENCH_ADXL345_POWER_CTL_MEASURE,
 				 BENCH_ADXL345_POWER_CTL_MEASURE);
@@ -520,6 +755,17 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	indio_dev->modes = INDIO_DIRECT_MODE;
 	indio_dev->channels = bench_adxl345_channels;
 	indio_dev->num_channels = ARRAY_SIZE(bench_adxl345_channels);
+
+	/*
+	 * No interrupt, no events. The event channel is last in the
+	 * array, so registering one channel fewer drops the three event
+	 * attributes with it. Leaving them visible on a board whose INT1
+	 * is not wired would offer an enable that writes a register and
+	 * then waits for a line nothing drives, which is the failure the
+	 * overlay in bench-adxl345-dt refuses for the same pin.
+	 */
+	if (st->irq <= 0)
+		indio_dev->num_channels--;
 
 	if (st->irq > 0) {
 		/*

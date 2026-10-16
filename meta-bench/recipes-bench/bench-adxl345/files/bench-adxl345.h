@@ -89,6 +89,40 @@
 #define BENCH_ADXL345_INT_WATERMARK	BIT(1)
 #define BENCH_ADXL345_INT_OVERRUN	BIT(0)
 
+/*
+ * TAP_AXES, bits 2:0. The suppress bit, 3, is left clear: it drops a
+ * double tap when acceleration above THRESH_TAP appears between the two
+ * taps, which is a judgement about what a double tap is and belongs to
+ * whoever is tapping rather than to this driver.
+ */
+#define BENCH_ADXL345_TAP_AXES_XYZ	0x07
+
+/*
+ * EVENT PARAMETERS WRITTEN AT PROBE, so that the gesture and free-fall
+ * functions have usable settings the moment userspace enables one. None
+ * of them enables an interrupt; INT_ENABLE is written only from
+ * write_event_config.
+ *
+ * Scale factors are from the ADXL345 datasheet, Analog Devices,
+ * Revision 0, pages 15 and 16, read Friday 16 October 2026. Note that
+ * the rest of this project cites Revision G, which was the copy read on
+ * Friday 9 October 2026; the register scale factors are the same and
+ * the revision is named on each citation rather than assumed.
+ *
+ * Two of the six are the datasheet's own recommendation and four are
+ * this bench's choice, which is said here rather than left to look like
+ * the same kind of number. Each of the four is a starting point: the
+ * tap threshold is writable from sysfs, and the three timings are
+ * changeable only by editing this file, which is a limit worth knowing
+ * before anyone tries to tune a tap from user space.
+ */
+#define BENCH_ADXL345_THRESH_TAP_DEFAULT 0x30	/* 3 g at 62.5 mg/LSB, chosen here */
+#define BENCH_ADXL345_DUR_DEFAULT	0x10	/* 10 ms at 625 us/LSB, chosen here; 0 would disable tap entirely */
+#define BENCH_ADXL345_LATENT_DEFAULT	0x50	/* 100 ms at 1.25 ms/LSB, chosen here; 0 would disable double tap */
+#define BENCH_ADXL345_WINDOW_DEFAULT	0xf0	/* 300 ms at 1.25 ms/LSB, chosen here; 0 would disable double tap */
+#define BENCH_ADXL345_THRESH_FF_DEFAULT	0x07	/* 437.5 mg at 62.5 mg/LSB; page 15 recommends 0x05 to 0x09 */
+#define BENCH_ADXL345_TIME_FF_DEFAULT	0x28	/* 200 ms at 5 ms/LSB; page 16 recommends 0x14 to 0x46 */
+
 /* FIFO_CTL. Mode is bits 7:6, the watermark is bits 4:0. */
 #define BENCH_ADXL345_FIFO_CTL_MODE	GENMASK(7, 6)
 #define BENCH_ADXL345_FIFO_CTL_SAMPLES	GENMASK(4, 0)

@@ -576,3 +576,69 @@ free-fall events of criterion 6, which need the interrupt and now have
 it, the A/B comparison of criterion 7, and the symbol check of
 criterion 8. Open on the bench: the `INT1` wire colour, the console's
 three pins, and shorter leads before 400 kHz.
+
+## 14. The events that no hardware could have reached
+
+Friday 16 October 2026. The open criterion was 6, the tap and free
+fall events, and the obvious next step was to flash a card and tap the
+breakout. Reading the driver first was cheaper and it is as well:
+**the three events could not have fired.**
+
+The handler reads `INT_SOURCE` and pushes single tap, double tap and
+free fall. Nothing in the driver ever set those three bits in
+`INT_ENABLE`, and nothing ever wrote `THRESH_TAP`, `DUR`, `Latent`,
+`Window`, `THRESH_FF`, `TIME_FF` or `TAP_AXES`. The acceptance table
+called that "Configured", which is what this bench means by a file
+saying so, and no file said so.
+
+**The datasheet settles it rather than leaving it as an inference.**
+This repository had never recorded what the event registers mean, so
+the datasheet was fetched again, from a mirror that serves Revision 0;
+the project otherwise cites Revision G, and both revisions are now
+named wherever they are used. Page 17 draws the distinction the defect
+turned on: for data ready, watermark and overrun, `INT_ENABLE` enables
+only the interrupt output and the functions are always enabled, and
+`INT_SOURCE` reports them regardless. For every other bit, a clear
+enable bit means the detection function does not run. So the part was
+never asked to detect a tap. Three of the parameter registers reset to
+zero as well, and zero disables tap outright in `DUR` and double tap in
+`Latent` and `Window`, which would have been a second reason for
+silence.
+
+**What the driver does now.** It declares the three events in an
+`iio_event_spec` on a channel of their own, which exists because an
+event only reaches user space as a named attribute if some channel
+declares it with the modifier the handler pushes, and no scan channel
+carries `IIO_MOD_X_OR_Y_OR_Z`. It writes the seven parameter registers
+at probe, two of them inside the ranges page 15 and page 16 recommend
+and four of them this bench's own choice, said so on each line. It arms
+nothing: `INT_ENABLE` is touched only from `write_event_config`, so an
+event fires when somebody enables it and not before. And it drops the
+event channel entirely when `INT1` is not wired, because an enable that
+writes a register and then waits for a line nothing drives is the same
+failure the overlay refuses for the same pin.
+
+The tap threshold is readable and writable through the standard event
+attribute, in the part's own counts rather than converted to the
+channel's units: 62.5 mg per count against the channel's 3.9 mg is a
+ratio of 16.03 that the datasheet does not bless, and a value that read
+back as something other than what was written would be worse than a
+count with its scale factor beside it in the header.
+
+**Eighteen assertions, and the proof found a nineteenth defect.**
+`tests/adxl345-driver-test.sh` now requires every `IIO_EV_DIR_` the
+file names to be declared in an event spec, the seven registers to be
+written at probe, the three timings to be non-zero, the two free fall
+values to sit inside the datasheet's recommended ranges, and
+`setup_events` never to touch `INT_ENABLE`. Breaking each of them fires
+the matching assertion. Running that proof is what showed the block had
+been appended **after** the suite's summary and its `[ "$fail" -eq 0 ]`,
+so eighteen assertions were outside the count and could not fail the
+run: with three of them failing the suite still exited zero and printed
+"47 passed, 0 failed". The block now sits above the summary, the count
+reads 65, and a single failure fails the run, which was checked both
+ways.
+
+Nothing here is measured. The next thing the board can say is whether a
+tap on the breakout arrives as an IIO event, and that needs a build, a
+flash and a hand on the part.
