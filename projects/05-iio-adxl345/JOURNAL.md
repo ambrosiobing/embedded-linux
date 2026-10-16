@@ -681,3 +681,40 @@ the column at a tool nothing installs fails the run, which was checked.
 Still not measured. The build is the first compile of the event code
 and of this program, and the board is the only thing that can say
 whether a tap arrives.
+
+## 16. The step that was skipped once too often is now the script's
+
+Friday 16 October 2026, late. The card was flashed with the new image
+and the board came up on no network. The phone running the hotspot
+showed no client, a sweep of the whole subnet from skyhorizon found no
+Raspberry Pi, and the Pi 3B+ has no serial console on this bench, so
+there was no way in at all. The cause was not subtle: flashing erases
+the card, `wifi.conf` lives on the card, and the line in the hand-over
+that says to write it again was skipped.
+
+**It had been skipped before.** The repository has carried a note about
+offering that file before a card leaves the reader since September. A
+note is not a fix; it is a thing to skip.
+
+So the file is no longer typed after every flash. It is typed once, on
+the build laptop, into a store outside the repository and outside every
+image, and `scripts/flash.sh` copies it onto the card while the card is
+still in the reader:
+
+    ./go credentials          once, ever
+    ./go flash /dev/sdX ...   copies it from then on
+
+`scripts/credentials-set.sh` prompts with the terminal's echo off,
+stores the derived 64 character key rather than the passphrase, prints
+only that each field is set, and restores the terminal on an interrupt
+so that a cancelled prompt does not leave an invisible shell.
+`scripts/credentials.sh` does the copying and the refusing, and it only
+speaks when the rootfs actually carries the provisioning program, so an
+image that configures no network is never nagged. A card that needs the
+file and has no copy to take it from fails the flash, because an
+unreachable board and a broken card are the same thing on a bench with
+no console.
+
+Thirteen assertions in `tests/credentials-check-test.sh`, including the
+two it must stay silent for. The case it exists for is the first one in
+the file.

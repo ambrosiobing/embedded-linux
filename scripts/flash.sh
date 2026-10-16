@@ -106,8 +106,59 @@ else
 	note "no $part, so the overlays on this card were NOT checked."
 fi
 
+# THE FILE THAT HAS TO BE WRITTEN BEFORE THE CARD LEAVES THE READER.
+#
+# Flashing erases the card, and the network configuration lives on the
+# card rather than in the image, so it is gone after every flash. The
+# hand-over has carried that as a line since September and the line is
+# what gets skipped; on Friday 16 October 2026 it was skipped and the
+# board came up on no network, with no usable serial console on that
+# board, which cost an evening and a second trip to the reader.
+#
+# Checked here because this is the last moment it is cheap.
+case $dev in
+*[0-9]) rootpart=${dev}p2 ;;
+*) rootpart=${dev}2 ;;
+esac
+
+creds=unchecked
+if [ -b "$part" ] && [ -b "$rootpart" ]; then
+	bmnt=$(mktemp -d)
+	rmnt=$(mktemp -d)
+	# The boot partition is mounted WRITABLE here, unlike the overlay
+	# pass above, because this step copies the file rather than only
+	# looking for it. umask=000 so that the copy is readable by the
+	# first-boot service, which runs as root but reads a FAT mount
+	# whose permissions come from the mount options.
+	if sudo mount -o rw,umask=000 "$part" "$bmnt" 2>/dev/null &&
+		sudo mount -o ro "$rootpart" "$rmnt" 2>/dev/null; then
+		# No sudo, and the store is passed explicitly rather than
+		# derived inside the script: umask=000 above makes the FAT
+		# mount writable by this user, and a path derived under sudo
+		# would resolve HOME to root's.
+		if sh "$(dirname "$0")/credentials.sh" "$bmnt" "$rmnt" \
+			"${BENCH_CREDENTIALS:-$BENCH_WORK/credentials}"; then
+			creds=ok
+		else
+			creds=missing
+		fi
+		sync
+	else
+		note "could not mount both partitions, so the credential files on"
+		note "this card were NOT written or checked."
+	fi
+	sudo umount "$rmnt" 2>/dev/null || true
+	sudo umount "$bmnt" 2>/dev/null || true
+	rmdir "$rmnt" "$bmnt" 2>/dev/null || true
+fi
+
 note "Connect the console at 115200 8N1 before powering up."
 
 # Non-zero on purpose. The image is written either way, and a card that will
 # boot with features silently missing is worth failing the command over.
 [ "$overlays" != bad ] || exit 1
+
+# Same reasoning, different file. A missing credential file is not a broken
+# card, it is an unreachable board, and on a bench whose Pi 3B+ has no
+# usable serial console those are the same thing.
+[ "$creds" != missing ] || exit 1

@@ -109,6 +109,7 @@ sdk-check)  exec sh ./scripts/sdk.sh check ;;
 archive)    shift; exec sh ./scripts/archive.sh "$@" ;;
 card-archive) shift; exec sh ./scripts/card-archive.sh "$@" ;;
 flash)      shift; exec sh ./scripts/flash.sh "$@" ;;
+credentials) shift; exec sh ./scripts/credentials-set.sh "$@" ;;
 overlays)   shift; exec sh ./scripts/check-overlays.sh "$@" ;;
 ksym)       shift; exec sh ./scripts/check-kernel-symbols.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
