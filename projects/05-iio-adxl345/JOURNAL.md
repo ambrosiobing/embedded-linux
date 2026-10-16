@@ -802,17 +802,31 @@ The event evidence of an hour earlier now carries this as a caveat: it
 proves the path end to end and it was taken with the interrupt polarity
 inverted relative to what the device tree declares.
 
-**And one claim in this entry is already contradicted.** Writing the
-three offset registers to zero by hand, with the driver unbound,
-changed nothing: the axes stayed at minus 358, minus 230 and 729. If
-the trim had been applied to the output, clearing it should have moved
-x by about 348 counts. So either those writes did not take, or the
-offset registers were not the reason the readings are wrong, and the
-remaining number to explain is the magnitude: those three axes make 844
-counts, which is 3.3 g, and a part at rest cannot see that at any
-orientation. The next thing to run is a second dump, to see whether
-`0x1e` to `0x20` now read zero.
+**The offsets were the cause, and the experiment that seemed to
+contradict it was reading a stale sample.** Writing the three registers
+to zero by hand appeared to change nothing: the axes still read minus
+358, minus 230 and 729, so the claim was withdrawn. A dump taken a
+minute later settled it the other way. The offsets read `00 00 00`, and
+the data registers held minus 9, 57 and 242, which is gravity and is
+the same reading this board gave on Friday 9 October 2026. Through
+sysfs a moment later: minus 10, 55, 241.
 
-The probe fix stands on its own regardless: `DATA_FORMAT` held `0xaf`,
-that was read directly, and a probe that cannot put the part into a
-known state is wrong whether or not it explains tonight's numbers.
+**Why the first read lied.** Unbinding the driver runs its powerdown
+action, which clears the measure bit, and a part that is not measuring
+keeps its last conversion in the data registers. The rebind set
+measuring again and the sysfs reads in the same command line ran within
+microseconds, before the first new sample existed: at 100 Hz that takes
+10 ms. So the values returned were the ones taken before the offsets
+were cleared. **A read immediately after a bind can be older than the
+configuration it is being used to test**, which is a trap worth the
+sentence it costs.
+
+The withdrawal is itself withdrawn, and the sequence is left in this
+entry rather than tidied away, because the shape is the useful part: a
+claim, an experiment that seemed to refute it, and a second measurement
+showing the experiment was the thing at fault.
+
+The arithmetic that pointed at it was the magnitude. Minus 358, minus
+230 and 729 make 844 counts, which is 3.3 g, and a part at rest cannot
+see that at any orientation. A reading whose length is wrong is wrong
+whatever its direction looks like.
