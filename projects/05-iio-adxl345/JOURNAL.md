@@ -830,3 +830,43 @@ The arithmetic that pointed at it was the magnitude. Minus 358, minus
 230 and 729 make 844 counts, which is 3.3 g, and a part at rest cannot
 see that at any orientation. A reading whose length is wrong is wrong
 whatever its direction looks like.
+
+## 19. The storm, measured, and single tap on its own
+
+Friday 16 October 2026, close to midnight. Two numbers finish the
+evening.
+
+**The interrupt storm was real.** With `INT_ENABLE` holding the `0xba`
+it inherited, the line at `/proc/interrupts` gained 5,726 counts across
+four processors in five seconds, about 1,100 a second, with nothing
+touching the board. Data ready asserts `INT1` on every sample and this
+handler never clears it, because it reads the data registers only when
+the watermark bit is set, so a level-triggered line stays asserted and
+the threaded handler runs again and again, each time doing an I2C read
+for nothing. Clearing that register by hand, which is what the fixed
+probe now does, took the next five seconds to zero additional
+interrupts. That is the defect of section 18 priced: a driver that
+cannot put the part into a known state had been spending about a
+thousand interrupts a second for an evening.
+
+**Single tap on its own works**, which the first event run could not
+show because double tap was armed beside it and absorbs the second of a
+pair. With only single tap enabled: 33 events in 20 seconds from of the
+order of a dozen knocks, in
+`docs/evidence/events-singletap-2026-10-16.csv`.
+
+**One knock is not one event.** The 33 fall into about fourteen
+clusters, two to four events each, one to seven milliseconds apart
+inside a cluster and a second or more between them. That is the
+breadboard ringing: the acceleration crosses 3 g several times as it
+decays and each crossing that satisfies `DUR` is a tap by the part's
+definition. The ADXL345 has no refractory period for single taps; the
+suppress bit governs double taps only. An application that treats one
+event as one tap will see three, and that belongs in the record rather
+than in the surprise of whoever writes it.
+
+Criterion 6 is measured, and with it six of eight. What remains needs
+no new hardware: criterion 7 is the one word swap to mainline's driver,
+which currently means a rebuild because the compatible string lives in
+the overlay source, and criterion 8 is the symbol check on the build
+host.
