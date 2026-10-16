@@ -14,7 +14,11 @@ What goes here when that changes, in the order the criteria are numbered:
   for criterion 2
 - the four sysfs reads with the board flat, for criterion 3
 - a capture decoded by `iio-decode`, for criterion 5
-- `iio_event_monitor` output while the board is tapped, for criterion 6
+- `iio-events` output while the board is tapped, for criterion 6. The
+  kernel tree's `iio_event_monitor` was named here until Friday
+  16 October 2026 and is packaged by nothing in this layer, so no bench
+  image has ever contained it; `iio-events` is this repository's own and
+  ships with `bench-iio`
 - two `iio-rate` runs on the same board, one per driver, for criterion 7
 - `./go ksym -f adxl345` and `./go kconfig -f adxl345`, for criterion 8
 

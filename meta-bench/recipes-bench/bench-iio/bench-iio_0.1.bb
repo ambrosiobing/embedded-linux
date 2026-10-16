@@ -1,9 +1,10 @@
 SUMMARY = "IIO bring-up, rate comparison and libiio client for Project 10"
-DESCRIPTION = "Four tools for the X-NUCLEO-IKS4A1: an honest sensor \
-inventory, software trigger management through configfs, the three-path \
-rate comparison, a scan decoder that reads the layout the kernel declares, \
-and a libiio client whose only difference between local and remote is the \
-context URI."
+DESCRIPTION = "Tools for any IIO device, written for the X-NUCLEO-IKS4A1 \
+and used unchanged on Project 5: an honest sensor inventory, software \
+trigger management through configfs, the three-path rate comparison, a \
+scan decoder that reads the layout the kernel declares, an event reader \
+that needs no libiio, and a libiio client whose only difference between \
+local and remote is the context URI."
 HOMEPAGE = "https://github.com/ambrosiobing/embedded-linux"
 
 LICENSE = "MIT"
@@ -16,6 +17,7 @@ SRC_URI = "\
     file://iio-rate \
     file://iio-decode \
     file://iio-stream.c \
+    file://iio-events.c \
     file://ahrs.py \
 "
 
@@ -44,6 +46,14 @@ do_compile() {
     ${CC} ${CFLAGS} ${LDFLAGS} \
         -o ${B}/iio-stream ${S}/iio-stream.c \
         `pkg-config --cflags --libs libiio`
+
+    # iio-events links against nothing. It reaches the IIO core through
+    # an ioctl and the uapi headers, which is the whole reason it can
+    # exist in an image that does not carry libiio: Project 5's image
+    # installs this recipe and not libiio, and its sixth acceptance
+    # criterion needs an event reader that no bench image has ever had.
+    ${CC} ${CFLAGS} ${LDFLAGS} \
+        -o ${B}/iio-events ${S}/iio-events.c
 }
 
 do_install() {
@@ -53,6 +63,7 @@ do_install() {
     install -m 0755 ${S}/iio-rate ${D}${bindir}/iio-rate
     install -m 0755 ${S}/iio-decode ${D}${bindir}/iio-decode
     install -m 0755 ${B}/iio-stream ${D}${bindir}/iio-stream
+    install -m 0755 ${B}/iio-events ${D}${bindir}/iio-events
 
     # Installed without its .py, because it is a program here rather than a
     # module to import. Its own selftest is reachable on the board as

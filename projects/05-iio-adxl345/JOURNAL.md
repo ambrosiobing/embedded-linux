@@ -642,3 +642,42 @@ ways.
 Nothing here is measured. The next thing the board can say is whether a
 tap on the breakout arrives as an IIO event, and that needs a build, a
 flash and a hand on the part.
+
+## 15. The evidence the criterion asked for was in no image
+
+Friday 16 October 2026, same sitting. With the events declared, the
+next step was to flash a card and tap the breakout while something
+watched. Two documents name what should watch: `iio_event_monitor`.
+**Nothing in this layer packages it.** It lives in the kernel tree
+under `tools/iio`, no recipe builds it, and no bench image has ever
+contained it, so criterion 6 asked for the output of a program that was
+shipped to no board. That is decision 75 one storey up: the tool a
+criterion depends on is as much a packaging question as the module a
+device depends on.
+
+Events cannot be read from the shell either. They do not come through
+the buffer character device; the IIO core hands them out on a second
+descriptor obtained with an ioctl, so reading them needs a program.
+
+**`iio-events` is that program**, added to `bench-iio`, which is
+Project 10's tooling and is already installed in Project 5's image. It
+takes a device name, finds the number by reading each `name` attribute
+rather than guessing a range, refuses a device that has no `events`
+directory instead of waiting forever on a device whose driver declares
+none, and prints one comma separated line per event with the kernel's
+timestamp. It links against nothing: the ioctl and the uapi headers are
+the whole interface, which matters because Project 5's image carries
+this recipe and not libiio.
+
+It arms nothing. An event fires only while its `_en` attribute is 1,
+and deciding to arm one is a decision about hardware that belongs to
+whoever is at the bench.
+
+Both documents now name the tool that exists, and the suite has a rule
+for the shape: the tool named in criterion 6's evidence column must
+appear in a `do_install` line of a recipe the image installs. Pointing
+the column at a tool nothing installs fails the run, which was checked.
+
+Still not measured. The build is the first compile of the event code
+and of this program, and the board is the only thing that can say
+whether a tap arrives.

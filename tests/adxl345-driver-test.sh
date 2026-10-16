@@ -363,6 +363,25 @@ else
 	ok "probe arms no event behind the operator"
 fi
 
+# THE EVIDENCE A CRITERION NAMES HAS TO BE IN THE IMAGE. Criterion 6
+# named iio_event_monitor, which lives in the kernel tree's tools/iio
+# and is packaged by nothing in this layer, so no bench image has ever
+# carried it: the criterion asked for output from a program that was
+# shipped to no board. That is decision 75's shape again, one layer up.
+crit6=$(grep -o '`[a-z0-9-]*` output while the board is tapped' \
+	"$ROOT/projects/05-iio-adxl345/README.md" | tr -d '`' | cut -d" " -f1)
+if [ -n "$crit6" ]; then
+	ok "criterion 6 names a tool: $crit6"
+else
+	no "criterion 6 names a tool"
+fi
+if grep -q "bindir}/$crit6" "$ROOT/meta-bench/recipes-bench/bench-iio/bench-iio_0.1.bb"; then
+	ok "and bench-iio installs it"
+else
+	no "and bench-iio installs it, so the evidence can be produced"
+fi
+has "and project 5 image installs bench-iio" "$IMAGE" "^    bench-iio "
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
