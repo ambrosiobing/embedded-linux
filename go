@@ -50,6 +50,8 @@
 #   sudo ./go card-archive PROJECT /dev/sdX   keep a copy of a whole card
 #   ./go card-archive list    what card images have been kept
 #   ./go flash /dev/sdX [IMAGE]   write an image to a card
+#   ./go credentials      the network key, once, for every later flash
+#   ./go credentials show what is stored, masked
 #   ./go overlays /mnt/boot      every dtoverlay= in config.txt has its .dtbo
 #   ./go ksym         check the fragment names real symbols, before a build
 #   ./go kconfig      check that the kernel fragment reached the .config
