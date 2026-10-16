@@ -35,6 +35,8 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT
 SRC=$ROOT/meta-bench/recipes-bench/bench-adxl345
 HDR=$SRC/files/bench-adxl345.h
 CORE=$SRC/files/bench-adxl345-core.c
@@ -381,6 +383,46 @@ else
 	no "and bench-iio installs it, so the evidence can be produced"
 fi
 has "and project 5 image installs bench-iio" "$IMAGE" "^    bench-iio "
+
+echo "--- the registers probe must write whole, not merge"
+
+# THE PART KEEPS ITS REGISTERS ACROSS A REBOOT. The ADXL345 has no reset
+# pin and no software reset, so only removing power returns it to the
+# datasheet defaults, and every probe inherits whatever the last session
+# left. Read off the bench on Friday 16 October 2026: DATA_FORMAT 0xaf
+# with SELF_TEST, INT_INVERT and Justify set, the three offset registers
+# holding up to 1.9 g of trim, BW_RATE at 12.5 Hz while the driver
+# assumed 100, INT_ENABLE with data ready, activity and inactivity on.
+# Every one of those produces readings that look like data.
+#
+# So the configuration registers are written, never merged. A
+# regmap_update_bits on any of them is the defect coming back.
+# ONLY THE PROBE IS READ HERE, and the exclusion is the point rather
+# than a convenience: bench_adxl345_powerdown clears the measure bit
+# with an update_bits on remove, which is correct, and a rule written
+# against the whole file flags it. The first run of this check did
+# exactly that.
+PROBE=$WORKDIR/probe.c
+sed -n '/^int bench_adxl345_core_probe/,$p' "$CORE" >"$PROBE"
+
+for r in DATA_FORMAT POWER_CTL BW_RATE INT_ENABLE; do
+	if grep -q "regmap_update_bits(regmap, BENCH_ADXL345_$r" "$PROBE"; then
+		no "probe writes $r whole rather than merging bits" 			"an update_bits leaves whatever the last session left"
+	else
+		ok "probe writes $r whole rather than merging bits"
+	fi
+	has "and probe writes $r at all" "$PROBE" "regmap_write(regmap, BENCH_ADXL345_$r"
+done
+
+for r in OFSX OFSY OFSZ; do
+	has "probe clears $r" "$PROBE" "regmap_write(regmap, BENCH_ADXL345_$r, 0)"
+done
+
+# The cached sample period and the rate register have to come from one
+# constant, or the FIFO timestamps are spread at a rate the part is not
+# running at.
+has "the probe writes the rate it caches" "$PROBE" 	'regmap_write(regmap, BENCH_ADXL345_BW_RATE,'
+has "and the cached period comes from the same constant" "$PROBE" 	'bench_adxl345_period_ns(BENCH_ADXL345_RATE_DEFAULT -'
 
 echo
 echo "$pass passed, $fail failed"

@@ -76,6 +76,19 @@
 #define BENCH_ADXL345_BW_RATE_MASK	GENMASK(3, 0)
 
 /*
+ * THE RATE THE PROBE WRITES, rather than the one it used to assume.
+ *
+ * 0x0a is 100 Hz and it is also the reset value, which is exactly why
+ * assuming it was wrong: this part has no reset pin, so its registers
+ * survive a warm reboot and hold whatever the last session left. Read
+ * off the bench on Friday 16 October 2026, BW_RATE held 0x07, which is
+ * 12.5 Hz, while the driver's cached sample period said 100 Hz. Nothing
+ * reports that disagreement; it comes out as FIFO timestamps spread
+ * eight times too close together.
+ */
+#define BENCH_ADXL345_RATE_DEFAULT	0x0a
+
+/*
  * INT_ENABLE, INT_MAP and INT_SOURCE share one bit layout, which is a
  * convenience of the part worth naming: the same mask enables an
  * interrupt, routes it to INT1 or INT2, and reads back as its cause.

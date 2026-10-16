@@ -752,3 +752,52 @@ letter, unmount leftovers, flash, unmount, detach, and the letter and
 the bus id both move between sessions. A `./go card flash` that does
 all of it is drafted and untested, and an untested script that erases a
 card has no business in this tree. It is the next thing to finish.
+
+## 18. The part remembers, and a probe that merges bits cannot know
+
+Friday 16 October 2026, after the events. Three sysfs reads returned
+EIO, then returned numbers: minus 1344, minus 320, minus 3776, the same
+five times running. Steady, so not noise, and every one an exact
+multiple of 64.
+
+That multiple is the whole thread. `DATA_FORMAT` has a Justify bit that
+left-aligns the sample in its word, which multiplies a thirteen bit
+reading by eight and a ten bit one by sixty four. Rebinding the driver
+restored resolution and range, because probe writes those, and the
+readings became multiples of eight instead: the bit probe does not
+write stayed set.
+
+Reading the register settled it at `0xaf`. Three bits that should be
+zero were set: SELF_TEST, which applies an electrostatic force that
+deflects the beam, INT_INVERT, which makes the interrupt active low
+while the overlay asks for level high, and Justify. A dump of the
+surrounding registers found three more things: the offset trim held up
+to 1.9 g, `BW_RATE` held 12.5 Hz while the driver's cached sample
+period said 100, and `INT_ENABLE` had data ready, activity and
+inactivity on.
+
+**None of it could have come from this driver**, and all of it survived
+every reboot of the evening. The ADXL345 has no reset pin and no
+software reset: only removing power returns its registers to the
+datasheet's defaults. So a probe inherits whatever the last session
+left, including a session that was writing to a bus that was NACKing,
+and `regmap_update_bits` over a partial mask leaves every bit outside
+the mask exactly as it found it.
+
+Every one of those produces readings that look like data. That is the
+shape this bench keeps meeting and it is worth naming once more: a
+wrong number that is obviously wrong costs an hour, and a wrong number
+that is plausible costs a conclusion.
+
+**The fix is coverage rather than cleverness.** Probe now writes
+`DATA_FORMAT`, `POWER_CTL`, `BW_RATE` and `INT_ENABLE` whole, clears
+the three offset registers, and takes its cached sample period from the
+same constant it writes to `BW_RATE`, so the two cannot drift apart.
+Fourteen assertions hold it there, and they read the probe alone rather
+than the file, because `bench_adxl345_powerdown` clears one bit with
+`update_bits` on remove and that is correct; the first version of the
+rule flagged it.
+
+The event evidence of an hour earlier now carries this as a caveat: it
+proves the path end to end and it was taken with the interrupt polarity
+inverted relative to what the device tree declares.

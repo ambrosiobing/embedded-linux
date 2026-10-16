@@ -687,8 +687,9 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	st->name = name;
 	st->irq = fwnode_irq_get(dev_fwnode(dev), 0);
 	st->watermark = BENCH_ADXL345_WATERMARK_DEFAULT;
-	/* BW_RATE resets to 0x0a, 100 Hz; the table index of that rate. */
-	st->period_ns = bench_adxl345_period_ns(0x0a - BENCH_ADXL345_RATE_FIRST);
+	/* Set further down, from the rate this probe writes rather than
+	 * from the reset value it used to assume. */
+	st->period_ns = 0;
 
 	/*
 	 * Ask the part who it is before configuring anything. An I2C
@@ -706,19 +707,77 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 				     devid, BENCH_ADXL345_DEVID_VALUE);
 
 	/*
-	 * FULL_RES at the widest range. Full resolution keeps 3.9 mg/LSB
-	 * whatever the range, so the reported scale stays constant and the
-	 * range becomes a choice about clipping rather than about
-	 * precision.
+	 * EVERY BIT OF EVERY REGISTER THIS DRIVER DEPENDS ON, WRITTEN
+	 * RATHER THAN MERGED, and the reason is the part itself.
+	 *
+	 * The ADXL345 has no reset pin and no software reset. Its
+	 * registers keep their values across a warm reboot and across a
+	 * driver unbind: only removing power returns them to the
+	 * datasheet's defaults. So whatever any earlier session left
+	 * behind is what this probe inherits, and an update_bits over a
+	 * partial mask leaves all of it in place.
+	 *
+	 * Read off the bench on Friday 16 October 2026, after an evening
+	 * in which several writes had failed mid-transfer on a marginal
+	 * bus, the part held:
+	 *
+	 *   DATA_FORMAT  0xaf   SELF_TEST set, INT_INVERT set, Justify set
+	 *   OFSX/Y/Z     0xa9 0xba 0x7a   up to 1.9 g of trim, from nowhere
+	 *   BW_RATE      0x07   12.5 Hz, while this driver assumed 100
+	 *   INT_ENABLE   0xba   data ready, activity and inactivity on
+	 *
+	 * Each of those produces readings that look like data. Justify
+	 * left-aligns the word, so every value is eight times too large;
+	 * SELF_TEST applies an electrostatic force that deflects the beam;
+	 * the offset registers add a trim at 15.6 mg a count; INT_INVERT
+	 * makes the interrupt active low while the device tree asks for
+	 * level high. Nothing in the driver could have noticed any of it.
+	 *
+	 * The fix is not cleverness, it is coverage: write the whole byte
+	 * wherever the configuration matters, so that probe puts the part
+	 * in a known state from any starting state.
 	 */
-	ret = regmap_update_bits(regmap, BENCH_ADXL345_DATA_FORMAT,
-				 BENCH_ADXL345_DATA_FORMAT_RANGE |
-				 BENCH_ADXL345_DATA_FORMAT_FULL_RES,
-				 BENCH_ADXL345_DATA_FORMAT_FULL_RES |
-				 FIELD_PREP(BENCH_ADXL345_DATA_FORMAT_RANGE,
-					    BENCH_ADXL345_RANGE_16G));
+	ret = regmap_write(regmap, BENCH_ADXL345_DATA_FORMAT,
+			   BENCH_ADXL345_DATA_FORMAT_FULL_RES |
+			   FIELD_PREP(BENCH_ADXL345_DATA_FORMAT_RANGE,
+				      BENCH_ADXL345_RANGE_16G));
 	if (ret)
 		return dev_err_probe(dev, ret, "cannot set DATA_FORMAT\n");
+
+	/*
+	 * The user offset trim, back to zero. These three are the ones
+	 * that cost the most to find, because a constant added to an axis
+	 * is indistinguishable from a part that is sitting at an angle.
+	 */
+	ret = regmap_write(regmap, BENCH_ADXL345_OFSX, 0);
+	if (!ret)
+		ret = regmap_write(regmap, BENCH_ADXL345_OFSY, 0);
+	if (!ret)
+		ret = regmap_write(regmap, BENCH_ADXL345_OFSZ, 0);
+	if (ret)
+		return dev_err_probe(dev, ret, "cannot clear the offsets\n");
+
+	/*
+	 * The output data rate, written rather than assumed, and the
+	 * cached period set from the same constant so the two cannot
+	 * drift apart.
+	 */
+	ret = regmap_write(regmap, BENCH_ADXL345_BW_RATE,
+			   BENCH_ADXL345_RATE_DEFAULT);
+	if (ret)
+		return dev_err_probe(dev, ret, "cannot set the output rate\n");
+
+	st->period_ns = bench_adxl345_period_ns(BENCH_ADXL345_RATE_DEFAULT -
+						BENCH_ADXL345_RATE_FIRST);
+
+	/*
+	 * Every interrupt off. What the buffer needs is enabled in
+	 * postenable and what an event needs is enabled from sysfs, so
+	 * anything set here is something nobody asked for.
+	 */
+	ret = regmap_write(regmap, BENCH_ADXL345_INT_ENABLE, 0);
+	if (ret)
+		return dev_err_probe(dev, ret, "cannot clear INT_ENABLE\n");
 
 	ret = regmap_write(regmap, BENCH_ADXL345_FIFO_CTL,
 			   FIELD_PREP(BENCH_ADXL345_FIFO_CTL_MODE,
@@ -740,9 +799,13 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 		return dev_err_probe(dev, ret,
 				     "cannot set the event parameters\n");
 
-	ret = regmap_update_bits(regmap, BENCH_ADXL345_POWER_CTL,
-				 BENCH_ADXL345_POWER_CTL_MEASURE,
-				 BENCH_ADXL345_POWER_CTL_MEASURE);
+	/*
+	 * Measurement on and every other bit off, written whole for the
+	 * reason given above: the link and wakeup bits were set on the
+	 * bench with nothing in this driver having written them.
+	 */
+	ret = regmap_write(regmap, BENCH_ADXL345_POWER_CTL,
+			   BENCH_ADXL345_POWER_CTL_MEASURE);
 	if (ret)
 		return dev_err_probe(dev, ret, "cannot start measuring\n");
 
