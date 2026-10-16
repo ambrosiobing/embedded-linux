@@ -44,7 +44,10 @@ no() {
 # PROGRAM is a path under the rootfs to create, or "none". FILE is a name
 # to create on the boot partition, or "none".
 build_card() {
-	rm -rf "$WORK/boot" "$WORK/root"
+	# ${WORK:?} rather than $WORK: an empty WORK would make this line
+	# "rm -rf /boot /root", and the form that refuses is the one to
+	# write in a file that runs unattended in CI.
+	rm -rf "${WORK:?}/boot" "${WORK:?}/root"
 	mkdir -p "$WORK/boot" "$WORK/root/usr/bin"
 	[ "$1" = none ] || { mkdir -p "$(dirname "$WORK/root/$1")"; : >"$WORK/root/$1"; }
 	[ "$2" = none ] || : >"$WORK/boot/$2"
@@ -58,7 +61,7 @@ run() {
 }
 
 store() {
-	rm -rf "$WORK/store"
+	rm -rf "${WORK:?}/store"
 	mkdir -p "$WORK/store"
 	[ "$1" = none ] || { echo "SSID=x"; echo "PSK=y"; } >"$WORK/store/$1"
 }

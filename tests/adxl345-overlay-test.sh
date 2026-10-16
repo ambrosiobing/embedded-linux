@@ -117,10 +117,13 @@ has "the design records 0x53 for SDO low" "$DESIGN" 'low gives .0x53.'
 echo "--- one .dtbo name across recipe, image and config.txt"
 
 has "the recipe compiles bench-adxl345.dtbo" "$RECIPE" 'bench-adxl345\.dtbo'
+# The pattern is BitBake's own variable syntax, which is the point of
+# the assertion; single quotes keep the shell out of it.
+# shellcheck disable=SC2016
 has "and deploys it into overlays/" "$RECIPE" 'install -m 0644 ${B}/bench-adxl345.dtbo ${DEPLOYDIR}/overlays/'
 has "the image copies overlays/bench-adxl345.dtbo onto the card" "$IMG" 'IMAGE_BOOT_FILES:append = " overlays/bench-adxl345.dtbo;overlays/bench-adxl345.dtbo"'
 has "and waits for the deploy before assembling" "$IMG" 'do_image\[depends\] += "bench-adxl345-dt:do_deploy"'
-has "the image installs the overlay recipe" "$IMG" '^    bench-adxl345-dt \\'
+has "the image installs the overlay recipe" "$IMG" '^    bench-adxl345-dt '
 has "config.txt requests dtoverlay=bench-adxl345" "$KAS" 'dtoverlay=bench-adxl345'
 hasnt "and requests it through an override, never a plain assignment" "$KAS" '^    RPI_EXTRA_CONFIG = '
 
@@ -133,6 +136,9 @@ echo "--- the interrupt, now that INT1 is wired"
 # overlay's own comment carries the reasoning for level high.
 has "the node names the gpio controller as its interrupt parent" "$DTS_CODE" 'interrupt-parent = <&gpio>;'
 has "and asks for GPIO23, level high" "$DTS_CODE" 'interrupts = <23 4>;'
+# Backticks inside the pattern are Markdown, not a command
+# substitution, and single quotes are what keeps them that way.
+# shellcheck disable=SC2016
 has "and the design's wiring table puts INT1 on pin 16" "$DESIGN" '| `INT1` | 16 | GPIO23 |'
 
 echo
