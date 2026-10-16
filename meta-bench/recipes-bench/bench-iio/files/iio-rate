@@ -125,7 +125,13 @@ cpu_ticks_of() {
 	# comm field, because a process name may contain spaces and
 	# parentheses and the naive cut on field 14 is wrong for exactly the
 	# processes whose names are interesting.
-	sed 's/.*) //' "$_stat" | awk '{print $12 + $13}'
+	#
+	# Children are counted too, fields 16 and 17, which are cutime and
+	# cstime. For a reader that is one process, dd on the buffer, they
+	# are zero and nothing changes. For the poll path the reader IS a
+	# shell loop whose work happens in forks, and counting only its own
+	# two fields reports a loop that is busy as using nothing.
+	sed 's/.*) //' "$_stat" | awk '{print $12 + $13 + $14 + $15}'
 }
 
 clock_ticks() {
@@ -189,6 +195,7 @@ do_poll() {
 	_start=$(date +%s)
 	_deadline=$((_start + DURATION))
 	_n=0
+	_ticks_before=$(cpu_ticks_of $$)
 	# Deliberately the naive loop, because the naive loop is the thing
 	# being measured. Every iteration is an open, a read, a close and an
 	# I2C transaction, and the number it produces is what a reader gets
@@ -199,6 +206,15 @@ do_poll() {
 	done
 	_elapsed=$(( $(date +%s) - _start ))
 	[ "$_elapsed" -gt 0 ] || _elapsed=1
+
+	# The loop's own cost, children included, because on this path the
+	# cost IS the forks: every iteration is a date, a cat, an open, a
+	# read and a close. Until Saturday 17 October 2026 this path passed
+	# nothing here and emit printed a zero, so a figure nobody measured
+	# sat in the results file beside figures somebody did.
+	_ticks=$(( $(cpu_ticks_of $$) - _ticks_before ))
+	cpu_pct=$(awk -v t="$_ticks" -v hz="$(clock_ticks)" -v s="$_elapsed" \
+		'BEGIN { printf "%.2f", (hz > 0 && s > 0) ? 100 * t / hz / s : 0 }')
 
 	emit poll "$1" "$((_n / _elapsed))" "$_n" "$_elapsed" 0 "" none
 }
@@ -450,13 +466,20 @@ emit() {
 		'BEGIN { printf "%.2f", (s > 0) ? i / s : 0 }')
 	printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
 		"$(date +%Y-%m-%dT%H:%M:%S%z)" "$path" "$device" "$rate" "$samples" \
-		"$seconds" "$irqs" "$irq_rate" "${cpu_pct:-0}" "$ts_sd" \
+		"$seconds" "$irqs" "$irq_rate" "${cpu_pct:-}" "$ts_sd" \
 		"$ts_source" >>"$csv"
 
 	echo
 	note "samples/s  $rate  ($samples in ${seconds}s)"
 	note "interrupts $irqs  (${irq_rate}/s)"
-	note "reader cpu ${cpu_pct:-0}%"
+	# An empty column rather than a zero. A number nobody measured is
+	# worse than a blank: the blank is honest, and the zero is a claim
+	# the next reader will compare against a figure somebody took.
+	if [ -n "${cpu_pct:-}" ]; then
+		note "reader cpu ${cpu_pct}%"
+	else
+		note "reader cpu not measured on this path"
+	fi
 	if [ -n "$ts_sd" ]; then
 		note "ts sd      ${ts_sd} us, source: $ts_source"
 		if [ "$ts_source" = driver-interpolated ]; then

@@ -91,6 +91,10 @@ build_device() {
 		echo 0 >"$DEV/scan_elements/${c}_en"
 	done
 
+	# What the poll path reads. One value is enough: the path is being
+	# measured, not the sensor.
+	echo 242 >"$DEV/in_accel_x_raw"
+
 	# The character device the buffer is read through. A regular file is
 	# enough: dd reads it and stops, which is what a short capture looks
 	# like from the program's side.
@@ -236,7 +240,17 @@ contains "and falls back to lsm6 for the ST driver, which names its line otherwi
 build_device
 echo 0 >"$DEV/buffer/watermark"
 out=$(BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results BENCH_IIO_DURATION=9 	BENCH_IIO_IRQ=lsm6 sh "$SUT" fifo lsm6dsv16x_accel 480 64 -d 1 2>&1 || true)
-contains "-d SEC sets the capture length and beats the environment" "$out" "in 1s)"
+# One second or two, not nine. The tool measures whole seconds from
+# date, so a run that starts a few milliseconds before a tick reports
+# the second boundary it crossed. Demanding exactly 1 made this suite
+# fail about one run in four, which is worse than the looseness: a
+# flaky test in CI is a red run that nobody can act on.
+case $out in
+*"in 1s)"* | *"in 2s)"*)
+	ok "-d SEC sets the capture length and beats the environment" ;;
+*)
+	no "-d SEC sets the capture length and beats the environment" "$out" ;;
+esac
 status=0
 out=$(BENCH_IIO_ROOT=$WORK sh "$SUT" fifo lsm6dsv16x_accel 480 64 -d five 2>&1) || status=$?
 check "a non-numeric -d is refused" "$status" "1"
@@ -412,6 +426,40 @@ STUB
 chmod +x "$WORK/bin/iio-decode"
 printf '%s' ' 185:   100   101   102   103  pinctrl-bcm2835  24 Edge  lsm6dsx' \
 	>"$WORK/proc/interrupts"
+
+echo "--- the poll path reports a cpu figure it actually took"
+
+# On Saturday 17 October 2026 the poll path printed "reader cpu 0%" and
+# wrote a zero into the results file. It had passed nothing: emit
+# defaulted an empty value to zero, so a figure nobody measured sat
+# beside figures somebody did. The loop forks a date and a cat per
+# iteration, so its real cost is not zero and is not small.
+build_device
+out=$(BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results 	sh "$SUT" poll lsm6dsv16x_accel -d 1 2>&1 || true)
+case $out in
+*"reader cpu not measured"*)
+	no "the poll path measures its own cpu" "it still reports nothing" ;;
+*"reader cpu "*)
+	ok "the poll path measures its own cpu" ;;
+*)
+	no "the poll path measures its own cpu" "$out" ;;
+esac
+
+cpu_col=$(awk -F, '$2 == "poll" { print $9 }' "$WORK/results/rates.csv" | tail -n 1)
+if [ -n "$cpu_col" ]; then
+	ok "and the results row carries that figure, not an invented zero"
+else
+	no "and the results row carries that figure, not an invented zero" 		"the cpu column is empty for a path that measured it"
+fi
+
+# And the other direction, read from the source because no path now
+# leaves the figure empty: the default that invented a zero must not
+# come back.
+if grep -q 'cpu_pct:-0' "$SUT"; then
+	no "emit no longer defaults an unmeasured cpu to zero"
+else
+	ok "emit no longer defaults an unmeasured cpu to zero"
+fi
 
 echo
 echo "$pass passed, $fail failed"

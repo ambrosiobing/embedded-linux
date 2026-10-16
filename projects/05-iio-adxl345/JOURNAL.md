@@ -870,3 +870,45 @@ no new hardware: criterion 7 is the one word swap to mainline's driver,
 which currently means a rebuild because the compatible string lives in
 the overlay source, and criterion 8 is the symbol check on the build
 host.
+
+## 20. Double tap is the quiet one, and the poll path was reporting a zero nobody measured
+
+Saturday 17 October 2026, just after midnight. Two more runs on the
+wired part, and the second one found a defect in the instrument rather
+than in the driver.
+
+**Double tap alone: 17 events in 20 seconds, one per pair.** The gaps
+are between 0.93 and 1.20 seconds, which is the hand knocking. Nothing
+clusters, where single tap on the same mount gave two to four events
+per knock milliseconds apart. The reason is the gesture's own
+definition: a tap, 100 ms of quiet, then a second tap inside 300 ms.
+Breadboard ringing inside the latency window is not a second tap. So
+the more complicated gesture is the better behaved one on a noisy
+mount, which is worth measuring rather than guessing. Evidence in
+`docs/evidence/events-doubletap-2026-10-16.md`.
+
+**The polled path: 98 reads a second, and a CPU figure that was never
+taken.** `iio-rate poll` printed `reader cpu 0%` and wrote a zero into
+`rates.csv`. It had measured nothing: the poll path passed an empty
+value and `emit` defaulted it with `${cpu_pct:-0}`. A number nobody
+measured sitting in a results file beside numbers somebody did is the
+thing this repository's own rules call worse than a blank, and it was
+in its own tooling.
+
+Two fixes. `emit` now prints "reader cpu not measured on this path" and
+writes an empty column, so nothing is invented. And the poll path
+measures itself, counting children: its loop forks a `date` and a `cat`
+every iteration, so the work is in the forks, and `cpu_ticks_of` was
+reading only fields 14 and 15 of `/proc/PID/stat`, which exclude them.
+A loop that keeps a core busy was reporting nothing at all.
+
+**And the 98 is not what it looks like either.** It is the rate at
+which this board can fork two processes, not what the bus or the part
+can do. The comment above that loop already said the naive loop is the
+thing being measured, which is fair, but the number must not be read
+beside the FIFO path's 96 samples a second as though they were
+comparable: the FIFO delivers 96 distinct samples, and the poll loop
+re-reads one register 98 times.
+
+Three assertions hold the fix, including one that greps the source for
+the default that invented the zero.
