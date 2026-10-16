@@ -159,6 +159,25 @@ Project 10 measures and compares:
 | Triggered buffer | a trigger plus `/dev/iio:deviceN` | the scan mask, `iio_push_to_buffers_with_timestamp` |
 | Hardware FIFO | the part's own 32-sample FIFO, drained on a watermark interrupt | the threaded IRQ, and why it exists |
 
+**Two of those three exist, and the middle row is a plan rather than a
+description.** Measured on Saturday 17 October 2026: the word `trigger`
+appears nowhere in the driver, and the device it registers has no
+`trigger` directory under `/sys/bus/iio/devices/iio:device0`, so
+`iio-rate trigger` has nothing to attach to. The buffer this driver
+owns is a kfifo filled by its own threaded interrupt at the part's
+watermark, which is the third row.
+
+The triggered path needs `iio_triggered_buffer_setup` and a pollfunc
+that reads one scan, and it is worth having precisely because Project
+10 compares the three against each other: an hrtimer trigger timestamps
+in the IIO core, where the FIFO path assigns its timestamps from
+arithmetic. Until it exists, a comparison of three paths on this part
+is a comparison of two.
+
+This table said three for as long as the project has existed. Nothing
+checked it, which is the same shape as the three events that could not
+fire: a claim written as an intention and read later as a fact.
+
 Channels are the three axes plus a timestamp. Mainline's core declares
 exactly `ADXL345_CHANNEL(0, X)`, `(1, Y)`, `(2, Z)`; ours adds the
 timestamp channel that a buffer needs.

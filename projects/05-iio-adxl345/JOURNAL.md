@@ -912,3 +912,29 @@ re-reads one register 98 times.
 
 Three assertions hold the fix, including one that greps the source for
 the default that invented the zero.
+
+## 21. The third path does not exist
+
+Saturday 17 October 2026. The next thing to run on the wired part was
+the trigger path, to put all three of the design's paths beside each
+other. It cannot be run: the driver has no trigger support at all. The
+word does not appear in the source, and the device listing taken an
+hour earlier has no `trigger` directory, which is why nothing noticed.
+
+`docs/DESIGN.md` has carried a table of three paths since before the
+driver was written. Two of them are real: polled sysfs reads, and the
+hardware FIFO drained by the threaded interrupt. The middle row,
+a triggered buffer, was a plan that the table states as a fact, and the
+table has been read as a description ever since.
+
+The gap is now in that table rather than in nobody's head. Implementing
+it means `iio_triggered_buffer_setup` and a pollfunc that reads one
+scan, and it is worth doing because the comparison Project 10 exists to
+make is only interesting across three paths: an hrtimer trigger
+timestamps in the IIO core, where the FIFO path assigns timestamps from
+arithmetic and will always look better for a reason that has nothing to
+do with the hardware.
+
+Same shape as the events of section 14 and as every other claim this
+bench has had to correct: written as an intention, read as a fact,
+checked by nothing.
