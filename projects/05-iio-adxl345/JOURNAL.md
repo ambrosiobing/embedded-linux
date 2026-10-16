@@ -938,3 +938,38 @@ do with the hardware.
 Same shape as the events of section 14 and as every other claim this
 bench has had to correct: written as an intention, read as a fact,
 checked by nothing.
+
+## 22. The red CI was mine, and a week old
+
+Saturday 17 October 2026. Four red runs in an hour turned out to be
+two separate things, and shellcheck was only the smaller one.
+
+**The one that had been red for a week.** `tests/lcd35a-overlay-test.sh`
+asserts that Project 7's kas file does not inherit the DSI panel
+overlay, and it checked that by looking for the literal string
+`RPI_EXTRA_CONFIG =`. Decision 119 replaced every plain assignment in
+those files with `:forcevariable` on Friday 9 October 2026, so the
+string went away and the test has failed on every push since. Nobody
+read a run for a week, which is the part worth noticing: a check that
+nobody reads is a check that is not running.
+
+The assertion was about the spelling of an override rather than about
+the thing it cared about. It now requires an override, because a plain
+assignment loses to section ordering, and separately requires that the
+value does not carry the DSI overlay. Putting that overlay back fires
+both.
+
+**The smaller one.** Three shellcheck findings in scripts written here,
+on a laptop with no shellcheck. Guessing fixed two of six; running it
+on skyhorizon named all six in one command. That command now sits in
+the working notes and belongs in front of every push.
+
+**And a gap found while looking.** CI compiles every C program in this
+layer by name, which is thorough and has one failure mode: a new
+program is invisible until a line is added. `iio-events` was written,
+packaged, installed on a card and run on a board before anyone noticed
+the list did not mention it. It has a line now.
+
+The whole evening's shape, three times over: a claim with nothing
+reading it. The events that could not fire, the design table's third
+path, and a test asserting a string that had moved.

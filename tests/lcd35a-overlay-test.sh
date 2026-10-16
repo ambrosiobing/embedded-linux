@@ -218,7 +218,25 @@ echo "--- the kas file"
 has "the kernel switch is on" "$KAS" 'BENCH_LCD35A_KERNEL = "1"'
 has "the SPI bus is enabled in config.txt" "$KAS" 'ENABLE_SPI_BUS = "1"'
 has "the overlay is loaded by config.txt" "$KAS" 'dtoverlay=bench-lcd35a'
-has "the DSI panel overlay is not inherited" "$KAS" 'RPI_EXTRA_CONFIG ='
+# The assertion used to be the literal 'RPI_EXTRA_CONFIG =', on the
+# reasoning that a plain assignment replaces the value this file
+# inherits from bench-rpi4.yml, which carries the DSI panel overlay. It
+# broke on Friday 9 October 2026 when that line became
+# ':forcevariable', and CI stayed red for a week because nobody read
+# the run.
+#
+# What matters was never the spelling of the override. It is that the
+# value this image ends up with does not carry the DSI overlay, and
+# that it is set in a way that survives kas writing the sections in
+# alphabetical order, which a plain assignment does not: decision 119.
+has "the overlay value is set with an override, not a plain assignment" 	"$KAS" 'RPI_EXTRA_CONFIG:forcevariable'
+# Written out rather than through a helper: this suite has no negative
+# one, and adding it for a single use would be the larger change.
+if grep -q 'RPI_EXTRA_CONFIG:forcevariable.*vc4-kms-dsi-7inch' "$KAS"; then
+	no "and the DSI panel overlay is not among what it sets"
+else
+	ok "and the DSI panel overlay is not among what it sets"
+fi
 
 # The DSI overlay belongs to the Pi 4 bench image and is an overlay for
 # hardware this board does not have, which costs a deferred probe retrying

@@ -170,6 +170,21 @@ jobs:
           esac
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libiio) meta-bench/recipes-bench/bench-iio/files/iio-stream.c -o /tmp/iio-stream $(pkg-config --libs libiio)
 
+      - name: Compile the IIO event reader
+        # Added Saturday 17 October 2026, with the program. Every C file
+        # in this layer is compiled here by name, which is thorough and
+        # has one failure mode: a new program is invisible until somebody
+        # adds a line, and iio-events was written, packaged, installed on
+        # a card and run on a board before anyone noticed this list did
+        # not mention it.
+        #
+        # It links against nothing. The ioctl and the uapi headers are
+        # the whole interface, which is why it can live in an image that
+        # has no libiio.
+        run: |
+          gcc -Wall -Wextra -Werror -O2 meta-bench/recipes-bench/bench-iio/files/iio-events.c -o /tmp/iio-events
+          /tmp/iio-events 2>&1 | head -2 || true
+
       - name: Compile the modem control tool
         # Project 15's mechanism half. Same source, same -Werror: a
         # toolchain upgrade should fail here rather than in someone's
