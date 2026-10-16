@@ -801,3 +801,18 @@ rule flagged it.
 The event evidence of an hour earlier now carries this as a caveat: it
 proves the path end to end and it was taken with the interrupt polarity
 inverted relative to what the device tree declares.
+
+**And one claim in this entry is already contradicted.** Writing the
+three offset registers to zero by hand, with the driver unbound,
+changed nothing: the axes stayed at minus 358, minus 230 and 729. If
+the trim had been applied to the output, clearing it should have moved
+x by about 348 counts. So either those writes did not take, or the
+offset registers were not the reason the readings are wrong, and the
+remaining number to explain is the magnitude: those three axes make 844
+counts, which is 3.3 g, and a part at rest cannot see that at any
+orientation. The next thing to run is a second dump, to see whether
+`0x1e` to `0x20` now read zero.
+
+The probe fix stands on its own regardless: `DATA_FORMAT` held `0xaf`,
+that was read directly, and a probe that cannot put the part into a
+known state is wrong whether or not it explains tonight's numbers.
