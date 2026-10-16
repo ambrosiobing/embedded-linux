@@ -1,0 +1,4 @@
+timestamp_ns,channel,modifier,type,direction
+1792184771915984137,accel,x|y|z,gesture,doubletap
+1792184772103658046,accel,x|y|z,gesture,doubletap
+1792184772103658046,accel,x|y|z,thresh,falling

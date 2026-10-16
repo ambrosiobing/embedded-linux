@@ -718,3 +718,37 @@ no console.
 Thirteen assertions in `tests/credentials-check-test.sh`, including the
 two it must stay silent for. The case it exists for is the first one in
 the file.
+
+## 17. Criterion 6 measured, and the evening it cost to get there
+
+Friday 16 October 2026, late. Two double taps and a free fall arrived
+through the IIO character device, decoded by `iio-events`. The evidence
+and its caveats are in `docs/evidence/events-2026-10-16.md`: one
+interrupt carried two of the three, the bus was NACKing writes minutes
+either side of the run, and single tap did not appear on its own
+because the part reports the double tap when both are enabled and both
+are satisfied.
+
+**The hour before it is worth more than the result**, because none of
+it was about the driver.
+
+| What cost time | Why | What now carries it |
+|---|---|---|
+| the build ran on last week's commit | the pull between the push and the build was skipped; caught only by reading the commit in the build banner | nothing yet, see below |
+| the flash erased `wifi.conf` and nobody wrote it again | it was a line in a hand-over, and that line had been skipped before | `./go credentials` once, and `scripts/flash.sh` copies it onto every card |
+| the board was then unreachable | no network, and this board has no usable serial console | the same change; a card that needs the file and has no copy now fails the flash |
+| `bmaptool` refused the card | a mount from an earlier step was left open, and the failure named errno 16 rather than the mount | `scripts/flash.sh` refuses a mounted target up front and prints the `umount` line |
+| three subnet sweeps found nothing | the ping objects were discarded before their operations completed, so nothing populated the ARP table | the sweep that works keeps the tasks and waits for them |
+| `i2cget` reported the part busy | the driver was bound to it, which is `UU` in a scan and is correct | nothing to fix; read through sysfs while a driver owns the address |
+
+**The mount and the credential file are the same mistake twice**, and
+it is mine: a step that changes state was handed over with its undo
+further down a list, and the middle of the list was overtaken. Both are
+now the script's business rather than the operator's.
+
+**What is deliberately not fixed tonight.** The card cycle is still
+eight steps across two shells: find the bus id, attach, read the device
+letter, unmount leftovers, flash, unmount, detach, and the letter and
+the bus id both move between sessions. A `./go card flash` that does
+all of it is drafted and untested, and an untested script that erases a
+card has no business in this tree. It is the next thing to finish.

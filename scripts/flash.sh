@@ -63,6 +63,27 @@ fi
 note "target $dev"
 lsblk -o NAME,SIZE,MODEL,MOUNTPOINT "$dev" 2>/dev/null || true
 
+# A PARTITION OF THIS CARD STILL MOUNTED IS THE COMMONEST WAY THIS
+# COMMAND FAILS, and it fails late: after the provenance, after the
+# confirmation and after the sudo password, with bmaptool's own message
+# about exclusive mode, which names errno 16 rather than the mount. It
+# happened on Friday 16 October 2026 with /mnt/bootfs left over from
+# reading the card a minute earlier.
+#
+# Refusing here costs nothing and names the fix. The unmount is not done
+# automatically on purpose: something is reading that filesystem, and a
+# script that silently unmounts another program's working directory is
+# worse than one that asks.
+mounted=$(lsblk -nro MOUNTPOINT "$dev" 2>/dev/null | grep -v '^$' || true)
+if [ -n "$mounted" ]; then
+	echo "$mounted" | while read -r m; do
+		note "still mounted: $m"
+	done
+	die "a partition of $dev is mounted, so the card cannot be written.
+       Unmount it first:
+           sudo umount $(echo "$mounted" | tr '\n' ' ')"
+fi
+
 printf 'Everything on %s will be erased. Type the device path to continue: ' "$dev"
 read -r answer
 [ "$answer" = "$dev" ] || die "not confirmed."
