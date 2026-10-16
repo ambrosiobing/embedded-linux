@@ -34,8 +34,11 @@ mask() {
 
 case $what in
 show)
-	if [ -d "$store" ] && [ -n "$(ls -A "$store" 2>/dev/null)" ]; then
-		for f in "$store"/*; do
+	# A glob rather than ls, which shellcheck objects to and which
+	# mishandles a name with a space in it.
+	set -- "$store"/*
+	if [ -e "$1" ]; then
+		for f in "$@"; do
 			echo "--- $f"
 			mask "$f" | sed 's/^/    /'
 		done

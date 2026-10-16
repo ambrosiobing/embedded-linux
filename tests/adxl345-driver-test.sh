@@ -305,6 +305,10 @@ echo "--- the events, which were pushed by a handler nothing could reach"
 #
 # So: every event direction this file names must also be declared in an
 # iio_event_spec. A fourth push added without a spec fires this.
+# Same word-splitting loop as the register check above, and the same
+# directive: the pattern admits only [A-Z_0-9], so every match is one
+# whitespace-free token.
+# shellcheck disable=SC2013
 for d in $(grep -o 'IIO_EV_DIR_[A-Z_0-9]*' "$CORE" | sort -u); do
 	if grep -q "\.dir = $d," "$CORE"; then
 		ok "$d is declared in an event spec, not only pushed"
@@ -370,8 +374,11 @@ fi
 # and is packaged by nothing in this layer, so no bench image has ever
 # carried it: the criterion asked for output from a program that was
 # shipped to no board. That is decision 75's shape again, one layer up.
-crit6=$(grep -o '`[a-z0-9-]*` output while the board is tapped' \
-	"$ROOT/projects/05-iio-adxl345/README.md" | tr -d '`' | cut -d" " -f1)
+# The backtick is built rather than typed: a literal one inside single
+# quotes is legal shell and confuses enough tools to be worth avoiding.
+BT=$(printf '`')
+crit6=$(grep -o "${BT}[a-z0-9-]*${BT} output while the board is tapped" \
+	"$ROOT/projects/05-iio-adxl345/README.md" | tr -d "$BT" | cut -d" " -f1)
 if [ -n "$crit6" ]; then
 	ok "criterion 6 names a tool: $crit6"
 else
