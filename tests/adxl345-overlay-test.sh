@@ -195,6 +195,12 @@ has "and refuses a control with no adi compatible" \
 has "and one that still claims ours" \
 	"$RECIPE" 'bbfatal "the control overlay still claims bench,adxl345"'
 has "the recipe compiles the control" "$RECIPE" 'bench-adxl345-adi.dtbo'
+# ${B} here is BitBake's build directory inside the recipe text being
+# searched, not a shell expansion, and single quotes are what keep it
+# literal. shellcheck cannot tell the difference and reports SC2016,
+# which is an info finding that still exits non-zero and so fails the
+# whole run.
+# shellcheck disable=SC2016
 has "and deploys it beside the other" \
 	"$RECIPE" 'install -m 0644 ${B}/bench-adxl345-adi.dtbo'
 has "the image carries both overlays" "$IMG" 'overlays/bench-adxl345-adi.dtbo'
