@@ -1060,3 +1060,68 @@ Friday 9 October 2026, when the driver compiled, bound and read
 gravity. It also still called the overlay deliberately missing. Three
 documents in this project have now had to be corrected for the same
 reason, which is that no check in this repository reads a sentence.
+
+## 24. Two lines that were never requests, and the check that said so
+
+Saturday 17 October 2026, the build host. `./go ksym -f adxl345` had
+never been run, which is half of criterion 8 and the only check in this
+repository that can be run before a kernel is compiled. It indexed 20854
+declarations in the 6.6.63 tree and refused the fragment.
+
+Every symbol exists. Three have no prompt, where the fragment's own
+header said one:
+
+    PROMPTLESS  CONFIG_REGMAP_I2C   selected from 63 places in the tree
+    PROMPTLESS  CONFIG_REGMAP_SPI   selected from 37
+    consequence CONFIG_ADXL345      marked, selected by accel/Kconfig
+
+`CONFIG_REGMAP_I2C` and `CONFIG_REGMAP_SPI` are the seam this whole
+project is built on. The core reaches the part only through a struct
+regmap, and those two symbols are what turn a bus into one. Both lines
+have been in the fragment since the first day, both were written as
+requests, and kconfig has been dropping both without a word ever since.
+
+**They were right anyway, and that is the uncomfortable part.** The
+modules loaded on Friday 9 October 2026 and the part bound and read
+gravity, so `devm_regmap_init_i2c` resolved at modprobe and
+`REGMAP_I2C` was certainly on in that build. Something in the BSP
+defconfig selects it. So the fragment contained two lines that did
+nothing, in a build that worked, and nothing in this repository could
+have told the two situations apart until the check that exists for
+exactly that was finally run.
+
+Note the shape, because it is the same as this afternoon's
+`CONFIG_IIO_TRIGGERED_BUFFER` question answered from the other end: a
+promptless symbol is a prediction, and a prediction that comes true is
+indistinguishable from a request until something reads the tree. That
+one was reasoned about and worked around before it could cost anything.
+These two were not reasoned about at all.
+
+**What changed.** Both lines keep their place, because they are the
+requirement and because a fragment with no line for a symbol is a
+fragment `./go kconfig` cannot check. Both now carry a consequence
+marker. The marker names the mechanism rather than a Kconfig path, so
+the script reports the claim as unchecked, which is the honest answer:
+it can verify that a named file selects the symbol, and that says
+nothing about whether the driver in that file is enabled in this image.
+Naming one of the 63 to make the output go quiet would have been the
+kind of claim this week has been spent removing.
+
+The `CONFIG_ADXL345` marker did name symbols rather than a file, so it
+was reported unchecked too. It now names `drivers/iio/accel/Kconfig`,
+which is the selector the run itself printed, so that claim is checked
+against the tree from here on.
+
+The suite gained an assertion per promptless symbol, which replaces one
+that read the first marker in the file through `grep -n` and `cut`. The
+moment a second marker appeared, that became arithmetic on three line
+numbers, and under `set -eu` it ended the whole run mid-way: the proof
+was watching it happen. Each of the three was then stripped of its
+marker in turn and watched to fail, and a blank line inserted between
+marker and symbol fails it too, which is `check-kernel-symbols.sh`'s own
+rule about a marker's reach.
+
+**What is still open.** Whether those two symbols are set in the
+`.config` a build produces. `./go ksym` cannot answer it by
+construction, and `./go kconfig -f adxl345` after the rebuild is the
+second half of criterion 8.

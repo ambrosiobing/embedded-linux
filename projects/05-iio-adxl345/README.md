@@ -20,7 +20,7 @@ it, and the core does not know which is loaded.
 **Built, bound and measured, with two criteria open.** As of Saturday 17
 October 2026: the module compiles against the image's 6.6.63 kernel,
 binds to the part on the bench through this project's own overlay, and
-has been read on the board for six of the criteria below. 94 assertions
+has been read on the board for six of the criteria below. 95 assertions
 pass with no board and no kernel tree.
 
 Three sentences of this section said the opposite until today, and they
@@ -127,7 +127,7 @@ means a board did.
 | 5 | A triggered buffer fills from the part's own FIFO on a watermark interrupt, and `iio-decode` turns it into CSV without knowing what the part is | a capture with `iio-rate`, decoded by Project 10's tool | **Measured**, Friday 9 October 2026, `INT1` on GPIO23 level high: `iio-rate fifo bench-adxl345 100 24` gave 960 samples in 10 s and 40 interrupts, 4.00 per second against 4.17 expected; watermark 8 gave 120 interrupts, 12.00 against 12.50; timestamp spread 1.7 ms and 0.96 ms once the driver spread each batch back from the interrupt. Journal sections 13 and 14 |
 | 6 | Single tap, double tap and free fall arrive as IIO events rather than as an invention of this driver | `iio-events` output while the board is tapped | **Measured**, Friday 16 October 2026, twice. The second run is the one to read: with the registers put right and only single tap armed, 33 events in 20 seconds, in `docs/evidence/events-singletap-2026-10-16.csv`. The first run, `events-2026-10-16.csv`, carried two double taps and a free fall and was taken with the interrupt polarity inverted. This row read "Configured" for two weeks while the three events could not fire at all; journal sections 14, 17, 18 and 19 |
 | 7 | Swapping the compatible string in the overlay moves the same hardware onto mainline's driver, and the two agree | two `iio-rate` runs, one per driver, on the same board | **Not started**, and it is the criterion this project exists to make possible |
-| 8 | Every symbol in the fragment is real, and every one reaches the built `.config` | `./go ksym -f adxl345` before, `./go kconfig -f adxl345` after | **Not started.** The fragment names one promptless symbol and marks it as a consequence, which `./go ksym` is built to check |
+| 8 | Every symbol in the fragment is real, and every one reaches the built `.config` | `./go ksym -f adxl345` before, `./go kconfig -f adxl345` after | **Half measured**, Saturday 17 October 2026. The first half ran on the build host against the 6.6.63 tree, 20854 declarations indexed: every line of `bench.cfg` and `adxl345.cfg` names a symbol that exists, and three of them are promptless rather than the one this project had thought about. `CONFIG_REGMAP_I2C` is selected from 63 places in the tree and `CONFIG_REGMAP_SPI` from 37, so neither line was ever a request. Both now carry a consequence marker and the fragment's header no longer claims one. The second half, `./go kconfig -f adxl345` against a `.config` a build produced, is the only check that can say whether those two symbols are actually on, and it waits for the rebuild |
 | 11 | A trigger drives the buffer: one scan per trigger through `/dev/iio:device0`, which is the middle of the three paths `docs/DESIGN.md` compares | `iio-rate trigger` on this device, printing both the trigger's rate and `in_accel_sampling_frequency` | **Configured**, Saturday 17 October 2026: the pollfunc, the mode bit and the branch that keeps the two buffer paths apart exist, and the suite asserts seven ways they fail silently. Nothing has run: the card carries the build at `e3574c8`, which has no triggered path at all |
 
 This row is numbered 11 rather than 9 because 9 and 10 are the asserted
@@ -150,7 +150,7 @@ not ask for:
 
 | Check | Command | Covers |
 |---|---|---|
-| The driver as text | `sh tests/adxl345-driver-test.sh` | 94 assertions, counted from the suite's own summary line on Saturday 17 October 2026: the compatible string in both bus files and never mainline's, the seam, the namespace import, every register defined exactly once, the scale against its own derivation, the watermark below the FIFO depth, all five modules reaching the image, the promptless symbol carrying its consequence marker, every configuration register written whole rather than merged, the event defaults against the datasheet's recommended ranges, and the seven silent failures of the triggered path |
+| The driver as text | `sh tests/adxl345-driver-test.sh` | 95 assertions, counted from the suite's own summary line on Saturday 17 October 2026: the compatible string in both bus files and never mainline's, the seam, the namespace import, every register defined exactly once, the scale against its own derivation, the watermark below the FIFO depth, all five modules reaching the image, the promptless symbol carrying its consequence marker, every configuration register written whole rather than merged, the event defaults against the datasheet's recommended ranges, and the seven silent failures of the triggered path |
 | Static layer checks | `./go lint` | The recipe's `SRC_URI`, ASCII, line length, the kas file's YAML |
 
 **What none of it proves.** That the driver compiles, that it probes, or

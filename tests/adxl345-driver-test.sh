@@ -280,12 +280,34 @@ has "mainline's SPI module is installed" "$IMAGE" 'kernel-module-adxl345-spi'
 # selected by the two above. Asking for it as a request is a line kconfig
 # accepts and ignores, so it has to carry the consequence marker that
 # ./go ksym understands.
-has "the promptless symbol is marked as a consequence" \
-	"$FRAG" '^# consequence:'
-consequence_line=$(grep -n '^# consequence:' "$FRAG" | cut -d: -f1)
-next_line=$((consequence_line + 1))
-check "and the marker sits directly above CONFIG_ADXL345" \
-	"$(sed -n "${next_line}p" "$FRAG")" "CONFIG_ADXL345=m"
+# THREE SYMBOLS IN THIS FRAGMENT HAVE NO PROMPT, which was measured
+# rather than reasoned: ./go ksym -f adxl345 on the build host on
+# Saturday 17 October 2026, against the 6.6.63 tree with 20854
+# declarations indexed, reported CONFIG_REGMAP_I2C selected from 63
+# places in the tree and CONFIG_REGMAP_SPI from 37, beside the
+# CONFIG_ADXL345 that was already known and marked. A promptless line is
+# a prediction rather than a request: kconfig drops it without a word and
+# ./go kconfig then passes it for the wrong reason. So each of the three
+# carries its marker on the line directly above it, which is where
+# check-kernel-symbols.sh looks; a blank line between does not carry.
+#
+# Asserted per symbol. The first spelling of this took the first marker
+# in the file through grep -n and cut, and the moment a second marker
+# appeared it became arithmetic on three line numbers, which under
+# set -eu ended the whole suite mid-run.
+for sym in CONFIG_REGMAP_I2C CONFIG_REGMAP_SPI CONFIG_ADXL345; do
+	line=$(grep -n "^$sym=" "$FRAG" | head -1 | cut -d: -f1)
+	if [ -z "$line" ]; then
+		no "$sym is in the fragment at all"
+		continue
+	fi
+	case $(sed -n "$((line - 1))p" "$FRAG") in
+	"# consequence:"*)
+		ok "$sym is marked as a consequence on the line above" ;;
+	*)
+		no "$sym has no consequence marker directly above it" ;;
+	esac
+done
 
 # The two IIO drivers depend on INPUT_ADXL34X=n in 6.12. Leaving the input
 # driver on does not conflict at runtime, it makes both lines above
