@@ -1343,3 +1343,84 @@ has to ask for it, and the honest thing is to say so where somebody
 reading the driver will see it.
 
 Evidence in `docs/evidence/fifo-watermark-2026-10-17.md`.
+
+## 29. The claim that neither driver can bind to the other's node
+
+Saturday 17 October 2026, evening. Criterion 7 wants the same hardware
+under mainline's driver, and the obvious route was to skip the reboot: a
+sysfs `unbind` from our driver and a `bind` to mainline's, which needs
+no rebuild and is reversible in one write.
+
+The unbind worked. The bind returned `Invalid argument`.
+
+**That error is the finding.** A refused match makes a sysfs `bind`
+return `ENODEV` and print nothing. The log read
+`adxl345_i2c: probe of 1-0053 failed with error -22`, and the driver
+core prints that line only after a probe has run. So mainline's driver
+matched a node whose compatible it has never heard of.
+
+The compatible had nothing to do with it. An I2C client created from a
+device tree node is named after the compatible with the vendor prefix
+stripped: `bench,adxl345` gives a client called `adxl345`, and
+mainline's `i2c_device_id` table carries that exact string.
+`i2c_device_match` tries OF, then ACPI, then the name. Ours is the
+third case and it does not care who claims the compatible.
+
+`docs/DESIGN.md` has said since before either driver existed that
+"the in-tree driver cannot bind to our node, because it does not claim
+that string. No load-order race exists to lose." The first sentence is
+false and is struck out. The second is true, and the reason given for
+it was wrong.
+
+**Why the race does not happen anyway.** The device reports
+
+    MODALIAS=of:Nadxl345T(null)Cbench,adxl345
+
+which is what udev autoloads from. Mainline's module declares
+`of:*Cadi,adxl345*` and `i2c:adxl345`, and neither matches that string,
+so nothing ever loads it for this node; it took a manual `modprobe` to
+get it onto the bus at all. The protection is the module alias, not the
+compatible, and it holds exactly as long as nothing else loads that
+module. Once both are registered, one client matches both drivers and
+the first to register holds it.
+
+**And why the shortcut can never work.** Mainline's probe builds a
+regmap and calls `adxl345_core_probe`, which does:
+
+    type = (uintptr_t)device_get_match_data(dev);
+    switch (type) {
+    case ADXL345: name = "adxl345"; break;
+    case ADXL375: name = "adxl375"; break;
+    default:      return -EINVAL;
+    }
+
+`device_get_match_data` consults the OF and ACPI tables and not the I2C
+one. Our compatible is in neither, so it returns NULL, the type is zero,
+and the switch falls through to `-EINVAL`. The `ADXL345` that its own
+`i2c_device_id` table carries as driver data for the name it just
+matched on is never read. The match path and the data path ask different
+questions, on any board, not only on this one.
+
+So criterion 7 needs the compatible changed, which means a rebuilt
+overlay or a second one selected from `config.txt`, and the shortcut is
+closed with a reason rather than left as an untried idea.
+
+**A footnote on what mainline's 6.6 driver is.** Reading it to answer
+this showed it has no FIFO, no events and no watermark hook. The
+control this project has been arranging for compares raw axes, scale
+and sampling frequency, and nothing else. That is still a control worth
+having and it is narrower than the design implies.
+
+**And the bench bit nobody planned.** The unbind left the part bound to
+nothing, and the first attempt to put our driver back failed:
+
+    bench-adxl345-i2c 1-0053: error -EREMOTEIO: cannot read DEVID
+
+The same `-121` this bench last saw on Friday 9 October 2026 at 400 kHz,
+except this card runs at 100 kHz. `i2cdetect -y 1` then showed `53`
+answering and nothing holding it, and the next bind succeeded. The
+likeliest reading is a bus left wedged by an interrupted transfer, with
+the detection sweep clocking it free, and the honest statement is that
+one probe failed and the next one did not. The afternoon's forced reads,
+`i2cget -f` against an address a driver held, are the one new thing this
+bench has been doing today and belong on the list of candidates.

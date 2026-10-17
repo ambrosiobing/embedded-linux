@@ -133,13 +133,49 @@ register an IIO device, and the numbers would look plausible either way.
 **Decision: the overlay declares `bench,adxl345`, and the driver matches
 only that.** Three consequences, and the third is the reason.
 
-1. The in-tree driver cannot bind to our node, because it does not claim
-   that string. No load-order race exists to lose.
-2. Both drivers can be in the same image without interfering, so the
-   failure mode of forgetting to disable one is nothing at all.
+1. ~~The in-tree driver cannot bind to our node, because it does not
+   claim that string. No load-order race exists to lose.~~ **Both halves
+   of that were tested on Saturday 17 October 2026 and the first is
+   false.** Mainline's driver was asked to probe this node and did: the
+   log reads `adxl345_i2c: probe of 1-0053 failed with error -22`, and
+   the driver core prints that only after a probe has run. A refused
+   match returns `ENODEV` from a sysfs `bind` and prints nothing.
+
+   The compatible never entered into it. An I2C client created from a
+   device tree node takes its name from the compatible with the vendor
+   prefix stripped, so `bench,adxl345` produces a client called
+   `adxl345`, and mainline's `i2c_device_id` table carries exactly that
+   string. Name matching is the third thing `i2c_device_match` tries,
+   after OF and ACPI, and it does not care that no driver claims our
+   compatible.
+2. Both drivers can be in the same image without interfering, and that
+   is still true, for a reason the sentence above got wrong. The device
+   reports `MODALIAS=of:Nadxl345T(null)Cbench,adxl345`, read off
+   `/sys/bus/i2c/devices/1-0053/modalias` on the same evening. udev
+   autoloads from that string, mainline's module declares
+   `of:*Cadi,adxl345*` and `i2c:adxl345`, and neither matches it. So
+   mainline's driver is never loaded for this node and the race never
+   starts.
+
+   **The protection is the module alias, not the compatible**, and it
+   lasts exactly as long as nothing else loads that module. A
+   `modprobe adxl345_i2c`, an image that loads every module it ships, or
+   any other part on the bus pulling it in, and both drivers are
+   registered on the I2C bus with one client both of them match.
+   Whichever registered first holds it.
 3. **The two become an A/B pair.** Change one word in the overlay,
    reboot, and the same hardware is driven by mainline's driver instead of
-   ours. Every number this project produces then has a control taken on the
+   ours. That word, and not a shortcut: a sysfs `bind` of mainline's
+   driver to our node was tried on Saturday 17 October 2026 and cannot
+   work in this kernel. Its probe builds a regmap and calls
+   `adxl345_core_probe`, which asks `device_get_match_data`, and that
+   consults the OF and ACPI tables only. Our compatible is in neither,
+   so it returns NULL, the type is zero, and the switch over the part
+   type falls to `default: return -EINVAL`. The `ADXL345` that
+   mainline's own `i2c_device_id` table carries for the name it matched
+   is never read. The match path and the data path inside that driver
+   ask different questions, which is why the swap has to be the
+   compatible string. Every number this project produces then has a control taken on the
    same board, the same bus and the same afternoon. Project 8 had to
    rebuild two kernels to get that property; here it costs a string.
 
