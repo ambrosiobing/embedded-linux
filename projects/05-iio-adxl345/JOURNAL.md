@@ -1173,3 +1173,41 @@ build failed because the directory had been kept.
 That is worth stating rather than fixing in a hurry. The alternative,
 letting the kernel work directory go, would have left this morning with
 no `.config` to read and criterion 8 still open.
+
+## 26. The triggered path compiles, and the evidence for it is indirect
+
+Saturday 17 October 2026, 09:00. The question left open since the
+afternoon was whether the three IIO trigger primitives this driver now
+calls are where it expects them in 6.6, since nothing on the authoring
+laptop can compile a kernel module.
+
+They are. The build tree's deploy directory carries two documents
+stamped 08:25:56 today:
+
+    runtime-kernel-module-bench-adxl345-i2c-6.6.63-v8.spdx.json
+    runtime-kernel-module-bench-adxl345-spi-6.6.63-v8.spdx.json
+
+**That is indirect and is reported as such.** The `.ko` itself is not
+there to look at, because this recipe was dropped from
+`RM_WORK_EXCLUDE` last week and its work directory is removed once it
+completes, which is why the earlier `find` for `bench-adxl345*.ko`
+returned nothing and proved nothing. What those documents do establish
+is that the recipe got as far as packaging, and packaging is downstream
+of `do_compile` and of modpost.
+
+The inference from there is about modpost rather than the compiler, and
+it is the half worth naming: a C file that calls an undeclared function
+fails to compile, which covers the headers, and a module that calls an
+exported-nowhere symbol fails at modpost, which covers the exports.
+Modern kernels make that an error rather than a warning unless
+`KBUILD_MODPOST_WARN` is set, and nothing here sets it. So
+`iio_alloc_pollfunc`, `iio_dealloc_pollfunc` and
+`iio_pollfunc_store_time` are both declared and exported in this kernel,
+which is what decision 120 depends on and what makes the choice to reach
+past `iio_triggered_buffer_setup` a working one rather than a plausible
+one.
+
+What remains is the board. `iio-rate trigger` against an hrtimer
+trigger, one scan per trigger, with both the trigger's rate and
+`in_accel_sampling_frequency` printed, on a card carrying this build
+rather than `e3574c8`.
