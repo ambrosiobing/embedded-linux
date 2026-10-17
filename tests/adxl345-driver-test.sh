@@ -431,6 +431,109 @@ done
 has "the probe writes the rate it caches" "$PROBE" 	'regmap_write(regmap, BENCH_ADXL345_BW_RATE,'
 has "and the cached period comes from the same constant" "$PROBE" 	'bench_adxl345_period_ns(BENCH_ADXL345_RATE_DEFAULT -'
 
+echo "--- the triggered path, which the design table claimed for a week"
+
+# THE MIDDLE ROW OF docs/DESIGN.md's THREE PATHS, which was a plan
+# written in the present tense until Saturday 17 October 2026. Nothing
+# found it: it was noticed because Project 10's iio-rate had no trigger
+# directory to attach to.
+#
+# What follows is one assertion per way this path fails without saying
+# anything.
+
+# ONE. A pollfunc whose hard-irq half is NULL never has pf->timestamp
+# written, and every sample then carries whatever was in that field.
+# The two halves are asserted together because either one alone is the
+# defect rather than half of it.
+has "the pollfunc stores the trigger time in its hard irq half" \
+	"$CORE" 'iio_alloc_pollfunc(iio_pollfunc_store_time'
+has "and the handler pushes that time rather than reading the clock" \
+	"$CORE" 'pf->timestamp'
+
+# TWO. A trigger counts its consumers and fires again only once every
+# one of them has reported done. An early return anywhere in the
+# handler therefore stops the path for good after a single failed bus
+# read, and the symptom is a trigger that has died rather than a read
+# that failed. So the handler is required to have exactly one exit.
+HANDLER=$WORKDIR/handler.c
+sed -n '/^static irqreturn_t bench_adxl345_trigger_handler/,/^}/p' \
+	"$CORE" >"$HANDLER"
+# Comment lines are dropped before counting, for two reasons: the
+# handler's own comment explains why it has one exit and uses the word,
+# and the defect this is looking for is an indented "if (ret) return",
+# which an anchored pattern would miss. The first spelling here counted
+# only returns at the start of a line and the mutation that adds the
+# early return went straight past it.
+#
+# The trailing space is load bearing: without it the pattern also
+# matches the irqreturn_t in the function's own signature, and the
+# count is two before anything is wrong.
+exits=$(grep -v '^[[:space:]]*[*/]' "$HANDLER" | grep -c 'return ')
+check "the trigger handler has one exit, so none can skip notify_done" \
+	"$exits" "1"
+has "and it does report done to the trigger" "$HANDLER" \
+	'iio_trigger_notify_done(indio_dev->trig)'
+
+# THREE. The two buffer modes, which are not alternatives: the core
+# picks the triggered one when a trigger is attached and this driver's
+# FIFO path otherwise. With no interrupt the FIFO path cannot run at
+# all, and a reader that enabled it would wait on a buffer nothing can
+# push into with no error anywhere.
+has "the triggered mode is declared" "$CORE" \
+	'indio_dev->modes |= INDIO_BUFFER_TRIGGERED'
+has "and the fifo mode is withdrawn when nothing can interrupt" "$CORE" \
+	'indio_dev->modes &= ~INDIO_BUFFER_SOFTWARE'
+
+# FOUR. The buffer has to be attached whether or not INT1 is wired,
+# because the triggered path needs the kfifo and does not need the
+# part's interrupt. It sat inside the interrupt branch until the
+# triggered path existed, which is why this is a line-order assertion
+# rather than a grep: moving it back inside would still match.
+buf=$(grep -n 'devm_iio_kfifo_buffer_setup(dev' "$CORE" | cut -d: -f1)
+gate=$(grep -n 'if (st->irq > 0) {' "$CORE" | cut -d: -f1)
+if [ -n "$buf" ] && [ -n "$gate" ] && [ "$buf" -lt "$gate" ]; then
+	ok "the buffer is attached before the interrupt is asked for"
+else
+	no "the buffer is attached inside the interrupt branch, leaving the triggered path nowhere to push"
+fi
+
+# FIVE. Both halves of the buffer setup ops have to know which path
+# they are for. A postenable that programs the part's FIFO while a
+# trigger is attached fills one buffer from two sources, and the
+# capture then carries twice the samples either path produced, in an
+# order that looks like jitter.
+trigs=$(grep -c 'if (indio_dev->trig)' "$CORE")
+check "both buffer halves ask which path the enable is for" "$trigs" "2"
+
+# SIX. The pollfunc is allocated by hand, so it is freed by hand.
+has "the pollfunc is released" "$CORE" 'iio_dealloc_pollfunc'
+has "and by a devm action, so no remove hook has to exist" "$CORE" \
+	'devm_add_action_or_reset(dev, bench_adxl345_free_pollfunc'
+
+# SEVEN. The helper every in-tree driver uses for this,
+# iio_triggered_buffer_setup, lives behind CONFIG_IIO_TRIGGERED_BUFFER,
+# which has no prompt in drivers/iio/Kconfig and is reached only by an
+# in-tree select. An out-of-tree module can select nothing, a fragment
+# line asking for the symbol directly is dropped by kconfig without a
+# word, and the module then fails at modprobe with an unknown symbol,
+# which reads like a corrupt .ko rather than like a missing option.
+#
+# Both halves are asserted, because either one on its own is the trap:
+# the driver must not call the helper, and the fragment must not ask
+# for the symbol. What the path does need is CONFIG_IIO_TRIGGER, which
+# bench.cfg sets for every image here.
+# The pattern carries the open bracket, so it matches a call and not
+# the driver's own comment explaining why it makes none. Without it
+# this assertion failed on the sentence that documents it, which is the
+# third rule in this repository to have matched its own prose.
+lacks "the driver does not call the helper behind the promptless symbol" \
+	"$CORE" 'iio_triggered_buffer_setup('
+lacks "and the fragment does not ask kconfig for that symbol" \
+	"$FRAG" 'CONFIG_IIO_TRIGGERED_BUFFER'
+has "the symbol the path does need is on for every image" \
+	"$ROOT/meta-bench/recipes-kernel/linux/files/bench.cfg" \
+	'^CONFIG_IIO_TRIGGER=y'
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

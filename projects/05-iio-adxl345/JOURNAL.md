@@ -973,3 +973,90 @@ the list did not mention it. It has a line now.
 The whole evening's shape, three times over: a claim with nothing
 reading it. The events that could not fire, the design table's third
 path, and a test asserting a string that had moved.
+
+## 23. The third path exists, and the helper for it cannot be reached
+
+Saturday 17 October 2026, later the same day. Section 21 named the
+missing middle path and said what implementing it would take:
+`iio_triggered_buffer_setup` and a pollfunc that reads one scan. The
+pollfunc was right. The helper is not available to this driver, and
+finding out why is the useful part of the afternoon.
+
+That helper does three things: attaches a kfifo, allocates a pollfunc,
+and sets `INDIO_BUFFER_TRIGGERED` in the device's modes. It lives behind
+`CONFIG_IIO_TRIGGERED_BUFFER`, which `drivers/iio/Kconfig` declares with
+no prompt, so nothing can ask for it and only an in-tree `select` can
+turn it on. This driver is out of tree and selects nothing. Putting the
+symbol in `adxl345.cfg` would be a line kconfig drops without a word,
+after which the module builds, packages, installs and then fails at
+`modprobe` with an unknown symbol, which reads like a corrupt `.ko`
+rather than like a missing kernel option. The other way round, enabling
+some unrelated in-tree driver that happens to select it, would make this
+driver's buffer a side effect of another driver's presence.
+
+**That is reasoning from how the symbol is declared, not a
+measurement**, and `./go ksym -f adxl345` on the build host is what
+would settle it. The reason it is safe to leave open is that the driver
+no longer depends on the answer: it calls the three underlying exported
+functions itself, and those need only `CONFIG_IIO_TRIGGER`, which
+`bench.cfg` has set built in for every image in this repository since
+Project 1. The capability is already on the board that is on the bench.
+
+**One buffer, two paths into it.** The core decides which path a buffer
+enable is for, in `iio_verify_update`, and its condition is that the
+device declares `INDIO_BUFFER_TRIGGERED` and has a trigger attached;
+failing that it falls back to `INDIO_BUFFER_SOFTWARE`, which is this
+driver's FIFO path. So the buffer's `postenable` returns early when a
+trigger is attached, leaving the part's FIFO in bypass with its
+watermark interrupt off. Without that branch both paths fill one buffer
+and a capture carries twice the samples either path produced, in an
+order that reads as jitter rather than as a defect.
+
+**And a board with no interrupt stops being a board with no buffer.**
+The kfifo setup used to sit inside the `if (st->irq > 0)` branch, which
+was right when the only way to fill it was the watermark interrupt. The
+triggered path needs the buffer and not the interrupt, so the setup
+moved out and the `INDIO_BUFFER_SOFTWARE` mode the helper declares is
+taken back again when nothing can interrupt: a reader who enabled it
+would otherwise wait on a buffer nothing can push into, with no error
+anywhere. The probe's message changed with it, from `no interrupt, so
+sysfs only and no buffer` to `no interrupt: no events, no fifo, buffer
+needs a trigger`. The old wording is still quoted in the README and in
+`docs/DESIGN.md` where it is evidence of what the board printed on
+Friday 9 October 2026, with a note saying so.
+
+**Seven assertions, and three of them were wrong first.** The suite now
+reads the handler and the probe for the ways this path fails without
+saying anything: a pollfunc with no hard-irq half, which leaves
+`pf->timestamp` unwritten so every sample carries whatever was in that
+field; an early return that skips `iio_trigger_notify_done`, which stops
+the trigger for good after one failed bus read; either mode bit missing;
+the buffer back inside the interrupt branch; either half of the setup
+ops no longer asking which path it is for; and the promptless symbol
+appearing in the fragment or the helper in the driver.
+
+Each was then broken on purpose and watched to fail. Three needed
+repair. The assertion refusing the helper matched the driver's own
+comment explaining why it calls no helper, which is the third rule in
+this repository to have been silenced by its own prose; it now carries
+the open bracket of a call. The one-exit count was anchored to the start
+of a line and the realistic defect, an indented `if (ret) return`, went
+straight past it; unanchored, it then counted the `irqreturn_t` in the
+function's own signature and read two before anything was wrong. Both
+are in the test's comments, because the next person to write a text
+assertion will reach for both spellings.
+
+**What is not measured.** Nothing here has run. The card carries the
+image built at `e3574c8`, which has neither the probe that writes whole
+registers nor any of this, so the README's row 11 says configured and
+names the commit the board is actually running. Attaching an hrtimer
+trigger and reading one scan per trigger is the next thing the bench
+owes this project, and it is behind the same rebuild as criterion 7.
+
+**And the README's own state section had gone stale.** It opened with
+"Written, not yet built" and "Nothing here has been compiled", both
+true when written on Saturday 3 October 2026 and both false since
+Friday 9 October 2026, when the driver compiled, bound and read
+gravity. It also still called the overlay deliberately missing. Three
+documents in this project have now had to be corrected for the same
+reason, which is that no check in this repository reads a sentence.

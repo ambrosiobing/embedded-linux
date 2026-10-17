@@ -3896,3 +3896,55 @@ the lines they always described. The card flashed today for project 5
 still runs its bus at the 100 kHz default and the record says so; the
 rebuild that carries the 400 kHz line waits until the wiring question
 is settled, because the sensor answers at either rate or at neither.
+
+## 120. An out-of-tree module calls the IIO trigger primitives directly, because the helper above them is behind a promptless symbol
+
+**Context.** Saturday 17 October 2026. Project 5's driver gained the
+triggered buffer path that `projects/05-iio-adxl345/docs/DESIGN.md` had
+described for three weeks. Every in-tree driver sets that path up with
+one call, `iio_triggered_buffer_setup`, which attaches a kfifo,
+allocates a pollfunc and sets the device's `INDIO_BUFFER_TRIGGERED`
+mode.
+
+**What stops that here.** The helper lives behind
+`CONFIG_IIO_TRIGGERED_BUFFER`, declared in `drivers/iio/Kconfig` with no
+prompt. A promptless symbol cannot be asked for; it is reached only by
+an in-tree `select`. A module built out of tree, as every driver in
+`meta-bench` is, selects nothing. A fragment line naming the symbol is
+dropped by kconfig silently, and the failure then arrives at `modprobe`
+as an unknown symbol, which reads like a corrupt `.ko` rather than like
+a missing kernel option. The alternative, enabling an unrelated in-tree
+driver that selects it as a side effect, makes one driver's buffer
+depend on another driver's presence.
+
+This is read from how the symbol is declared rather than measured.
+`./go ksym -f adxl345` is the command that settles it and criterion 8 of
+that project is where the answer goes.
+
+**Decision.** An out-of-tree IIO driver in this layer calls the
+primitives rather than the helper: `iio_alloc_pollfunc` with
+`iio_pollfunc_store_time` as its hard-irq half, a devm action calling
+`iio_dealloc_pollfunc`, and `indio_dev->modes |= INDIO_BUFFER_TRIGGERED`
+beside the kfifo it already attaches. Those need `CONFIG_IIO_TRIGGER`,
+which `bench.cfg` sets built in for every image here, so the capability
+is on every board this bench has flashed. No kernel fragment in this
+repository asks for `CONFIG_IIO_TRIGGERED_BUFFER`, and
+`tests/adxl345-driver-test.sh` refuses both halves: the symbol in the
+fragment, and a call to the helper in the driver.
+
+**Consequence.** Three functions and one devm action instead of one
+call, with the reason written where each sits. The driver is portable to
+any kernel with `CONFIG_IIO_TRIGGER`, which is the one it would have
+needed anyway. The same decision applies to the next out-of-tree driver
+in this layer, and the one after it: when a subsystem's convenience
+helper sits behind a promptless symbol, the module reaches past it.
+
+A second rule falls out of the same change and is worth stating because
+it is not about Kconfig at all. A device that offers two buffer paths
+has to decide which one an enable is for, and the IIO core already
+decides: `iio_verify_update` picks the triggered mode when the device
+declares it and has a trigger attached, and the software mode
+otherwise. The driver's `postenable` and `predisable` mirror that
+condition rather than inventing one. Both paths filling one buffer is
+not a crash; it is a capture with twice the samples either path
+produced, in an order that reads as jitter.

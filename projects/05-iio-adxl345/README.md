@@ -17,20 +17,30 @@ it, and the core does not know which is loaded.
 
 ## State
 
-**Written, not yet built.** The driver, its recipe, the kernel fragment,
-the image and the build configuration exist, and 43 assertions pass with no
-board and no kernel tree.
+**Built, bound and measured, with two criteria open.** As of Saturday 17
+October 2026: the module compiles against the image's 6.6.63 kernel,
+binds to the part on the bench through this project's own overlay, and
+has been read on the board for six of the criteria below. 94 assertions
+pass with no board and no kernel tree.
 
-**Nothing here has been compiled.** BitBake has never parsed these recipes,
-no kernel has built these modules, and no board has run them. That is a
-rung below Software complete on purpose: the machine this was written on
-has no kernel source, so the C has been checked for the things text can be
-checked for and not for whether it compiles.
+Three sentences of this section said the opposite until today, and they
+were true when they were written. **Nothing holds a sentence.** What
+replaced them:
 
-One piece is deliberately missing: **the device tree overlay**. It needs an
-I2C address and an interrupt GPIO that are properties of how this bench's
-breakout is wired, and the board has not been read. See
-[Deferred, with reasons](#deferred-with-reasons).
+- the driver first compiled on Friday 9 October 2026 and the modules
+  were packaged and installed the same day
+- the overlay this section used to call deliberately missing is
+  `meta-bench/recipes-bench/bench-adxl345-dt/`, written once the bench
+  had been read: `0x53` on `i2c-1`, `INT1` on header pin 16, GPIO23
+- criteria 1 to 6 are measured, 7 and 8 are not started, and 11 is
+  configured and unmeasured
+
+**What the board is running is not what this tree says.** The card
+carries the image built at `e3574c8`, which is before the probe that
+writes whole registers and before the triggered path. Its registers were
+corrected by hand on Friday 16 October 2026 so that the event
+measurements could be taken, which is why those rows name both the
+commit and the correction.
 
 ## What this project adds to the repository
 
@@ -118,20 +128,29 @@ means a board did.
 | 6 | Single tap, double tap and free fall arrive as IIO events rather than as an invention of this driver | `iio-events` output while the board is tapped | **Measured**, Friday 16 October 2026, twice. The second run is the one to read: with the registers put right and only single tap armed, 33 events in 20 seconds, in `docs/evidence/events-singletap-2026-10-16.csv`. The first run, `events-2026-10-16.csv`, carried two double taps and a free fall and was taken with the interrupt polarity inverted. This row read "Configured" for two weeks while the three events could not fire at all; journal sections 14, 17, 18 and 19 |
 | 7 | Swapping the compatible string in the overlay moves the same hardware onto mainline's driver, and the two agree | two `iio-rate` runs, one per driver, on the same board | **Not started**, and it is the criterion this project exists to make possible |
 | 8 | Every symbol in the fragment is real, and every one reaches the built `.config` | `./go ksym -f adxl345` before, `./go kconfig -f adxl345` after | **Not started.** The fragment names one promptless symbol and marks it as a consequence, which `./go ksym` is built to check |
+| 11 | A trigger drives the buffer: one scan per trigger through `/dev/iio:device0`, which is the middle of the three paths `docs/DESIGN.md` compares | `iio-rate trigger` on this device, printing both the trigger's rate and `in_accel_sampling_frequency` | **Configured**, Saturday 17 October 2026: the pollfunc, the mode bit and the branch that keeps the two buffer paths apart exist, and the suite asserts seven ways they fail silently. Nothing has run: the card carries the build at `e3574c8`, which has no triggered path at all |
 
-Beyond those, two things this repository asserts that the theme does not
-ask for:
+This row is numbered 11 rather than 9 because 9 and 10 are the asserted
+pair below, and renumbering them would break the references in
+`JOURNAL.md` and `walkthrough/DECISIONS.md`. It was added on Saturday 17
+October 2026, the day the path it describes was written: for the three
+weeks before that, `docs/DESIGN.md` claimed three paths out of the part,
+no criterion covered the middle one, and nothing noticed.
+
+Beyond those, three things this repository asserts that the theme does
+not ask for:
 
 | # | Criterion | State |
 |---|---|---|
 | 9 | The core never learns what a bus is | Asserted: the test fails if `bench-adxl345-core.c` includes `i2c.h` or `spi.h` |
 | 10 | Every module the recipe builds is named in the image | Asserted, and the test fails if any of the five is dropped |
+| 12 | The two buffer paths cannot fill one capture together | Asserted: both halves of the buffer setup ops branch on an attached trigger, and the test fails if either stops asking |
 
 ## What is tested without hardware
 
 | Check | Command | Covers |
 |---|---|---|
-| The driver as text | `sh tests/adxl345-driver-test.sh` | 43 assertions: the compatible string in both bus files and never mainline's, the seam, the namespace import, every register defined exactly once, the scale against its own derivation, the watermark below the FIFO depth, all five modules reaching the image, and the promptless symbol carrying its consequence marker |
+| The driver as text | `sh tests/adxl345-driver-test.sh` | 94 assertions, counted from the suite's own summary line on Saturday 17 October 2026: the compatible string in both bus files and never mainline's, the seam, the namespace import, every register defined exactly once, the scale against its own derivation, the watermark below the FIFO depth, all five modules reaching the image, the promptless symbol carrying its consequence marker, every configuration register written whole rather than merged, the event defaults against the datasheet's recommended ranges, and the seven silent failures of the triggered path |
 | Static layer checks | `./go lint` | The recipe's `SRC_URI`, ASCII, line length, the kas file's YAML |
 
 **What none of it proves.** That the driver compiles, that it probes, or
@@ -145,8 +164,8 @@ tree, and the numbers are the board's.
 
 | What | Why | What would close it |
 |---|---|---|
-| The device tree overlay | It needs an I2C address and an interrupt GPIO, and both are properties of how this bench's DFRobot SEN0032 is wired rather than of the part. DFRobot publishes the chip's capability, `I2C / SPI (3 or 4 lines)` at `3.3~6V`, and no pin list. A node with a guessed interrupt does not fail safely: it drives whatever else is on that pin | Read the silkscreen. Three facts: whether SPI is exposed at all, which pin carries `INT1`, and what the supply does to the logic levels |
-| Anything on the SPI bus | The driver is written for both because that is the subsystem's shape, but whether this breakout exposes SPI at all is unknown | The same look at the board |
+| ~~The device tree overlay~~ | **Closed Friday 9 October 2026.** It needed an I2C address and an interrupt GPIO, both properties of how this bench's DFRobot SEN0032 is wired rather than of the part, and DFRobot publishes the chip's capability and no pin list. The board was read instead of guessed: `0x53` on `i2c-1`, `INT1` to header pin 16, GPIO23, level high | `meta-bench/recipes-bench/bench-adxl345-dt/` |
+| Anything on the SPI bus | The driver is written for both because that is the subsystem's shape. The breakout does expose all four lines, which was read off the board on Sunday 4 October 2026 and is in `docs/DESIGN.md` with the strapping hazard attached, so what is deferred is now the measuring rather than the question | A second overlay on `spi0`, and the three straps moved. Nothing in the driver changes: that is what the regmap seam is for |
 | The activity and inactivity events | The part detects them and the driver does not yet route them. They need threshold and time registers exposed as IIO event attributes, which is a larger surface than tap and free fall | Worth doing once the interrupt path is proven by the simpler events |
 
 **The supply is the one that can cost you something.** A breakout rated to

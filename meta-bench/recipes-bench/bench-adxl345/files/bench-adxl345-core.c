@@ -50,6 +50,8 @@
 #include <linux/iio/iio.h>
 #include <linux/iio/kfifo_buf.h>
 #include <linux/iio/sysfs.h>
+#include <linux/iio/trigger.h>
+#include <linux/iio/trigger_consumer.h>
 
 #include "bench-adxl345.h"
 
@@ -566,10 +568,100 @@ static irqreturn_t bench_adxl345_irq_thread(int irq, void *private)
 	return IRQ_HANDLED;
 }
 
+/*
+ * THE TRIGGERED PATH, WHICH IS THE SECOND WAY OUT OF THIS PART AND NOT A
+ * VARIANT OF THE FIRST.
+ *
+ * Here something else decides when a sample is taken: an hrtimer trigger
+ * at a rate of its own, or the sysfs trigger when a test wants one scan
+ * at a time. The core calls this function once per trigger, it reads the
+ * current output registers, and one scan goes into the same kfifo the
+ * watermark path fills.
+ *
+ * Three differences from the FIFO path, all of them the point of having
+ * both:
+ *
+ *   - the timestamp is taken in the core at the moment the trigger
+ *     fired, not computed. pf->timestamp holds it because
+ *     iio_pollfunc_store_time is this pollfunc's hard-irq half; with a
+ *     NULL half the field is never written and every sample would carry
+ *     whatever was there before.
+ *   - one bus transaction per sample rather than one per batch, so this
+ *     path costs the most CPU per sample of the three and is the reason
+ *     the part has a FIFO at all.
+ *   - the trigger rate and the part's output rate are independent, and
+ *     nothing here enforces a relationship between them. Trigger faster
+ *     than BW_RATE and the same conversion is read twice; slower and
+ *     conversions are skipped. Neither is an error and neither is
+ *     reported, which makes it a thing to measure rather than a thing to
+ *     guard: Project 10's iio-rate reads back in_accel_sampling_frequency
+ *     and the trigger's own rate, and the comparison is only meaningful
+ *     when it prints both.
+ *
+ * st->scan is shared with the interrupt thread, which is safe because
+ * the two paths are mutually exclusive: the core runs one buffer mode at
+ * a time and picks it at enable, see the postenable below.
+ *
+ * All six data bytes are read whatever the scan mask says. That is the
+ * part's requirement rather than a shortcut, since DATAX0 through DATAZ1
+ * have to be read in one transaction to be one sample; a scan mask with
+ * fewer axes is handled by the core's demux on the way into the buffer.
+ */
+static irqreturn_t bench_adxl345_trigger_handler(int irq, void *p)
+{
+	struct iio_poll_func *pf = p;
+	struct iio_dev *indio_dev = pf->indio_dev;
+	struct bench_adxl345 *st = iio_priv(indio_dev);
+	int ret;
+
+	ret = regmap_bulk_read(st->regmap, BENCH_ADXL345_DATAX0,
+			       st->scan.axis, BENCH_ADXL345_SAMPLE_BYTES);
+	if (!ret)
+		iio_push_to_buffers_with_timestamp(indio_dev, &st->scan,
+						   pf->timestamp);
+
+	/*
+	 * Unconditionally, including after a failed read. The trigger
+	 * counts its consumers and will not fire again until every one of
+	 * them has said it is done, so an early return on error stops the
+	 * path for good rather than dropping one sample.
+	 */
+	iio_trigger_notify_done(indio_dev->trig);
+
+	return IRQ_HANDLED;
+}
+
+static void bench_adxl345_free_pollfunc(void *data)
+{
+	iio_dealloc_pollfunc(data);
+}
+
 static int bench_adxl345_buffer_postenable(struct iio_dev *indio_dev)
 {
 	struct bench_adxl345 *st = iio_priv(indio_dev);
 	int ret;
+
+	/*
+	 * WHICH OF THE TWO BUFFER PATHS THIS ENABLE IS FOR.
+	 *
+	 * The core decides, in iio_verify_update, and its condition is
+	 * that the device declares INDIO_BUFFER_TRIGGERED and has a
+	 * trigger attached; failing that it falls back to
+	 * INDIO_BUFFER_SOFTWARE, which is this driver's FIFO path. So a
+	 * trigger in current_trigger means the pollfunc above is about to
+	 * run and the part's own FIFO must stay in bypass with its
+	 * watermark interrupt off, or both paths would fill the same
+	 * buffer and the capture would carry twice as many samples as
+	 * either path produced.
+	 *
+	 * This branch mirrors the core's condition rather than reading
+	 * its decision, because the mode itself is not a public field of
+	 * struct iio_dev in this kernel. If the two ever disagree the
+	 * symptom is doubled samples or none, so the condition is named
+	 * here and asserted in tests/adxl345-driver-test.sh.
+	 */
+	if (indio_dev->trig)
+		return 0;
 
 	ret = regmap_write(st->regmap, BENCH_ADXL345_FIFO_CTL,
 			   FIELD_PREP(BENCH_ADXL345_FIFO_CTL_MODE,
@@ -611,6 +703,16 @@ static int bench_adxl345_buffer_predisable(struct iio_dev *indio_dev)
 {
 	struct bench_adxl345 *st = iio_priv(indio_dev);
 	int ret;
+
+	/*
+	 * The same condition as the postenable, for symmetry rather than
+	 * for safety: the two writes below are idempotent and would do no
+	 * harm on the triggered path. A trigger cannot be attached or
+	 * detached while a buffer is enabled, so the mode this sees is
+	 * the mode the postenable saw.
+	 */
+	if (indio_dev->trig)
+		return 0;
 
 	ret = regmap_update_bits(st->regmap, BENCH_ADXL345_INT_ENABLE,
 				 BENCH_ADXL345_INT_WATERMARK, 0);
@@ -830,6 +932,63 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 	if (st->irq <= 0)
 		indio_dev->num_channels--;
 
+	/*
+	 * ONE BUFFER, TWO PATHS INTO IT.
+	 *
+	 * The kfifo is attached whatever is wired, because the triggered
+	 * path needs it and does not need the part's interrupt. Until
+	 * Saturday 17 October 2026 this call sat inside the branch below
+	 * and a board with no INT1 had no buffer at all, which is what
+	 * docs/DESIGN.md described as the sysfs-only case.
+	 *
+	 * The helper declares INDIO_BUFFER_SOFTWARE as it attaches the
+	 * buffer, which is this driver's name for the FIFO path, so with
+	 * no interrupt that mode is taken back again below: a reader who
+	 * enabled it would wait on a buffer nothing can push into, with
+	 * no error anywhere to say why.
+	 */
+	ret = devm_iio_kfifo_buffer_setup(dev, indio_dev,
+					  &bench_adxl345_buffer_ops);
+	if (ret)
+		return ret;
+
+	/*
+	 * And the triggered path, built from the three exported functions
+	 * rather than from iio_triggered_buffer_setup, which is the
+	 * helper every in-tree driver uses for this.
+	 *
+	 * The helper lives behind CONFIG_IIO_TRIGGERED_BUFFER, which has
+	 * no prompt in drivers/iio/Kconfig and is reached only by an
+	 * in-tree "select". A configuration fragment asking for it
+	 * directly is a line kconfig drops without a word, and this
+	 * module is out of tree and can select nothing. Depending on
+	 * some unrelated in-tree driver to select it would make this
+	 * driver's buffer a side effect of another driver's presence.
+	 *
+	 * What it does is attach a kfifo, allocate a pollfunc and set the
+	 * mode bit. The kfifo is above, and the other two are here.
+	 * CONFIG_IIO_TRIGGER is all this needs, it is =y in bench.cfg for
+	 * every image in this repository, and ./go ksym is where that
+	 * claim is checked.
+	 *
+	 * The name is the thread name the trigger's consumer runs under
+	 * and shows up in ps; in-tree spells it with iio_device_id, and
+	 * dev_name is already unique per instance.
+	 */
+	indio_dev->pollfunc = iio_alloc_pollfunc(iio_pollfunc_store_time,
+						 bench_adxl345_trigger_handler,
+						 IRQF_ONESHOT, indio_dev,
+						 "%s_consumer", dev_name(dev));
+	if (!indio_dev->pollfunc)
+		return -ENOMEM;
+
+	ret = devm_add_action_or_reset(dev, bench_adxl345_free_pollfunc,
+				       indio_dev->pollfunc);
+	if (ret)
+		return ret;
+
+	indio_dev->modes |= INDIO_BUFFER_TRIGGERED;
+
 	if (st->irq > 0) {
 		/*
 		 * Route the interrupts this driver handles to INT1 and
@@ -849,19 +1008,17 @@ int bench_adxl345_core_probe(struct device *dev, struct regmap *regmap,
 			return dev_err_probe(dev, ret,
 					     "cannot request irq %d\n",
 					     st->irq);
-
-		ret = devm_iio_kfifo_buffer_setup(dev, indio_dev,
-						  &bench_adxl345_buffer_ops);
-		if (ret)
-			return ret;
 	} else {
 		/*
-		 * No interrupt in the device tree is a usable driver with
-		 * no buffer, not a failure. Said once at probe so that a
-		 * missing buffer directory later is explained rather than
-		 * mysterious.
+		 * No interrupt in the device tree costs the events and the
+		 * part's own FIFO, and leaves the polled and triggered
+		 * paths working. Said once at probe so that a buffer which
+		 * only fills when a trigger is attached is explained
+		 * rather than mysterious.
 		 */
-		dev_info(dev, "no interrupt, so sysfs only and no buffer\n");
+		indio_dev->modes &= ~INDIO_BUFFER_SOFTWARE;
+		dev_info(dev,
+			 "no interrupt: no events, no fifo, buffer needs a trigger\n");
 	}
 
 	return devm_iio_device_register(dev, indio_dev);

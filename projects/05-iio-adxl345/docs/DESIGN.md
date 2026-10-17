@@ -159,24 +159,76 @@ Project 10 measures and compares:
 | Triggered buffer | a trigger plus `/dev/iio:deviceN` | the scan mask, `iio_push_to_buffers_with_timestamp` |
 | Hardware FIFO | the part's own 32-sample FIFO, drained on a watermark interrupt | the threaded IRQ, and why it exists |
 
-**Two of those three exist, and the middle row is a plan rather than a
-description.** Measured on Saturday 17 October 2026: the word `trigger`
-appears nowhere in the driver, and the device it registers has no
-`trigger` directory under `/sys/bus/iio/devices/iio:device0`, so
-`iio-rate trigger` has nothing to attach to. The buffer this driver
-owns is a kfifo filled by its own threaded interrupt at the part's
-watermark, which is the third row.
+**For most of this project only two of the three existed, and the middle
+row was a plan written in the present tense.** Measured on Saturday 17
+October 2026: the word `trigger` appeared nowhere in the driver, and the
+device it registered had no `trigger` directory under
+`/sys/bus/iio/devices/iio:device0`, so `iio-rate trigger` had nothing to
+attach to. This table said three for as long as the project had existed,
+nothing checked it, and that is the same shape as the three events that
+could not fire: a claim written as an intention and read later as a
+fact.
 
-The triggered path needs `iio_triggered_buffer_setup` and a pollfunc
-that reads one scan, and it is worth having precisely because Project
-10 compares the three against each other: an hrtimer trigger timestamps
-in the IIO core, where the FIFO path assigns its timestamps from
-arithmetic. Until it exists, a comparison of three paths on this part
-is a comparison of two.
+The middle row was written the same day and has not yet run on the
+board, so the README's acceptance table carries it as configured rather
+than measured. It is a pollfunc that reads one six byte sample and
+pushes one scan into the same kfifo the watermark path fills, with the
+timestamp the IIO core took when the trigger fired.
 
-This table said three for as long as the project has existed. Nothing
-checked it, which is the same shape as the three events that could not
-fire: a claim written as an intention and read later as a fact.
+### What having two buffer paths costs
+
+One branch, in the buffer's `postenable`, and it is worth stating
+because getting it wrong is not a crash. The core decides which mode a
+buffer enable is for, in `iio_verify_update`, and its condition is that
+the device declares `INDIO_BUFFER_TRIGGERED` and has a trigger
+attached; failing that it falls back to `INDIO_BUFFER_SOFTWARE`, which
+is this driver's name for the FIFO path. So a trigger in
+`current_trigger` means the part's own FIFO has to stay in bypass with
+its watermark interrupt off. Without that branch both paths fill one
+buffer, and the capture carries twice the samples either path produced
+in an order that reads as jitter.
+
+The same branch is what makes the two paths comparable rather than
+mixed, which is the whole reason Project 10 measures three: an hrtimer
+trigger timestamps in the core at the moment it fired, where the FIFO
+path assigns timestamps by arithmetic from the interrupt backwards.
+
+Two more properties of the triggered path that are worth knowing before
+measuring it, both of them deliberate:
+
+- the trigger rate and the part's output data rate are independent and
+  nothing enforces a relationship. Trigger faster than `BW_RATE` and
+  the same conversion is read twice; slower and conversions are
+  skipped. Neither is an error and neither is reported, so a comparison
+  is only meaningful if it prints both numbers.
+- one bus transaction per sample rather than one per batch, which is
+  why the part has a FIFO at all and what the three-way comparison
+  should show in the CPU column.
+
+### The helper an out-of-tree module cannot have
+
+In-tree drivers set this path up with `iio_triggered_buffer_setup`,
+which attaches a kfifo, allocates a pollfunc and sets the mode bit.
+This driver does those three things itself, and the reason is a Kconfig
+one.
+
+`CONFIG_IIO_TRIGGERED_BUFFER` is declared in `drivers/iio/Kconfig`
+without a prompt, so nothing can ask for it and only an in-tree
+`select` can set it. A module built out of tree selects nothing. A
+configuration fragment naming the symbol is a line kconfig drops
+silently, and the module then builds, packages, installs and fails at
+`modprobe` with an unknown symbol, which reads like a corrupt `.ko`
+rather than like a missing kernel option. The alternative, enabling
+some unrelated in-tree driver that happens to select it, would make
+this driver's buffer a side effect of another driver's presence.
+
+**That is reasoning from how the symbol is declared, not a measurement.**
+`./go ksym -f adxl345` is the command that settles it, and it is worth
+running for its own sake. What makes the question safe to leave open is
+that the driver does not depend on the answer: the three functions it
+calls instead need only `CONFIG_IIO_TRIGGER`, which `bench.cfg` sets
+built in for every image in this repository, so the capability is
+already on the board that is on the bench today.
 
 Channels are the three axes plus a timestamp. Mainline's core declares
 exactly `ADXL345_CHANNEL(0, X)`, `(1, Y)`, `(2, Z)`; ours adds the
@@ -282,6 +334,14 @@ an open row. While `INT1` was unconnected the driver's probe took its
 "no interrupt, so sysfs only and no buffer" path, and criteria 2 to 4
 were measured in that state; the lead went back on pin 16 late the same
 night and the overlay declares it from that build on.
+
+That sentence quotes what the board printed on Friday 9 October 2026 and
+not what the driver prints now. The triggered path added on Saturday 17
+October 2026 made the old message wrong: a board with no interrupt keeps
+its buffer, it just needs a trigger to fill it, so the line now reads
+"no interrupt: no events, no fifo, buffer needs a trigger". The earlier
+wording is left standing where it is quoted as evidence, because that is
+what was read on that date.
 
 ### The three questions this section used to hold open
 
