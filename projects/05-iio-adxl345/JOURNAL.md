@@ -1457,3 +1457,57 @@ partition, and criterion 7 becomes: edit one line in `config.txt`,
 reboot, take the same readings. The criterion still needs a rebuild and
 a reflash once, to put the second overlay on a card, and after that it
 needs neither again.
+
+## 31. The control, and the 0.141 per cent it found
+
+Saturday 17 October 2026, the end of the day. The card flashed at
+`ff83351` carries both overlays, so the swap was one word in
+`/boot/config.txt` and a reboot, which is what `docs/DESIGN.md` has
+promised the A/B pair would cost since before either driver existed and
+what it had never once actually cost.
+
+Eleven minutes apart, same part, same breadboard, same orientation:
+
+| | ours | mainline |
+|---|---|---|
+| `name` | `bench-adxl345` | `adxl345` |
+| `in_accel_scale` | 0.038245935 | 0.038300 |
+| x, y, z | -13, 56, 240 | -14, 57, 239 |
+| magnitude | 246.79 counts | 246.10 counts |
+
+`dmesg` said nothing under either. The axes agree to a count and the
+magnitudes to 0.28 per cent, which is the part's own noise rather than a
+result: both drivers read the same six registers over the same bus and
+sign-extend the same thirteen bits. Agreement there was expected, and
+its worth is that it was checked.
+
+**The scales differ by 0.141 per cent, and that is the finding.** Both
+derivations are written down, in each driver's own source:
+
+    ours      3.9 mg/LSB * 9.80665                  = 0.038245935
+    mainline  (16 + 16) * 9.81 / (2^13 - 1) = 0.0383  -> 38300 micro
+
+One takes the datasheet's quoted scale factor, the other the span across
+thirteen bits. Measured against the datasheet's own typical sensitivity,
+256 LSB per g with standard gravity, which is 0.03830723, ours is 0.160
+per cent low and mainline's 0.019 per cent low.
+
+Mainline is closer partly by luck: `2^13 - 1` rather than 4096 counts
+per 16 g adds 0.012 per cent, 9.81 rather than 9.80665 adds 0.034, and
+rounding to three significant figures takes 0.065 back off. Ours is low
+for a plainer reason: 3.9 is a rounded 1/256, since 1/256 g is 3.90625
+mg, and the datasheet prints both figures for the same quantity.
+
+**Nothing was changed on the strength of it.** Both numbers sit inside
+the part's sensitivity tolerance, and this part is 3.8 per cent off
+nominal, twenty times the disagreement. Moving our constant to 1/256
+would make every figure this project has published 0.16 per cent larger
+and would need the test's own derivation rewritten, so it is recorded
+rather than done, and the choice is left to be made deliberately.
+`docs/evidence/drivers-ab-2026-10-17.md` carries the arithmetic.
+
+**That closes every criterion.** Nine measured on the board, two more
+asserted by the suite, and the one that took longest to reach was the
+one the whole arrangement existed for. The useful part was never going
+to be the agreement; it was that a disagreement, when it came, could be
+traced to a line of source in each driver rather than argued about.

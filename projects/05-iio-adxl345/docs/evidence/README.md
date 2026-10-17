@@ -16,6 +16,7 @@ one day.
 | `events-singletap-2026-10-16.csv` and `.md` | 6, single tap alone, after the registers were put right by hand | Friday 16 October 2026 |
 | `events-doubletap-2026-10-16.csv` and `.md` | 6, double tap, the quiet one | Friday 16 October 2026 |
 | `fifo-watermark-2026-10-17.csv` and `.md` | 5, and a defect behind it: the part interrupts once per sample unless userspace writes `buffer/watermark` | Saturday 17 October 2026 |
+| `drivers-ab-2026-10-17.csv` and `.md` | 7, the same part under both drivers, eleven minutes apart, and the 0.141 per cent their scales disagree by | Saturday 17 October 2026 |
 | `triggered-2026-10-17.csv` and `.md` | 11, the triggered buffer, one scan per fire, timestamped by the core | Saturday 17 October 2026, on the first card to carry the corrected probe |
 
 ## What is still missing, in criterion order
@@ -27,8 +28,6 @@ one day.
   the README; neither is in a file here
 - the four sysfs reads with the board flat, for criterion 3, for the
   same reason
-- two `iio-rate` runs on the same board, one per driver, for criterion
-  7, which needs one word changed in `config.txt` and a reboot
 - `./go ksym -f adxl345` and `./go kconfig -f adxl345`, for criterion 8.
   Both ran on Saturday 17 October 2026 and both are quoted in
   `JOURNAL.md` sections 24 and 25; their output is not in a file here

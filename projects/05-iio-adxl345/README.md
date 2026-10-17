@@ -17,11 +17,13 @@ it, and the core does not know which is loaded.
 
 ## State
 
-**Built, bound and measured, with one criterion open.** As of Saturday 17
+**Built, bound and measured, with nothing open.** As of Saturday 17
 October 2026: the module compiles against the image's 6.6.63 kernel,
 binds to the part on the bench through this project's own overlay, and
-has been read on the board for eight of the criteria below. 95
-assertions pass with no board and no kernel tree.
+every criterion below has been read on the board, including the one this
+project exists to make possible, which is the same hardware under
+mainline's driver as a control. 95 assertions pass with no board and no
+kernel tree.
 
 Three sentences of this section said the opposite until today, and they
 were true when they were written. **Nothing holds a sentence.** What
@@ -32,8 +34,9 @@ replaced them:
 - the overlay this section used to call deliberately missing is
   `meta-bench/recipes-bench/bench-adxl345-dt/`, written once the bench
   had been read: `0x53` on `i2c-1`, `INT1` on header pin 16, GPIO23
-- criteria 1 to 6, 8 and 11 are measured; 7 is the only one left, and
-  it is one word in `config.txt` and a reboot
+- every criterion is measured. The last of them, 7, took one word in
+  `config.txt` and a reboot, which is what the design document promised
+  the A/B pair would cost
 
 **What the board is running, since Saturday 17 October 2026:** the image
 built at `8d17d9b`, flashed that morning, which is the first card to
@@ -129,7 +132,7 @@ means a board did.
 | 4 | The output data rate can be set and read back through `in_accel_sampling_frequency` | write 100, read 100, and the same for 3200 | **Measured**, Friday 9 October 2026: `100.000000` and `3200.000000` read back. This row used to name the file `sampling_frequency`, which does not exist: the channel declares the rate shared by type, so the attribute carries the `in_accel_` prefix, as mainline's does |
 | 5 | A triggered buffer fills from the part's own FIFO on a watermark interrupt, and `iio-decode` turns it into CSV without knowing what the part is | a capture with `iio-rate`, decoded by Project 10's tool | **Measured**, Friday 9 October 2026, `INT1` on GPIO23 level high: `iio-rate fifo bench-adxl345 100 24` gave 960 samples in 10 s and 40 interrupts, 4.00 per second against 4.17 expected; watermark 8 gave 120 interrupts, 12.00 against 12.50; timestamp spread 1.7 ms and 0.96 ms once the driver spread each batch back from the interrupt. Journal sections 13 and 14  **And a figure nobody had taken, Saturday 17 October 2026:** every capture of this path has been made through `iio-rate`, which writes `buffer/watermark` first, so the default was never measured. It is 1, because the IIO core initialises the buffer's watermark to 1 and overwrites what probe put there. Measured: 96.7 interrupts a second against 4.0 with 24 written, a factor of 24.2 on a 32 sample FIFO. `docs/evidence/fifo-watermark-2026-10-17.md` |
 | 6 | Single tap, double tap and free fall arrive as IIO events rather than as an invention of this driver | `iio-events` output while the board is tapped | **Measured**, Friday 16 October 2026, twice. The second run is the one to read: with the registers put right and only single tap armed, 33 events in 20 seconds, in `docs/evidence/events-singletap-2026-10-16.csv`. The first run, `events-2026-10-16.csv`, carried two double taps and a free fall and was taken with the interrupt polarity inverted. This row read "Configured" for two weeks while the three events could not fire at all; journal sections 14, 17, 18 and 19 |
-| 7 | Swapping the compatible string in the overlay moves the same hardware onto mainline's driver, and the two agree | two captures, one per driver, on the same board | **Not started**, and it is the criterion this project exists to make possible. Saturday 17 October 2026 closed off the shortcut and narrowed the scope. The shortcut: a sysfs `bind` of mainline's driver to our node matches, by the client name the I2C core derives from our compatible, and then fails `-EINVAL` because `adxl345_core_probe` asks `device_get_match_data`, which reads the OF and ACPI tables and not the I2C one. The scope: mainline's 6.6 driver has no FIFO, no events and no watermark hook, so the comparison is raw axes, scale and sampling frequency. The control now ships: the image carries a second `.dtbo`, generated from the one source by substituting that property and guarded against a substitution that stops applying, so the swap is one line in `config.txt` and a reboot. What remains is a rebuild and a reflash to put it on a card, once; journal 29 and 30 |
+| 7 | Swapping the compatible string in the overlay moves the same hardware onto mainline's driver, and the two agree | two captures, one per driver, on the same board | **Measured**, Saturday 17 October 2026, eleven minutes apart on one part with one word changed in `config.txt`. The axes agree to a count and the magnitudes to 0.28 per cent, which is this part's own noise. The scales differ by 0.141 per cent, and both derivations are written down: ours takes the datasheet's rounded 3.9 mg/LSB, mainline takes the 13-bit span with g as 9.81. Against the datasheet's own 256 LSB/g, ours is 0.160 per cent low and mainline 0.019 per cent low. `docs/evidence/drivers-ab-2026-10-17.md` |
 | 8 | Every symbol in the fragment is real, and every one reaches the built `.config` | `./go ksym -f adxl345` before, `./go kconfig -f adxl345` after | **Measured**, Saturday 17 October 2026, both halves. `./go ksym` against the 6.6.63 tree, 20854 declarations indexed: every line of `bench.cfg` and `adxl345.cfg` names a symbol that exists, and three are promptless rather than the one this project had thought about. `./go kconfig` then read the `.config` the build wrote at 07:44 and found every option of both fragments present. `CONFIG_REGMAP_I2C=y` and `CONFIG_REGMAP_SPI=y`, so the two predictions are true in this image and are now evidence rather than reasoning; `CONFIG_ADXL345=m` beside the two bus modules; `CONFIG_INPUT_ADXL34X` off, which is what keeps those two satisfiable; and `CONFIG_IIO_TRIGGER=y`, which is the one kernel symbol row 11's triggered path needs |
 | 11 | A trigger drives the buffer: one scan per trigger through `/dev/iio:device0`, which is the middle of the three paths `docs/DESIGN.md` compares | a capture whose scans carry timestamps the core took, spaced by the trigger and not by arithmetic | **Measured**, Saturday 17 October 2026, on the first card to carry this driver: five scans fired one second apart came back 1.015137, 1.015712, 1.015848 and 1.015909 seconds apart, each timestamped when its trigger fired. x -10, y 54, z 241 counts, a magnitude of 247.1 against the 246.5 the same board read through sysfs on Friday 9 October 2026. `docs/evidence/triggered-2026-10-17.md`. A sysfs trigger rather than an hrtimer one, because this image sets `BENCH_ADXL345_KERNEL` and not `BENCH_IIO_KERNEL`, so it has no `CONFIG_IIO_HRTIMER_TRIGGER`; a trigger faster than the part's output rate is therefore still unmeasured |
 
