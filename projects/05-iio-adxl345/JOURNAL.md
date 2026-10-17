@@ -1125,3 +1125,51 @@ rule about a marker's reach.
 `.config` a build produces. `./go ksym` cannot answer it by
 construction, and `./go kconfig -f adxl345` after the rebuild is the
 second half of criterion 8.
+
+## 25. Criterion 8 closed, and the kernel work directory that carries state both ways
+
+Saturday 17 October 2026, 08:35 on the build host. `./go kconfig -f
+adxl345` read the `.config` the kernel had produced at 07:44 and
+reported every option of both fragments present:
+
+    ok  CONFIG_REGMAP_I2C=y        the first prediction, now measured
+    ok  CONFIG_REGMAP_SPI=y        and the second
+    ok  CONFIG_ADXL345=m           with its two bus modules beside it
+    ok  CONFIG_INPUT_ADXL34X off   which is what keeps those two satisfiable
+    ok  CONFIG_IIO_TRIGGER=y       the one symbol the triggered path needs
+
+That closes criterion 8, both halves on the same day. The two promptless
+regmap lines of section 24 were predictions when they were written and
+are evidence now: something in this configuration does select them, and
+the check that can see it has run. `CONFIG_IIO_TRIGGER=y` is the other
+one worth naming, because decision 120 rests on it. This morning it was
+a line in `bench.cfg` and a claim in a comment; it is now a symbol read
+out of the `.config` the image is built from.
+
+**The build itself failed**, and not in anything this project wrote.
+`linux-raspberrypi` `do_package` was stopped by pseudo:
+
+    path mismatch [3 links]: ino 762980
+      db  '.../packages-split/kernel-module-ad714x-6.6.63-v8'
+      req '.../packages-split/kernel-module-cm109-6.6.63-v8'
+
+Two different module package directories sharing one inode in pseudo's
+database. The cause is visible in the hour before it: the earlier run
+reached 5380 of 5423 tasks with `do_package` running, and the window it
+ran in closed. A packaging task killed part way leaves `packages-split`
+and the pseudo database describing different things, and the next run's
+first act is to remove that directory, which is the operation pseudo
+refused.
+
+**The two halves of this are the same decision.** `kas/bench-adxl345.yml`
+carries `RM_WORK_EXCLUDE += "linux-raspberrypi"` so that the kernel's
+work directory survives, because `./go kconfig` reads the `.config` from
+it and that is the only evidence criterion 8 can be measured from. The
+same persistence is what carried a half-written `packages-split` from a
+killed run into the next one. Tonight it paid both ways in one hour:
+criterion 8 could be measured from a build that had failed, and the
+build failed because the directory had been kept.
+
+That is worth stating rather than fixing in a hurry. The alternative,
+letting the kernel work directory go, would have left this morning with
+no `.config` to read and criterion 8 still open.
