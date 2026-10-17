@@ -22,6 +22,17 @@ cannot drift: decision 123.
 `dmesg | grep -i adxl` returned nothing under mainline: it bound
 silently, as ours does.
 
+## And back again, which is what makes it a control
+
+The overlay was swapped back the same evening and the part read a third
+time: x -14, y 56, z 240, magnitude 246.84 counts, against 246.79 before
+the swap and 246.10 under mainline.
+
+A before and an after can always be explained by the hour between them.
+A before, an after and a return cannot: the part is where it started, so
+the 0.28 per cent between the two arms belongs to the readings rather
+than to drift, temperature or a knocked breadboard.
+
 ## The axes agree and say nothing surprising
 
 A count on each axis, 0.28 per cent on the magnitude, which is this

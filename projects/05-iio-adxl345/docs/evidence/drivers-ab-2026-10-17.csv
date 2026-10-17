@@ -1,3 +1,4 @@
 driver,name,overlay,scale,x_raw,y_raw,z_raw,magnitude_counts,magnitude_ms2,magnitude_g
 bench,bench-adxl345,bench-adxl345,0.038245935,-13,56,240,246.79,9.4387,0.9625
 mainline,adxl345,bench-adxl345-adi,0.038300,-14,57,239,246.10,9.4257,0.9612
+bench,bench-adxl345,bench-adxl345,0.038245935,-14,56,240,246.84,9.4406,0.9627
