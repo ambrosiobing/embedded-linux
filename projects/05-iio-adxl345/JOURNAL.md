@@ -1555,3 +1555,96 @@ measure. Measuring it needs a trigger at a known rate, which needs
 `CONFIG_IIO_HRTIMER_TRIGGER`, which needs one line in
 `kas/bench-adxl345.yml`, a kernel rebuild and a reflash. That is now the
 only measurement this project knows it is missing.
+
+## 33. The third path, and the hour it took to notice it had been measured twice
+
+Saturday 17 October 2026, the evening. The card at `9429c89` carries the
+hrtimer trigger, so the table `docs/DESIGN.md` has described since before
+the driver existed could finally be filled on one part, one boot, one
+orientation.
+
+| | polled | hrtimer trigger | hardware FIFO |
+|---|---|---|---|
+| samples a second | 102 | 100 | 96 |
+| interrupts a second | 0 | 0 | 4.00 |
+| reader CPU | 92.50 % | 0.40 % | 0.20 % |
+| timestamp spread | none | 1.682 us | 1670.786 us |
+
+The trigger sets the pace exactly where the polled reader free-runs and
+the FIFO delivers what the part converts. The four-fold CPU difference
+between trigger and FIFO is wakeups rather than bus traffic: both read
+six bytes a sample, one of them 100 times a second and the other four.
+`docs/evidence/paths-2026-10-17.md` carries the rest, including why the
+92.50 per cent is a fact about a shell and not about polling.
+
+**And the run in the middle, which measured the triggered path while
+reporting the FIFO.** 984 samples, zero interrupts, a spread of 1.483
+microseconds where the driver's arithmetic gives 1566. The cause was in
+Project 10's tool and is decision 124: a shell has one `EXIT` trap, the
+trigger path set one and `capture` replaced it, so the trigger was never
+removed or detached and the next FIFO run inherited it. This driver then
+did exactly what it was written to do this afternoon, which is to leave
+the part's FIFO in bypass whenever a trigger is attached, and the whole
+thing was invisible because the row's `path` and `ts_source` columns say
+what the tool asked for rather than what it got.
+
+Reading `/proc/interrupts` directly settled it in one line: `0 0 0 0`
+for the entire boot.
+
+**The duplicate question is answered.** Two captures of 201 scans,
+counting consecutive scans with identical x, y and z:
+
+    200 Hz trigger   107 of 201 duplicates, 53.2 %
+     50 Hz trigger    11 of 201 duplicates,  5.5 %
+
+The rate ratio predicts 1 - 96/200, which is 52 per cent, against 53.2
+measured. The 50 Hz arm is the control and measures what the method
+cannot distinguish: below the part's rate every scan is a fresh
+conversion, so those eleven are two consecutive conversions of a
+motionless sensor landing on identical bits. The effect is ten times its
+own floor.
+
+It also re-derived the part's rate a third way, 94 distinct conversions
+in a second, against 96 and 96.7 from two different interrupt methods
+this morning.
+
+## 34. The probe has no retry, and that is now three times
+
+The same evening, before any of the above could run: the first boot of
+the new card came up with no `iio:device0` at all.
+
+    [ 7.295126] bench-adxl345-i2c 1-0053: error -EREMOTEIO: cannot read DEVID
+    [ 7.304150] bench-adxl345-i2c: probe of 1-0053 failed with error -121
+
+`i2cdetect -y 1` then showed `53` answering, and a manual
+`echo 1-0053 > .../bind` probed cleanly and gave a working device for
+the rest of the evening.
+
+**Three occurrences now.** Friday 9 October 2026 at 400 kHz, attributed
+to the bus speed and fixed by dropping to 100 kHz. This afternoon, after
+an unbind and a rebind, attributed to a bus left mid-transfer and
+cleared by an `i2cdetect` sweep. And this one: a cold boot at 100 kHz
+with nothing else on the bus and no forced reads, failing on the very
+first transaction to the part.
+
+Three is a pattern, and the pattern is not about the bus speed.
+
+**What makes it expensive is the driver rather than the wire.** One
+failed `DEVID` read and the device never exists. There is no retry, no
+deferral, and nothing in userspace to notice: the board boots, the
+modules load, and `/sys/bus/iio/devices` is simply empty. Every tool
+here then reports what it honestly sees, "no IIO device named
+bench-adxl345", which is true and says nothing about why.
+
+Mainline's driver has the same shape, so this is not a defect peculiar
+to this project.
+
+**Not changed tonight, deliberately.** The obvious repair is a bounded
+retry around the identification read, two or three attempts a
+millisecond apart, which would have turned all three occurrences into a
+line in the log. The less obvious question is whether a part that NAKs
+its first transaction after power-up should be waited for at all or
+whether the wiring should be fixed, and that one wants the breadboard
+replaced with something soldered before it is answered. Recorded here,
+and in the project's deferred table, so the next person meets three
+dated occurrences rather than a surprise.

@@ -230,20 +230,26 @@ because the image for this project carries no
 Saturday 17 October 2026, two of the three on one part seventeen seconds
 apart, through Project 10's `iio-rate`:
 
-| | polled | hardware FIFO |
-|---|---|---|
-| samples a second | 105 | 96 |
-| interrupts a second | 0 | 4.00 |
-| reader CPU | 94.00 % | 0.10 % |
+| | polled | hrtimer trigger | hardware FIFO |
+|---|---|---|---|
+| samples a second | 102 | 100 | 96 |
+| interrupts a second | 0 | 0 | 4.00 |
+| reader CPU | 92.50 % | 0.40 % | 0.20 % |
+| timestamp spread | none | 1.682 us | 1670.786 us |
 
-940 times the CPU for the same part at the same rate, 859 times per
-sample. The polled arm also issues 105 reads a second against about 96
-conversions, so roughly 9 per cent of them return a sample that was
-already returned, and nothing in that path can tell.
+Taken on one card, one boot and one orientation, which took until the
+image carried an hrtimer trigger.
 
-The caveat belongs beside the number: `iio-rate` is a shell script, so
-94 per cent is what a shell costs reading sysfs in a loop rather than
-what polling costs. `docs/evidence/paths-2026-10-17.md` has both.
+The four-fold difference between the trigger and the FIFO is the
+measurement worth keeping: both read six bytes a sample over the same
+bus, so it is not traffic, it is 100 wakeups a second against 4.
+
+The caveat belongs beside the first column rather than under it.
+`iio-rate` is a shell script, so 92.50 per cent is what a shell costs
+reading sysfs in a loop and not what polling costs.
+`docs/evidence/paths-2026-10-17.md` has that, the duplicate experiment,
+and the run in between that measured the triggered path while reporting
+the FIFO.
 
 ### What having two buffer paths costs
 
@@ -270,15 +276,14 @@ measuring it, both of them deliberate:
   nothing enforces a relationship. Trigger faster than `BW_RATE` and
   the same conversion is read twice; slower and conversions are
   skipped. Neither is an error and neither is reported, so a comparison
-  is only meaningful if it prints both numbers. **Still unmeasured, and
-  not for want of trying:** a sysfs trigger fires when something writes
-  to it, so every scan of the 17 October capture had a fresh conversion
-  waiting. Measuring the fast case needs a trigger at a known rate,
-  which means an hrtimer, which means `BENCH_IIO_KERNEL` in this
-  project's kas file and a rebuild. `kas/bench-adxl345.yml` sets
-  `BENCH_ADXL345_KERNEL` alone today, and `iio-trigger list` on the
-  board says so in as many words: the configfs directory for hrtimer
-  triggers does not exist.
+  is only meaningful if it prints both numbers. **Measured on Saturday
+  17 October 2026**, once the image carried an hrtimer trigger: at 200
+  Hz against a part converting near 96, 107 of 201 consecutive scans
+  carried identical axes, which is 53.2 per cent against the 52 the rate
+  ratio predicts. The same capture at 50 Hz gives 5.5 per cent, and that
+  is the floor of the method rather than an effect: two consecutive
+  conversions of a motionless part can land on identical bits. Neither
+  the driver nor the core reports any of it, which is the point.
 - one bus transaction per sample rather than one per batch, which is
   why the part has a FIFO at all and what the three-way comparison
   should show in the CPU column.

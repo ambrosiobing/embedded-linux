@@ -1,3 +1,7 @@
-timestamp,path,device,samples_per_s,samples,seconds,irqs,irqs_per_s,cpu_pct,ts_sd_us,ts_source
-2026-10-17T11:16:33+0000,poll,bench-adxl345,105,1052,10,0,0.00,94.00,,none
-2026-10-17T11:16:50+0000,fifo,bench-adxl345,96,960,10,40,4.00,0.10,1566.105,driver-interpolated
+image,path,trigger_hz,watermark,samples_per_s,samples,seconds,irqs,irqs_per_s,cpu_pct,ts_sd_us,ts_source,note
+ff83351,poll,,,105,1052,10,0,0.00,94.00,,none,before the hrtimer trigger existed in any image
+ff83351,fifo,,24,96,960,10,40,4.00,0.10,1566.105,driver-interpolated,
+9429c89,poll,,,102,1024,10,0,0.00,92.50,,none,
+9429c89,trigger,100,,100,1001,10,0,0.00,0.40,1.682,iio-core,
+9429c89,fifo,,24,96,960,10,40,4.00,0.20,1670.786,driver-interpolated,
+9429c89,fifo-contaminated,,24,98,984,10,0,0.00,0.10,1.483,driver-interpolated,a trigger left attached made this the triggered path while the row said fifo
