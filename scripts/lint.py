@@ -24,6 +24,47 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROBLEMS: list[str] = []
 
+# The layers kas clones, which are not this repository's to check.
+#
+# They are gitignored, and with KAS_WORK_DIR set they live in ~/bench and
+# never appear here at all. Run without it, kas falls back to paths
+# relative to the kas file and clones them into this directory instead:
+# 469 MB of somebody else's recipes. .gitignore says why that is tolerated
+# rather than refused.
+#
+# Every walk below used to read them. On the build host on Saturday 17
+# October 2026 that made "./go check" report 320 problems, all of them in
+# meta-raspberrypi, and end with "host checks FAILED". Not one was
+# actionable and not one was ours: a BSP recipe naming patches that live
+# in its own layer, upstream lines past 88 columns, upstream files with no
+# SPDX tag. A check that cannot be read is a check nobody reads, and this
+# one sits in front of every push.
+#
+# On the authoring laptop these directories do not exist, which is why the
+# same command said "lint: clean" there for as long as the defect lasted.
+VENDORED = ("poky", "meta-openembedded", "meta-raspberrypi")
+
+
+def ours(path: Path) -> bool:
+    """Is this a file this repository is responsible for?"""
+    parts = path.relative_to(ROOT).parts
+    return bool(parts) and parts[0] not in VENDORED and ".git" not in parts
+
+
+def tree(pattern: str):
+    """Every file matching pattern that this repository owns.
+
+    The one walk in this file. Every check calls this rather than
+    rglob, so the exclusion above cannot be forgotten by the next rule
+    somebody adds.
+    """
+    return (path for path in ROOT.rglob(pattern) if ours(path))
+
+
+def vendored_present() -> list[str]:
+    """Which cloned layers are in the way, for the report at the end."""
+    return [name for name in VENDORED if (ROOT / name).is_dir()]
+
 # Em dash and en dash, spelled as code points.
 DASHES = (chr(0x2014), chr(0x2013))
 
@@ -40,7 +81,7 @@ def check_ascii() -> None:
     """Recipes and shell scripts stay ASCII; prose may use whatever it needs."""
     patterns = ("*.bb", "*.bbappend", "*.conf", "*.c", "*.cfg", "*.yml", "*.sh")
     for pattern in patterns:
-        for path in ROOT.rglob(pattern):
+        for path in tree(pattern):
             if ".git" in path.parts:
                 continue
             for number, line in enumerate(text(path).splitlines(), 1):
@@ -79,7 +120,7 @@ def check_kconfig_comments() -> None:
     allowed = re.compile(r"^# CONFIG_[A-Za-z0-9_]+ is not set$")
     suspect = re.compile(r"^# CONFIG_[A-Za-z0-9_]+\b")
     for pattern in ("*.cfg", "*.config"):
-        for path in ROOT.rglob(pattern):
+        for path in tree(pattern):
             if ".git" in path.parts:
                 continue
             for number, line in enumerate(text(path).splitlines(), 1):
@@ -95,7 +136,7 @@ def check_kconfig_comments() -> None:
 
 def check_dashes() -> None:
     """House rule: no em or en dashes anywhere in the repository."""
-    for path in ROOT.rglob("*"):
+    for path in tree("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
         if path.suffix in {".png", ".jpg", ".pdf"}:
@@ -141,7 +182,7 @@ def recipe_files(recipe: Path) -> tuple[set[str], str]:
 
 def check_src_uri() -> None:
     """Every file:// entry must exist, and every file must be referenced."""
-    for recipe in list(ROOT.rglob("*.bb")) + list(ROOT.rglob("*.bbappend")):
+    for recipe in list(tree("*.bb")) + list(tree("*.bbappend")):
         if ".git" in recipe.parts:
             continue
         wanted, _ = recipe_files(recipe)
@@ -188,7 +229,7 @@ def check_src_uri_installed() -> None:
     """
     compiled = {".c", ".h"}
     tasks = ("do_configure", "do_compile", "do_install")
-    for recipe in list(ROOT.rglob("*.bb")) + list(ROOT.rglob("*.bbappend")):
+    for recipe in list(tree("*.bb")) + list(tree("*.bbappend")):
         if ".git" in recipe.parts:
             continue
         body = text(recipe)
@@ -245,7 +286,7 @@ def check_image_packages() -> None:
             found |= installs(ROOT / "meta-bench" / required, seen)
         return found
 
-    images = [r for r in ROOT.rglob("*-image*.bb") if ".git" not in r.parts]
+    images = list(tree("*-image*.bb"))
 
     # A comment may legitimately name a package a sibling image installs:
     # bench-hub-image explains itself by pointing at what the real-time
@@ -272,7 +313,7 @@ def check_image_packages() -> None:
 
 def check_systemd_units() -> None:
     """A unit in SYSTEMD_SERVICE that do_install misses fails late and loudly."""
-    for recipe in ROOT.rglob("*.bb"):
+    for recipe in tree("*.bb"):
         if ".git" in recipe.parts:
             continue
         body = text(recipe)
@@ -308,7 +349,7 @@ def check_pkgconfig_inherit() -> None:
     Comment lines are skipped, because bench-iio's own comment names the
     tool, and a rule that matches its own explanation silences nothing.
     """
-    for recipe in ROOT.rglob("*.bb"):
+    for recipe in tree("*.bb"):
         if ".git" in recipe.parts:
             continue
         body = text(recipe)
@@ -346,7 +387,7 @@ def check_module_rprovides() -> None:
     is reported too, because then nothing here can say what it produces.
     """
     objm = re.compile(r"^\s*obj-m\s*[:+]?=\s*(.+?)\s*$", re.M)
-    for recipe in ROOT.rglob("*.bb"):
+    for recipe in tree("*.bb"):
         if ".git" in recipe.parts:
             continue
         body = text(recipe)
@@ -381,8 +422,8 @@ def shell_files() -> list[Path]:
     Two sources, because common.sh is sourced and has no shebang while
     bench-state, rt-run and their kind have a shebang and no extension.
     """
-    found = {p for p in ROOT.rglob("*.sh") if ".git" not in p.parts}
-    for path in ROOT.rglob("*"):
+    found = set(tree("*.sh"))
+    for path in tree("*"):
         if not path.is_file() or ".git" in path.parts:
             continue
         if path.suffix in {".md", ".png", ".jpg", ".pdf", ".pyc"}:
@@ -543,7 +584,7 @@ def check_busybox_compat() -> None:
 
 
 def check_license_headers() -> None:
-    for path in list(ROOT.rglob("*.c")) + list(ROOT.rglob("*.sh")):
+    for path in list(tree("*.c")) + list(tree("*.sh")):
         if ".git" in path.parts:
             continue
         if "SPDX-License-Identifier" not in text(path):
@@ -658,7 +699,7 @@ def check_layer_conf() -> None:
 
 
 def check_line_length() -> None:
-    for path in list(ROOT.rglob("*.c")) + list(ROOT.rglob("*.bb")):
+    for path in list(tree("*.c")) + list(tree("*.bb")):
         if ".git" in path.parts:
             continue
         for number, line in enumerate(text(path).splitlines(), 1):
@@ -851,7 +892,7 @@ def check_csv_line_endings() -> None:
     So the local test suite cannot catch this class at all, which is the
     same argument as the shellcheck rules above.
     """
-    for path in ROOT.rglob("*.py"):
+    for path in tree("*.py"):
         if ".git" in path.parts or path.name == "lint.py":
             continue
         for number, line in enumerate(text(path).splitlines(), start=1):
@@ -884,6 +925,36 @@ VERBATIM_CAPTURES = frozenset({
     "projects/02-neo-air-mainline/docs/bootlog-sd.txt",
     "projects/20-optee-keystore/docs/evidence/boot-console-2026-09-22.txt",
 })
+
+
+def check_lint_walks_once() -> None:
+    """Every walk in this file goes through tree(), which prunes the layers.
+
+    The rule this file applies to recipes, applied to itself: a search
+    chooses its input, and a search that chose the wrong input reports
+    confidently on files nobody asked about. On Saturday 17 October 2026
+    fifteen walks here read poky, meta-openembedded and meta-raspberrypi
+    wherever kas had cloned them into the repository, and "./go check" on
+    the build host ended with 320 problems and a failed run, none of them
+    this repository's. On the authoring laptop, where those directories
+    do not exist, the same command said "lint: clean".
+
+    So there is now one walk, inside tree(), and this refuses a second.
+    The next rule anybody adds here inherits the exclusion rather than
+    having to remember it.
+
+    The needle is assembled from two pieces on purpose. Written whole it
+    would match itself, which is the way three checks in this repository
+    have silenced themselves, and twice more in the hour this one was
+    written.
+    """
+    needle = "ROOT" + ".rglob"
+    source = text(ROOT / "scripts" / "lint.py")
+    count = source.count(needle)
+    if count > 1:
+        fail(ROOT / "scripts/lint.py",
+             f"{count} direct walks; every check must call tree(), "
+             "which prunes the layers kas clones here")
 
 
 def check_control_bytes() -> None:
@@ -1030,7 +1101,7 @@ def check_markdown() -> None:
     is read as carelessness rather than as drift.
     """
     fence = "```"
-    for path in ROOT.rglob("*.md"):
+    for path in tree("*.md"):
         if ".git" in path.parts:
             continue
         content = text(path)
@@ -1061,6 +1132,7 @@ def main() -> int:
         check_shell_patterns,
         check_csv_line_endings,
         check_control_bytes,
+        check_lint_walks_once,
         check_busybox_compat,
         check_src_uri_installed,
         check_image_packages,
@@ -1076,6 +1148,17 @@ def main() -> int:
         check_markdown,
     ):
         check()
+
+    # What was not read, said out loud and only when there was a choice
+    # to make. Silent on the authoring laptop, where these directories do
+    # not exist; one line on a build host where kas has cloned them here.
+    skipped = vendored_present()
+    if skipped:
+        print("not read: " + ", ".join(skipped))
+        print("          cloned by kas into this directory, gitignored,")
+        print("          and not this repository's to check. Set")
+        print("          KAS_WORK_DIR and they go to ~/bench instead.")
+        print()
 
     if PROBLEMS:
         for problem in PROBLEMS:

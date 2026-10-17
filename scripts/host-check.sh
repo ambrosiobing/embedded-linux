@@ -28,9 +28,37 @@ step() {
 # escape the check. Two sources, because common.sh is sourced and has no
 # shebang, while bench-state and bench-wifi-setup have a shebang and no
 # extension. Markdown is excluded: the docs quote shebangs inside examples.
+#
+# WHAT A SEARCH CHOOSES, IT HAS TO SAY. Both halves used to start at the
+# repository root and walk into the layers kas clones here when
+# KAS_WORK_DIR is unset: poky, meta-openembedded and meta-raspberrypi.
+# On the build host on Saturday 17 October 2026 that fed
+# meta-raspberrypi's pi-bluetooth recipe to shellcheck as a shell script,
+# which produced 28 findings about BitBake syntax and a failed run. The
+# three directories are pruned here and in scripts/lint.py, and both say
+# when they skipped one.
+#
+# The first-line test is the second half of the same fix. A shebang means
+# a shell script only on the first line, and that recipe writes an init
+# script with a heredoc, so the string sits in the middle of a BitBake
+# file. Pruning the layers is what fixed today's run; this is what keeps
+# a recipe in meta-bench from doing the same thing tomorrow.
+BENCH_PRUNE="--exclude-dir=.git --exclude-dir=poky"
+BENCH_PRUNE="$BENCH_PRUNE --exclude-dir=meta-openembedded"
+BENCH_PRUNE="$BENCH_PRUNE --exclude-dir=meta-raspberrypi"
+
 BENCH_SH=$( {
-	grep -rl --exclude-dir=.git --exclude=*.md "^#!/bin/sh" .
-	find . -path ./.git -prune -o -name "*.sh" -print
+	# shellcheck disable=SC2086
+	grep -rl $BENCH_PRUNE --exclude=*.md "^#!/bin/sh" . |
+		while IFS= read -r f; do
+			case $(head -n 1 "$f") in
+			"#!/bin/sh"*) printf '%s\n' "$f" ;;
+			esac
+		done
+	find . \( -path ./.git -o -path ./poky \
+		-o -path ./meta-openembedded \
+		-o -path ./meta-raspberrypi \) -prune \
+		-o -name "*.sh" -print
 } | sed "s|^[.]/||" | sort -u)
 
 step "static layer checks"
@@ -54,8 +82,17 @@ step "python programs compile"
 # error in either of them is a watchdog that dies on its first start, which
 # on a gateway means the box is offline and cannot be reached to be fixed.
 BENCH_PY=$( {
-	grep -rl --exclude-dir=.git --exclude=*.md "^#!/usr/bin/env python3" .
-	find . -path ./.git -prune -o -name "*.py" -print
+	# shellcheck disable=SC2086
+	grep -rl $BENCH_PRUNE --exclude=*.md "^#!/usr/bin/env python3" . |
+		while IFS= read -r f; do
+			case $(head -n 1 "$f") in
+			"#!/usr/bin/env python3"*) printf '%s\n' "$f" ;;
+			esac
+		done
+	find . \( -path ./.git -o -path ./poky \
+		-o -path ./meta-openembedded \
+		-o -path ./meta-raspberrypi \) -prune \
+		-o -name "*.py" -print
 } | sed "s|^[.]/||" | sort -u)
 for f in $BENCH_PY; do
 	if python3 -m py_compile "$f"; then

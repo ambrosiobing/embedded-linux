@@ -3948,3 +3948,57 @@ otherwise. The driver's `postenable` and `predisable` mirror that
 condition rather than inventing one. Both paths filling one buffer is
 not a crash; it is a capture with twice the samples either path
 produced, in an order that reads as jitter.
+
+## 121. The checks read only what this repository owns, and say when they skipped something
+
+**Context.** Saturday 17 October 2026. `./go check` was run on the build
+host for the first time in a while, to exercise the three test suites the
+authoring laptop cannot run. Every suite passed. The run ended with "host
+checks FAILED".
+
+The cause was `scripts/lint.py` reporting 320 problems, every one of them
+in `meta-raspberrypi`: a BSP recipe naming patches that live in its own
+layer, upstream lines past 88 columns, upstream files with no SPDX tag.
+Beside them, `shellcheck` had been handed `pi-bluetooth_0.1.19.bb` as a
+shell script and produced 28 findings about BitBake syntax, because
+`grep -rl "^#!/bin/sh"` matches a shebang anywhere in a file and that
+recipe writes an init script with a heredoc.
+
+kas clones `poky`, `meta-openembedded` and `meta-raspberrypi` into
+`KAS_WORK_DIR`. With that variable unset it falls back to paths relative
+to the kas file and clones them into the repository instead, which
+`.gitignore` tolerates and `scripts/common.sh` warns about. Fifteen walks
+in the linter and two searches in the host check then read them.
+
+**Why it survived.** On the authoring laptop those directories do not
+exist, so the same command said "lint: clean" there throughout. The
+machine that could see the defect was the machine nobody ran the check on,
+and the output on that machine was 320 lines long, which is the same thing
+as no output.
+
+**Decision.** Both tools read only what this repository owns. The linter
+has one walk, `tree()`, which prunes the three directories, and
+`check_lint_walks_once` refuses a second: the next rule anybody adds
+inherits the exclusion rather than having to remember it. The host check
+prunes the same three in both of its searches, and takes a shebang as a
+shebang only on the first line of a file, so a recipe in `meta-bench`
+cannot be shellchecked as a shell script tomorrow.
+
+And both say what they did not read, one line, only when a cloned layer is
+actually present. Silence where there was no choice to make; a sentence
+where there was.
+
+**Consequence.** `./go check` is usable on the build host again, which is
+the only host that can run all of it. Proved in both directions on the
+authoring laptop: the files each walk yields are identical with the
+exclusion and without it, eleven patterns and 972 files, because nothing
+is cloned there; a recipe with a long line, an em dash and a non-ASCII
+character is ignored under `meta-raspberrypi` and produces three findings
+under `meta-bench`; a shell script and a heredoc recipe planted in a fake
+cloned layer enter neither search. The new rule was then broken by putting
+one walk back, watched to fire, and restored.
+
+A note on the needle, because it is the fourth instance in one evening: it
+is assembled from two pieces so that it does not match itself. Three
+checks in this repository have been silenced by their own prose, and two
+assertions written tonight did the same thing within the hour.
