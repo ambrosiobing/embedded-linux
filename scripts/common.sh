@@ -59,11 +59,83 @@ require_disk_gb() {
 # run does not run alongside the first: it waits on the handshake and prints
 # "Retrying server connection" every thirty seconds, forever, with no hint
 # that another build is the reason.
+# THE SERVER IS NOT A BUILD, and this guard could not tell the difference.
+#
+# That memory-resident server outlives the command that started it, by
+# design: it is what makes the next command fast. Its process is
+# bitbake/bin/bitbake-server, whose command line contains the string this
+# guard looked for, so for as long as the server lingered the guard
+# refused every build on the bench with nothing running at all. That
+# happened on Saturday 17 October 2026, one command after a successful
+# "./go bitbake bench-adxl345 -c clean linux-raspberrypi": the kas run had
+# exited, its server had not, and the refusal said another run owned the
+# build directory.
+#
+# So: the CLIENT is what is looked for, the server is reported as a note,
+# and a refusal prints the pid and the command line it matched. A refusal
+# with no evidence cannot be argued with, which means it is either
+# believed or switched off, and on a three-hour build it gets switched
+# off.
+#
+# A process whose command line cannot be read is refused rather than
+# ignored, with its pid named. That is the conservative way round for a
+# guard protecting a long build, and the pid is printed so the reader can
+# decide rather than guess.
+# Can the question be asked at all? pgrep is absent on Git Bash, where
+# "pgrep ... >/dev/null 2>&1" is simply false and a guard built on it waves
+# everything through. No build runs on that host, so nothing is at risk,
+# but a check that reports success without having looked is the failure
+# this repository keeps finding in itself. Both callers say which it did.
+bitbake_guard_in_force() {
+	command -v pgrep >/dev/null 2>&1
+}
+
+# Every BitBake process, classified, one per line:
+#
+#     client PID COMMAND
+#     server PID COMMAND
+#
+# Nothing at all when pgrep is absent, which is why bitbake_guard_in_force
+# exists beside this: silence has two meanings here and only one of them is
+# "nothing is running".
+#
+# A process whose command line cannot be read is reported as a client, with
+# its pid and no command. That is the conservative way round for a guard
+# protecting a three-hour build, and the pid is printed so a reader can
+# decide rather than guess.
+bitbake_processes() {
+	bitbake_guard_in_force || return 0
+	for pid in $(pgrep -f 'bitbake/bin/bitbake' 2>/dev/null || true); do
+		cmd=$(tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)
+		case ${cmd:-unreadable} in
+		*bitbake-server*) printf 'server %s %s\n' "$pid" "$cmd" ;;
+		unreadable) printf 'client %s (command line unreadable)\n' "$pid" ;;
+		*) printf 'client %s %s\n' "$pid" "$cmd" ;;
+		esac
+	done
+}
+
 require_no_running_build() {
-	if pgrep -f 'bitbake/bin/bitbake' >/dev/null 2>&1; then
+	if ! bitbake_guard_in_force; then
+		note "pgrep is absent, so a running build cannot be detected here"
+		note "this guard is not in force on this host"
+		return 0
+	fi
+
+	procs=$(bitbake_processes)
+	clients=$(printf '%s\n' "$procs" | sed -n 's/^client /       /p')
+	servers=$(printf '%s\n' "$procs" |
+		sed -n 's/^server \([0-9][0-9]*\) .*/\1/p' | tr '\n' ' ')
+
+	if [ -n "$clients" ]; then
 		die "another BitBake run already owns this build directory.
        BitBake allows one at a time per build dir. Let the first finish, or
-       stop it, then run this again."
+       stop it, then run this again. What this matched:
+$clients"
+	fi
+
+	if [ -n "$servers" ]; then
+		echo "--- bitbake   server idle (pid ${servers%% }), which is not a build"
 	fi
 }
 

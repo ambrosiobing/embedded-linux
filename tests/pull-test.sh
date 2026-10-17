@@ -172,6 +172,66 @@ contains "the refusal says why, in terms of the layer" \
 contains "and names the error the user would otherwise see" \
 	"$out" "not deterministic"
 contains "and says what to do instead" "$out" "Wait for it to finish"
+contains "and names the process it matched, so it can be argued with" \
+	"$out" "What this matched"
+contains "naming the pid" "$out" "$faker"
+
+kill "$faker" 2>/dev/null || true
+faker=
+
+echo "== with only the memory-resident server, which is not a build"
+
+# THE REFUSAL THIS SUITE DID NOT CATCH. BitBake keeps a server per build
+# directory and it outlives the command that started it, by design: it is
+# what makes the next command fast. Its process is bitbake-server, whose
+# command line contains the string both guards matched on, so for as long
+# as it lingered every build and every pull was refused with nothing
+# running. It happened on Saturday 17 October 2026, one command after a
+# successful clean, and the message said another run owned the build
+# directory.
+#
+# The fake is the same shape as the one above with the real name, because
+# the discriminator under test is the name.
+mkdir -p "$WORK/fake/bitbake/bin"
+cat >"$WORK/fake/bitbake/bin/bitbake-server" <<'EOF'
+#!/bin/sh
+sleep 30
+EOF
+chmod +x "$WORK/fake/bitbake/bin/bitbake-server"
+"$WORK/fake/bitbake/bin/bitbake-server" &
+faker=$!
+
+i=0
+while [ "$i" -lt 20 ]; do
+	pgrep -f 'bitbake/bin/bitbake-server' >/dev/null 2>&1 && break
+	sleep 0.1 2>/dev/null || sleep 1
+	i=$((i + 1))
+done
+
+if pgrep -f 'bitbake/bin/bitbake-server' >/dev/null 2>&1; then
+	ok "the fake server is visible to pgrep"
+else
+	no "the fake server is visible to pgrep"
+fi
+
+# And that it is still matched by the pattern the guards start from, or
+# this test proves nothing: the whole defect was that this pattern is too
+# wide, and a fake the pattern misses would pass for the wrong reason.
+if pgrep -f 'bitbake/bin/bitbake' >/dev/null 2>&1; then
+	ok "and the old pattern still matches it, which is the defect"
+else
+	no "the old pattern does not match the fake server"
+fi
+
+rc=0
+out=$(run) || rc=$?
+
+if [ "$rc" -eq 0 ]; then
+	ok "a pull is allowed while only the server is up"
+else
+	no "a pull is refused by an idle server, which is the defect"
+	printf '%s\n' "$out" | sed 's/^/       /'
+fi
 
 kill "$faker" 2>/dev/null || true
 faker=

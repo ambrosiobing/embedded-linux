@@ -4002,3 +4002,52 @@ A note on the needle, because it is the fourth instance in one evening: it
 is assembled from two pieces so that it does not match itself. Three
 checks in this repository have been silenced by their own prose, and two
 assertions written tonight did the same thing within the hour.
+
+## 122. A guard looks for the BitBake client, never the server, and prints what it matched
+
+**Context.** Saturday 17 October 2026, on the build host. One command
+after a successful `./go bitbake bench-adxl345 -c clean
+linux-raspberrypi`, the next `./go adxl345` was refused: "another BitBake
+run already owns this build directory". Nothing was running. The kas
+command had exited and printed its summary.
+
+**What was happening.** BitBake keeps one memory-resident server per
+build directory and it outlives the command that started it, by design,
+because that is what makes the next command fast. The server's process is
+`bitbake/bin/bitbake-server`, and both guards in this repository looked
+for processes matching `bitbake/bin/bitbake`, which is a substring of it.
+So for as long as the server lingered, every build and every pull was
+refused, and the refusal named nothing: no pid, no command line, nothing
+to argue with.
+
+This is the failure `references/traps.md` already describes in the
+abstract, written after three guards fired wrongly in one evening, and
+the first entry in that list is this one: a pgrep that could not tell an
+idle BitBake server from a running build. It was described and not fixed.
+Today it cost a build.
+
+**Decision.** The detection lives once, in `scripts/common.sh`:
+
+- `bitbake_guard_in_force` says whether the question can be asked at all,
+  which it cannot on a host with no `pgrep`.
+- `bitbake_processes` classifies every match as `client` or `server`,
+  reading `/proc/PID/cmdline`, and reports a process whose command line
+  cannot be read as a client with its pid and no command, which is the
+  conservative way round for a guard protecting three hours of work.
+- `require_no_running_build` refuses only on a client, prints the pid and
+  the command line of each one, and reports an idle server as a note
+  rather than a refusal. On a host with no `pgrep` it now says so
+  instead of passing silently.
+
+`scripts/pull.sh` keeps its own wording, because a second build and a
+pull are refused for different reasons, and takes the same detection
+rather than a `pgrep` of its own.
+
+**Consequence.** `tests/pull-test.sh` gained a fake `bitbake-server`
+beside its fake client and asserts three things: that the old pattern
+still matches the server, which is the defect; that a pull is allowed
+while only the server is up; and that a refusal names the pid it matched.
+That suite skips on the authoring laptop, which has no `pgrep`, so those
+three assertions are exercised on the build host and in CI and nowhere
+else. What was verified on the authoring laptop is the branch that says
+the guard is not in force, which is the one that machine can reach.

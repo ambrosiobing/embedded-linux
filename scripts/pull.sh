@@ -56,19 +56,26 @@ require_tool git
 
 cd "$REPO_DIR" || die "cannot enter $REPO_DIR"
 
-# The same pgrep the build scripts use, with a different explanation. A
+# The same detection the build scripts use, with a different explanation. A
 # second build is refused because BitBake allows one per build directory;
 # a pull is refused because it rewrites what the first one is reading.
 #
-# And say so when the question could not be asked. pgrep is absent on Git
-# Bash, where "pgrep ... >/dev/null 2>&1" is simply false and the guard
-# waves everything through. No build runs on that host, so nothing is at
-# risk, but a check that reports success without having looked is the
-# failure this repository keeps finding in itself. It says which it did.
-if ! command -v pgrep >/dev/null 2>&1; then
+# It is bitbake_processes in common.sh rather than a pgrep of its own, and
+# that is the whole point of the change on Saturday 17 October 2026: both
+# guards matched BitBake's memory-resident server, which outlives every
+# command by design, so both refused with nothing running. The server is
+# not a build, and a pull during an idle server rewrites nothing.
+#
+# And say so when the question could not be asked, which is the other half
+# this file already had.
+if ! bitbake_guard_in_force; then
 	note "pgrep is absent, so a running build cannot be detected here"
 	note "this guard is not in force on this host"
-elif pgrep -f 'bitbake/bin/bitbake' >/dev/null 2>&1; then
+else
+	bitbake_clients=$(bitbake_processes | sed -n 's/^client /       /p')
+fi
+
+if [ -n "${bitbake_clients:-}" ]; then
 	die "a BitBake run is in progress, and this checkout is its layer.
 
        Pulling now edits the metadata of the running build. BitBake
@@ -80,7 +87,10 @@ elif pgrep -f 'bitbake/bin/bitbake' >/dev/null 2>&1; then
        Wait for it to finish. If you need the new commits now, clone
        somewhere else and read them there:
 
-           git -C $REPO_DIR log --oneline origin/main"
+           git -C $REPO_DIR log --oneline origin/main
+
+       What this matched:
+$bitbake_clients"
 fi
 
 before=$(git rev-parse --short HEAD 2>/dev/null) ||
