@@ -180,6 +180,43 @@ buffer_off() {
 	echo 0 >"$_dev/buffer/enable" 2>/dev/null || true
 }
 
+# ONE EXIT TRAP, BECAUSE A SHELL HAS ONLY ONE.
+#
+# Until Saturday 17 October 2026 do_trigger set a trap to remove the
+# trigger it had created, and capture() then set its own for the raw
+# file, replacing it. The trigger's cleanup never ran once. On the bench
+# that left the trigger registered AND attached after every trigger run,
+# so the next "iio-rate fifo" enabled a buffer with a trigger attached,
+# the IIO core took the triggered path, the driver left the part's
+# hardware FIFO in bypass, and the row written said "fifo" and
+# "driver-interpolated" over 984 samples that came from neither.
+#
+# A trap set in two places is a trap that runs in one, and nothing says
+# so: no error, no warning, and the half that lost is the half that
+# registered first.
+CLEAN_DEV=
+CLEAN_RAW=
+CLEAN_TRIG=
+
+cleanup() {
+	[ -z "$CLEAN_RAW" ] || rm -f "$CLEAN_RAW"
+	[ -z "$CLEAN_DEV" ] || buffer_off "$CLEAN_DEV"
+
+	# The buffer first, then the detach, then the removal. The core
+	# refuses to remove a trigger a device is using, and refuses to
+	# change current_trigger while a buffer is enabled, so any other
+	# order fails quietly and leaves exactly the state this exists to
+	# prevent.
+	if [ -n "$CLEAN_TRIG" ]; then
+		[ -z "$CLEAN_DEV" ] ||
+			echo >"$CLEAN_DEV/trigger/current_trigger" 2>/dev/null ||
+			true
+		iio-trigger remove "$CLEAN_TRIG" >/dev/null 2>&1 || true
+	fi
+}
+
+trap cleanup EXIT INT TERM
+
 # ------------------------------------------------------------- the paths
 
 do_poll() {
@@ -230,8 +267,12 @@ do_trigger() {
 	note "rate       ${hz} Hz"
 
 	iio-trigger add hrtimer "$trig" "$hz" >/dev/null
-	# shellcheck disable=SC2064
-	trap "buffer_off '$dev'; iio-trigger remove '$trig' >/dev/null 2>&1 || true" EXIT INT TERM
+
+	# Registered with the one cleanup rather than trapped here. See the
+	# comment above cleanup(): a second trap replaces the first, and
+	# this is the one that used to lose.
+	CLEAN_DEV=$dev
+	CLEAN_TRIG=$trig
 
 	echo "$trig" >"$dev/trigger/current_trigger"
 	capture "$dev" "$name" trigger "$hz" iio-core
@@ -281,6 +322,30 @@ do_fifo() {
        magnetometer is one such: that is why the trigger path is
        demonstrated there and the FIFO path here."
 
+	# A TRIGGER ATTACHED HERE MEANS THIS PATH CANNOT RUN AT ALL.
+	#
+	# iio_verify_update picks the triggered mode whenever the device
+	# declares it and has a trigger, and falls back to the software
+	# mode otherwise. A driver whose buffer serves both paths then
+	# leaves its hardware FIFO alone, and the capture measures the
+	# trigger while this program reports the FIFO. That happened on
+	# Saturday 17 October 2026, from a trigger this tool's own trigger
+	# path had left behind.
+	#
+	# Detached rather than refused, because "iio-rate fifo" is an
+	# explicit request for the path a trigger prevents, and said out
+	# loud, because a tool that silently changes the state of a device
+	# is how the next hour gets lost.
+	if [ -r "$dev/trigger/current_trigger" ]; then
+		_attached=$(cat "$dev/trigger/current_trigger" 2>/dev/null)
+		if [ -n "$_attached" ]; then
+			note "detached   trigger \"$_attached\", which would have"
+			note "           made the core take the triggered path and"
+			note "           leave the hardware FIFO in bypass"
+			echo >"$dev/trigger/current_trigger" 2>/dev/null || true
+		fi
+	fi
+
 	note "path       hardware FIFO"
 	note "device     $name at $(basename "$dev")"
 	note "rate       ${hz} Hz"
@@ -302,8 +367,7 @@ do_fifo() {
 	# fault: invisible on a dirty system and plain on a clean one.
 	echo "${BENCH_IIO_BUFLEN:-256}" >"$dev/buffer/length"
 	echo "$watermark" >"$wm_attr"
-	# shellcheck disable=SC2064
-	trap "buffer_off '$dev'" EXIT INT TERM
+	CLEAN_DEV=$dev
 
 	capture "$dev" "$name" fifo "$hz" driver-interpolated
 }
@@ -370,8 +434,8 @@ capture() {
 	note "irq line   matching \"$irq_match\" in /proc/interrupts"
 	irq_before=$(irq_count_of "$irq_match")
 	raw=$(mktemp)
-	# shellcheck disable=SC2064
-	trap "rm -f '$raw'; buffer_off '$dev'" EXIT INT TERM
+	CLEAN_DEV=$dev
+	CLEAN_RAW=$raw
 
 	# The character device, which is in /dev and not under sysfs. Its
 	# name is the sysfs directory's name, which is the one place the two
@@ -513,6 +577,29 @@ emit() {
 		_ratio=$(awk -v m="$irq_rate" -v e="$_expected" 			'BEGIN { printf "%.1f", (e > 0) ? m / e : 0 }')
 		note "expected   ${_expected}/s from ${hz} Hz over a watermark of $watermark"
 		note "ratio      ${_ratio}x measured over expected"
+		# THE OTHER END OF THE SAME GUARD, added Saturday 17 October
+		# 2026. This asked only whether the line was carrying too
+		# many edges. A run that carried NONE printed "ratio 0.0x"
+		# and passed, beside 984 samples that had to have come from
+		# somewhere. Both ends are the same question: does the
+		# interrupt rate match what the watermark predicts.
+		#
+		# Half is the floor, as two is the ceiling, and loose for the
+		# same reason. Zero is the case that matters: samples arriving
+		# with no interrupts means this is not the FIFO path, whatever
+		# the row says.
+		if [ "${samples:-0}" -gt 0 ] &&
+			[ "$(awk -v r="$_ratio" 'BEGIN { print (r < 0.5) ? 1 : 0 }')" = 1 ]; then
+			note "FAIL  samples arrived and the interrupt rate is less"
+			note "      than half what the watermark predicts, so they"
+			note "      did not come from the hardware FIFO. The usual"
+			note "      cause is a trigger attached to the device: the"
+			note "      core then takes the triggered path and the"
+			note "      part's FIFO stays in bypass. Check"
+			note "      trigger/current_trigger."
+			IRQ_VERDICT=fail
+		fi
+
 		if [ "$(awk -v r="$_ratio" 'BEGIN { print (r > 2) ? 1 : 0 }')" = 1 ]; then
 			note "FAIL  the interrupt rate is more than twice what the"
 			note "      watermark predicts, so the line is carrying edges"

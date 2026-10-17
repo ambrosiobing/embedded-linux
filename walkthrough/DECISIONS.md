@@ -4101,3 +4101,66 @@ artefact, derive it from the subject rather than copying it, and make
 the derivation fail loudly when it no longer applies. The question "did
 this still differ in the way I meant" has to be asked by something that
 runs.
+
+## 124. One exit trap per program, and a measurement that proves which path it took
+
+**Context.** Saturday 17 October 2026, on the bench. `iio-rate fifo` on
+Project 5's driver reported 984 samples, zero interrupts, and a
+timestamp spread of 1.483 microseconds where the same command an hour
+earlier had reported 960 samples, 40 interrupts and 1566. Both runs
+printed `fifo` and `driver-interpolated`. One of them was measuring the
+triggered path.
+
+**What was happening, in two halves.**
+
+A shell has one `EXIT` trap. `do_trigger` set one to remove the trigger
+it had created; `capture`, called immediately after, set its own for the
+raw file and replaced it. The trigger's cleanup never ran, so every
+trigger run left its trigger registered and attached. Nothing reported
+this: a trap set twice runs once and the half that loses is the half
+that registered first.
+
+Then `iio-rate fifo` enabled a buffer on a device with a trigger
+attached. `iio_verify_update` picks the triggered mode whenever one is
+attached, Project 5's driver leaves the part's FIFO in bypass on that
+path by design, and the samples came from the leftover hrtimer at its
+own rate. The row said what the tool had asked for rather than what it
+got.
+
+**And the guard that should have caught it had one end.** The tool
+computes expected interrupts from rate over watermark and fails above a
+ratio of 2, because a ringing line once gave thirty times. A ratio of
+ZERO printed and passed.
+
+**Decision.** Three changes, in `iio-rate`.
+
+One trap, installed once, calling `cleanup`, which acts on three
+variables any path may set: the raw file, the device whose buffer to
+disable, and the trigger to detach and remove. Order inside it is buffer
+off, then detach, then remove, because the core refuses both the removal
+of a trigger in use and a change of `current_trigger` while a buffer is
+enabled.
+
+`do_fifo` detaches any trigger it finds before measuring, and says which
+one. Detached rather than refused: `iio-rate fifo` is an explicit
+request for the path a trigger prevents. Said out loud because a tool
+that silently changes a device's state is how the next hour is lost.
+
+The ratio guard gained its lower end: samples arriving with an interrupt
+rate below half what the watermark predicts is a failure naming the
+likely cause.
+
+**Consequence.** The suite's own fixture had encoded the defect as the
+passing case: it never advanced `/proc/interrupts` and asserted that a
+ratio of zero exits zero, with a comment calling that the healthy run.
+It now builds a healthy run with the same bumper technique the storm
+case uses, three seconds rather than one so that a single step is a
+sixth of the ratio rather than a half, and asserts separately that the
+quiet shape fails. Four assertions, each proved by removing the thing it
+checks.
+
+The rule beyond this program: **a measurement must prove which path
+produced it, not label it.** Every one of these rows carried a `path`
+column and a `ts_source` column, and both were arguments rather than
+observations. The interrupt rate was the observation, and it was printed
+beside them for three weeks without being asked whether it agreed.

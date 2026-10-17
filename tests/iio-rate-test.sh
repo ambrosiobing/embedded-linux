@@ -361,13 +361,86 @@ contains "the expected interrupt rate is printed, not left to the reader" \
 	"$out" "expected   7.50/s from 480 Hz over a watermark of 64"
 contains "and the ratio beside it" "$out" "ratio      "
 
-# The quiet fixture never advances /proc/interrupts, so the delta is zero
-# and so is the ratio. That is the passing case and it must not exit
-# non-zero, or every other assertion in this file would be measuring the
-# wrong thing.
+# THE QUIET FIXTURE WAS THE BUG, NOT THE PASSING CASE.
+#
+# This block used to run the quiet fixture, which never advances
+# /proc/interrupts, and assert that a ratio of zero exits zero. It called
+# that "the passing case". On Saturday 17 October 2026 a real board
+# produced exactly that shape and it was not a passing case: 984 samples
+# arrived with no interrupts at all, because a trigger left attached by
+# this tool's own trigger path made the IIO core take the triggered
+# route and leave the hardware FIFO in bypass. The row written said
+# "fifo" and "driver-interpolated" and both were false.
+#
+# So the healthy case is now built rather than assumed, with the same
+# bumper the storm case uses, and the quiet case is asserted to fail.
+# A fixture that cannot tell a working FIFO from a bypassed one cannot
+# check the guard that tells them apart.
+#
+# Three seconds rather than one. The tool sums four processor columns,
+# so a healthy 7.50/s is 1.9 per column per second, which is coarse
+# against a one second window: one step either way moves the ratio by
+# half. Over three seconds the same step is a sixth, and the assertion
+# stops being a race.
+#
+# One per column per half second, which is four columns at 2/s, which is
+# 8/s against the 7.50 expected: a ratio of 1.07. Two per column was the
+# first attempt and that is 16/s, which the storm half of the same guard
+# correctly refused. The arithmetic has to be done before the fixture is
+# written, not after it fails.
+(
+	i=1
+	while [ "$i" -lt 20 ]; do
+		printf '%s' " 185:   $i   $i   $i   $i  pinctrl-bcm2835  24 Edge  lsm6dsx" \
+			>"$WORK/proc/interrupts.tmp"
+		mv "$WORK/proc/interrupts.tmp" "$WORK/proc/interrupts"
+		i=$((i + 1))
+		sleep 0.5
+	done
+) &
+healthy=$!
+
 status=0
-run_fifo 480 64 >/dev/null 2>&1 || status=$?
-check "a ratio inside the limit exits zero" "$status" "0"
+out=$(BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results \
+	BENCH_IIO_DURATION=3 BENCH_IIO_IRQ=lsm6 \
+	sh "$SUT" fifo lsm6dsv16x_accel 480 64 2>&1) || status=$?
+kill "$healthy" 2>/dev/null || true
+wait "$healthy" 2>/dev/null || true
+
+check "a working FIFO, interrupting as its watermark predicts, exits zero" \
+	"$status" "0"
+contains "and its ratio is printed" "$out" "ratio      "
+
+# And the shape that fooled a real bench: samples arriving with no
+# interrupts. The quiet fixture reproduces it exactly, because nothing
+# advances the counter while the fake decoder still yields rows.
+printf '%s' " 185:   0   0   0   0  pinctrl-bcm2835  24 Edge  lsm6dsx" \
+	>"$WORK/proc/interrupts"
+status=0
+out=$(run_fifo 480 64 2>&1) || status=$?
+check "samples with no interrupts is a failure, not a pass" "$status" "3"
+contains "and it says they did not come from the hardware FIFO" \
+	"$out" "did not come from the hardware FIFO"
+contains "and names the usual cause" "$out" "trigger attached to the device"
+
+# --------------------------- and the cause itself, which is upstream of it
+#
+# A trigger left in current_trigger makes the IIO core take the triggered
+# path, so the hardware FIFO never runs. The guard above catches the
+# consequence; this is the tool refusing to walk into it. On Saturday 17
+# October 2026 the leftover came from this tool's own trigger path, which
+# removed its trigger without detaching it first.
+# The device from the block above is reused deliberately: calling
+# build_device here would reset the watermark attribute that block added
+# and leave every assertion after this one measuring a different fixture.
+mkdir -p "$DEV/trigger"
+echo "a-leftover-trigger" >"$DEV/trigger/current_trigger"
+out=$(run_fifo 480 64 2>&1 || true)
+contains "a trigger attached before a fifo run is detached" \
+	"$out" "detached   trigger"
+contains "and the refusal names which one" "$out" "a-leftover-trigger"
+check "and current_trigger is empty afterwards" \
+	"$(cat "$DEV/trigger/current_trigger")" ""
 
 # Now a storm.
 #
@@ -460,6 +533,33 @@ if grep -q 'cpu_pct:-0' "$SUT"; then
 else
 	ok "emit no longer defaults an unmeasured cpu to zero"
 fi
+
+echo "--- the trigger path puts the device back as it found it"
+
+# THE OTHER HALF OF THE SAME DEFECT. The fifo path now detaches a trigger
+# it finds; this is the path that left one behind. The IIO core will not
+# remove a trigger a device is using, so "iio-trigger remove" on an
+# attached trigger fails silently and the object stays, registered and
+# attached, for the next run to inherit.
+#
+# A fake iio-trigger is enough: what is under test is whether this
+# program clears current_trigger before it asks for the removal, not
+# what the removal does.
+mkdir -p "$WORK/bin"
+cat >"$WORK/bin/iio-trigger" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+chmod +x "$WORK/bin/iio-trigger"
+
+mkdir -p "$DEV/trigger"
+echo "" >"$DEV/trigger/current_trigger"
+PATH=$WORK/bin:$PATH \
+	BENCH_IIO_ROOT=$WORK BENCH_IIO_RESULTS=$WORK/results \
+	BENCH_IIO_DURATION=1 BENCH_IIO_IRQ=lsm6 \
+	sh "$SUT" trigger lsm6dsv16x_accel 100 >/dev/null 2>&1 || true
+check "current_trigger is empty when the trigger path exits" \
+	"$(cat "$DEV/trigger/current_trigger")" ""
 
 echo
 echo "$pass passed, $fail failed"
