@@ -69,5 +69,16 @@ IMAGE_INSTALL:append = " \
 # guess. The same evening showed what the line in kas/bench-adxl345.yml
 # that requests it is worth: scripts/check-overlays.sh runs at flash time
 # and refuses a config.txt that names an overlay the card does not carry.
-IMAGE_BOOT_FILES:append = " overlays/bench-adxl345.dtbo;overlays/bench-adxl345.dtbo"
+#
+# BOTH OVERLAYS TRAVEL, AND ONLY ONE IS LOADED. The second is the same
+# description with one property substituted, mainline's compatible
+# instead of this project's, generated in bench-adxl345-dt from the one
+# source so the two cannot drift apart. Carrying it costs a few hundred
+# bytes on the FAT partition and turns acceptance criterion 7 from a
+# rebuild into one edited line in config.txt and a reboot, which is what
+# docs/DESIGN.md has claimed the A/B pair would cost since before either
+# driver existed. Added Saturday 17 October 2026, after a sysfs bind of
+# mainline's driver was tried instead and could not work: journal 29.
+IMAGE_BOOT_FILES:append = " overlays/bench-adxl345.dtbo;overlays/bench-adxl345.dtbo \
+    overlays/bench-adxl345-adi.dtbo;overlays/bench-adxl345-adi.dtbo"
 do_image[depends] += "bench-adxl345-dt:do_deploy"

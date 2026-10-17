@@ -121,7 +121,16 @@ has "the recipe compiles bench-adxl345.dtbo" "$RECIPE" 'bench-adxl345\.dtbo'
 # the assertion; single quotes keep the shell out of it.
 # shellcheck disable=SC2016
 has "and deploys it into overlays/" "$RECIPE" 'install -m 0644 ${B}/bench-adxl345.dtbo ${DEPLOYDIR}/overlays/'
-has "the image copies overlays/bench-adxl345.dtbo onto the card" "$IMG" 'IMAGE_BOOT_FILES:append = " overlays/bench-adxl345.dtbo;overlays/bench-adxl345.dtbo"'
+# The source;destination pair rather than the whole assignment. The
+# first spelling of this matched the complete line including its closing
+# quote, so adding the control overlay on Saturday 17 October 2026 broke
+# it by turning that quote into a backslash continuation. What the
+# assertion is about is that this file reaches the card, and the pair is
+# what says so.
+has "the image copies overlays/bench-adxl345.dtbo onto the card" \
+	"$IMG" 'overlays/bench-adxl345.dtbo;overlays/bench-adxl345.dtbo'
+has "and IMAGE_BOOT_FILES is appended to rather than replaced" \
+	"$IMG" '^IMAGE_BOOT_FILES:append'
 has "and waits for the deploy before assembling" "$IMG" 'do_image\[depends\] += "bench-adxl345-dt:do_deploy"'
 has "the image installs the overlay recipe" "$IMG" '^    bench-adxl345-dt '
 has "config.txt requests dtoverlay=bench-adxl345" "$KAS" 'dtoverlay=bench-adxl345'
@@ -140,6 +149,60 @@ has "and asks for GPIO23, level high" "$DTS_CODE" 'interrupts = <23 4>;'
 # substitution, and single quotes are what keeps them that way.
 # shellcheck disable=SC2016
 has "and the design's wiring table puts INT1 on pin 16" "$DESIGN" '| `INT1` | 16 | GPIO23 |'
+
+echo "--- the control overlay, which is this one with a single property changed"
+
+# ACCEPTANCE CRITERION 7 IS A COMPARISON, AND A COMPARISON DIFFERS IN
+# ONE VARIABLE OR IT IS NOT ONE. The control that puts this part under
+# mainline's driver is generated in the recipe by substituting the
+# compatible, rather than kept as a second .dts, because two copies of a
+# description drift and this repository has paid for that twice.
+#
+# The substitution is reproduced here and the result compared with the
+# source, so the one-variable property is checked rather than trusted.
+# diff prints one line for the removal and one for the addition, hence
+# two.
+CTRL=$WORK/control.dts
+sed 's/compatible = "bench,adxl345";/compatible = "adi,adxl345";/' \
+	"$DTS" >"$CTRL"
+# The "|| true" is load bearing under set -e: grep -c prints 0 and exits
+# 1 when it matches nothing, and nothing is exactly the case this
+# assertion exists to catch, so without it the suite ends here instead of
+# reporting. Found by breaking the substitution on purpose and watching
+# a different assertion fail while this one said nothing at all.
+differing=$(diff "$DTS" "$CTRL" | grep -c '^[<>]' || true)
+if [ "$differing" -eq 2 ]; then
+	ok "the control differs from the source in exactly one line"
+else
+	no "the control differs in $((differing / 2)) lines, not one"
+fi
+has "and that line is mainline's compatible" "$CTRL" 'compatible = "adi,adxl345";'
+hasnt "and ours is not in it" "$CTRL" 'compatible = "bench,adxl345";'
+
+# The recipe has to do the same substitution, anchored the same way. A
+# looser pattern would edit the comment block as well, which quotes both
+# strings while explaining the switch.
+has "the recipe generates the control from the one source" \
+	"$RECIPE" "sed 's/compatible = \"bench,adxl345\";/compatible = \"adi,adxl345\";/'"
+
+# And the failure that matters: sed is silent when its pattern is absent,
+# so a substitution that stopped applying would produce a control that is
+# a byte-for-byte copy of the thing it is a control for. Every
+# measurement taken with it would then agree perfectly, for the wrong
+# reason, and nothing downstream could tell.
+has "and refuses a control with no adi compatible" \
+	"$RECIPE" 'bbfatal "the control overlay has no adi,adxl345 compatible'
+has "and one that still claims ours" \
+	"$RECIPE" 'bbfatal "the control overlay still claims bench,adxl345"'
+has "the recipe compiles the control" "$RECIPE" 'bench-adxl345-adi.dtbo'
+has "and deploys it beside the other" \
+	"$RECIPE" 'install -m 0644 ${B}/bench-adxl345-adi.dtbo'
+has "the image carries both overlays" "$IMG" 'overlays/bench-adxl345-adi.dtbo'
+
+# Carrying both is not loading both. config.txt names one, and which one
+# is the whole experiment.
+hasnt "and config.txt still asks for ours, not the control" \
+	"$KAS" 'dtoverlay=bench-adxl345-adi'
 
 echo
 echo "passed $pass, failed $fail"

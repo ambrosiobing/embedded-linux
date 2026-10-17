@@ -1424,3 +1424,36 @@ the detection sweep clocking it free, and the honest statement is that
 one probe failed and the next one did not. The afternoon's forced reads,
 `i2cget -f` against an address a driver held, are the one new thing this
 bench has been doing today and belong on the list of candidates.
+
+## 30. Both overlays travel, so the swap is a line and a reboot
+
+Saturday 17 October 2026, after section 29 closed the sysfs route. The
+A/B pair this project was designed around needs the compatible changed,
+and until today that meant editing `bench-adxl345-overlay.dts` and
+rebuilding, which is why it had never been done once in three weeks.
+
+The image now carries two `.dtbo`. The second is the first with one
+property substituted, generated in `bench-adxl345-dt` rather than
+written out again, because a second description maintained by hand
+differs in one property today and in whatever nobody copied across next
+month. Decision 123 has the general form.
+
+The substitution is anchored to the whole property line, since the
+overlay's comment block quotes both strings while explaining the switch
+and a looser pattern would edit the prose. `do_compile` then refuses a
+control with no `adi,adxl345` and refuses one that still carries
+`bench,adxl345`, which is the failure that would otherwise be silent:
+`sed` says nothing when its pattern is absent, so the control would be a
+copy of the thing it is a control for, and the comparison would agree
+perfectly for the wrong reason.
+
+`tests/adxl345-overlay-test.sh` does the same substitution on the host
+and asserts that exactly one line differs. Reformatting the property in
+the source so the pattern misses it makes that assertion report a
+control differing in zero lines.
+
+**What this costs and what it buys.** A few hundred bytes on the FAT
+partition, and criterion 7 becomes: edit one line in `config.txt`,
+reboot, take the same readings. The criterion still needs a rebuild and
+a reflash once, to put the second overlay on a card, and after that it
+needs neither again.

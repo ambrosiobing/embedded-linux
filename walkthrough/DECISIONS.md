@@ -4051,3 +4051,53 @@ That suite skips on the authoring laptop, which has no `pgrep`, so those
 three assertions are exercised on the build host and in CI and nowhere
 else. What was verified on the authoring laptop is the branch that says
 the guard is not in force, which is the one that machine can reach.
+
+## 123. A control is generated from the thing it is a control for, and the difference is checked
+
+**Context.** Saturday 17 October 2026. Project 5's acceptance criterion
+7 compares this repository's ADXL345 driver against mainline's on the
+same part, which needs a second device tree overlay differing in one
+property: the compatible string. Until today that swap meant editing the
+source and rebuilding, so it had never been done.
+
+**The obvious implementation is the wrong one.** A second `.dts` beside
+the first differs in one property on the day it is written. Six weeks
+later it differs in the interrupt cell nobody copied across, and the
+comparison silently stops being one. This repository has paid for that
+shape twice already, in two volumes that each exist as two trees: see
+`references/conventions.md` and decision 112.
+
+**Decision.** The control is generated from the source at build time.
+`bench-adxl345-dt` substitutes the whole property line, anchored so that
+the comment block quoting both strings is not edited too, and compiles
+the result to a second `.dtbo`. Both travel on the boot partition and
+`config.txt` names one, so the swap is an edited line and a reboot.
+
+**And the substitution is checked, because sed is silent when it
+misses.** A pattern that stops matching produces a control that is a
+byte-for-byte copy of the thing it controls for. Every measurement taken
+with it then agrees perfectly, for the wrong reason, and nothing
+downstream can tell. So `do_compile` refuses a control that lacks
+mainline's compatible and refuses one that still carries ours, and
+`tests/adxl345-overlay-test.sh` reproduces the substitution on the host
+and asserts that exactly one line differs.
+
+**Consequence.** Proved in both directions before it was committed. The
+property was reformatted in the source so the pattern missed it: the
+host assertion reported a control differing in zero lines. The recipe's
+second guard was replaced with `true`: the assertion for it failed. Both
+restored, 27 passed.
+
+The host assertion also found a defect in itself on the way, worth
+recording because it is the shape this repository keeps meeting: `grep
+-c` prints 0 and exits 1 when it matches nothing, and nothing is exactly
+the case the assertion exists to catch, so under `set -e` the suite
+ended before reporting. The first mutation looked like it fired, because
+a different assertion failed. A check that is right for a reason other
+than its own is not yet a check.
+
+**The rule, for the next one.** Where a measurement needs a control
+artefact, derive it from the subject rather than copying it, and make
+the derivation fail loudly when it no longer applies. The question "did
+this still differ in the way I meant" has to be asked by something that
+runs.
