@@ -39,9 +39,12 @@ replaced them:
   the A/B pair would cost
 
 **What the board is running, since Saturday 17 October 2026:** the image
-built at `8d17d9b`, flashed that morning, which is the first card to
-carry the probe that writes whole registers and the first to carry the
-triggered path. Read on the board immediately after the first boot,
+built at `ff83351`, flashed that afternoon, which carries both overlays
+and therefore both drivers' nodes; the card flashed that morning at
+`8d17d9b` was the first to carry the probe that writes whole registers
+and the triggered path. Since the criterion 7 capture the board has been
+running the CONTROL, `dtoverlay=bench-adxl345-adi`, so the part is under
+mainline's driver until that line is put back. Read on the board immediately after the first boot,
 `DATA_FORMAT` was `0x0b`, the three offset registers `0x00`, `BW_RATE`
 `0x0a` and `INT_ENABLE` `0x00`: the part in a known state from a cold
 start rather than by hand. The rows measured before that date name the
@@ -85,9 +88,19 @@ The overlay names which driver it wants:
 | `compatible = "bench,adxl345"` | this project's | the thing under test |
 | `compatible = "adi,adxl345"` | `drivers/iio/accel/adxl345_*` | the control |
 
-Neither can bind to the other's node, so both are installed and no load
-order decides anything. Swapping the string is an edit to one line on the
-FAT partition and a reboot.
+Swapping the string is an edit to one line on the FAT partition and a
+reboot, and since Saturday 17 October 2026 not even that: both overlays
+travel on the card, so it is which one `config.txt` names.
+
+**This paragraph used to say that neither driver can bind to the other's
+node. That is false**, and `docs/DESIGN.md` carries the measurement: an
+I2C client created from a device tree node is named after the compatible
+with the vendor prefix stripped, so ours is called `adxl345`, which is
+in mainline's `i2c_device_id` table. Mainline's driver was asked to
+probe our node and did. What keeps the two apart in practice is the
+module alias rather than the compatible: the device reports
+`MODALIAS=of:Nadxl345T(null)Cbench,adxl345` and nothing autoloads
+mainline's module for that string.
 
 **Why that is worth the trouble.** A driver written from scratch invites one
 question, which is whether it does the same thing as the one everybody else

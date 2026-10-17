@@ -179,6 +179,13 @@ only that.** Three consequences, and the third is the reason.
    same board, the same bus and the same afternoon. Project 8 had to
    rebuild two kernels to get that property; here it costs a string.
 
+**Measured on Saturday 17 October 2026**, eleven minutes apart on one
+part with one word changed in `config.txt`: the axes agree to a count,
+the magnitudes to 0.28 per cent, and the two scales differ by 0.141 per
+cent, each derived from a different line of its own driver's source.
+`docs/evidence/drivers-ab-2026-10-17.md` carries both derivations and
+the arithmetic that places them against the datasheet.
+
 The cost is that the overlay is not portable to a machine running the
 in-tree driver, which is correct: it describes this bench, and a node that
 asked for a driver nobody has is a node that does not probe.
