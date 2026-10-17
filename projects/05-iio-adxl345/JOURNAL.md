@@ -1277,3 +1277,69 @@ known rate. So does the criterion's own evidence line, which named
 say so. Adding the switch is one line and a rebuild, and it is the right
 thing to do before the three paths are compared rather than merely
 listed.
+
+## 28. The watermark nothing writes
+
+Saturday 17 October 2026, afternoon, still on the card from section 27.
+The triggered capture had left a buffer enabled, so reading two
+registers off the part was free, and the first of them was the point:
+with a trigger attached, `INT_ENABLE` read `0x00` and `FIFO_CTL` read
+`0x00`. The core had chosen the triggered mode, the driver's
+`postenable` had returned early, and the part's own FIFO was in bypass
+with its watermark interrupt disarmed. Detaching the trigger and
+enabling the buffer again gave `0x02`. That is today's two path branch,
+measured on the hardware rather than asserted in a test.
+
+**The second register was not what I predicted.** `FIFO_CTL` read
+`0x81`, stream mode with a watermark of one, where the driver writes 24
+at probe and I had said `0x98` out loud beforehand.
+
+The IIO core calls `hwfifo_set_watermark` when a buffer is enabled and
+passes the buffer's own watermark attribute, which it initialises to 1.
+That call lands before `postenable` reads the field, so the probe's
+value is overwritten every time. A 32 sample FIFO, and the default path
+interrupts once per sample.
+
+It had never been measured because of how it has always been measured.
+Every capture of this path has gone through Project 10's `iio-rate`,
+which writes `buffer/watermark` before it starts, so every published
+number was taken at 24 and the path a plain program takes was invisible.
+
+**Three windows per arm, with an accidental control.**
+
+| Arm | `FIFO_CTL` | interrupts in 10 s |
+|---|---|---|
+| nothing written | `0x81` | 967, three times |
+| buffer disabled | `0x00` | 0 |
+| 24 written | `0x98` | 40, three times |
+
+967 against 40 is 24.18, and the watermark is 24. The zero came from a
+shell `&&` chain that stopped at a failed write and left the buffer
+disabled, which is a better control than one anybody would have
+thought to take.
+
+The two arms also agree about the part: 96.7 interrupts a second at one
+sample each, 4.0 a second at 24 samples each, which is 96.0 samples a
+second. Both about three per cent under the 100 Hz the rate register
+was set to. The agreement is the useful part, because a late handler
+draining more than its watermark would distort the fast arm and not the
+slow one, and it does not.
+
+**The failed write is its own small lesson.** `echo 24 >
+buffer/watermark` returned `Invalid argument`, because the core refuses
+a watermark larger than `buffer/length` and the length was still 16
+from the triggered capture. `iio-rate` writes the length first and
+`tests/iio-rate-test.sh` asserts that order. The sequence here was
+hand-rolled and walked into exactly what the tool was built to avoid,
+which is an argument for using the tool rather than for adding a check.
+
+**What changed.** The driver is not wrong; its documentation was.
+`bench-adxl345.h` called 24 a default, which it has never been on any
+board. The header now says what the constant is, which is the value
+held if that hook is never called and the ceiling the clamp works
+against, and names the measurement. No kernel interface lets a driver
+set the buffer's initial watermark, so a program that wants batching
+has to ask for it, and the honest thing is to say so where somebody
+reading the driver will see it.
+
+Evidence in `docs/evidence/fifo-watermark-2026-10-17.md`.

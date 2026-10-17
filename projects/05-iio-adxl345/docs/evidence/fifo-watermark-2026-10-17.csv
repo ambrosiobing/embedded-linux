@@ -1,0 +1,8 @@
+arm,watermark,fifo_ctl,first_total,second_total,delta,window_s,per_second
+default,1,0x81,10150,11117,967,10,96.7
+default,1,0x81,12085,13052,967,10,96.7
+control,none,0x00,20778,20778,0,10,0.0
+default,1,0x81,22126,23093,967,10,96.7
+written,24,0x98,34774,34814,40,10,4.0
+written,24,0x98,35000,35040,40,10,4.0
+written,24,0x98,35094,35134,40,10,4.0

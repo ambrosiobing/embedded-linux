@@ -15,6 +15,7 @@ one day.
 | `events-2026-10-16.csv` and `.md` | 6, the three event types through the character device | Friday 16 October 2026, while `DATA_FORMAT` still held `0xaf`, so its interrupt polarity was inverted; it proved the path and little else |
 | `events-singletap-2026-10-16.csv` and `.md` | 6, single tap alone, after the registers were put right by hand | Friday 16 October 2026 |
 | `events-doubletap-2026-10-16.csv` and `.md` | 6, double tap, the quiet one | Friday 16 October 2026 |
+| `fifo-watermark-2026-10-17.csv` and `.md` | 5, and a defect behind it: the part interrupts once per sample unless userspace writes `buffer/watermark` | Saturday 17 October 2026 |
 | `triggered-2026-10-17.csv` and `.md` | 11, the triggered buffer, one scan per fire, timestamped by the core | Saturday 17 October 2026, on the first card to carry the corrected probe |
 
 ## What is still missing, in criterion order

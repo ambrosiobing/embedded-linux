@@ -90,6 +90,14 @@ struct bench_adxl345 {
 	 * iio-rate, which writes that attribute and then proves a hardware
 	 * FIFO by the interrupt rate, would have measured a part that
 	 * ignored it.
+	 *
+	 * The value probe puts here is not the one the part runs at. The
+	 * core calls that hook on every buffer enable with the buffer's
+	 * own watermark attribute, which it initialises to 1, so a capture
+	 * that does not write buffer/watermark first gets one interrupt
+	 * per sample out of a 32 sample FIFO. Measured on Saturday 17
+	 * October 2026 at 96.7 interrupts a second against 4.0 with 24
+	 * written: docs/evidence/fifo-watermark-2026-10-17.md.
 	 */
 	unsigned int watermark;
 

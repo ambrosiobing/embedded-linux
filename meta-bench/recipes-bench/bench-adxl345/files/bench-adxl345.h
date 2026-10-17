@@ -153,6 +153,27 @@
  * purpose: a watermark of 32 leaves no room to service the interrupt
  * before the 33rd sample overruns, and an overrun is a silently short
  * buffer rather than an error anybody sees.
+ *
+ * THE 24 IS NOT WHAT THE PART RUNS AT, and calling it a default was
+ * wrong until Saturday 17 October 2026. The IIO core calls the
+ * hwfifo_set_watermark hook when a buffer is enabled and passes the
+ * buffer's own watermark attribute, which it initialises to 1. So this
+ * value is overwritten before postenable ever reads it, and the part
+ * interrupts once per sample unless userspace writes buffer/watermark
+ * first.
+ *
+ * Measured on the bench that evening, three windows of ten seconds
+ * each: 967 interrupts with nothing having written the attribute, and
+ * 40 with 24 written to it. A factor of 24.2, which is the watermark.
+ * docs/evidence/fifo-watermark-2026-10-17.md.
+ *
+ * What this constant still is: the value the driver holds if the core
+ * never calls that hook, and the reason the clamp in
+ * bench_adxl345_set_watermark has a ceiling at all. What it is not is
+ * the rate anything runs at. Project 10's iio-rate writes
+ * buffer/watermark before every capture, which is why every number this
+ * project has published about the FIFO was taken at 24 and why the
+ * default path went three weeks unmeasured.
  */
 #define BENCH_ADXL345_FIFO_DEPTH	32
 #define BENCH_ADXL345_WATERMARK_DEFAULT	24
