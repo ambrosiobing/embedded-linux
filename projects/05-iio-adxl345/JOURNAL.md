@@ -1511,3 +1511,47 @@ asserted by the suite, and the one that took longest to reach was the
 one the whole arrangement existed for. The useful part was never going
 to be the agreement; it was that a disagreement, when it came, could be
 traced to a line of source in each driver rather than argued about.
+
+## 32. What the paths cost, which is the number this project was for
+
+Saturday 17 October 2026, after the A/B. The board was still wired and
+the card current, so the last thing measurable without a rebuild was the
+comparison `docs/DESIGN.md` has described since before the driver
+existed. Two arms of three, seventeen seconds apart:
+
+| | polled | hardware FIFO |
+|---|---|---|
+| samples a second | 105 | 96 |
+| interrupts a second | 0 | 4.00 |
+| reader CPU | 94.00 % | 0.10 % |
+| timestamps | none | driver-interpolated, sd 1566 us |
+
+**940 times the CPU, 859 per sample.** That is what a 32 sample FIFO
+buys, and it is the first number this project has put on it. The
+driver's side of the same fact: 92 interrupts a second saved, 24.0
+samples per interrupt.
+
+**The caveat is not a footnote.** `iio-rate` is a shell script, so 94
+per cent is the cost of a shell reading a sysfs attribute in a loop, not
+the cost of polling. A C reader would be far cheaper. What the row
+supports is a shell reader against the kernel batching into a buffer,
+and saying more than that would be the mistake project 4 made with
+`k_cycle_get_32` and project 8 made with a GPIO write: the instrument
+inside the result, unlabelled.
+
+**And an observation neither arm was taken for.** The polled reader
+issued 105 reads a second while the part converted about 96, a figure
+established twice this morning from independent working points. So about
+9 per cent of those reads returned a conversion that had already been
+returned, and nothing in the polled path can tell: no timestamp, no
+sequence, no data-ready check. That is the property the other two paths
+exist to fix, and it only became visible because the arms were measured
+against each other rather than one at a time.
+
+It is also the same question the triggered path raises from the other
+side. A trigger asking faster than the part converts re-reads one
+conversion, and `docs/DESIGN.md` says so and calls it a thing to
+measure. Measuring it needs a trigger at a known rate, which needs
+`CONFIG_IIO_HRTIMER_TRIGGER`, which needs one line in
+`kas/bench-adxl345.yml`, a kernel rebuild and a reflash. That is now the
+only measurement this project knows it is missing.

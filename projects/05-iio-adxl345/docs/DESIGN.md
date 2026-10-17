@@ -225,6 +225,26 @@ fired rather than a time computed from a batch:
 because the image for this project carries no
 `CONFIG_IIO_HRTIMER_TRIGGER`, which is the next paragraph's business.
 
+### What the paths cost, measured
+
+Saturday 17 October 2026, two of the three on one part seventeen seconds
+apart, through Project 10's `iio-rate`:
+
+| | polled | hardware FIFO |
+|---|---|---|
+| samples a second | 105 | 96 |
+| interrupts a second | 0 | 4.00 |
+| reader CPU | 94.00 % | 0.10 % |
+
+940 times the CPU for the same part at the same rate, 859 times per
+sample. The polled arm also issues 105 reads a second against about 96
+conversions, so roughly 9 per cent of them return a sample that was
+already returned, and nothing in that path can tell.
+
+The caveat belongs beside the number: `iio-rate` is a shell script, so
+94 per cent is what a shell costs reading sysfs in a loop rather than
+what polling costs. `docs/evidence/paths-2026-10-17.md` has both.
+
 ### What having two buffer paths costs
 
 One branch, in the buffer's `postenable`, and it is worth stating
