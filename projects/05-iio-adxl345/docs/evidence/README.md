@@ -1,26 +1,38 @@
 # Evidence, Project 5
 
-Empty on purpose.
+This file said "Empty on purpose" until Saturday 17 October 2026, and
+by then the directory held nine files. It was true when it was written
+on Saturday 3 October 2026, when this project had neither a kernel tree
+nor a board. Nothing in this repository reads a sentence, which is the
+third document in this project to have needed the same correction in
+one day.
 
-Every acceptance criterion in this project's README that is marked "Not
-started" needs either a kernel tree or a board, and this project has had
-neither. Nothing has been compiled, nothing has probed, and no reading has
-been taken.
+## What is here
 
-What goes here when that changes, in the order the criteria are numbered:
+| File | Criterion | Taken |
+|---|---|---|
+| `fifo-rates-2026-10-09.csv` and `.md` | 5, the hardware FIFO drained on a watermark interrupt | Friday 9 October 2026 |
+| `events-2026-10-16.csv` and `.md` | 6, the three event types through the character device | Friday 16 October 2026, while `DATA_FORMAT` still held `0xaf`, so its interrupt polarity was inverted; it proved the path and little else |
+| `events-singletap-2026-10-16.csv` and `.md` | 6, single tap alone, after the registers were put right by hand | Friday 16 October 2026 |
+| `events-doubletap-2026-10-16.csv` and `.md` | 6, double tap, the quiet one | Friday 16 October 2026 |
+| `triggered-2026-10-17.csv` and `.md` | 11, the triggered buffer, one scan per fire, timestamped by the core | Saturday 17 October 2026, on the first card to carry the corrected probe |
 
-- the build log showing three `.ko` produced, for criterion 1
-- `dmesg` from a probe that found `DEVID` 0xe5, and from one that did not,
-  for criterion 2
-- the four sysfs reads with the board flat, for criterion 3
-- a capture decoded by `iio-decode`, for criterion 5
-- `iio-events` output while the board is tapped, for criterion 6. The
-  kernel tree's `iio_event_monitor` was named here until Friday
-  16 October 2026 and is packaged by nothing in this layer, so no bench
-  image has ever contained it; `iio-events` is this repository's own and
-  ships with `bench-iio`
-- two `iio-rate` runs on the same board, one per driver, for criterion 7
-- `./go ksym -f adxl345` and `./go kconfig -f adxl345`, for criterion 8
+## What is still missing, in criterion order
 
-A directory with a file explaining why it is empty is more honest than an
-absent directory, which reads as an oversight.
+- the build log showing three `.ko` produced, for criterion 1. The
+  modules have been built four times since; what is not here is the log
+- `dmesg` from a probe that found `DEVID` `0xe5` and from one that did
+  not, for criterion 2. Both have been read on the bench and quoted in
+  the README; neither is in a file here
+- the four sysfs reads with the board flat, for criterion 3, for the
+  same reason
+- two `iio-rate` runs on the same board, one per driver, for criterion
+  7, which needs one word changed in `config.txt` and a reboot
+- `./go ksym -f adxl345` and `./go kconfig -f adxl345`, for criterion 8.
+  Both ran on Saturday 17 October 2026 and both are quoted in
+  `JOURNAL.md` sections 24 and 25; their output is not in a file here
+
+The pattern in that list is worth naming rather than leaving to be
+noticed: this project has measured far more than it has filed. A figure
+quoted in a journal entry is a record; a figure in a file beside its
+own arithmetic is evidence somebody else can check.

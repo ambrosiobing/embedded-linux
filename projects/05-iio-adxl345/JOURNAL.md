@@ -1211,3 +1211,69 @@ What remains is the board. `iio-rate trigger` against an hrtimer
 trigger, one scan per trigger, with both the trigger's rate and
 `in_accel_sampling_frequency` printed, on a card carrying this build
 rather than `e3574c8`.
+
+## 27. The card that carries the fix, and the third path measured
+
+Saturday 17 October 2026, late morning. The image built at `8d17d9b`
+went onto the card, and it is the first one to carry three things
+together that the bench has only ever had separately: the probe that
+writes whole registers, the three events declared on a channel so they
+reach userspace, and the triggered path.
+
+**The flash was one command and it did the step that cost Friday
+evening.** Among its output:
+
+    --- credentials  wifi.conf copied from /home/bing/bench/credentials
+
+No editor, no retyping, nothing to forget. The overlay check passed on
+the card itself rather than on the recipe: two overlays requested,
+`bench-adxl345` and `vc4-fkms-v3d`, both among the 68 on the boot
+partition.
+
+**The probe, read off the part from a cold start:**
+
+    0x1e 0x00    OFSX, the trim gone
+    0x1f 0x00    OFSY
+    0x20 0x00    OFSZ
+    0x2c 0x0a    BW_RATE, 100 Hz
+    0x2e 0x00    INT_ENABLE, nothing armed
+    0x31 0x0b    DATA_FORMAT, FULL_RES and 16 g and nothing else
+
+Friday's part held `0xaf`, `0xa9 0xba 0x7a`, `0x07` and `0xba`. The same
+six reads, on the same wiring, with the only difference being which
+image the card carries. `dmesg | grep -i adxl` returns one line, the
+taint message, which is a probe that found what it expected and said
+nothing.
+
+**And the third path.** The capture and its arithmetic are in
+`docs/evidence/triggered-2026-10-17.md`. Five scans, fired a second
+apart through a sysfs trigger, came back 1.015137, 1.015712, 1.015848
+and 1.015909 seconds apart, each carrying the moment its own trigger
+fired. The axes read x -10, y 54, z 241 counts, a magnitude of 247.1
+against the 246.5 the same board read through sysfs on Friday 9 October
+2026: two paths, three weeks apart, agreeing to within a count.
+
+The spacing is the whole point. The FIFO path assigns its timestamps by
+arithmetic, counting back from one interrupt at the configured rate, so
+its samples are evenly spaced by construction and would look identical
+whatever the hardware did. These were measured by the core when
+`iio_pollfunc_store_time` ran, and they carry the shell loop's own
+overhead, about 15 milliseconds growing by a few hundred microseconds a
+time. A number that could not have been predicted from the source is
+the only kind worth capturing.
+
+**What the image cannot do, found by trying.** `iio-trigger list` said
+`/sys/kernel/config/iio/triggers/hrtimer does not exist`, and it is
+right: `kas/bench-adxl345.yml` sets `BENCH_ADXL345_KERNEL` and not
+`BENCH_IIO_KERNEL`, so `iio.cfg` and its `CONFIG_IIO_HRTIMER_TRIGGER`
+are in Project 10's images and not this one. The sysfs trigger is in
+`bench.cfg` for every image and was enough to prove the path.
+
+It is not enough for the next question. A trigger faster than the part's
+output rate re-reads one conversion, slower skips conversions, and
+neither is an error or a report; measuring that wants a trigger at a
+known rate. So does the criterion's own evidence line, which named
+`iio-rate trigger DEVICE HZ`, a command this image cannot run. Both now
+say so. Adding the switch is one line and a rebuild, and it is the right
+thing to do before the three paths are compared rather than merely
+listed.

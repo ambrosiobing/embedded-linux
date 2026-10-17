@@ -17,11 +17,11 @@ it, and the core does not know which is loaded.
 
 ## State
 
-**Built, bound and measured, with two criteria open.** As of Saturday 17
+**Built, bound and measured, with one criterion open.** As of Saturday 17
 October 2026: the module compiles against the image's 6.6.63 kernel,
 binds to the part on the bench through this project's own overlay, and
-has been read on the board for six of the criteria below. 95 assertions
-pass with no board and no kernel tree.
+has been read on the board for eight of the criteria below. 95
+assertions pass with no board and no kernel tree.
 
 Three sentences of this section said the opposite until today, and they
 were true when they were written. **Nothing holds a sentence.** What
@@ -32,15 +32,18 @@ replaced them:
 - the overlay this section used to call deliberately missing is
   `meta-bench/recipes-bench/bench-adxl345-dt/`, written once the bench
   had been read: `0x53` on `i2c-1`, `INT1` on header pin 16, GPIO23
-- criteria 1 to 6 are measured, 7 and 8 are not started, and 11 is
-  configured and unmeasured
+- criteria 1 to 6, 8 and 11 are measured; 7 is the only one left, and
+  it is one word in `config.txt` and a reboot
 
-**What the board is running is not what this tree says.** The card
-carries the image built at `e3574c8`, which is before the probe that
-writes whole registers and before the triggered path. Its registers were
-corrected by hand on Friday 16 October 2026 so that the event
-measurements could be taken, which is why those rows name both the
-commit and the correction.
+**What the board is running, since Saturday 17 October 2026:** the image
+built at `8d17d9b`, flashed that morning, which is the first card to
+carry the probe that writes whole registers and the first to carry the
+triggered path. Read on the board immediately after the first boot,
+`DATA_FORMAT` was `0x0b`, the three offset registers `0x00`, `BW_RATE`
+`0x0a` and `INT_ENABLE` `0x00`: the part in a known state from a cold
+start rather than by hand. The rows measured before that date name the
+commit they were taken on, which was `e3574c8` with its registers
+corrected by hand.
 
 ## What this project adds to the repository
 
@@ -128,7 +131,7 @@ means a board did.
 | 6 | Single tap, double tap and free fall arrive as IIO events rather than as an invention of this driver | `iio-events` output while the board is tapped | **Measured**, Friday 16 October 2026, twice. The second run is the one to read: with the registers put right and only single tap armed, 33 events in 20 seconds, in `docs/evidence/events-singletap-2026-10-16.csv`. The first run, `events-2026-10-16.csv`, carried two double taps and a free fall and was taken with the interrupt polarity inverted. This row read "Configured" for two weeks while the three events could not fire at all; journal sections 14, 17, 18 and 19 |
 | 7 | Swapping the compatible string in the overlay moves the same hardware onto mainline's driver, and the two agree | two `iio-rate` runs, one per driver, on the same board | **Not started**, and it is the criterion this project exists to make possible |
 | 8 | Every symbol in the fragment is real, and every one reaches the built `.config` | `./go ksym -f adxl345` before, `./go kconfig -f adxl345` after | **Measured**, Saturday 17 October 2026, both halves. `./go ksym` against the 6.6.63 tree, 20854 declarations indexed: every line of `bench.cfg` and `adxl345.cfg` names a symbol that exists, and three are promptless rather than the one this project had thought about. `./go kconfig` then read the `.config` the build wrote at 07:44 and found every option of both fragments present. `CONFIG_REGMAP_I2C=y` and `CONFIG_REGMAP_SPI=y`, so the two predictions are true in this image and are now evidence rather than reasoning; `CONFIG_ADXL345=m` beside the two bus modules; `CONFIG_INPUT_ADXL34X` off, which is what keeps those two satisfiable; and `CONFIG_IIO_TRIGGER=y`, which is the one kernel symbol row 11's triggered path needs |
-| 11 | A trigger drives the buffer: one scan per trigger through `/dev/iio:device0`, which is the middle of the three paths `docs/DESIGN.md` compares | `iio-rate trigger` on this device, printing both the trigger's rate and `in_accel_sampling_frequency` | **Compiled, not run.** Saturday 17 October 2026: the pollfunc, the mode bit and the branch that keeps the two buffer paths apart exist, the suite asserts seven ways they fail silently, and the module built against the image's 6.6.63 kernel at 08:25. That last is what settles decision 120's open question: `iio_alloc_pollfunc`, `iio_dealloc_pollfunc` and `iio_pollfunc_store_time` are declared where the driver expects them and exported, since modpost refuses an undefined symbol rather than warning. Nothing has run on hardware: the card carries the build at `e3574c8`, which has no triggered path at all |
+| 11 | A trigger drives the buffer: one scan per trigger through `/dev/iio:device0`, which is the middle of the three paths `docs/DESIGN.md` compares | a capture whose scans carry timestamps the core took, spaced by the trigger and not by arithmetic | **Measured**, Saturday 17 October 2026, on the first card to carry this driver: five scans fired one second apart came back 1.015137, 1.015712, 1.015848 and 1.015909 seconds apart, each timestamped when its trigger fired. x -10, y 54, z 241 counts, a magnitude of 247.1 against the 246.5 the same board read through sysfs on Friday 9 October 2026. `docs/evidence/triggered-2026-10-17.md`. A sysfs trigger rather than an hrtimer one, because this image sets `BENCH_ADXL345_KERNEL` and not `BENCH_IIO_KERNEL`, so it has no `CONFIG_IIO_HRTIMER_TRIGGER`; a trigger faster than the part's output rate is therefore still unmeasured |
 
 This row is numbered 11 rather than 9 because 9 and 10 are the asserted
 pair below, and renumbering them would break the references in

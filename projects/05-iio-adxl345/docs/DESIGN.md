@@ -169,11 +169,18 @@ nothing checked it, and that is the same shape as the three events that
 could not fire: a claim written as an intention and read later as a
 fact.
 
-The middle row was written the same day and has not yet run on the
-board, so the README's acceptance table carries it as configured rather
-than measured. It is a pollfunc that reads one six byte sample and
-pushes one scan into the same kfifo the watermark path fills, with the
-timestamp the IIO core took when the trigger fired.
+The middle row was written the same day and ran on the board that
+evening, which makes this table a description of three paths for the
+first time since it was written. It is a pollfunc that reads one six
+byte sample and pushes one scan into the same kfifo the watermark path
+fills, with the timestamp the IIO core took when the trigger fired.
+
+Five scans fired a second apart came back 1.015137, 1.015712, 1.015848
+and 1.015909 seconds apart, each carrying the moment its own trigger
+fired rather than a time computed from a batch:
+`docs/evidence/triggered-2026-10-17.md`. The trigger was a sysfs one,
+because the image for this project carries no
+`CONFIG_IIO_HRTIMER_TRIGGER`, which is the next paragraph's business.
 
 ### What having two buffer paths costs
 
@@ -200,7 +207,15 @@ measuring it, both of them deliberate:
   nothing enforces a relationship. Trigger faster than `BW_RATE` and
   the same conversion is read twice; slower and conversions are
   skipped. Neither is an error and neither is reported, so a comparison
-  is only meaningful if it prints both numbers.
+  is only meaningful if it prints both numbers. **Still unmeasured, and
+  not for want of trying:** a sysfs trigger fires when something writes
+  to it, so every scan of the 17 October capture had a fresh conversion
+  waiting. Measuring the fast case needs a trigger at a known rate,
+  which means an hrtimer, which means `BENCH_IIO_KERNEL` in this
+  project's kas file and a rebuild. `kas/bench-adxl345.yml` sets
+  `BENCH_ADXL345_KERNEL` alone today, and `iio-trigger list` on the
+  board says so in as many words: the configfs directory for hrtimer
+  triggers does not exist.
 - one bus transaction per sample rather than one per batch, which is
   why the part has a FIFO at all and what the three-way comparison
   should show in the CPU column.
