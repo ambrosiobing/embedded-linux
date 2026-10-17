@@ -26,6 +26,30 @@ local_conf_header:
     # bbappend for why it is opt in.
     BENCH_ADXL345_KERNEL = "1"
 
+    # And Project 10's fragment, for one symbol in it:
+    # CONFIG_IIO_HRTIMER_TRIGGER, which is a trigger that fires at a rate
+    # you set. Added Saturday 17 October 2026, after the triggered path
+    # ran on this part through the sysfs trigger and could not be
+    # measured with it, because a sysfs trigger fires when something
+    # writes to it and therefore has no rate.
+    #
+    # docs/DESIGN.md compares three paths out of the part and the third
+    # is the one that asks at a known rate. Without this the comparison
+    # is polled against the hardware FIFO, which is what
+    # docs/evidence/paths-2026-10-17.md carries, and the question that
+    # table raises stays open: a reader that asks faster than the part
+    # converts gets the same conversion twice, measured at about 9 per
+    # cent on the polled arm, and nothing in either path reports it.
+    #
+    # What it costs. iio.cfg also configures the four sensors of an
+    # X-NUCLEO-IKS4A1 as modules; none of them is installed by this
+    # image, so they cost build time and no space on the card. It brings
+    # CONFIG_CONFIGFS_FS, which the hrtimer trigger needs because the
+    # trigger is created by making a directory under
+    # /sys/kernel/config/iio/triggers/hrtimer, and a kernel rebuild,
+    # because changing the fragment changes the configuration.
+    BENCH_IIO_KERNEL = "1"
+
     # The part is on I2C. meta-raspberrypi turns this into
     # "dtparam=i2c_arm=on" in config.txt, without which the bus does not
     # exist and the overlay's node has no parent to attach to.

@@ -556,6 +556,31 @@ has "the symbol the path does need is on for every image" \
 	"$ROOT/meta-bench/recipes-kernel/linux/files/bench.cfg" \
 	'^CONFIG_IIO_TRIGGER=y'
 
+# EIGHT. A trigger at a known rate is the third of the three paths
+# docs/DESIGN.md compares, and it needs the hrtimer trigger, which lives
+# in Project 10's fragment. Two halves, and either alone is the defect
+# this repository has lost a board to twice: the kas switch configures
+# the module and the image line puts it on the card. A card with the
+# switch and not the line carries a kernel that can make hrtimer
+# triggers and no file to make them with, and iio-trigger reports an
+# empty configfs directory exactly as it does without the switch.
+has "the kas file turns on the fragment that configures the hrtimer trigger" \
+	"$ROOT/kas/bench-adxl345.yml" 'BENCH_IIO_KERNEL = "1"'
+# Anchored to the indent and the trailing space of an IMAGE_INSTALL
+# entry, because that recipe's own comment names this package while
+# explaining why it is there, and an unanchored pattern matched the
+# prose. Renaming the installed module left this assertion green. The
+# sibling four lines up, for bench-iio, has always been anchored this
+# way; this one was not read before it was written.
+has "and the image installs the module it produces" \
+	"$IMAGE" '^    kernel-module-iio-trig-hrtimer '
+has "which is =m in that fragment, not built in" \
+	"$ROOT/meta-bench/recipes-kernel/linux/files/iio.cfg" \
+	'^CONFIG_IIO_HRTIMER_TRIGGER=m'
+has "and the configfs it is created through is built in" \
+	"$ROOT/meta-bench/recipes-kernel/linux/files/iio.cfg" \
+	'^CONFIG_CONFIGFS_FS=y'
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

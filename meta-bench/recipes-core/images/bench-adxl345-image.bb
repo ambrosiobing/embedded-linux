@@ -15,16 +15,17 @@ IMAGE_INSTALL:append = " \
     kernel-module-bench-adxl345-spi \
     kernel-module-adxl345-i2c \
     kernel-module-adxl345-spi \
+    kernel-module-iio-trig-hrtimer \
 "
 
 # THE MODULE LINES ARE THE POINT OF THIS FILE.
 #
-# Five of them, and every one is a package rather than a kernel option.
-# adxl345.cfg compiles all five; naming them here is what puts them in the
-# rootfs. Yocto packages one module per .ko and installs only what an
-# image asks for, so a driver can be configured, built, packaged, cached
-# and still absent from the card, with a device that never appears as the
-# only symptom.
+# Six of them, and every one is a package rather than a kernel option.
+# adxl345.cfg compiles five of them and iio.cfg the sixth; naming them
+# here is what puts them in the rootfs. Yocto packages one module per
+# .ko and installs only what an image asks for, so a driver can be
+# configured, built, packaged, cached and still absent from the card,
+# with a device that never appears as the only symptom.
 #
 # This repository has paid for that twice. Project 1 lost a round to a
 # wireless driver whose module package nobody named, and Project 8 lost a
@@ -37,6 +38,17 @@ IMAGE_INSTALL:append = " \
 # The first three are Project 5's own driver, built out of tree by
 # meta-bench/recipes-bench/bench-adxl345. Three modules rather than one
 # because the core is shared and each bus file loads on its own.
+#
+# kernel-module-iio-trig-hrtimer is the sixth, added Saturday 17 October
+# 2026 together with BENCH_IIO_KERNEL in kas/bench-adxl345.yml, and it is
+# this rule's own lesson applied before it could bite. That switch makes
+# CONFIG_IIO_HRTIMER_TRIGGER=m, and a module that is configured is not a
+# module that is on the card: without this line the image would carry a
+# kernel able to make hrtimer triggers and no file to make them with, and
+# iio-trigger would report an empty configfs directory exactly as it does
+# today, for an entirely different reason. Project 10's image names the
+# same package, and this is that sibling read before the copy was
+# written.
 #
 # The last two are mainline's. They are here so that the control is on the
 # card rather than in a second image: this project's driver claims
