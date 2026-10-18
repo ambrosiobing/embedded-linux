@@ -98,6 +98,25 @@ chmod +x "$WORK/bin"/*
 PATH=$WORK/bin:$PATH
 export PATH
 
+# The whole suite rests on one capability: that $PYTHON can exec the stubs
+# above. Native Windows Python cannot run an extensionless shell script, so
+# every call raises FileNotFoundError and the ladder never moves. What that
+# produces is worse than a row of failures: the assertions that a recovery
+# did NOT run are satisfied by nothing having happened, so they are reported
+# as passes and the untested path looks partly tested. Probe the capability
+# and say what was not looked at.
+#
+# The Microsoft Store python3 is caught here too. It exits 0 for --version
+# while running nothing, so a version check cannot see it; executing
+# anything exits non-zero.
+if ! "$PYTHON" -c "import subprocess; subprocess.run(['mmcli', '--version'], capture_output=True)" >/dev/null 2>&1
+then
+	echo "SKIP: this Python cannot execute the shell stubs this suite needs,"
+	echo "      so NOTHING below was exercised. Run it on the WSL laptop, or"
+	echo "      let CI run it."
+	exit 0
+fi
+
 # Every wait is zero, so the ladder runs at the speed of the stubs. The
 # real values are in the shipped lte.conf and are the point of the unit,
 # not of the state machine.

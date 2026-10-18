@@ -4164,3 +4164,74 @@ produced it, not label it.** Every one of these rows carried a `path`
 column and a `ts_source` column, and both were arguments rather than
 observations. The interrupt rate was the observation, and it was printed
 beside them for three weeks without being asked whether it agreed.
+
+## 125. A host capability is probed before the first assertion, and a suite that cannot run says so instead of failing
+
+**Context.** Sunday 18 October 2026, on win11 aquamarine. Three suites
+disagreed with the rest of the tree. `lte-watchdog-test.sh` reported 6
+passed and 19 failed. `lte-exporter-test.sh` reported failures of the
+same shape. `rt-plot-test.sh` exited 1 having printed nothing at all.
+None of the three is a defect in the thing under test.
+
+**Three causes, all of them properties of the host.** The watchdog and
+the exporter replace `mmcli`, `ping`, `nmcli` and `ip` with shell stubs
+on `PATH` and then drive them from Python. Native Windows Python cannot
+exec an extensionless shell script, so each call raises
+`FileNotFoundError`, which the program reports as
+`mmcli: [WinError 2] The system cannot find the file specified`. The
+figure generator is given fixtures under the directory `mktemp -d`
+returns, which under Git Bash is an MSYS path, `/tmp/...`, that the same
+interpreter cannot open; the first command substitution then fails and
+`set -eu` ends the suite before a line is printed, so an unmet
+requirement reads as a crash.
+
+**The part that makes this worth a decision.** Six of the watchdog's
+assertions reported `ok`. Every one of them asserts that a recovery did
+NOT run: no modem reset yet, no power cycle yet, no ping attempted. A
+suite in which nothing executed at all satisfies each of them. So the
+run reported a quarter of its assertions as passes, and the quarter it
+chose was the half of the behaviour that matters most, which is the
+ladder refusing to skip a rung. An absence that nothing produced is not
+evidence, and it looks exactly like evidence.
+
+**Decision.** Where a whole suite rests on one host capability, that
+capability is probed before the first assertion. If it is absent the
+suite prints `SKIP`, says plainly that nothing below was exercised, and
+exits 0. Each probe exercises the capability in the same form the suite
+uses it: the stub probe asks Python to exec `mmcli`, and the path probe
+asks it to open a file under `$WORK`.
+
+**Rejected: probing for the interpreter.** `command -v python3` succeeds
+on this laptop, because `python3` there is the Microsoft Store stub.
+That stub exits 0 for `--version` while running nothing, so a version
+check cannot see it either; it exits non-zero only when asked to execute
+something. A presence check and a version check both report a working
+interpreter that is not one.
+
+**Rejected: passing the probe's path as an argument.** The first version
+did, and it passed while the suite went on to fail. Git Bash rewrites an
+argument that looks like a path into Windows form, so the probe opened
+`C:/Users/.../Temp/tmp.X/probe` and succeeded. The fixtures are named
+`path:format`, which the rewriter leaves alone, so what the generator
+receives is the MSYS spelling. The path now sits in the probe's own
+source, where nothing rewrites it, as a raw string so that a Windows
+base containing backslashes is not a syntax error and therefore not a
+false refusal.
+
+**Rejected: making the missing C compiler a skip.** `sensorhub-cabi-test.sh`
+prints `FAILED` and exits 1 where there is no `cc`, saying that without
+one it proves nothing. That is a defensible refusal and it is left
+standing, because turning it into a skip is a question about what CI
+must be required to have, not about the authoring laptop.
+
+**Consequence.** Twenty of the 21 suites that default to `python3` now
+exit 0 here: 18 run and pass, three skip and name what was not looked
+at. The breadth was measured rather than assumed, which mattered, since
+the shared default line is in all 21 and only three of them were broken.
+
+`rt-plot-test.sh` skips with a remedy that works on this host rather
+than only a pointer elsewhere, because the cause there is the spelling
+of a directory and not the interpreter. The first version of that
+message named `TMPDIR` alone and did not clear its own condition: the
+default `python3` is still the stub. It now names both, and running
+exactly what it prints gives 24 passed, 0 failed.
