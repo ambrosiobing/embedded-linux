@@ -1648,3 +1648,46 @@ whether the wiring should be fixed, and that one wants the breadboard
 replaced with something soldered before it is answered. Recorded here,
 and in the project's deferred table, so the next person meets three
 dated occurrences rather than a surprise.
+
+## 35. Fifteen runs, read at last, and the one red among them
+
+Sunday 18 October 2026.
+
+Every push on Saturday 17 October 2026 went out without anyone reading
+what the checks said about it. Fifteen runs. Read this morning, with a
+handful of queries against a public endpoint and no credentials.
+
+Thirteen green, one failure, one cancelled.
+
+The failure is `5af24b9` at 09:52, and the step is the sixth, "Shell
+scripts", with the twelve compile steps and the suite after it all
+skipped. The commit twelve minutes later, `ff83351`, is six added lines
+in one file, and its subject names the cause: the new recipe assertion
+needed the SC2016 directive its sibling already had. So the red was
+caught on win11 skyhorizon by `./go check` and repaired before the run
+was ever looked at, and the repair was exactly the width of the finding,
+one file and one directive. One commit taking it green also says
+shellcheck had found nothing else.
+
+The cancelled run is `96c4bfb`, superseded two minutes later by the next
+push. That commit and the failed one are both ancestors of `f525514`,
+which is green, so nothing in Saturday's work stands unchecked.
+
+**The boring result is the argument for looking.** Fifteen runs deep,
+and the answer was one red that had already been fixed on the laptop and
+nothing besides. That is the whole cost of knowing, and it is the same
+cost whether the answer is this or the red on the RTOS repository that
+had been standing for days when an email finally surfaced it.
+
+**Two notes on getting the answer, both already written down.** Whether
+a run passed is public: `conclusion` out of the runs endpoint, no token.
+The log text is not, and refuses an unauthenticated read with 403. I met
+that 403 before reading the bench notes, which have carried both facts,
+and the route through the token git already holds, since Sunday 4
+October 2026. The token turned out to be unnecessary, because a fixing
+commit that names its own cause is a better record than a log, but that
+was not knowable until after the refusal. The second note is that the
+runs endpoint at `per_page=100` returns more than 300 kB, which a pipe
+into Python truncates partway through; writing it to a file first is
+what those notes say to do, and the filtered queries that answer
+"how many, and how many red" are smaller than either.
