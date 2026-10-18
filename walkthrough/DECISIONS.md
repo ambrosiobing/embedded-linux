@@ -4235,3 +4235,19 @@ of a directory and not the interpreter. The first version of that
 message named `TMPDIR` alone and did not clear its own condition: the
 default `python3` is still the stub. It now names both, and running
 exactly what it prints gives 24 passed, 0 failed.
+
+**The quiet direction, proved on a host that has the capability.** A
+probe that refused wrongly would be invisible from the pipeline, since a
+skip exits 0 and the step stays green. So the run for this change was
+read rather than trusted: the only `SKIP` in the whole Tests step is the
+pre-existing U-Boot one, and the three suites ran in full and passed, 25
+for the watchdog, 24 for the exporter and 24 for the figure generator.
+The watchdog's 25 is also the arithmetic on the fault it replaces: 6
+passed and 19 failed is the same 25 assertions, so the absences that
+reported themselves as passes were a quarter of the suite.
+
+Shellcheck first reaches these files in that pipeline, because there is
+none on the authoring laptop and the build laptop is a separate clone
+that can only receive the change by pull. It found nothing, and its step
+discovers its files with a `find` rather than a list, so all three were
+in scope.
