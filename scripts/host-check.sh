@@ -20,6 +20,64 @@ cd "$REPO_DIR" || die "cannot enter $REPO_DIR"
 
 fail=0
 
+# AN ABSENT HOST TOOL IS COUNTED SEPARATELY FROM A DEFECT.
+#
+# The header above says a skipped compile counts as a failure rather than a
+# pass with a note, and that stays. This file exists to compile before three
+# hours of build start, so reporting "passed" without the compile would be
+# worse than useless, and the exit status below is still non-zero when a
+# compile did not happen.
+#
+# What changed on Monday 19 October 2026 is what it SAYS. Until then the
+# last line read "host checks FAILED. Fix these before starting a
+# three-hour build." On win11 aquamarine that sentence was false in both
+# halves: there is no pkg-config and no compiler there by a rule of this
+# bench rather than by accident, so nothing needed fixing, and no build
+# starts on that laptop anyway. A red line whose only meaning is "wrong
+# machine" is what teaches a reader to skim red lines, which is the harm
+# decisions 125 and 128 are both about.
+#
+# So absence is counted and named, and the verdict distinguishes "this tree
+# has defects" from "this host cannot ask". Note that shellcheck has always
+# been note-and-continue here rather than a failure, which is a real
+# distinction and is kept: the compiles are the point of this file, and a
+# missing linter is a bonus withheld rather than a question unasked.
+absent=0
+absent_list=""
+
+missing() {
+	absent=$((absent + 1))
+	case " $absent_list " in
+	*" $1 "*) ;;
+	*) absent_list="$absent_list $1" ;;
+	esac
+}
+
+# ONE INTERPRETER, RESOLVED ONCE, FOR EVERY PYTHON STEP BELOW.
+#
+# python3 was named directly in two places: the static layer checks and
+# py_compile over every Python file in the tree. On win11 aquamarine
+# python3 is the Microsoft Store stub, which runs nothing, so that loop
+# reported FORTY files as having compile errors when the interpreter was
+# the only thing wrong. Forty red lines meaning "wrong machine" is the
+# strongest form of the harm this file's verdict was changed for: nobody
+# reads the forty-first.
+#
+# The stub is invisible to the usual probes. command -v finds it, and it
+# exits 0 for --version while running nothing at all, so executing
+# something is the only test that distinguishes it.
+#
+# PYTHON overrides the search for a host where neither name is right.
+PY=${PYTHON:-}
+if [ -z "$PY" ]; then
+	for candidate in python3 python; do
+		if "$candidate" -c "import sys" >/dev/null 2>&1; then
+			PY=$candidate
+			break
+		fi
+	done
+fi
+
 step() {
 	printf '\n--- %s\n' "$1"
 }
@@ -62,7 +120,12 @@ BENCH_SH=$( {
 } | sed "s|^[.]/||" | sort -u)
 
 step "static layer checks"
-python3 scripts/lint.py || fail=1
+if [ -n "$PY" ]; then
+	"$PY" scripts/lint.py || fail=1
+else
+	echo "no working Python on this host, so the layer checks were NOT run."
+	missing python3
+fi
 
 step "shell files parse"
 # Always available, unlike shellcheck, and it catches the one thing that
@@ -94,14 +157,25 @@ BENCH_PY=$( {
 		-o -path ./meta-raspberrypi \) -prune \
 		-o -name "*.py" -print
 } | sed "s|^[.]/||" | sort -u)
-for f in $BENCH_PY; do
-	if python3 -m py_compile "$f"; then
-		echo "ok   $f"
-	else
-		echo "FAILED $f"
-		fail=1
-	fi
-done
+if [ -z "$PY" ]; then
+	# Counted once, not once per file. Forty identical lines saying the
+	# interpreter is absent is the noise that hides the one line that
+	# matters, and the count is of checks not asked, not of files.
+	echo "no working Python on this host, so NONE of these compiled:"
+	for f in $BENCH_PY; do
+		echo "    $f"
+	done
+	missing python3
+else
+	for f in $BENCH_PY; do
+		if "$PY" -m py_compile "$f"; then
+			echo "ok   $f"
+		else
+			echo "FAILED $f"
+			fail=1
+		fi
+	done
+fi
 find . -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
 
 step "shell scripts"
@@ -125,11 +199,11 @@ done
 step "compile the daemon against host libgpiod"
 if ! command -v pkg-config >/dev/null 2>&1; then
 	echo "pkg-config is not installed. Run scripts/host-setup.sh."
-	fail=1
+	missing pkg-config
 elif ! pkg-config --exists libgpiod; then
 	echo "libgpiod development files are not installed."
 	echo "Run scripts/host-setup.sh, or: sudo apt-get install -y libgpiod-dev"
-	fail=1
+	missing libgpiod-dev
 else
 	version=$(pkg-config --modversion libgpiod)
 	echo "libgpiod $version"
@@ -281,11 +355,11 @@ step "compile drmfill against host libdrm"
 # would. That is the whole argument for this file.
 if ! command -v pkg-config >/dev/null 2>&1; then
 	echo "pkg-config is not installed. Run scripts/host-setup.sh."
-	fail=1
+	missing pkg-config
 elif ! pkg-config --exists libdrm; then
 	echo "libdrm development files are not installed."
 	echo "Run scripts/host-setup.sh, or: sudo apt-get install -y libdrm-dev"
-	fail=1
+	missing libdrm-dev
 else
 	echo "libdrm $(pkg-config --modversion libdrm)"
 	out=$(mktemp -d)/drmfill
@@ -321,11 +395,11 @@ step "compile kbd_bridge against host libevdev"
 # source, so -I on that directory is the whole include path.
 if ! command -v pkg-config >/dev/null 2>&1; then
 	echo "pkg-config is not installed. Run scripts/host-setup.sh."
-	fail=1
+	missing pkg-config
 elif ! pkg-config --exists libevdev; then
 	echo "libevdev development files are not installed."
 	echo "Run scripts/host-setup.sh, or: sudo apt-get install -y libevdev-dev"
-	fail=1
+	missing libevdev-dev
 else
 	echo "libevdev $(pkg-config --modversion libevdev)"
 	out=$(mktemp -d)/kbd-bridge
@@ -350,9 +424,20 @@ else
 fi
 
 echo
-if [ "$fail" -eq 0 ]; then
-	echo "host checks passed. Next: ./go build"
-else
-	echo "host checks FAILED. Fix these before starting a three-hour build."
+if [ "$fail" -ne 0 ]; then
+	echo "host checks FAILED: something above is wrong with the tree."
+	echo "Fix these before starting a three-hour build."
 	exit 1
+elif [ "$absent" -ne 0 ]; then
+	echo "NO DEFECT FOUND, and $absent of these checks could not be asked on"
+	echo "this host. Absent:$absent_list"
+	echo
+	echo "This is not a go-ahead for a build, and the exit status says so,"
+	echo "because the compiles are the point of this file and they did not"
+	echo "happen. It is not a finding against the tree either. Run it on the"
+	echo "build laptop, where scripts/host-setup.sh installs all of these;"
+	echo "docs/BUILD-HOST.md is the list."
+	exit 1
+else
+	echo "host checks passed. Next: ./go build"
 fi

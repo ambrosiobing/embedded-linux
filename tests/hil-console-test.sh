@@ -25,7 +25,8 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 RUNNER=$ROOT/projects/04-netboot-hil/runner
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
+bench_python "the console harness was NOT exercised and"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

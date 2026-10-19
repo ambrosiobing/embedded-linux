@@ -28,7 +28,8 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
+bench_python "the policy rules were NOT checked and"
 
 "$PYTHON" -u - "$ROOT/tests" <<'PYTHON'
 import sys

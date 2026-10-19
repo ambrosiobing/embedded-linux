@@ -26,7 +26,8 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/meta-bench/recipes-bench/bench-stwin/files
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
+bench_python "the supervisor was NOT checked and"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

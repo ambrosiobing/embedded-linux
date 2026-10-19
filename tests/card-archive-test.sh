@@ -424,8 +424,33 @@ contains "and the original skipped statement is still there" "$prov3" \
 
 # A source that is not the one archived must be refused, and the failure
 # recorded rather than left for the operator to remember.
+#
+# THE MUTATION IS COMPUTED FROM THE BYTE IT REPLACES, NOT A FIXED LETTER.
+#
+# This wrote a literal 'x' at offset 4096 until Monday 19 October 2026, and
+# card.img is 9001 kB of /dev/urandom, so one run in 256 found an 'x'
+# already there. The copy was then byte for byte identical, verify was
+# right to succeed, and these three assertions failed together saying the
+# archive comparison was broken. It fired inside ./go check that morning
+# while the suite passed five times in a row on its own, which is how a
+# one-in-256 flake presents: as something the last change must have done.
+#
+# Incrementing the byte it finds always changes it, and the guard below
+# refuses to continue if the file did not change after all. A mutation
+# that is not checked to have mutated is a test of nothing, on the runs
+# where it quietly does nothing.
 cp "$WORK/card.img" "$WORK/other.img"
-printf 'x' | dd of="$WORK/other.img" bs=1 seek=4096 conv=notrunc status=none
+old_byte=$(dd if="$WORK/other.img" bs=1 skip=4096 count=1 status=none |
+	od -An -tu1 | tr -d ' \n')
+new_byte=$(( (old_byte + 1) % 256 ))
+printf "$(printf '\\%03o' "$new_byte")" |
+	dd of="$WORK/other.img" bs=1 seek=4096 conv=notrunc status=none
+if cmp -s "$WORK/card.img" "$WORK/other.img"; then
+	no "the altered copy really differs from the archived source" \
+		"byte 4096 was $old_byte, wrote $new_byte, files still identical"
+else
+	ok "the altered copy really differs from the archived source"
+fi
 refuses "verify refuses a source that is not the archived one" verify \
 	"$DEST2" "$WORK/other.img"
 contains "and says not to treat the archive as a copy of it" "$REFUSAL" \

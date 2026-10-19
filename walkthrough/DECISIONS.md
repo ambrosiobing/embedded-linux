@@ -4507,3 +4507,186 @@ is the part's data output. The brown lead comes off FIRST, with the
 power off, before anything else is moved. It is in `docs/DESIGN.md`, in
 the `.dts` header, in the README's deferred row and asserted by the
 test, because it is the one step in this project that can damage a part.
+
+## 131. A gate that cannot be satisfied here still refuses, and says which of the two things happened
+
+**Context.** `./go check` runs `scripts/host-check.sh`, and on win11
+aquamarine it ended:
+
+    --- compile kbd_bridge against host libevdev
+    pkg-config is not installed. Run scripts/host-setup.sh.
+    host checks FAILED. Fix these before starting a three-hour build.
+
+Both halves of that last sentence were false there. Nothing needed
+fixing, and no build has ever started on that laptop: it has no
+`pkg-config` and no compiler by a rule of this bench rather than by
+accident. Six branches across three steps set `fail=1` for an absent
+tool or an absent library.
+
+**What this is NOT.** It is not decision 128 again, and the first reading
+of it was wrong in two ways worth recording.
+
+The file's own header says "A skipped compile counts as a failure rather
+than a pass with a note", with the reason: the file exists to compile
+before three hours of build, so reporting a pass without the compile
+would be worse than useless. That is deliberate and documented, not an
+oversight.
+
+And the comment that looked like it contradicted that does not. The
+`kbd_bridge` step says a host missing the library "should still check
+everything else and say what it could not", which is about step
+independence, so that one absent library does not skip unrelated checks.
+It says nothing about the exit status. Intent and behaviour agreed all
+along.
+
+**Decision.** Keep the strictness and the non-zero exit. Count absence
+separately from defect, name the absent tools, and make the last line say
+which of the two happened.
+
+**Why not 128's pattern.** `sensorhub-cabi-test.sh` is one test among
+ninety in a suite that answers "is this tree sound", so a missing
+compiler made the whole suite red for a reason unrelated to the
+question, and the fix was to declare the dependency and let CI enforce
+it. `host-check.sh` is not a test, it is a gate on a three-hour build,
+and "not cleared" is a true and useful verdict on every host. A
+`BENCH_REQUIRE_*` here would only weaken it, and the environment that
+would set it is the build laptop, which has the tools anyway, so the
+strictness there is automatic. Nothing consumes the exit status but a
+person: CI does not run this file, which its own workflow comments say
+twice, and the only hook in the clone is `commit-msg`.
+
+**Rejected: exiting zero on a host that cannot compile.** That is the
+one thing the header forbids, and it would turn the gate into a
+formality on the machine where it matters.
+
+**Rejected: a second entry point for the subset the authoring laptop can
+run.** It would answer the complaint and split one gate into two things
+to remember, and the subset is already covered where it counts: the
+lint job runs the static checks, the shell checks and every test on
+every push.
+
+**Consequence.** On the authoring laptop the run now ends with no defect
+found, the count of checks that could not be asked, and the absent tools
+named, followed by a sentence saying this is not a go-ahead and not a
+finding against the tree. `docs/BUILD-HOST.md` records the behaviour
+beside the package table that makes it pass.
+
+The linter caught the first draft of the comment explaining all this: a
+line beginning `# shellcheck` is parsed as a directive whose first word
+must be one of six keywords, so a sentence starting with the tool's name
+is a silent no-op where it looks like a rule. That check exists because
+this repository has shipped exactly that, and it fired on prose about
+the distinction it was describing.
+
+## 132. A mutation is computed from what it replaces, and checked to have changed it
+
+**Context.** Monday 19 October 2026, while verifying decision 131's new
+verdict. `./go check` reported three failures in
+`tests/card-archive-test.sh`, all in one block, saying that `verify` had
+accepted a source which was not the archived one. The suite passed five
+times in a row when run on its own, under both `sh` and `bash`, and
+nothing changed between the run that failed and the run before it had
+touched that file.
+
+**The cause, which is arithmetic rather than timing.** The test copies
+the card image and alters the copy:
+
+    cp "$WORK/card.img" "$WORK/other.img"
+    printf 'x' | dd of="$WORK/other.img" bs=1 seek=4096 conv=notrunc
+
+`card.img` is 9001 kB of `/dev/urandom`. Byte 4096 is therefore a
+uniformly random byte, and one run in 256 already holds an `x`. On those
+runs the write changes nothing, the copy is byte for byte identical,
+`verify` is correct to succeed, and three assertions fail together
+announcing that the archive comparison is broken.
+
+**Decision.** Read the byte, write that byte plus one modulo 256, and
+assert that the files now differ before using them. A mutation is
+computed from what it replaces rather than being a fixed literal, and
+the assertion that it worked is a check of its own.
+
+**Rejected: appending a byte instead.** It always differs and it tests
+the wrong path. A longer file can be refused on its size, which would
+leave the byte-for-byte comparison this block exists for unexercised and
+passing.
+
+**Rejected: a different fixed byte, or a second offset.** Both reduce the
+probability and keep the shape. One run in 256 is bad enough precisely
+because it is rare: it presents as a regression caused by whatever
+changed most recently, and the five clean standalone runs that follow
+make it look like the harness rather than the test.
+
+**Consequence.** 76 assertions where there were 75, the extra one being
+the guard. Three values were checked directly: 120, which is `x` and the
+exact case that fired; 255, which wraps to 0 and writes a NUL byte; and
+0. All three differ afterwards with the file length unchanged, so this
+stays an in-place byte change and not a truncation.
+
+**What this cost, and the lesson that is not about bytes.** Three
+failures appeared in a gate immediately after a change to three other
+test files, and the obvious reading was that the change had broken
+something. Two things kept that from being written down as the cause:
+the failing assertions named a file none of the edits touched, and the
+suite passed on its own. A rare flake and a new regression look identical
+in a single run, and the way to tell them apart is to read what the
+assertion actually does rather than to re-run it until it agrees.
+
+## 133. One shared resolver for the interpreter, because presence is not the capability and fourteen suites proved it
+
+**Context.** Monday 19 October 2026. Verifying decision 131 meant finding
+out why `./go check` still reported a broken tree after the verdict was
+fixed, and the answer was measured rather than guessed: fourteen of the
+seventeen suites in `tests/` that need Python exited with status **49** on
+win11 aquamarine, printing nothing and asserting nothing. 49 is the
+Microsoft Store `python3` stub's own exit status. `host-check.sh` counts a
+non-zero exit from any suite as a defect in the tree, so those fourteen
+silent 49s were most of what made that gate say the tree was broken on a
+laptop where nothing was.
+
+**The one defect, repeated.** Presence is not the capability. The stub is
+found by `command -v`, and it exits 0 for `--version` while running
+nothing at all, so a presence check and a version check both report a
+working interpreter that is not one. Executing something is the only
+probe that distinguishes it. Two suites had the presence form of the
+guard and passed it. The other twelve had no guard, so `set -eu` carried
+the 49 outward with no output.
+
+**Decision.** One file, `tests/lib/python.sh`, sourced by all seventeen.
+`bench_python` resolves an interpreter that runs or skips saying what went
+unchecked. `bench_python_module` asks about a module and takes the
+caller's own `BENCH_REQUIRE_<MODULE>` value as an argument, so the
+variable's name is visible at the call site rather than assembled by
+`eval`.
+
+**Rejected: the same block copied into fourteen files.** The suites are
+standalone by house style and mostly stay so, but fourteen copies of one
+twenty-line argument is the drift this repository has already paid for in
+two volumes, and the argument is the part that matters: anyone editing one
+copy would not know the other thirteen existed.
+
+**Why tests/lib/ and not tests/.** `./go check` and CI run every
+`tests/*.sh`. A sourced fragment caught by that glob would be executed as
+a suite that asserts nothing and always passes, and this repository has
+shipped exactly that shape before. The subdirectory keeps it out of the
+glob while `find . -name "*.sh"` still reaches it, so shellcheck sees it.
+`tests/common-test.sh` already sources `scripts/common.sh`, so sourcing
+inside `tests/` is not new.
+
+**An explicit PYTHON is reported, never replaced.** The first draft
+searched for a working interpreter even when `PYTHON` had been named, so
+a broken explicit choice was silently swapped for a different one.
+Substituting an interpreter nobody asked for is how a suite comes to pass
+on a toolchain nobody meant to measure. It now searches only when
+`PYTHON` is unset.
+
+**Consequence, and the number that is the point.** The twelve unguarded
+suites now report 37, 14, 15, 25, 28, 29, 29, 27, 53, 29, 30 and 28
+assertions on this laptop. Every one of those had never run here. They
+were not failing checks, they were absent checks that read as failing
+ones, which is the more expensive of the two because the output looks
+like work being done.
+
+`./go check` on the authoring laptop went from 42 reported defects to
+none, and its verdict is now the absence branch of decision 131: no
+defect found, the count of checks that could not be asked, and the tools
+named.

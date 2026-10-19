@@ -27,18 +27,14 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/meta-bench/recipes-bench/libadxl345/files/adxl345-linux
-PYTHON=${PYTHON:-python3}
 
 [ -f "$SRC/python/adxl-motion" ] || {
 	echo "FAILED   missing: $SRC/python/adxl-motion"
 	exit 1
 }
 
-if ! command -v "$PYTHON" >/dev/null 2>&1; then
-	echo "skipped  no $PYTHON on this host, so the detector was not run."
-	echo "         CI has python3 and does run it."
-	exit 0
-fi
+. "$ROOT/tests/lib/python.sh"
+bench_python "the detector was NOT run and"
 
 # The program imports adxl345, which loads libadxl345.so.1 through ctypes
 # and is not present on a build host. The Detector class needs none of

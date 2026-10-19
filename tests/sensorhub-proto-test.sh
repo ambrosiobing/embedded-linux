@@ -27,12 +27,9 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-PYTHON=${PYTHON:-python3}
 
-if ! "$PYTHON" -c "import struct" 2>/dev/null; then
-	echo "FAILED   no usable python3 interpreter"
-	exit 1
-fi
+. "$ROOT/tests/lib/python.sh"
+bench_python "the wire format was NOT checked and"
 
 cd "$ROOT/tests" || exit 1
 exec "$PYTHON" - <<'PYTEST'

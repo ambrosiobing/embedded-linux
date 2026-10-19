@@ -25,7 +25,6 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUT=$ROOT/meta-bench/recipes-bench/bench-rt/files/rt-analyze
-PYTHON=${PYTHON:-python3}
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -80,12 +79,9 @@ field() {
 	printf '%s\n' "$1" | tr ' ' '\n' | sed -n "s/^$2=//p" | head -1
 }
 
-if ! "$PYTHON" -c "import numpy" 2>/dev/null; then
-	echo "FAILED   numpy is not installed, and this test is arithmetic."
-	echo "         Run scripts/host-setup.sh, or:"
-	echo "         sudo apt-get install -y python3-numpy"
-	exit 1
-fi
+. "$ROOT/tests/lib/python.sh"
+bench_python "the arithmetic was NOT checked and"
+bench_python_module numpy "the arithmetic was NOT checked and" "${BENCH_REQUIRE_NUMPY:-0}"
 
 # ------------------------------------------------------------ generator
 #

@@ -26,7 +26,6 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/meta-bench/recipes-bench/libadxl345/files/adxl345-linux
-PYTHON=${PYTHON:-python3}
 
 [ -f "$SRC/src/adxl.c" ] || {
 	echo "FAILED   missing: $SRC/src/adxl.c"
@@ -37,11 +36,8 @@ PYTHON=${PYTHON:-python3}
 	exit 1
 }
 
-if ! command -v "$PYTHON" >/dev/null 2>&1; then
-	echo "skipped  no $PYTHON on this host, so the register map was not"
-	echo "         compared. CI has python3 and does compare it."
-	exit 0
-fi
+. "$ROOT/tests/lib/python.sh"
+bench_python "the register map was NOT compared and"
 
 "$PYTHON" - "$SRC/src/adxl.c" "$ROOT/tests" <<'ENDPY'
 import re

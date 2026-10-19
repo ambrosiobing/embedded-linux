@@ -23,7 +23,8 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
+bench_python "the header layout was NOT checked and"
 
 "$PYTHON" -u - "$ROOT" <<'PYTHON'
 import os

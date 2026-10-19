@@ -31,7 +31,8 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
+bench_python "the policy was NOT checked and"
 
 BENCH_ROOT=$ROOT
 export BENCH_ROOT

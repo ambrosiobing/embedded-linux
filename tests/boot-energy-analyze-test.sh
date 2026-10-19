@@ -25,7 +25,8 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUT=$ROOT/projects/03-boot-energy/measure/analyze.py
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
+bench_python "the energy analysis was NOT checked and"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

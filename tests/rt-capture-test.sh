@@ -29,7 +29,6 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUT=$ROOT/meta-bench/recipes-bench/bench-rt/files/rt-capture
-PYTHON=${PYTHON:-python3}
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -61,11 +60,9 @@ contains() {
 	esac
 }
 
-if ! "$PYTHON" -c "import numpy" 2>/dev/null; then
-	echo "FAILED   numpy is not installed, and rt-capture imports it."
-	echo "         sudo apt-get install -y python3-numpy"
-	exit 1
-fi
+. "$ROOT/tests/lib/python.sh"
+bench_python "the driver was NOT exercised and"
+bench_python_module numpy "the driver was NOT exercised and" "${BENCH_REQUIRE_NUMPY:-0}"
 
 # ------------------------------------------------------------- the driver
 #

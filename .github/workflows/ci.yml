@@ -344,6 +344,12 @@ jobs:
         # this is the environment that makes it.
         env:
           BENCH_REQUIRE_CC: "1"
+          # Same promise for numpy. rt-analyze-test.sh and
+          # rt-capture-test.sh skip where the resolved interpreter has no
+          # numpy, which is right on a host that never had it, and wrong
+          # here: host-setup installs python3-numpy and this job runs it,
+          # so an absence is a defect rather than a gap.
+          BENCH_REQUIRE_NUMPY: "1"
         run: |
           for t in tests/*.sh; do
             echo "== $t"

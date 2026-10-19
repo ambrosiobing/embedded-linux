@@ -125,6 +125,16 @@ compiles the application with `-Werror` against the host's libgpiod v2, the
 same API the target uses. A mistake in the GPIO calls surfaces there in
 seconds instead of two hours into a BitBake run.
 
+**On a host without the compile tools it exits non-zero, and says that is
+what happened.** The compiles are the point of the file, so a run that
+skipped them is not a pass and the status reflects it. Since Monday 19
+October 2026 the last line distinguishes the two cases: a defect in the
+tree, or checks this host could not ask, with the absent tools named. The
+authoring laptop has no `pkg-config` and no compiler by a rule of this
+bench, so that is the answer it gives there, and it is not a finding
+against the tree. This document's package table is the list that makes it
+pass.
+
 ## Caches
 
 `DL_DIR` and `SSTATE_DIR` live beside the build tree rather than inside it,
