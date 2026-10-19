@@ -14,9 +14,13 @@
 # and called with the same inputs as the reference. Nothing is transcribed,
 # nothing is approximated, and the assertions are on exact bytes.
 #
-# This test needs a C compiler. It fails rather than skips without one,
-# for the reason scripts/host-check.sh gives at length: a check that
-# reports success when it did not run is worse than no check.
+# This test needs a C compiler, and a Python to drive ctypes. Without
+# either it SKIPS, saying what was not compared and that the skip is a gap
+# rather than a pass; with BENCH_REQUIRE_CC=1 the missing compiler is a
+# failure instead, which is what the environment that promised one sets.
+# Decision 128 has the argument, and the sentence it replaced said this
+# test fails rather than skips, which stopped being true on Monday 19
+# October 2026.
 #
 #   sh tests/sensorhub-cabi-test.sh
 #
@@ -26,7 +30,7 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$ROOT/meta-bench/recipes-bench/bench-sensorhub/files
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
 CC=${CC:-cc}
 
 WORK=$(mktemp -d)
@@ -71,6 +75,11 @@ fi
 "$CC" -shared -fPIC -O2 -Wall -Wextra -Werror \
 	"$SRC/proto.c" -o "$WORK/libproto.so"
 echo "ok       proto.c compiles clean with -Werror as a shared object"
+
+# Asked after the compiler, because that is this test's headline
+# dependency: on a host with neither, "no C compiler" is the more useful
+# of the two gaps to report.
+bench_python "the C was NOT compared against the specification and"
 
 cd "$ROOT/tests" || exit 1
 LIBPROTO=$WORK/libproto.so

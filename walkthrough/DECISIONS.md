@@ -4710,3 +4710,35 @@ like work being done.
 none, and its verdict is now the absence branch of decision 131: no
 defect found, the count of checks that could not be asked, and the tools
 named.
+
+### Finished on Tuesday 20 October 2026: the last four
+
+Seventeen suites took the helper on Monday and four did not, because each
+of those four had a probe of its own written earlier the same day: the two
+LTE suites ask whether Python can exec a shell stub, `rt-plot` whether it
+can open a file under `$WORK`, and `sensorhub-cabi` whether there is a C
+compiler. Leaving them was two idioms for one question, which is the drift
+this entry is about, so they now call `bench_python` for the interpreter
+and keep their own probe on top of it. No suite carries
+`PYTHON=${PYTHON:-python3}` any more.
+
+**It was not only tidying.** `sensorhub-cabi-test.sh` drives ctypes through
+`exec "$PYTHON"`, so on a host with a compiler and no working `python3` it
+would have exited 49 exactly like the fourteen. That was invisible here
+only because its compiler check skips first. The resolver is called after
+that check rather than before it: on a host lacking both, "no C compiler"
+is the more useful of the two gaps to report.
+
+**And a claim of mine had already gone stale.** That file's header still
+read "This test needs a C compiler. It fails rather than skips without
+one", which stopped being true on Monday 19 October 2026 when decision 128
+changed it. One day old, written while fixing something else, and exactly
+the fault this repository collects: a sentence that was true when it was
+written and was left standing after the thing it described changed.
+
+**One message got shorter, which is the test of the change.** `rt-plot`
+printed `TMPDIR=$TEMP PYTHON=python sh ...` as its remedy, the `PYTHON`
+half being needed only because the default was the stub. With the search
+in the helper the remedy is one variable again, and running exactly what
+it prints gives 24 passed, 0 failed. A remedy that shrinks when the cause
+is removed is the sign the cause really was removed.

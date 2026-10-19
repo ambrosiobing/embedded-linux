@@ -18,7 +18,8 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUT=$ROOT/scripts/rt-plot.py
-PYTHON=${PYTHON:-python3}
+. "$ROOT/tests/lib/python.sh"
+bench_python "the figure generator was NOT exercised and"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -43,10 +44,11 @@ then
 	echo "      generator was NOT exercised. The cause is the spelling of the"
 	echo "      directory and not the interpreter, so this host can run the"
 	echo "      suite by giving mktemp a base the interpreter can open:"
-	echo "        TMPDIR=\$TEMP PYTHON=python sh $0"
-	echo "      which was 24 passed, 0 failed here on Sunday 18 October 2026."
-	echo "      The PYTHON half is needed only where python3 is the Microsoft"
-	echo "      Store stub, which is the case on the authoring laptop."
+	echo "        TMPDIR=\$TEMP sh $0"
+	echo "      which was 24 passed, 0 failed here on Tuesday 20 October"
+	echo "      2026. That command named PYTHON=python as well until the"
+	echo "      interpreter search moved into tests/lib/python.sh, which"
+	echo "      now resolves it, so the remedy is one variable again."
 	exit 0
 fi
 rm -f "$WORK/probe"
