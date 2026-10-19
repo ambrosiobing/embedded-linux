@@ -1754,3 +1754,76 @@ checks is a restatement, and 9.79 against 9.81 reads like a part's
 tolerance rather than like arithmetic. The assertion now starts from
 1/256 and asserts 9.81, and both directions were watched: with the
 constant corrected and the test not, those two assertions failed.
+
+## 37. Two of the deferred rows answered, one of them by deciding not to write code
+
+Monday 19 October 2026, continued.
+
+**The probe retry is not being added, and the breadboard is being
+replaced instead.** Three first-transaction failures at two bus speeds,
+one of them on a cold boot with nothing else on the bus, is the
+signature of a contact rather than of a protocol. What makes that worth
+saying out loud is how the first two were explained: bus speed on
+Friday 9 October 2026, a bus left mid-transfer on Saturday 17 October
+2026. Each was plausible and each was specific to its occasion, which is
+exactly how a physical intermittent looks from the software side. Every
+occurrence gets a local cause and the common one never gets named.
+
+A bounded retry would have turned all three into a log line. That is the
+objection to it, not the argument for it: a retry over a bad contact
+succeeds in a way indistinguishable from the fault being gone, and the
+next intermittent on that breadboard arrives into a system that silently
+absorbs first-transaction failures. Isolate the physical variable, then
+decide what software owes the remainder.
+
+It is falsifiable, which is the part that matters. If a cold boot still
+fails its first transaction with soldered wiring, contact resistance was
+the wrong cause and the retry becomes an answer rather than a guess. The
+measurement is a count of cold boots either side, and the three dated
+occurrences are already in the record to count against.
+
+One consequence to state before it is a surprise: all nine measured
+criteria were taken on the breadboard, so rewiring changes the
+instrument. The scale and rate figures should not move. If they do, that
+is a finding about what the breadboard was contributing.
+
+**The SPI arm now exists as far as it can without the bench.**
+`bench-adxl345-spi-overlay.dts` targets `spi0` chip select 0, the recipe
+generates its mainline control by the same substitution the I2C pair
+uses, and the card carries four `.dtbo` with `config.txt` naming one.
+
+Three properties in it are not this project's to invent, and the test
+holds them to their source rather than to a datasheet quoted from
+memory. `bench-adxl345-spi.c` says the part is CPOL=1 CPHA=1 and that
+the device tree states it rather than the driver assuming it, and that
+the 5 MHz ceiling belongs in the device tree because it is as much a
+property of this wiring as of the chip. So the assertions compare the
+overlay against that file, and a driver rewritten to assume them fails
+instead of drifting.
+
+The firmware's `spidev` on that chip select is disabled rather than
+competed with. Two drivers on one chip select is a defect this bench has
+already met on eplepi, where `config.txt` had handed both SPI0 chip
+selects to CAN overlays and the second claimant simply did not appear.
+
+**What is not claimed, in the file's own words.** Nothing has driven this
+breakout over SPI. The `.dts` says `NOT YET RUN ON HARDWARE` at the top
+and the test asserts that it does. And the verification here is weaker
+than usual: there is no `dtc` on the authoring laptop and the lint job
+does not run BitBake, so the first real compile of that file is a build
+on the build laptop. What ran here was structural, braces and angle
+brackets balanced, fragments numbered without gaps, every `__overlay__`
+carrying a target. That is not a compile and is not presented as one.
+
+The procedure is in `docs/DESIGN.md` with the lead-by-lead table, and
+step zero is the brown lead coming off `SDO` with the power off, because
+in SPI mode that pin is the part's output and the lead holds it at GND.
+That hazard is now in four places: the design document, the overlay's
+header, the README's deferred row, and an assertion.
+
+**And one inconsistency found while writing it.** The design document's
+wiring table puts the `SDO` ground lead on header pin 14; the I2C
+overlay's own comment says header pin 6. Both are GND, so nothing has
+ever misbehaved, but the two documents describe different lead
+positions and one of them is wrong about the board. Noted in DESIGN.md
+for whoever next has the board open, rather than guessed at from here.

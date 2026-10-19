@@ -9,7 +9,8 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_URI = "file://bench-adxl345-overlay.dts"
+SRC_URI = "file://bench-adxl345-overlay.dts \
+           file://bench-adxl345-spi-overlay.dts"
 
 S = "${WORKDIR}"
 
@@ -68,6 +69,43 @@ the substitution did not apply"
     dtc -@ -I dts -O dtb \
         -o ${B}/bench-adxl345-adi.dtbo \
         ${B}/bench-adxl345-adi-overlay.dts
+
+    # THE SPI ARM, THE SAME FOUR WAYS.
+    #
+    # The seam claim in docs/DESIGN.md is that moving buses costs one
+    # overlay and nothing in the driver. Shipping the SPI pair makes that
+    # a config.txt line and a reboot once the straps have moved, which is
+    # the same cost the I2C A/B pair already has.
+    #
+    # Nothing has driven this breakout over SPI as of Monday 19 October
+    # 2026. Compiling here proves the overlay is well formed and says
+    # nothing about a part answering, which is why criterion 10 stays
+    # deferred and the .dts says so at the top.
+    dtc -@ -I dts -O dtb \
+        -o ${B}/bench-adxl345-spi.dtbo \
+        ${S}/bench-adxl345-spi-overlay.dts
+
+    sed 's/compatible = "bench,adxl345";/compatible = "adi,adxl345";/' \
+        ${S}/bench-adxl345-spi-overlay.dts \
+        > ${B}/bench-adxl345-spi-adi-overlay.dts
+
+    # The same guard as the I2C control, and for the same reason: a
+    # substitution that did not apply leaves a control identical to its
+    # subject, and every comparison then agrees perfectly for the wrong
+    # reason. Both directions, because either failure produces that.
+    if ! grep -q 'compatible = "adi,adxl345";' \
+            ${B}/bench-adxl345-spi-adi-overlay.dts; then
+        bbfatal "the SPI control overlay has no adi,adxl345 compatible: \
+the substitution did not apply"
+    fi
+    if grep -q 'compatible = "bench,adxl345";' \
+            ${B}/bench-adxl345-spi-adi-overlay.dts; then
+        bbfatal "the SPI control overlay still claims bench,adxl345"
+    fi
+
+    dtc -@ -I dts -O dtb \
+        -o ${B}/bench-adxl345-spi-adi.dtbo \
+        ${B}/bench-adxl345-spi-adi-overlay.dts
 }
 
 # The firmware loads overlays from an "overlays" directory on the boot
@@ -79,6 +117,8 @@ do_deploy() {
     install -d ${DEPLOYDIR}/overlays
     install -m 0644 ${B}/bench-adxl345.dtbo ${DEPLOYDIR}/overlays/
     install -m 0644 ${B}/bench-adxl345-adi.dtbo ${DEPLOYDIR}/overlays/
+    install -m 0644 ${B}/bench-adxl345-spi.dtbo ${DEPLOYDIR}/overlays/
+    install -m 0644 ${B}/bench-adxl345-spi-adi.dtbo ${DEPLOYDIR}/overlays/
 }
 
 addtask deploy after do_compile before do_build

@@ -91,6 +91,15 @@ IMAGE_INSTALL:append = " \
 # docs/DESIGN.md has claimed the A/B pair would cost since before either
 # driver existed. Added Saturday 17 October 2026, after a sysfs bind of
 # mainline's driver was tried instead and could not work: journal 29.
+#
+# The SPI pair joins them on Monday 19 October 2026. Four overlays and
+# config.txt names one, so the card can be moved between buses and
+# between drivers without a rebuild. The SPI arm needs the straps moved
+# before it can be selected, and its .dts says so at the top; carrying
+# the files costs a few hundred bytes and means the bench session that
+# moves the straps does not also need a build.
 IMAGE_BOOT_FILES:append = " overlays/bench-adxl345.dtbo;overlays/bench-adxl345.dtbo \
-    overlays/bench-adxl345-adi.dtbo;overlays/bench-adxl345-adi.dtbo"
+    overlays/bench-adxl345-adi.dtbo;overlays/bench-adxl345-adi.dtbo \
+    overlays/bench-adxl345-spi.dtbo;overlays/bench-adxl345-spi.dtbo \
+    overlays/bench-adxl345-spi-adi.dtbo;overlays/bench-adxl345-spi-adi.dtbo"
 do_image[depends] += "bench-adxl345-dt:do_deploy"

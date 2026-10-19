@@ -1,0 +1,143 @@
+/*
+ * bench-adxl345-spi: the same ADXL345 on SPI0 chip select 0, bound to
+ * Project 5's own driver.
+ *
+ * THE POINT OF THIS FILE IS THAT THE DRIVER DOES NOT CHANGE.
+ *
+ * docs/DESIGN.md's seam claim is that a core speaking only
+ * struct regmap * with a bus file either side costs one overlay to move
+ * between buses. The I2C half has had hardware behind it since Friday
+ * 9 October 2026 and the SPI half has been a compile-time claim since
+ * the day it was written. This overlay is what turns the second half
+ * into a measurement, and nothing in bench-adxl345-core.c is touched to
+ * do it.
+ *
+ * EVERY SPI PROPERTY HERE IS STATED BY THE DRIVER, NOT BY THIS FILE.
+ *
+ * bench-adxl345-spi.c says so in its own comment: the part is CPOL=1
+ * CPHA=1, "which the device tree states with spi-cpol and spi-cpha
+ * rather than the driver assuming it", and the 5 MHz ceiling "is a
+ * property of the board's wiring quality as much as of the chip" and so
+ * is stated as spi-max-frequency. That file is the citation for all
+ * three values below. The read and multi-byte bits are the driver's
+ * read_flag_mask and need nothing here.
+ *
+ * NOT YET RUN ON HARDWARE. As of Monday 19 October 2026 nothing has ever
+ * driven this breakout over SPI. This file is declarative and compiles,
+ * which is not the same as a part answering. Criterion 10 stays deferred
+ * until the straps have moved and a DEVID read has come back 0xe5 over
+ * this bus, and the README says so.
+ *
+ * THE WIRING THIS EXPECTS, AND THE ORDER THAT MATTERS.
+ *
+ * docs/DESIGN.md has the fitted I2C wiring and the hazard. In I2C mode
+ * SDO is the address strap and the brown lead holds it at GND; in SPI
+ * mode SDO is the part's data OUTPUT. Connecting an output to ground is
+ * the one step here that can damage something, so the brown lead comes
+ * off FIRST, with the power off, before anything else is moved. That
+ * ordering is in DESIGN.md and is repeated here because this is the file
+ * somebody reads when they are about to do it.
+ *
+ * The destination pins are the Raspberry Pi's standard SPI0 assignment
+ * on the 40-pin header, which is a property of the host and not of this
+ * breakout: SCLK on GPIO11, physical pin 23; MOSI on GPIO10, physical
+ * pin 19; MISO on GPIO9, physical pin 21; CE0 on GPIO8, physical pin 24.
+ * Read the board against DESIGN.md's table before power, every time.
+ *
+ * SPIDEV ON THIS CHIP SELECT IS DISABLED, DELIBERATELY.
+ *
+ * The Pi firmware's own device tree declares a spidev child on each of
+ * SPI0's two chip selects. Two drivers on one chip select is the defect
+ * this bench has already met, on eplepi, where config.txt had given both
+ * SPI0 chip selects away to CAN overlays and the second claimant simply
+ * did not appear. Leaving spidev0 enabled here would be the same fault:
+ * the part would be on the bus, the overlay would load, and which driver
+ * owned chip select 0 would depend on order. Fragment 0 below removes
+ * the ambiguity rather than relying on winning it.
+ *
+ * THE COMPATIBLE STRING IS THE A/B SWITCH, same as the I2C overlay.
+ *
+ * "bench,adxl345" is claimed by this project's driver and nothing else.
+ * The recipe generates the mainline control from this very file by
+ * substituting the compatible property, so the two overlays cannot drift
+ * apart. See bench-adxl345-dt_0.1.bb and decision 123.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/*
+	 * "brcm,bcm2835" is the compatible every Raspberry Pi overlay
+	 * uses, including on the BCM2837 of a 3B+. It matches the SoC
+	 * family rather than the part, and the firmware accepts it.
+	 */
+	compatible = "brcm,bcm2835";
+
+	/*
+	 * First, so that the chip select is free before anything is put on
+	 * it. Fragment order is not a guarantee of application order, but
+	 * stating the removal before the addition is how this reads to a
+	 * person, and a person is who has to understand it at the bench.
+	 */
+	fragment@0 {
+		target = <&spidev0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@1 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			accel: adxl345@0 {
+				compatible = "bench,adxl345";
+
+				/*
+				 * Chip select 0, which is CE0 on GPIO8,
+				 * physical pin 24.
+				 */
+				reg = <0>;
+
+				/*
+				 * The part's maximum in 4-wire mode. Stated
+				 * here rather than in the driver because it
+				 * is as much a property of this wiring as of
+				 * the chip, and this wiring is jumper leads
+				 * on a breadboard. If the first capture over
+				 * this bus is dirty, this number is the first
+				 * thing to halve.
+				 */
+				spi-max-frequency = <5000000>;
+
+				/*
+				 * SPI mode 3. Both are required by the part
+				 * and neither is the SPI core's default, so
+				 * omitting them gives a bus that clocks and a
+				 * DEVID read that returns rubbish rather than
+				 * an error.
+				 */
+				spi-cpol;
+				spi-cpha;
+
+				/*
+				 * The same INT1 lead on the same pin as the
+				 * I2C overlay, GPIO23 on header pin 16, and
+				 * level high for the reason the I2C overlay
+				 * gives: the line stays asserted while the
+				 * FIFO is above its watermark, so an edge
+				 * request counts bounces on a long jumper.
+				 * This lead does not move when the bus does.
+				 */
+				interrupt-parent = <&gpio>;
+				interrupts = <23 4>;	/* GPIO23, header pin 16, LEVEL HIGH */
+			};
+		};
+	};
+};

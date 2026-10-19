@@ -469,6 +469,55 @@ dangerous path disabled behind a flag until the offsets are confirmed.
 
 This section is filled in when the board has been read, and not before.
 
+### Moving this wiring to SPI, in the order that matters
+
+Written Monday 19 October 2026, when the overlay was added. **Not yet
+performed.** Nothing has driven this breakout over SPI, so every line
+below is a plan read off the wiring table above and the Raspberry Pi's
+standard SPI0 assignment, not a record of a working configuration.
+
+**Step zero is the only one that can damage a part.** In I2C mode `SDO`
+is the address strap and the brown lead holds it at GND. In SPI mode
+`SDO` is the part's data **output**. So with the power off, the brown
+lead comes off first, before anything else is touched. An output driving
+into ground is the whole hazard and it is one lead.
+
+The destination pins belong to the host header rather than to this
+breakout, which is why they are not in the observed table above:
+
+| lead | from | to | why |
+|---|---|---|---|
+| brown | `SDO` to GND, header pin 14 | `SDO` to GPIO9, MISO, header pin 21 | the part's data output, which must stop being grounded before it is driven |
+| orange | `CS` to 3V3, header pin 17 | `CS` to GPIO8, CE0, header pin 24 | held high it selects I2C; driven by the host it is the chip select |
+| blue | `SDA` to GPIO2, header pin 3 | `SDA` to GPIO10, MOSI, header pin 19 | the same pin on the part is the data input in SPI mode |
+| yellow | `SCL` to GPIO3, header pin 5 | `SCL` to GPIO11, SCLK, header pin 23 | the clock moves to the SPI controller's |
+| red, black, purple | unchanged | unchanged | 3V3 on pin 1, GND on pin 9, `INT1` on GPIO23 pin 16. The interrupt does not move when the bus does, and the overlay asks for the same cell |
+
+Read the board against this table before power, every time, and say out
+loud which pin is 3V3 and which is GND before the first lead goes on.
+The supply warning at the top of the README applies unchanged.
+
+Then, with the card already carrying four overlays:
+
+1. `dtoverlay=bench-adxl345-spi` in `config.txt`, in place of the I2C
+   line rather than beside it. `config.txt` names one.
+2. Boot, and read `DEVID`. `0xe5` over the new bus is the first thing
+   that has ever been true of this breakout on SPI, and it is the whole
+   of criterion 10.
+3. If it is dirty rather than absent, halve `spi-max-frequency` in the
+   overlay before suspecting anything else. 5 MHz is the part's ceiling
+   in 4-wire mode and this wiring is jumper leads.
+4. Then the same captures the I2C arm has, so the two are comparable:
+   the three paths, and the A/B against mainline through
+   `bench-adxl345-spi-adi`.
+
+**One inconsistency in the record to settle while the board is in hand.**
+The wiring table above puts the `SDO` ground lead on header pin 14, and
+`bench-adxl345-overlay.dts` says header pin 6. Both pins are GND, so
+nothing has ever misbehaved because of it, but one of the two documents
+is describing a different lead position than the board has. Whoever next
+has the board open should read which it is and correct the other.
+
 ## Data flow
 
 ```

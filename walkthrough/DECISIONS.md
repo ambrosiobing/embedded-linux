@@ -4404,3 +4404,106 @@ the test reads and the workflow makes.
 the skip exits 0 on the authoring laptop and the enforced branch exits 1
 there under `BENCH_REQUIRE_CC=1`. On this laptop `./go check` now ends
 without a red line that means nothing but the machine it ran on.
+
+## 129. The wiring is replaced rather than retried, because a retry would hide the next fault
+
+**Context.** The ADXL345 has failed the first transaction after power-up
+three times: Friday 9 October 2026 at 400 kHz, attributed to bus speed
+and apparently fixed by dropping to 100 kHz; Saturday 17 October 2026
+after an unbind, attributed to a bus left mid-transfer and cleared by an
+`i2cdetect` sweep; and later that same day on a cold boot at 100 kHz
+with nothing else on the bus and no forced reads, failing on the very
+first transaction to the part. Each time the bus was fine seconds later.
+The probe reads `DEVID` once, so one failed read means the device never
+exists, and the only symptom is an empty `/sys/bus/iio/devices`.
+
+**Decision.** Replace the breadboard with soldered connections. Do not
+add the retry.
+
+**Why that way round.** Three occurrences at two different bus speeds,
+one of them on a cold boot with nothing else on the bus, all on the
+first transaction after power-up, is the signature of a contact rather
+than of a protocol. The first two explanations were each plausible and
+each specific to its occasion, which is what a physical intermittent
+looks like from the software side: every occurrence gets a different
+local cause and the common one is never named.
+
+**Rejected: adding the bounded retry now.** Two or three attempts a
+millisecond apart would turn all three occurrences into a line in the
+log, which is the problem. A retry over a bad contact is a mitigation
+whose success is indistinguishable from the fault being gone, and the
+next intermittent on that breadboard, whatever it is, arrives into a
+system that now silently absorbs first-transaction failures. Isolate the
+physical variable first, then decide what software should do about
+whatever is left.
+
+**Rejected: both at once.** A retry added in the same session as the
+rewiring makes the result unreadable. If the failures stop, nothing says
+which change stopped them, and the retry stays in the tree forever as
+insurance nobody can evaluate.
+
+**What makes this falsifiable.** If a first-transaction failure survives
+soldered wiring, contact resistance was the wrong cause, and the retry
+becomes the answer rather than a guess about one. The measurement is a
+count of cold boots before and after, which is why the three dated
+occurrences are in journal 34 and the README's deferred table rather
+than in a sentence saying it happens sometimes.
+
+**Consequence.** Project 5's nine measured criteria were all taken on the
+breadboard. Rewiring is a change to the instrument, so any capture
+repeated afterwards is a different setup and says so; the scale and rate
+figures should not move, and if they do, that is itself a finding about
+what the breadboard was contributing.
+
+## 130. The SPI arm ships as an overlay before the straps move, so the bench session is not also a build
+
+**Context.** `docs/DESIGN.md` claims a seam: a core speaking only
+`struct regmap *` with a bus file either side, so moving between buses
+costs one overlay and nothing in the driver. The I2C half has had
+hardware behind it since Friday 9 October 2026. The SPI half has been a
+compile-time claim since it was written, and criterion 10 is deferred on
+it. Closing it needs three straps moved, which is bench work, and an
+overlay, which is not.
+
+**Decision.** Ship the overlay first. `bench-adxl345-spi-overlay.dts`
+targets `spi0` chip select 0, and the recipe generates its mainline
+control by the same substitution the I2C pair uses, so the card now
+carries four `.dtbo` and `config.txt` names one.
+
+**Rejected: writing the overlay in the session that moves the straps.**
+That session would be a wiring change, a build, a flash and a first
+measurement over an untried bus, with any failure having four candidate
+causes. The overlay is the part that can be written, reviewed and
+asserted with no hardware, so it is done first and the bench session
+becomes an edit to `config.txt` and a reboot.
+
+**Three things the overlay states that are not this file's to invent.**
+`spi-cpol`, `spi-cpha` and `spi-max-frequency` all come from
+`bench-adxl345-spi.c`, which says in its own comment that the part is
+CPOL=1 CPHA=1 and that the device tree states it rather than the driver
+assuming it, and that the 5 MHz ceiling belongs in the device tree
+because it is as much a property of this wiring as of the chip. The test
+asserts the overlay against that file, so a driver changed to assume
+them instead fails rather than drifts.
+
+**The firmware's spidev on that chip select is disabled, deliberately.**
+Two drivers on one chip select is a defect this bench has already met,
+on eplepi, where `config.txt` had given both SPI0 chip selects to CAN
+overlays and the second claimant did not appear. The overlay removes the
+`spidev0` node rather than relying on winning against it.
+
+**What is NOT claimed.** Nothing has driven this breakout over SPI. The
+overlay compiles into a well-formed `.dtbo`, which says nothing about a
+part answering, and the `.dts` says so at the top in those words. One
+thing is weaker than usual: there is no `dtc` on the authoring laptop
+and the lint job does not run BitBake, so the first real compile of this
+file is a build on the build laptop. What ran here is a structural check,
+braces and angle brackets balanced, fragments numbered without gaps,
+every `__overlay__` carrying a target, and that is not a substitute.
+
+**And the hazard, repeated where it will be read.** In I2C mode `SDO` is
+the address strap and the brown lead holds it at GND. In SPI mode `SDO`
+is the part's data output. The brown lead comes off FIRST, with the
+power off, before anything else is moved. It is in `docs/DESIGN.md`, in
+the `.dts` header, in the README's deferred row and asserted by the
+test, because it is the one step in this project that can damage a part.

@@ -28,6 +28,7 @@ set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DTS=$ROOT/meta-bench/recipes-bench/bench-adxl345-dt/files/bench-adxl345-overlay.dts
+SPIDTS=$ROOT/meta-bench/recipes-bench/bench-adxl345-dt/files/bench-adxl345-spi-overlay.dts
 RECIPE=$ROOT/meta-bench/recipes-bench/bench-adxl345-dt/bench-adxl345-dt_0.1.bb
 I2C=$ROOT/meta-bench/recipes-bench/bench-adxl345/files/bench-adxl345-i2c.c
 IMG=$ROOT/meta-bench/recipes-core/images/bench-adxl345-image.bb
@@ -69,7 +70,7 @@ hasnt() {
 	fi
 }
 
-for f in "$DTS" "$RECIPE" "$I2C" "$IMG" "$KAS" "$DESIGN"; do
+for f in "$DTS" "$SPIDTS" "$RECIPE" "$I2C" "$IMG" "$KAS" "$DESIGN"; do
 	[ -r "$f" ] || {
 		echo "FAILED   missing input: $f"
 		exit 1
@@ -95,6 +96,7 @@ code_of() {
 }
 
 DTS_CODE=$(code_of "$DTS" c)
+SPIDTS_CODE=$(code_of "$SPIDTS" c)
 I2C_CODE=$(code_of "$I2C" c)
 
 echo "--- the compatible string, which is the A/B switch"
@@ -209,6 +211,83 @@ has "the image carries both overlays" "$IMG" 'overlays/bench-adxl345-adi.dtbo'
 # is the whole experiment.
 hasnt "and config.txt still asks for ours, not the control" \
 	"$KAS" 'dtoverlay=bench-adxl345-adi'
+
+# ------------------------------------------------- the SPI arm, on paper
+#
+# Added Monday 19 October 2026, and NOTHING HERE IS A HARDWARE CLAIM.
+# No part has ever answered over SPI on this bench. What these assertions
+# hold together is the same set of agreements the I2C arm needs, so that
+# the bench session which moves the straps does not also discover that a
+# file disagrees with another file.
+#
+# The three SPI properties are checked against the driver's own statement
+# of them rather than against a datasheet remembered here.
+# bench-adxl345-spi.c says the part is CPOL=1 CPHA=1 and that the device
+# tree states it, and that the 5 MHz ceiling is stated there too. If that
+# file is ever changed to assume them instead, these fail and say so.
+
+SPI=$ROOT/meta-bench/recipes-bench/bench-adxl345/files/bench-adxl345-spi.c
+
+has "the SPI overlay claims this project's compatible" 	"$SPIDTS_CODE" 'compatible = "bench,adxl345";'
+hasnt "and not mainline's" "$SPIDTS_CODE" '"adi,adxl345"'
+has "it targets spi0" "$SPIDTS_CODE" 'target = <&spi0>;'
+has "the node sits on chip select 0" "$SPIDTS_CODE" 'adxl345@0 {'
+has "and reg says the same" "$SPIDTS_CODE" 'reg = <0>;'
+
+# Two drivers on one chip select is the defect this bench met on eplepi,
+# where config.txt had given both SPI0 chip selects to CAN overlays. The
+# firmware declares a spidev on each, so the overlay removes the one it
+# is about to occupy instead of relying on winning it.
+has "it disables the firmware's spidev on that chip select" 	"$SPIDTS_CODE" 'target = <&spidev0>;'
+has "and says disabled" "$SPIDTS_CODE" 'status = "disabled";'
+
+has "the overlay states SPI mode 3, polarity" "$SPIDTS_CODE" 'spi-cpol;'
+has "and phase" "$SPIDTS_CODE" 'spi-cpha;'
+has "the driver is the authority for that, and still says so" 	"$SPI" 'CPOL=1 CPHA=1'
+has "the overlay states the 5 MHz ceiling" 	"$SPIDTS_CODE" 'spi-max-frequency = <5000000>;'
+has "and the driver still leaves it to the device tree" 	"$SPI" 'spi-max-frequency'
+
+# The interrupt lead does not move when the bus does, so this is the one
+# property that must be identical in both overlays rather than merely
+# present in each.
+has "the SPI overlay keeps INT1 on GPIO23, level high" 	"$SPIDTS_CODE" 'interrupts = <23 4>;'
+i2cirq=$(grep -o 'interrupts = <[0-9]* [0-9]*>;' "$DTS_CODE" | head -1)
+spiirq=$(grep -o 'interrupts = <[0-9]* [0-9]*>;' "$SPIDTS_CODE" | head -1)
+if [ "$i2cirq" = "$spiirq" ] && [ -n "$i2cirq" ]; then
+	ok "and it is the same cell the I2C overlay asks for"
+else
+	no "and it is the same cell the I2C overlay asks for" 		"i2c: $i2cirq  spi: $spiirq"
+fi
+
+# The four names have to agree across three files, which is what row
+# three of the list at the top of this file is about. Four overlays now.
+has "the recipe compiles bench-adxl345-spi.dtbo" 	"$RECIPE" 'bench-adxl345-spi\.dtbo'
+has "and the SPI control beside it" 	"$RECIPE" 'bench-adxl345-spi-adi\.dtbo'
+# shellcheck disable=SC2016
+has "it deploys the SPI overlay" 	"$RECIPE" 'install -m 0644 ${B}/bench-adxl345-spi.dtbo ${DEPLOYDIR}/overlays/'
+# shellcheck disable=SC2016
+has "and the SPI control" 	"$RECIPE" 'install -m 0644 ${B}/bench-adxl345-spi-adi.dtbo ${DEPLOYDIR}/overlays/'
+has "the recipe fetches the SPI source" 	"$RECIPE" 'file://bench-adxl345-spi-overlay.dts'
+has "the image copies the SPI overlay onto the card" 	"$IMG" 'overlays/bench-adxl345-spi\.dtbo;overlays/bench-adxl345-spi\.dtbo'
+has "and the SPI control" 	"$IMG" 'overlays/bench-adxl345-spi-adi\.dtbo;overlays/bench-adxl345-spi-adi\.dtbo'
+
+# The substitution guard, both directions, the same as the I2C control's.
+# A control identical to its subject is the failure that reads as a
+# perfect agreement.
+# The control is REDIRECTED INTO ITS OWN FILE, which is what makes it a
+# separate subject rather than an in-place edit of the thing it is a
+# control for. BitBake variable syntax, so single quotes.
+# shellcheck disable=SC2016
+has "the SPI control is generated into its own file" 	"$RECIPE" '> ${B}/bench-adxl345-spi-adi-overlay.dts'
+has "from the SPI source and not the I2C one" 	"$RECIPE" 'bench-adxl345-spi-overlay.dts'
+has "and a substitution that did not apply is fatal" 	"$RECIPE" 'the SPI control overlay has no adi,adxl345 compatible'
+has "and so is one that left ours behind" 	"$RECIPE" 'the SPI control overlay still claims bench,adxl345'
+
+# Carrying four is not loading four. config.txt names one, and the SPI
+# arm needs the straps moved before it can be the one.
+hasnt "config.txt does not yet ask for the SPI overlay" 	"$KAS" 'dtoverlay=bench-adxl345-spi'
+has "the .dts says on its face that no part has answered over SPI" 	"$SPIDTS" 'NOT YET RUN ON HARDWARE'
+has "and that the brown lead comes off first" "$SPIDTS" 'brown lead comes'
 
 echo
 echo "passed $pass, failed $fail"
