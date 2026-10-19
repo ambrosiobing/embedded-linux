@@ -4622,6 +4622,26 @@ exact case that fired; 255, which wraps to 0 and writes a NUL byte; and
 0. All three differ afterwards with the file length unchanged, so this
 stays an in-place byte change and not a truncation.
 
+**The mutation is written with awk, after two wrong forms.** The first
+built an octal escape and handed it to `printf` as its format string.
+Shellcheck calls that SC2059 and refuses it, and it is right: a format
+string that comes from a variable is one substitution away from being a
+format directive. CI caught it on Monday 19 October 2026, which is the
+check working.
+
+`printf '%b'` on the same escape was the obvious replacement and is
+simply wrong here. It emitted the three ASCII digits of the number
+instead of the byte, so the copy would have differed in three bytes at
+the wrong offset, and the only thing saying so would have been the guard
+added above. Measured at 0, 1, 120 and 255 before it was believed.
+
+`awk -v b="$new_byte" 'BEGIN { printf "%c", b }'` is the byte, which
+POSIX requires of `%c` given a numeric argument, and it was checked at
+the same four values. The guard is what makes the remaining portability
+risk visible rather than silent: if some `awk` here emitted nothing or
+the digits, the files would not differ and the assertion says exactly
+that.
+
 **What this cost, and the lesson that is not about bytes.** Three
 failures appeared in a gate immediately after a change to three other
 test files, and the obvious reading was that the change had broken

@@ -443,7 +443,17 @@ cp "$WORK/card.img" "$WORK/other.img"
 old_byte=$(dd if="$WORK/other.img" bs=1 skip=4096 count=1 status=none |
 	od -An -tu1 | tr -d ' \n')
 new_byte=$(( (old_byte + 1) % 256 ))
-printf "$(printf '\\%03o' "$new_byte")" |
+# awk and not printf. The first version built an octal escape and passed it
+# as printf's format string, which shellcheck calls SC2059 and refuses: a
+# format string that comes from a variable is one substitution away from
+# being a format directive. CI caught it, correctly.
+#
+# printf '%b' on the escape was tried instead and is simply wrong here: it
+# emitted the three ASCII digits of the number rather than the byte, so the
+# copy differed in three bytes at the wrong offset and the guard below would
+# have been the only thing saying so. awk's %c with a numeric argument is
+# the byte, which POSIX requires, and it was checked at 0, 1, 120 and 255.
+awk -v b="$new_byte" 'BEGIN { printf "%c", b }' |
 	dd of="$WORK/other.img" bs=1 seek=4096 conv=notrunc status=none
 if cmp -s "$WORK/card.img" "$WORK/other.img"; then
 	no "the altered copy really differs from the archived source" \
