@@ -334,6 +334,16 @@ jobs:
 
       - name: Tests
         # Every test in tests/, so adding one is enough to have CI run it.
+        #
+        # BENCH_REQUIRE_CC turns a missing compiler from a skip into a
+        # failure. sensorhub-cabi-test.sh skips where there is no cc, which
+        # is right on the authoring laptop, where this bench's own rules say
+        # there will never be one. It is wrong here: this job installs gcc,
+        # so a compiler going missing is a defect and a skip would hide a
+        # test that had stopped running. The variable is the promise, and
+        # this is the environment that makes it.
+        env:
+          BENCH_REQUIRE_CC: "1"
         run: |
           for t in tests/*.sh; do
             echo "== $t"

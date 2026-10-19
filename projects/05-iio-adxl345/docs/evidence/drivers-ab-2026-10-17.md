@@ -97,3 +97,39 @@ project has published 0.16 per cent larger, and require
 `tests/adxl345-driver-test.sh` to recompute the constant from the new
 pair. It is left unchanged here, and recorded, so that the choice is
 made deliberately rather than as a side effect of this capture.
+
+## Correction applied, Monday 19 October 2026
+
+The change was made. `BENCH_ADXL345_SCALE_NANO` went from 38245935 to
+38307227, which is 9.80665 / 256 rounded onto IIO's one nano grid. The
+paragraph above says 0.038307226; that is the same number truncated
+rather than rounded, and the constant takes the nearer grid point.
+
+**Every figure above is left exactly as it was measured.** The numbers
+in this file were produced by the driver as it stood on Saturday 17
+October 2026, and rewriting them would destroy the only record of what
+that driver reported. To read them against the corrected driver:
+
+| as printed here | corrected | change |
+|---|---|---|
+| `in_accel_scale` 0.038245935 | 0.038307227 | +0.160 % |
+| 9.4387 m/s^2 | 9.4538 m/s^2 | +0.160 % |
+| 0.9625 g | 0.9641 g | +0.160 % |
+
+Raw counts are untouched, because the scale never reached them: x -8,
+y 46, z 242 are what the part converted and they still are.
+
+**The disagreement this capture measured is now 0.019 per cent, not
+0.141.** Ours was 0.160 per cent low and mainline 0.019 per cent low
+against 256 LSB/g; with ours corrected to the specification the two
+differ only by mainline's own rounding to three significant figures.
+
+**One thing fell out of it that is worth more than the 0.16 per cent.**
+The driver's comment on the tap threshold had called the ratio between
+the threshold scale and the channel scale "16.03, which the datasheet
+does not bless". With the channel derived from 256 LSB/g the two are
+1/16 g and 1/256 g, so the ratio is exactly 16. The awkward number was
+an artefact of the rounded 3.9, and the part's two scale factors are
+exact binary fractions of g. The limit on converting thresholds stays,
+for the other reason the comment gives: a converted value reads back as
+something other than what was written.

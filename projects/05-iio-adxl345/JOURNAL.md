@@ -1691,3 +1691,66 @@ runs endpoint at `per_page=100` returns more than 300 kB, which a pipe
 into Python truncates partway through; writing it to a file first is
 what those notes say to do, and the filtered queries that answer
 "how many, and how many red" are smaller than either.
+
+## 36. The scale derived from the specification, and the 16.03 that was never real
+
+Monday 19 October 2026.
+
+`BENCH_ADXL345_SCALE_NANO` is now 38307227 and was 38245935. The
+difference is which form of one number the derivation starts from.
+
+The datasheet prints both 3.9 mg/LSB in a table and 256 LSB/g in the
+specifications, and they are the same quantity: 1/256 g is 3.90625 mg.
+Deriving from the table's rounded form cost 0.16 per cent, which is what
+`docs/evidence/drivers-ab-2026-10-17.md` found on Saturday 17 October
+2026 by putting this driver and mainline's on the same part and asking
+why their scales disagreed by 0.141 per cent.
+
+    1/256 g/LSB * 9.80665 m/s^2/g = 0.0383072265625 m/s^2 per LSB
+
+IIO reports this as `IIO_VAL_INT_PLUS_NANO`, a one nano grid, and the
+nearest point on it is 38307227. The evidence file had written
+0.038307226, which is the same number truncated; the constant takes the
+nearer point and the file now says so.
+
+**The old numbers are left exactly as they were measured.** Rewriting
+them would destroy the only record of what that driver reported, so each
+affected figure has the corrected value and the delta beside it:
+`in_accel_scale` 0.038245935 against 0.038307227, the A/B magnitude
+9.4387 against 9.4538 m/s^2, the triggered capture's 0.964 g and
+9.45 m/s^2 against 0.965 and 9.46. Raw counts are untouched throughout,
+because the scale never reached them.
+
+**The disagreement that started this is now 0.019 per cent.** Ours was
+0.160 low and mainline 0.019 low against 256 LSB/g. With ours taken to
+the specification, what remains between the two drivers is mainline's
+own rounding to three significant figures.
+
+## Two things the correction exposed that were not the 0.16 per cent
+
+**The acceptance table disagreed with itself.** Criterion 3 records
+`in_accel_scale` `0.038245935` and, in the same cell, "which is 0.95 g
+on z" for z at 242 counts. 242/256 is 0.9453, which rounds to 0.95; 242
+at the scale the driver was reporting is 0.9438, which rounds to 0.94.
+So the figure beside the scale had been computed from 256 LSB/g while
+the driver's constant came from 3.9 mg, and the row has agreed with
+itself only since today. The criterion's own wording asks for one g as
+9.81 m/s^2, and 256 counts at the old constant came to 9.79.
+
+**The awkward ratio was an artefact.** The comment on the tap threshold
+said converting thresholds to channel units "would mean a ratio of
+16.03 that the datasheet does not bless". THRESH_TAP is 62.5 mg per
+count, which is 1/16 g, and the channel in full resolution is 1/256 g,
+so the ratio is exactly 16 and both scale factors are exact binary
+fractions of g. The 16.03 existed only because the channel scale had
+been derived from the rounded 3.9. The limit on converting stays, for
+the other reason the comment gives: a converted threshold reads back as
+something other than what was written.
+
+**Why this was invisible for three weeks.** The test recomputed the
+constant from the same rounded figure the constant came from, so it
+agreed. A test that derives from the identical input as the thing it
+checks is a restatement, and 9.79 against 9.81 reads like a part's
+tolerance rather than like arithmetic. The assertion now starts from
+1/256 and asserts 9.81, and both directions were watched: with the
+constant corrected and the test not, those two assertions failed.

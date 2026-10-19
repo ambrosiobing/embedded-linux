@@ -59,23 +59,34 @@
  * The scale, derived here rather than copied, so the derivation can be
  * argued with.
  *
- * In FULL_RES mode the part keeps 3.9 mg per LSB at every range, which is
- * the mode this driver uses precisely so that the scale does not change
- * underneath userspace when the range does. IIO reports acceleration in
- * m/s^2, so:
+ * In FULL_RES mode the part keeps one LSB at 1/256 g at every range,
+ * which is the mode this driver uses precisely so that the scale does not
+ * change underneath userspace when the range does. IIO reports
+ * acceleration in m/s^2, so:
  *
- *     3.9 mg/LSB  =  0.0039 g/LSB
- *     0.0039 g/LSB * 9.80665 m/s^2/g  =  0.038245935 m/s^2 per LSB
+ *     1/256 g/LSB  =  0.00390625 g/LSB
+ *     0.00390625 g/LSB * 9.80665 m/s^2/g  =  0.0383072265625 m/s^2 per LSB
  *
- * Expressed as IIO_VAL_INT_PLUS_NANO that is 0 and 38245935 nano.
+ * IIO_VAL_INT_PLUS_NANO puts a one nanometre-per-second-squared grid under
+ * that, and the nearest point on it is 0 and 38307227 nano.
+ *
+ * DERIVED FROM 256 LSB/g, NOT FROM THE TABLE'S 3.9 mg/LSB. The datasheet
+ * prints both and they are the same quantity, 1/256 g being 3.90625 mg,
+ * but 3.9 is the rounded form and deriving from it costs 0.16 per cent.
+ * This constant read 38245935 until Monday 19 October 2026;
+ * docs/evidence/drivers-ab-2026-10-17.md is the capture that found it, by
+ * putting this driver and mainline's on the same part and asking why their
+ * scales disagreed by 0.141 per cent.
  *
  * tests/adxl345-driver-test.sh recomputes this from the two constants and
  * fails if the number below drifts from them, because a scale that is
  * wrong by a factor is the defect most likely to survive review: every
  * axis still moves, the signs are right, and gravity reads as the wrong
- * number only if somebody checks it against 9.81.
+ * number only if somebody checks it against 9.81. It also asserts that 256
+ * counts read as 9.81 and not 9.79, which is the whole visible effect of
+ * this correction.
  */
-#define BENCH_ADXL345_SCALE_NANO	38245935
+#define BENCH_ADXL345_SCALE_NANO	38307227
 
 struct bench_adxl345 {
 	struct regmap *regmap;
@@ -289,12 +300,17 @@ static int bench_adxl345_write_event_config(struct iio_dev *indio_dev,
 /*
  * The thresholds are reported and taken in the part's own counts, not
  * in the channel's units, and that is a deliberate limit rather than an
- * oversight. THRESH_TAP and THRESH_FF are 62.5 mg per count while the
- * channel reads 3.9 mg per count in full resolution; converting would
- * mean a ratio of 16.03 that the datasheet does not bless, and a value
- * that reads back as something other than what was written. A count and
- * its scale factor are honest and are in the header beside the
- * register. The page is 15 in Revision 0.
+ * oversight. THRESH_TAP and THRESH_FF are 62.5 mg per count, which is
+ * 1/16 g, while the channel reads 1/256 g per count in full resolution,
+ * so the ratio is exactly 16. It is worth saying that this comment read
+ * "a ratio of 16.03 that the datasheet does not bless" until Monday 19
+ * October 2026: the awkward number was an artefact of deriving the
+ * channel scale from the table's rounded 3.9 mg, and both scale factors
+ * are in fact exact binary fractions of g. The limit stays anyway, for
+ * the other reason given here: converting would hand back a value that
+ * reads as something other than what was written. A count and its scale
+ * factor are honest and are in the header beside the register. The page
+ * is 15 in Revision 0.
  */
 static int bench_adxl345_read_event_value(struct iio_dev *indio_dev,
 					  const struct iio_chan_spec *chan,

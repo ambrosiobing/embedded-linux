@@ -206,21 +206,34 @@ check "and none is defined twice" "$duplicated" "0"
 # is the defect most likely to survive review: every axis still moves and
 # the signs are still right.
 #
-# 3.9 mg/LSB * 9.80665 m/s^2/g = 0.038245935 m/s^2, so 38245935 nano.
+# 1/256 g/LSB * 9.80665 m/s^2/g = 0.0383072265625 m/s^2, so 38307227 nano
+# on IIO's one nano grid.
+#
+# DERIVED FROM 256 LSB/g AND NOT FROM 3.9 mg/LSB, which is the same
+# quantity rounded for a table and costs 0.16 per cent. The pair here is
+# the whole point of the assertion: a test that restates the constant
+# proves nothing, and this one agreed with the wrong constant for three
+# weeks because it recomputed from the same rounded figure the constant
+# came from. Corrected Monday 19 October 2026.
 
 stated=$(sed -n 's/^#define BENCH_ADXL345_SCALE_NANO[[:space:]]*\([0-9]*\).*/\1/p' \
 	"$CORE")
-# %.0f and not %d: the product is 0.038245935 exactly in decimal, and
-# %d truncates the binary representation of it to ...934. A test that
-# rounds differently from the arithmetic it checks reports a defect that
-# is its own.
-computed=$(awk 'BEGIN { printf "%.0f", 0.0039 * 9.80665 * 1000000000 }')
+# %.0f and not %d: the product is 0.0383072265625 exactly in decimal, so
+# the nano figure ends in .5625 and has to round up. %d truncates instead,
+# and a test that rounds differently from the arithmetic it checks reports
+# a defect that is its own.
+computed=$(awk 'BEGIN { printf "%.0f", (1 / 256) * 9.80665 * 1000000000 }')
 check "the scale constant matches its own derivation" "$stated" "$computed"
 
 # And a sanity check that the number means what the comment says: one g
-# should come back as about 9.81 m/s^2 over 256 LSB in full resolution.
+# should come back as 9.81 m/s^2 over 256 LSB in full resolution.
+#
+# This expected 9.79 until the constant was derived from 256 LSB/g. That
+# it now reads 9.81 is the entire visible effect of the correction, and
+# also why the old value never looked wrong: 9.79 against 9.81 reads like
+# a part's tolerance rather than like arithmetic.
 gravity=$(awk -v s="$stated" 'BEGIN { printf "%.2f", s / 1000000000 * 256 }')
-check "256 LSB reads as one g" "$gravity" "9.79"
+check "256 LSB reads as one g" "$gravity" "9.81"
 
 # ----------------------------------------------- the watermark is not 32
 #

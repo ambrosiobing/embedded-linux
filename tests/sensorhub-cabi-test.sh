@@ -32,11 +32,38 @@ CC=${CC:-cc}
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+# A MISSING COMPILER IS A SKIP HERE AND A FAILURE WHERE ONE IS PROMISED.
+#
+# This used to print FAILED and exit 1 wherever there was no cc, on the
+# argument that without one the test proves nothing. True, and still said
+# below, but a hard failure is only useful where the environment is
+# guaranteed to have the tool. The authoring laptop never has one, by a
+# rule of this bench rather than by accident, so every ./go check there
+# ended in a red line that means "wrong machine" and trains its reader to
+# skim past red lines.
+#
+# So the dependency is declared instead: skipped where the tool is absent,
+# enforced where it was promised. BENCH_REQUIRE_CC=1 is set for the Tests
+# step in .github/workflows, which is the environment that installs gcc, so
+# a compiler going missing there is a failure and not a quiet skip. That
+# distinction is the whole point: a skip that can happen in CI is a test
+# that has stopped running without saying so.
 if ! command -v "$CC" >/dev/null 2>&1; then
-	echo "FAILED   no C compiler ($CC): this test compares the C against"
-	echo "         the specification, so without one it proves nothing."
-	echo "         Run scripts/host-setup.sh, or: sudo apt-get install -y gcc"
-	exit 1
+	if [ "${BENCH_REQUIRE_CC:-0}" = "1" ]; then
+		echo "FAILED   no C compiler ($CC), and BENCH_REQUIRE_CC=1 says this"
+		echo "         environment promised one. This test compares the C"
+		echo "         against the specification, so without one it proves"
+		echo "         nothing, and skipping here would hide that."
+		echo "         Run scripts/host-setup.sh, or: sudo apt-get install -y gcc"
+		exit 1
+	fi
+	echo "SKIP: no C compiler ($CC) on this host, so the C was NOT compared"
+	echo "      against the specification and NOTHING below ran. That is a"
+	echo "      gap and not a pass. The build laptop and CI both have one;"
+	echo "      on this host, install it or name another:"
+	echo "          CC=gcc-13 sh $0"
+	echo "      Run scripts/host-setup.sh, or: sudo apt-get install -y gcc"
+	exit 0
 fi
 
 # The same warnings the recipe and CI use. A shared object rather than a

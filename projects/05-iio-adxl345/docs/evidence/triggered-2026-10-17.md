@@ -77,7 +77,13 @@ by a count or two between scans, which is the part converting afresh
 rather than the same registers being read five times.
 
 Magnitude is 247.1 counts on average. At the nominal 3.9 mg per LSB
-that is 0.964 g, or 9.45 m/s^2 at the scale the driver reports.
+that is 0.964 g, or 9.45 m/s^2 at the scale the driver reported on the
+day. Corrected Monday 19 October 2026: the scale constant was derived
+from the datasheet table's rounded 3.9 mg/LSB and is now derived from
+256 LSB/g, so both of those read 0.16 per cent higher on the corrected
+driver, 0.965 g and 9.46 m/s^2. The 247.1 counts are untouched, being
+what the part converted, and 247.1 over 256 is the 0.965 directly. See
+drivers-ab-2026-10-17.md.
 
 **The same board read 246.5 counts through sysfs on Friday 9 October
 2026**, from x -8, y 46, z 242. So the triggered path and the polled

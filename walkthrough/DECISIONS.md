@@ -4303,3 +4303,104 @@ The next archive on skyhorizon separates the two remaining
 possibilities without further guessing, because the messages differ: a
 manifest found by reading the directory names the file it took, and a
 directory with no package list at all still says so.
+
+## 127. The channel scale is derived from 256 LSB/g, not from the same datasheet's 3.9 mg/LSB
+
+**Context.** The ADXL345 datasheet states the full-resolution
+sensitivity twice: 3.9 mg/LSB in a table and 256 LSB/g in the
+specifications. They are the same quantity, since 1/256 g is 3.90625 mg.
+This driver derived from the first and mainline's derives from the 13-bit
+span, and on Saturday 17 October 2026 the two were measured on one part
+eleven minutes apart and disagreed by 0.141 per cent. Against 256 LSB/g,
+ours was 0.160 per cent low and mainline 0.019 per cent low.
+
+**Decision.** Derive from 256 LSB/g.
+`BENCH_ADXL345_SCALE_NANO` becomes 38307227, which is
+9.80665 / 256 = 0.0383072265625 rounded onto the one nano grid that
+`IIO_VAL_INT_PLUS_NANO` provides. It was 38245935.
+
+**Rejected: keeping 3.9 mg/LSB because it is what the table prints.**
+Both numbers are in the same datasheet and one is the other rounded for
+a table. Where a document states a quantity twice, the specification is
+the statement and the table is a convenience, and deriving from the
+convenience costs 0.16 per cent for no gain.
+
+**Rejected: adopting mainline's 38300 micro for agreement's sake.** It
+is closer to the specification than ours was, and partly by luck: using
+`2^13 - 1` rather than 4096 counts per 16 g adds 0.012 per cent, 9.81
+rather than 9.80665 adds 0.034, and rounding to three significant
+figures takes 0.065 back off. Matching a number whose errors cancel is
+not the same as being right, and the remaining 0.019 per cent between
+the two drivers is now mainline's rounding alone.
+
+**Rejected: rewriting the published figures.** Every number this project
+has published that passed through the scale is 0.16 per cent low as
+printed, and all of them stay. They are the only record of what that
+driver reported on the day it was measured. Each affected figure carries
+the corrected value and the delta beside it, in
+`docs/evidence/drivers-ab-2026-10-17.md`,
+`docs/evidence/triggered-2026-10-17.md` and the README's criteria 3 and
+7. Raw counts needed nothing, because the scale never reached them.
+
+**Consequence, and the part that is worth more than 0.16 per cent.**
+Two claims in the tree were wrong in ways the correction exposes rather
+than causes.
+
+The acceptance table disagreed with itself. Criterion 3 cites
+`in_accel_scale` 0.038245935 and, in the same cell, 0.95 g for z at 242
+counts. 242/256 is 0.9453 and rounds to 0.95; 242 at the old constant is
+0.9438 and rounds to 0.94. The figure had been computed from the
+specification while the constant came from the table.
+
+The driver's note on tap thresholds called the ratio between the
+threshold scale and the channel scale "16.03, which the datasheet does
+not bless". THRESH_TAP is 1/16 g per count and the channel is 1/256 g,
+so the ratio is exactly 16 and both are exact binary fractions of g. The
+16.03 was an artefact of the rounded derivation. The limit on converting
+thresholds stays, for the reason the comment gives second: a converted
+value reads back as something other than what was written.
+
+And the reason none of it surfaced for three weeks: the test recomputed
+the constant from the same rounded figure the constant was derived from,
+so it agreed with it. An assertion that takes the identical input as the
+thing it checks is a restatement. It now starts from 1/256, and it
+asserts that 256 counts read as 9.81 rather than 9.79, which is the only
+externally visible effect of the whole change.
+
+## 128. A test that needs a tool declares the dependency: skipped where it is absent, enforced where it was promised
+
+**Context.** Decision 125 left `sensorhub-cabi-test.sh` alone. It printed
+`FAILED` and exited 1 wherever there was no `cc`, on the argument that
+without a compiler it proves nothing, and that was called a defensible
+refusal whose change was a question about what CI must have. This answers
+that question, so this entry supersedes that paragraph of 125.
+
+**Context the refusal ignored.** The authoring laptop has no C compiler
+by a rule of this bench, not by accident: compiling happens in WSL on
+the build laptop. So every `./go check` there ended in a red line that
+means "wrong machine", and a red line that fires on a correct run is the
+thing that teaches its reader to skim red lines. That is the same harm
+the three probes in 125 were added to prevent, and the argument against
+changing it was that a skip in CI would be invisible.
+
+**Decision.** Both, selected by the environment. The test skips with a
+message saying that the C was NOT compared against the specification and
+that this is a gap and not a pass, naming `CC` for a host with a
+differently spelled compiler. Where `BENCH_REQUIRE_CC=1` it fails
+instead, saying that the environment promised a compiler. The variable is
+set on the Tests step in `.github/workflows/ci.yml`, which is the job
+that installs gcc.
+
+**Rejected: skipping everywhere.** A skip that can happen in CI is a
+test that has stopped running without saying so, which is exactly 125's
+own warning about a probe that refuses wrongly in a green pipeline.
+
+**Rejected: a separate CI step asserting `cc` exists.** It would work,
+and it puts the requirement somewhere other than the test that has it.
+The dependency belongs with the dependent, so the promise is a variable
+the test reads and the workflow makes.
+
+**Consequence.** Both branches were run before the change was committed:
+the skip exits 0 on the authoring laptop and the enforced branch exits 1
+there under `BENCH_REQUIRE_CC=1`. On this laptop `./go check` now ends
+without a red line that means nothing but the machine it ran on.
