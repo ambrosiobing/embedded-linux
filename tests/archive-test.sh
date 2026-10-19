@@ -478,6 +478,134 @@ else
 	echo "skip     resolved-name check needs real symlinks (CI has them)"
 fi
 
+echo "== a manifest carrying only the stable name is still found"
+
+# The symptom reproduced here was reported by a real archive on Saturday 17
+# October 2026: "no .manifest beside the image", with the .bmap found in the
+# same breath.
+#
+# deploy/images offers each artefact under a timestamped name and under a
+# stable symlink. Since ece0378 on Thursday 17 September 2026 the image
+# search says -type f, which is right, because the link and its target were
+# arriving as two candidates for one file. It also means the image is now
+# always the timestamped real file, and the companion names are derived from
+# it. A .bmap does carry the timestamp and is found. A manifest that exists
+# only under the stable spelling is invisible to that derivation.
+#
+# Which spelling the manifest carries is a property of the Yocto release,
+# not something worth encoding here, so the lookup reads the directory.
+# Its own work tree, because the shared fixture above holds several
+# manifests on purpose and the next case is about that.
+mwork=$tmp/work-manifest
+mdeploy=$mwork/build/tmp/deploy/images/raspberrypi4-64
+mkdir -p "$mdeploy"
+mstem=bench-image-raspberrypi4-64
+echo "image bytes" >"$mdeploy/$mstem.rootfs-20261017.wic.bz2"
+echo "bmap" >"$mdeploy/$mstem.rootfs-20261017.wic.bmap"
+echo "pkg 2.0" >"$mdeploy/$mstem.rootfs.manifest"
+
+mstore=$tmp/store-manifest
+out=$(BENCH_WORK=$mwork BENCH_IMAGE_DIR=$mstore 	BENCH_IMAGE=$mdeploy/$mstem.rootfs-20261017.wic.bz2 	sh "$repo/scripts/archive.sh" bench-rpi4 2>&1 || echo EXIT-FAILED)
+case $out in
+*EXIT-FAILED*)
+	no "the archive succeeds"
+	printf '%s
+' "$out" | sed 's/^/       /'
+	;;
+*) ok "the archive succeeds" ;;
+esac
+case $out in
+*"no .manifest beside the image"*)
+	no "a manifest under the stable name only is found"
+	;;
+*) ok "a manifest under the stable name only is found" ;;
+esac
+
+# Named, not merely found: a lookup that reads a directory has to say which
+# file it took, or the next reader cannot tell a correct pick from a lucky
+# one.
+case $out in
+*"$mstem.rootfs.manifest"*) ok "and it names the file it took" ;;
+*) no "and it names the file it took" ;;
+esac
+
+mfound=$(find "$mstore" -name '*.manifest' -print 2>/dev/null | head -1)
+if [ -n "$mfound" ]; then
+	ok "and the manifest reached the store"
+	check "and it is the right one" "$(cat "$mfound")" "pkg 2.0"
+else
+	no "and the manifest reached the store"
+	no "and it is the right one"
+fi
+
+echo "== a foreign image's package list in the same directory is ignored"
+
+# deploy/images accumulates every image recipe built for that machine, so
+# more than one .manifest in the directory is the normal case and not an
+# ambiguity. The image's own basename is the part that is guaranteed: a
+# manifest belongs to the same IMAGE_BASENAME and MACHINE as the image, so
+# the candidates are filtered on that prefix before being counted.
+echo "pkg 3.0" >"$mdeploy/other-image-raspberrypi4-64.rootfs.manifest"
+mstore2=$tmp/store-manifest-foreign
+out=$(BENCH_WORK=$mwork BENCH_IMAGE_DIR=$mstore2 	BENCH_IMAGE=$mdeploy/$mstem.rootfs-20261017.wic.bz2 	sh "$repo/scripts/archive.sh" bench-rpi4 2>&1 || echo EXIT-FAILED)
+mfound2=$(find "$mstore2" -name '*.manifest' -print 2>/dev/null | head -1)
+if [ -n "$mfound2" ]; then
+	check "ours is stored and the foreign one is not" 		"$(cat "$mfound2")" "pkg 2.0"
+else
+	no "ours is stored and the foreign one is not"
+fi
+case $out in
+*other-image*) no "and the foreign name is not reported as a candidate" ;;
+*) ok "and the foreign name is not reported as a candidate" ;;
+esac
+rm -f "$mdeploy/other-image-raspberrypi4-64.rootfs.manifest"
+
+echo "== two package lists for the same image are refused, naming both"
+
+# Two builds of one image left in one directory. Picking the newer would
+# file a package list that may belong to the other, and a package list that
+# belongs to a different image is worse than none, because it reads as
+# evidence. The image is still archived: it is still worth keeping, which
+# is the judgement the absent-kas branch already makes.
+echo "pkg 5.0" >"$mdeploy/$mstem.rootfs-20261016.manifest"
+mstore3=$tmp/store-manifest-two
+out=$(BENCH_WORK=$mwork BENCH_IMAGE_DIR=$mstore3 	BENCH_IMAGE=$mdeploy/$mstem.rootfs-20261017.wic.bz2 	sh "$repo/scripts/archive.sh" bench-rpi4 2>&1 || echo EXIT-FAILED)
+case $out in
+*EXIT-FAILED*)
+	no "the image is still archived"
+	printf '%s
+' "$out" | sed 's/^/       /'
+	;;
+*) ok "the image is still archived" ;;
+esac
+case $out in
+*20261016*20261017*|*20261017*20261016*) ok "and both candidates are named" ;;
+*) no "and both candidates are named" ;;
+esac
+if [ -n "$(find "$mstore3" -name '*.manifest' -print 2>/dev/null)" ]; then
+	no "and no manifest is stored"
+else
+	ok "and no manifest is stored"
+fi
+rm -f "$mdeploy/$mstem.rootfs-20261016.manifest"
+
+echo "== a stable link beside its target counts once"
+
+# ece0378's lesson applied to the manifest: a stable link beside its
+# timestamped target is the normal tree, and counting it twice would turn
+# every healthy build into the refusal above.
+rm -f "$mdeploy/$mstem.rootfs.manifest"
+echo "pkg 4.0" >"$mdeploy/$mstem.rootfs-20261017.manifest"
+ln -sf "$mstem.rootfs-20261017.manifest" "$mdeploy/$mstem.rootfs.manifest"
+mstore4=$tmp/store-manifest-link
+out=$(BENCH_WORK=$mwork BENCH_IMAGE_DIR=$mstore4 	BENCH_IMAGE=$mdeploy/$mstem.rootfs-20261017.wic.bz2 	sh "$repo/scripts/archive.sh" bench-rpi4 2>&1 || echo EXIT-FAILED)
+mlinked=$(find "$mstore4" -name '*.manifest' -print 2>/dev/null | head -1)
+if [ -n "$mlinked" ]; then
+	check "the manifest is stored once, dereferenced" 		"$(cat "$mlinked")" "pkg 4.0"
+else
+	no "the manifest is stored once, dereferenced"
+fi
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

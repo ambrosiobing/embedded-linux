@@ -4251,3 +4251,55 @@ none on the authoring laptop and the build laptop is a separate clone
 that can only receive the change by pull. It found nothing, and its step
 discovers its files with a `find` rather than a list, so all three were
 in scope.
+
+## 126. A companion artefact is found by reading the directory, filtered on the one part of the name that is guaranteed
+
+**Context.** A real archive on Saturday 17 October 2026 reported `no
+.manifest beside the image` and found the `.bmap` in the same breath.
+The two are not symmetrical, and the asymmetry dates from a fix.
+
+`ece0378`, on Thursday 17 September 2026, added `-type f` to nine mtime
+rankings, because a stable symlink and its target were arriving as two
+candidates for one file and `newest_path` was reporting the loser as an
+older image ignored. That was right. Its side effect is that the image
+search can no longer return the short link, so the image is always the
+timestamped real file and the companion names are derived from it. A
+`.bmap` carries that timestamp. The walkthrough's own recorded listing
+of a real deploy directory shows the manifest under the stable spelling,
+`bench-image-raspberrypi4-64.rootfs.manifest`, with no timestamp in it.
+
+**Inferred, not observed.** That the live tree has no timestamped
+manifest is read off the walkthrough's listing and the reported symptom
+together. The archive store is on the external drive on skyhorizon and
+is not reachable from the authoring laptop, so the filename itself has
+not been looked at. The fix does not depend on which spelling it is.
+
+**Decision.** When the derived name misses, read the directory. The
+candidates are filtered on the image's own basename, resolved through
+any symlink, and deduplicated. Exactly one is used and named in the
+output. Several are reported, naming each, and none is stored.
+
+**Rejected: spelling another name.** Stripping the timestamp and trying
+again would work today and encode a guess about a Yocto release. The
+basename is guaranteed, since a manifest belongs to the same
+`IMAGE_BASENAME` and `MACHINE` as its image. The timestamp is not, which
+is the entire reason this branch exists, so it is not matched on.
+
+**Rejected: taking the newest of several.** A package list that belongs
+to a different image is worse than none, because it reads as evidence
+rather than as a gap. The image is still archived when the manifest is
+ambiguous, which is the judgement the absent-kas branch already makes.
+
+**Consequence.** The symlink and its target are one candidate, not two,
+which is `ece0378`'s lesson applied here: without the resolve-then-
+deduplicate step every healthy tree would land in the refusal above, and
+that case is asserted.
+
+Three comments in the file were claims that stopped being true when
+`-type f` arrived, all three saying the search returns the short link.
+They now say what the code does, and name the commit that changed it.
+
+The next archive on skyhorizon separates the two remaining
+possibilities without further guessing, because the messages differ: a
+manifest found by reading the directory names the file it took, and a
+directory with no package list at all still says so.

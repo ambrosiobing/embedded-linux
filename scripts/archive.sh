@@ -292,9 +292,10 @@ save() {
 
 	# deploy/images offers each artefact under two names: the real
 	# bench-image-<machine>.rootfs-<timestamp>.wic.bz2 and a short
-	# symlink to it. Either can be the one the search returned, so the
-	# .bmap and .manifest are looked for under both bases rather than
-	# derived from whichever name happened to win.
+	# symlink to it. The search can no longer return the link, because it
+	# says -type f, but BENCH_IMAGE can still name one, so the .bmap and
+	# .manifest are looked for under both bases rather than derived from
+	# whichever name happened to win.
 	#
 	# Found by tests/archive-test.sh on its first run, which is the
 	# argument for a fixture shaped like the real deploy tree instead of
@@ -305,6 +306,58 @@ save() {
 	# real was resolved above, for the target check.
 	bmap=$(sibling "$image" "$real" .wic.bmap)
 	manifest=$(sibling "$image" "$real" .manifest)
+
+	# WHEN THE DERIVED NAME MISSES, READ THE DIRECTORY.
+	#
+	# A real archive on Saturday 17 October 2026 said "no .manifest
+	# beside the image" and found the .bmap in the same breath. The two
+	# are not symmetrical. Since ece0378, on Thursday 17 September 2026,
+	# the image search says -type f, which is right, because a stable
+	# symlink and its target were arriving as two candidates for one
+	# file. It also means the image is now always the timestamped real
+	# file, so the comment above about the search returning the short
+	# link no longer describes this code. A .bmap carries that timestamp
+	# and is found. Whether the manifest does is a property of the Yocto
+	# release, and the walkthrough's own recorded listing shows it under
+	# the stable spelling, so it is read rather than spelled.
+	#
+	# Filtered on the image's basename first, because deploy/images
+	# accumulates every image recipe built for that machine and more than
+	# one .manifest there is normal. The basename is the part that is
+	# guaranteed: a manifest belongs to the same IMAGE_BASENAME and
+	# MACHINE as its image. The timestamp is not guaranteed, which is the
+	# whole reason this branch exists, so it is not matched on.
+	#
+	# A stable link and its target are ONE candidate, resolved before
+	# counting. That is ece0378's lesson applied here, and without it
+	# every healthy tree would land in the refusal below.
+	if [ -z "$manifest" ]; then
+		imgbase=$(basename "$real")
+		imgbase=${imgbase%.wic.bz2}
+		prefix=${imgbase%%.rootfs*}
+		candidates=$(find "$(dirname "$real")" -maxdepth 1 			-name "$prefix*.manifest" 2>/dev/null |
+			while read -r entry; do
+				readlink -f "$entry" 2>/dev/null ||
+					printf '%s
+' "$entry"
+			done | sort -u)
+		# grep -c exits 1 when nothing matches, which under set -e
+		# would end the run here, before anything had been said.
+		found=$(printf '%s
+' "$candidates" | grep -c . || true)
+		case $found in
+		0) ;;
+		1)
+			manifest=$candidates
+			note "manifest $(basename "$manifest"), found by reading the directory"
+			;;
+		*)
+			note "$found package lists for $prefix and nothing to say which belongs to this image, so none is stored:"
+			printf '%s
+' "$candidates" | sed 's|^|    |'
+			;;
+		esac
+	fi
 
 	# A SECOND IMAGE IN THE SAME DIRECTORY IS REFUSED, NAMING BOTH.
 	#
@@ -346,10 +399,10 @@ save() {
 	# Everything is stored under ONE base name, the resolved real one.
 	#
 	# This used to copy each file under whatever basename it was found by,
-	# and those differ. The image is usually found as the short symlink,
-	# because the link is written last and therefore wins newest-by-mtime;
-	# the .bmap is found by resolving that link first, so it arrives under
-	# the timestamped name. The store then held:
+	# and those differ. The image was then usually found as the short
+	# symlink, because the link is written last and therefore won
+	# newest-by-mtime; the .bmap was found by resolving that link first,
+	# so it arrived under the timestamped name. The store then held:
 	#
 	#   bench-rt-image-raspberrypi4-64.rootfs.wic.bz2
 	#   bench-rt-image-raspberrypi4-64.rootfs-20260916142705.wic.bmap
@@ -364,7 +417,9 @@ save() {
 	#
 	# -L because the useful names in deploy/images are symlinks, and a
 	# symlink into a build tree that is about to be deleted archives
-	# nothing at all.
+	# nothing at all. Since ece0378 the search returns the real file, so
+	# this matters for a BENCH_IMAGE naming a link and for the manifest,
+	# which the branch above may have resolved from one.
 	base=$(basename "$real")
 	cp -L "$image" "$dest/$base"
 	# Written as if/else rather than "test && cp || note", which is not
