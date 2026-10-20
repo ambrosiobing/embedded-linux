@@ -34,23 +34,19 @@
 #
 # Sets PYTHON to an interpreter that runs, or prints a skip and exits 0.
 #
-# PYTHON names the interpreter when it is already set, and is reported
-# rather than replaced when it does not work: substituting a different
-# interpreter for the one somebody asked for is how a suite comes to pass
-# on a toolchain nobody meant to measure. Unset, the two usual spellings
-# are tried in order, because the working one on the authoring laptop is
-# python and on every other host here it is python3.
+# How PYTHON is resolved, and why an explicit one is never replaced, is in
+# scripts/python-resolve.sh rather than repeated here.
+#
+# The resolution itself moved to scripts/python-resolve.sh on Tuesday 20
+# October 2026, when ./go lint, ./go plot, ./go matrix and the PSK
+# derivation in scripts/credentials-set.sh turned out to name python3
+# directly and to have the same fault. Three callers wanting three
+# different things on failure is why that file resolves and returns while
+# this one decides what a test should do about it.
+. "${BENCH_RESOLVE:-$ROOT/scripts/python-resolve.sh}"
+
 bench_python() {
-	PYTHON=${PYTHON:-}
-	if [ -z "$PYTHON" ]; then
-		for _bench_py in python3 python; do
-			if "$_bench_py" -c "import sys" >/dev/null 2>&1; then
-				PYTHON=$_bench_py
-				break
-			fi
-		done
-	fi
-	if [ -z "$PYTHON" ] || ! "$PYTHON" -c "import sys" >/dev/null 2>&1; then
+	if ! bench_resolve_python; then
 		echo "SKIP: no working Python on this host, so $1"
 		echo "      NOTHING below ran. That is a gap and not a pass."
 		echo "      python3 here may be the Microsoft Store stub, which"

@@ -4742,3 +4742,67 @@ half being needed only because the default was the stub. With the search
 in the helper the remedy is one variable again, and running exactly what
 it prints gives 24 passed, 0 failed. A remedy that shrinks when the cause
 is removed is the sign the cause really was removed.
+
+### The entry points had it too, Tuesday 20 October 2026
+
+Decision 133 fixed twenty-one test suites and the gate. It did not ask
+whether anything else named `python3` directly, and three things did.
+
+**`./go lint` was broken on the authoring laptop.** It ran `python3`, the
+Microsoft Store stub, and ended with its exit status of 49 and a refusal
+written to stderr in German. `./go plot` and `./go matrix` the same. The
+lint target is the one that matters, because it is what a person types
+before committing, and it was broken on the machine where the committing
+happens.
+
+It went unnoticed through all of Monday 19 October 2026 for a reason worth
+writing down: every invocation that day was `python scripts/lint.py` typed
+by hand. Running the thing a person runs is not the same as running the
+thing it calls, and a day of lint checks never once exercised the command
+the documentation gives.
+
+**The key derivation was safe and said the wrong thing.**
+`scripts/credentials-set.sh` derives a WPA PSK with Python where
+`wpa_passphrase` is absent. The stub writes its refusal to **stderr**, so
+the command substitution captured an empty string and the existing guard
+fired. Nothing wrote a German error message into a credentials file, which
+is the outcome that was worth checking before anything else. But the
+guard's message names a passphrase shorter than eight characters as the
+usual reason, so it blamed the passphrase for an absent interpreter.
+
+**Decision.** The resolution moves to `scripts/python-resolve.sh`, which
+sets `PYTHON` and returns, printing nothing. Four callers then decide what
+to do about failure, because they want four different things: a test skips
+saying what went unchecked, `host-check.sh` counts a check it could not ask
+and carries on, `go` stops because a person typed it, and the credentials
+script names the real cause instead of the passphrase.
+
+**Rejected: putting the resolution in `tests/lib/python.sh` and sourcing
+that from `go`.** The helper is where a test's skip policy lives, and a
+top-level command reaching into `tests/` for a utility inverts which of
+the two is the dependency.
+
+**Rejected: three inline copies.** Three copies of eight lines is how
+fourteen copies start, which is the whole of decision 133.
+
+**Consequence.** `./go lint` runs on the authoring laptop, and
+`PYTHON=/nonexistent ./go lint` names the command, says the stub exits 0
+for `--version` while running nothing, and exits 1. Both branches were run
+before this was committed.
+
+**And a note on how the gate was verified, because the first method was
+wrong twice.** Editing `host-check.sh` while it was executing gave a
+syntax error from shifted offsets, since a shell reads a script
+incrementally. The fix invented for that, running a frozen copy from a
+scratch directory, broke the script's own `. "$(dirname "$0")/common.sh"`:
+the copy sits elsewhere, so `common.sh` was not found, `set -eu` was never
+in force, `REPO_DIR` was unset and `cd "$REPO_DIR"` was a no-op that
+happened to leave the right directory. Every one of those runs said so on
+its FIRST line and the tails were what got read.
+
+The verdict numbers from those runs turned out to be right, which is luck
+rather than evidence. Confirmed afterwards by running `sh
+./scripts/host-check.sh` by its real path and touching nothing while it
+ran: no defect found, three checks not asked, `pkg-config` absent, exit 1.
+The method is the simple one: run the real path, and do not edit the tree
+while it runs.

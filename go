@@ -69,6 +69,30 @@
 # SPDX-License-Identifier: MIT
 cd "$(dirname "$0")" || exit 1
 
+# THESE THREE NAMED python3 DIRECTLY UNTIL TUESDAY 20 OCTOBER 2026.
+#
+# On the Windows authoring laptop python3 is the Microsoft Store stub,
+# which runs nothing, so ./go lint, ./go plot and ./go matrix all ended
+# with its exit status of 49 and a refusal written to stderr in German.
+# ./go lint is the one that matters, because it is what a person types
+# before committing, and it was broken on the machine where the committing
+# happens. It went unnoticed all of Monday 19 October 2026 because every
+# invocation that day was "python scripts/lint.py" typed by hand.
+#
+# Resolved here rather than inside each script, because the scripts are
+# also imported and run by other callers. scripts/python-resolve.sh holds
+# the resolution and decision 133 the account of what it is for.
+. ./scripts/python-resolve.sh
+
+bench_py() {
+	bench_resolve_python && return 0
+	echo "no working Python on this host, so ${1:-this command} cannot run." >&2
+	echo "python3 here may be the Microsoft Store stub, which exits 0" >&2
+	echo "for --version while running nothing. Name one with PYTHON=," >&2
+	echo "or install it: scripts/host-setup.sh, or ./go setup." >&2
+	exit 1
+}
+
 case "${1:-}" in
 setup)      exec sh ./scripts/host-setup.sh ;;
 check)      exec sh ./scripts/host-check.sh ;;
@@ -117,9 +141,9 @@ ksym)       shift; exec sh ./scripts/check-kernel-symbols.sh "$@" ;;
 kconfig)    shift; exec sh ./scripts/check-kernel-config.sh "$@" ;;
 reproduce)  shift; exec sh ./scripts/reproduce.sh "$@" ;;
 packages)   exec sh ./scripts/packages.sh ;;
-plot)       shift; exec python3 ./scripts/rt-plot.py "$@" ;;
-matrix)     shift; exec python3 ./scripts/rt-matrix.py "$@" ;;
-lint)       exec python3 ./scripts/lint.py ;;
+plot)       shift; bench_py "./go plot"; exec "$PYTHON" ./scripts/rt-plot.py "$@" ;;
+matrix)     shift; bench_py "./go matrix"; exec "$PYTHON" ./scripts/rt-matrix.py "$@" ;;
+lint)       bench_py "./go lint"; exec "$PYTHON" ./scripts/lint.py ;;
 projects)
 	for d in projects/*/; do
 		[ -d "$d" ] || continue

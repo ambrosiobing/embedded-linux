@@ -68,15 +68,12 @@ missing() {
 # something is the only test that distinguishes it.
 #
 # PYTHON overrides the search for a host where neither name is right.
-PY=${PYTHON:-}
-if [ -z "$PY" ]; then
-	for candidate in python3 python; do
-		if "$candidate" -c "import sys" >/dev/null 2>&1; then
-			PY=$candidate
-			break
-		fi
-	done
-fi
+# The resolution moved to scripts/python-resolve.sh on Tuesday 20 October
+# 2026, when ./go lint turned out to have the same fault. It sets PYTHON;
+# PY is kept as the name the steps below already use.
+. "$(dirname "$0")/python-resolve.sh"
+bench_resolve_python || true
+PY=$PYTHON
 
 step() {
 	printf '\n--- %s\n' "$1"

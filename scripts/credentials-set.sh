@@ -93,8 +93,24 @@ if command -v wpa_passphrase >/dev/null 2>&1; then
 	psk=$(wpa_passphrase "$ssid" "$secret" |
 		sed -n 's/^[[:space:]]*psk=\([0-9a-f]\{64\}\)$/\1/p')
 else
-	psk=$(python3 -c "import hashlib,sys;print(hashlib.pbkdf2_hmac('sha1',sys.argv[2].encode(),sys.argv[1].encode(),4096,32).hex())" \
-		"$ssid" "$secret")
+	# Resolved rather than named. python3 on the Windows authoring laptop
+	# is the Microsoft Store stub, which writes its refusal to stderr, so
+	# this substitution captured an empty string and the guard below
+	# fired. That was safe, and it blamed the passphrase for an absent
+	# interpreter: the message it prints names a key shorter than eight
+	# characters as the usual reason. scripts/python-resolve.sh and
+	# decision 133 have the rest.
+	. "$(dirname "$0")/python-resolve.sh"
+	if bench_resolve_python; then
+		psk=$("$PYTHON" -c "import hashlib,sys;print(hashlib.pbkdf2_hmac('sha1',sys.argv[2].encode(),sys.argv[1].encode(),4096,32).hex())" \
+			"$ssid" "$secret")
+	else
+		echo "credentials-set: there is no wpa_passphrase and no working" >&2
+		echo "       Python here, so the key cannot be derived on this" >&2
+		echo "       host at all. Name an interpreter with PYTHON=, or" >&2
+		echo "       install one with ./go setup." >&2
+		exit 1
+	fi
 fi
 
 [ -n "$psk" ] || {
