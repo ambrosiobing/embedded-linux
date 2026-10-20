@@ -40,9 +40,10 @@
 # The resolution itself moved to scripts/python-resolve.sh on Tuesday 20
 # October 2026, when ./go lint, ./go plot, ./go matrix and the PSK
 # derivation in scripts/credentials-set.sh turned out to name python3
-# directly and to have the same fault. Three callers wanting three
-# different things on failure is why that file resolves and returns while
-# this one decides what a test should do about it.
+# directly and to have the same fault. FOUR callers wanting four different
+# things on failure is why that file resolves and returns while this one
+# decides what a test should do about it: go, scripts/host-check.sh,
+# scripts/credentials-set.sh and here.
 . "${BENCH_RESOLVE:-$ROOT/scripts/python-resolve.sh}"
 
 bench_python() {
