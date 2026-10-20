@@ -4501,6 +4501,22 @@ file is a build on the build laptop. What ran here is a structural check,
 braces and angle brackets balanced, fragments numbered without gaps,
 every `__overlay__` carrying a target, and that is not a substitute.
 
+**That last paragraph was corrected on Tuesday 20 October 2026, and the
+correction is more embarrassing than the gap.** `dtc` was never missing
+from the places that matter: `scripts/host-setup.sh` installs
+`device-tree-compiler`, the CI workflow installs it by name, and
+`tests/lcd35a-overlay-test.sh` has compiled Project 7's overlay with
+`dtc -@` since long before any of this, failing on a warning. The tool
+was there the whole time and this project's suite simply never asked for
+it. The gap was real and the reason given for it was wrong.
+
+`tests/adxl345-overlay-test.sh` now compiles all four: both sources and
+both controls, each control produced by the same substitution the
+recipe runs, since a control that does not compile fails the build and
+generating it in the suite is the only way to see that before BitBake
+does. It skips, saying so, where `dtc` is absent, which is the authoring
+laptop and nowhere else.
+
 **And the hazard, repeated where it will be read.** In I2C mode `SDO` is
 the address strap and the brown lead holds it at GND. In SPI mode `SDO`
 is the part's data output. The brown lead comes off FIRST, with the
