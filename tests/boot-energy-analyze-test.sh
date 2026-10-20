@@ -27,6 +27,16 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SUT=$ROOT/projects/03-boot-energy/measure/analyze.py
 . "$ROOT/tests/lib/python.sh"
 bench_python "the energy analysis was NOT checked and"
+# analyze.py imports numpy, so the interpreter gate above is not
+# enough: without the module this suite ended in a raw
+# ModuleNotFoundError and exit 1, which scripts/host-check.sh counts
+# as a defect in the tree. Missed on Tuesday 20 October 2026 because
+# the sweep that found these ran with python3 as the Microsoft Store
+# stub, so every suite failed for the interpreter reason first and
+# the module dependency never surfaced. Found by the README saying
+# this test needs numpy. ppk2_boot.py does not, and its suite has no
+# such line.
+bench_python_module numpy "the energy analysis was NOT checked and" "${BENCH_REQUIRE_NUMPY:-0}"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

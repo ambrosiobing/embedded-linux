@@ -4806,3 +4806,45 @@ rather than evidence. Confirmed afterwards by running `sh
 ran: no defect found, three checks not asked, `pkg-config` absent, exit 1.
 The method is the simple one: run the real path, and do not edit the tree
 while it runs.
+
+### A sweep under one fault cannot see the fault behind it
+
+Tuesday 20 October 2026, after this entry had twice been called finished.
+
+`tests/boot-energy-analyze-test.sh` ended in a raw `ModuleNotFoundError`
+and exit 1 on an interpreter without numpy, where it should have skipped
+naming the gap. Its program, `projects/03-boot-energy/measure/analyze.py`,
+imports numpy, and the conversion had given that suite the interpreter
+gate and not the module gate.
+
+**Why it survived two days of this.** The sweep that found the fourteen
+broken suites ran with `python3` as the Microsoft Store stub, so every
+suite failed at the interpreter and no module dependency could surface
+behind it. A sweep conducted under one fault measures that fault and
+nothing else, and nothing in its output says so. The numpy gap only
+became visible once the interpreter gap was fixed, and by then the sweep
+had been run and believed.
+
+**What found it was a sentence.** `projects/03-boot-energy/README.md`
+said both of its tests need numpy. Chasing that claim found the ungated
+suite, and also found the claim half wrong in the other direction:
+`ppk2_boot.py` does not import numpy, so the capture test never needed
+it. One sentence, inaccurate about both halves, and the only thing in the
+tree pointing at a real defect.
+
+**Generalised rather than patched.** Every suite's gate was cross-checked
+against its program's imports, which comes back clean. Then every suite
+was run against `python -S`, which skips site-packages and so presents an
+interpreter with NO third-party module at all, not merely no numpy: none
+exits non-zero. That covers yaml, matplotlib, daqhats, ppk2_api and the
+rest in one pass, and it is the check this entry should have had from the
+start.
+
+`matplotlib` needs no gate because `analyze.py` refuses rather than skips
+when it is absent, and both branches are asserted: 37 assertions on a
+host with it and 36 on the runner without.
+
+`docs/BUILD-HOST.md` argued that numpy "belongs in the host list rather
+than being skipped with a note", which the skip now contradicts on its
+face. Both are true at once and it says so: installing it is what stops
+the skip from happening on any host that matters.

@@ -80,8 +80,13 @@ happens.
 
 ## Running it
 
-Neither test needs a board, a PPK2, or Project 2. Both need `numpy`, which
-CI has.
+Neither test needs a board, a PPK2, or Project 2. The analysis test needs
+`numpy`, because `analyze.py` imports it; the capture test does not, because
+`ppk2_boot.py` does not. This said "both" until Tuesday 20 October 2026,
+and reading that sentence is what found the analysis test ending in a raw
+`ModuleNotFoundError` where it should have skipped. Both skip, naming what
+went unchecked, on a host without what they need; `BENCH_REQUIRE_NUMPY=1`
+makes the absence a failure instead, and `.github/workflows/ci.yml` sets it.
 
 ```bash
 sh tests/boot-energy-analyze-test.sh
