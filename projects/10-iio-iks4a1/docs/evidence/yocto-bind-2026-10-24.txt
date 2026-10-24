@@ -344,6 +344,56 @@ annotation should re-check it rather than trust it.
 It blocks nothing: st_lis2duxs12 is not in the image, so the LIS2DUXS12 is
 unreachable here whatever it answers.
 
+**A third state, later the same evening: absent.** On the freshly flashed
+card below, iio-probe reports the bus column for 0x19 as "absent", where
+both earlier boots said "present". So across three boots that address has
+read absent, present, and present-with-a-plain-scan. It is intermittent
+rather than changed, which is a different thing to chase and still not
+worth chasing while no driver for the part is in the image.
+
+
+REPRODUCED FROM ONE COMMIT, WITH NOTHING COPIED BY HAND
+
+Everything above was measured on a card whose overlay had been scp'd onto
+the boot partition. That is a state no commit describes, so the result was
+re-taken properly: bench-iio-image rebuilt at 8ae1ada, which carries the
+st,drdy-int-pin property in the overlay recipe, archived as
+proj10-bench-iio/2026-10-24_8ae1ada, and flashed.
+
+    0x1e    LIS2MDL      st_magn      iio      claimed   loaded     lis2mdl
+            working: magnetometer, no FIFO
+
+Five of seven parts, from a single commit, with no hand editing of the
+card. The corrected iio-probe legend is on it too, which can only arrive
+through an image build, so the tool fix is confirmed as shipped rather
+than only committed.
+
+
+AND A NATURAL EXPERIMENT ON THE CREDENTIALS FAILURE
+
+The first flash of this card could not copy the network file:
+
+    --- could not mount both partitions, so the credential files on
+    --- this card were NOT written or checked.
+
+It was diagnosed as a stale partition table: the kernel kept the previous
+image's geometry, so the rootfs partition was the old 384.8M while the
+newly written ext4 described 478.4M, and ext4 will not mount a filesystem
+larger than its device. Forcing a re-read moved it to 478.4M and the mount
+then worked.
+
+The second flash, of the 8ae1ada image onto the same card in the same
+reader, printed
+
+    --- credentials  wifi.conf copied from /home/bing/bench/credentials
+
+The difference is that this image is the same size as the one already on
+the card, 478.4M over 478.4M, so the cached table was still correct and no
+re-read was needed. Same code, same card, same reader, differing in the
+one variable the diagnosis named. The failure is in the tooling and is
+recorded for a fix: checking that the partition NODES exist is not enough,
+because tonight they existed and were wrong.
+
 The reboot was checked before the result was read, because the first
 attempt at this test produced an unchanged board that could easily have
 been reported as a failed fix: the dmesg still carried a 726 second entry
