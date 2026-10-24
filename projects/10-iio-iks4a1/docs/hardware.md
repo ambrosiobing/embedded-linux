@@ -112,6 +112,100 @@ and the first `i2cdetect` will show it. Three things follow:
    than assumed; this makes the confirmation diagnostic rather than merely
    present
 
+## UM3239 is read, and it settles every strap
+
+**Supplied as a file on Saturday 24 October 2026, not fetched.** The
+section above stands: `st.com` still refuses this bench. What changed is
+that the document arrived by hand, UM3239 Rev 5 of February 2025.
+
+It is the document this page asked for first, and it closes all three
+things it was wanted for: which IMU is strapped to which address, what
+the shield does between the Arduino header and the sensors, and the
+jumper arrangement. It also carries four pages of schematic, so the
+separate schematic this page was still waiting for does not exist and is
+not needed.
+
+**Table 1, solder bridges for I2C address, defaults in bold in the
+original:**
+
+| Sensor | Default ADD | Set by | 7-bit |
+|---|---|---|---|
+| LSM6DSO16IS (U9) | `D5h` | SB35 | **0x6A** |
+| LSM6DSV16X (U4) | `D7h` | SB15 | **0x6B** |
+| LIS2DUXS12 (U5) | `33h` | SB20 | **0x19** |
+| LPS22DF (U6) | `BBh` | SB29 | **0x5D** |
+| LIS2MDL (U7) | `3Ch` | fixed, no strap | **0x1E** |
+| STTS22H (U8) | `71h` | fixed, no strap | **0x38** |
+| SHT40AD1B (U10) | `89h` | fixed, no strap | **0x44** |
+
+**So the predicted scan stops being a choice.** Four rows above were
+one-of-two or one-of-four, and all four are now single values: the
+LIS2DUXS12 is `0x19` and not `0x18`, the LPS22DF is `0x5D`, the STTS22H
+is `0x38` of its four possibilities, and **the LSM6DSO16IS is at `0x6A`
+with the LSM6DSV16X at `0x6B`**, which is the question this page said
+was not knowable from the headers.
+
+Seven addresses, exactly: `19 1e 38 44 5d 6a 6b`.
+
+**The identification read gains rather than loses by this.** It stops
+being a way to choose between two possibilities and becomes a claim the
+board can contradict: `0x6a` must read `0x22` at register `0x0F` and
+`0x6b` must read `0x70`. Either one swapped means this is not the board
+this page describes, which is a better test than the one it replaces.
+
+**Table 4, the Arduino connector, which is the wiring to a Raspberry Pi:**
+
+| Shield | Signal | Pi 3B+ header |
+|---|---|---|
+| CN6 pin 4 | 3.3 V | pin 1 |
+| CN5 pin 7 | GND | pin 9 |
+| CN5 pin 9 | I2C SDA | pin 3, GPIO2 |
+| CN5 pin 10 | I2C SCL | pin 5, GPIO3 |
+| CN8 pin 6 | LSM6DSO16IS INT1 | an input of your choosing |
+| CN9 pin 6 | LSM6DSV16X INT1 | an input of your choosing |
+| CN9 pin 8 | LSM6DSO16IS INT2 | |
+| CN9 pin 5 | LSM6DSV16X INT2 | |
+| CN8 pin 3 | LIS2MDL DRDY | |
+| CN8 pin 4 | LIS2DUXS12 INT | |
+| CN8 pin 5 | STTS22H INT | |
+| CN9 pin 7 | LPS22DF INT1 | |
+
+Table 4's own footnote says unlisted pins are not connected, so that is
+the whole of what the Arduino connector carries. **Five leads bring the
+board up**: 3.3 V, ground, the two bus lines and one interrupt.
+
+**The interrupt pin disagrees with this project's own wiring and that is
+not settled here.** The section below puts the LSM6DSV16X `INT1` on
+GPIO24, header pin 18, while project 5's overlay asks for GPIO23. Either
+works and they cannot both be used at once; whoever wires the shield
+picks one and writes it down with the date, because a wiring table is an
+observation and never a standing state.
+
+**The supply arrangement, which is the opposite of the SEN0032's.** The
+board mounts an `LDK130M-R` LDO generating 1.8 V for the MEMS from the
+3.3 V it is given, and UM3239 states that all signals between the sensors
+and the main board are translated by a level shifter. So the host side of
+every signal sits at the 3.3 V supplied to the connector, and a Raspberry
+Pi's levels are correct by the board's design rather than by luck. The
+SEN0032 ran its digital pins straight to the die with no margin at all,
+which is why that part had an absolute maximum worth worrying about and
+this one does not.
+
+**SPI is not available for the on-board sensors.** The introduction says
+the board talks to the host over I2C, with SPI pins only for a sensor
+mounted on the DIL24 adaptor, and Table 4 lists `SPI CLK` on CN9 pin 4
+with no MOSI, MISO or chip select anywhere. The auxiliary SPI named in
+the feature list belongs to the LSM6DSV16X and is for an external camera
+module. **A two-bus demonstration cannot be done on this shield's own
+IMU**, which is a real cost to project 5's seam and should be recorded as
+one rather than discovered during a bring-up.
+
+**Five bus modes exist, selected by J4 and J5.** Mode 1 is the plain one,
+every sensor on the host bus. Modes 2 and 3 put one IMU in charge as an
+I2C sensor hub with the environmental sensors behind it on an auxiliary
+bus, which changes what a scan shows. Anyone meeting an unexpected scan
+should read J4 and J5 before suspecting the parts.
+
 ## Why the identification read is worth more here than anywhere else
 
 This bench has wanted a `WHO_AM_I` check before. Project 5's page lists
@@ -311,7 +405,7 @@ at all. So the following remain exactly as `NOT READ` as before:
 |---|---|
 | the supply range of each sensor | its datasheet |
 | the absolute maximum on an interrupt pin | its datasheet |
-| what the IKS4A1 shield does between the Arduino header and the sensors | UM3239 |
+| ~~what the IKS4A1 shield does between the header and the sensors~~ | **UM3239, read Saturday 24 October 2026: an LDO to 1.8 V and a level shifter, so the connector side is at the supplied 3.3 V** |
 | whether `INT1` is push-pull or open-drain by default, and its polarity | the datasheet, and also a register the header does define |
 
 **The last row is half answerable from the header**, which is a good
@@ -327,7 +421,7 @@ order of value:
 
 | Document | What it closes |
 |---|---|
-| **UM3239**, getting started with the X-NUCLEO-IKS4A1 | which IMU is strapped to which address, what the shield does between the header and the sensors, and the jumper arrangement |
+| ~~**UM3239**, getting started with the X-NUCLEO-IKS4A1~~ | **done**, Rev 5 of February 2025, supplied as a file on Saturday 24 October 2026. It closed all three: the straps, the level shifting, and the jumper modes |
 | LSM6DSV16X datasheet | the supply range, the absolute maxima, and the `INT1` pin's electrical behaviour |
 | LPS22DF, LIS2MDL, STTS22H, LIS2DUXS12 datasheets | the same, per sensor |
 | ~~SHT40 datasheet, from Sensirion~~ | **done**, version 6.4 of November 2023, read Wednesday 7 October 2026 and worked through above |
@@ -339,6 +433,11 @@ actually happens.
 
 ## Still `NOT READ`
 
-Everything above marked so, plus the IKS4A1's schematic if ST publishes
-one separately from UM3239. **The register maps are no longer on this
-list**, and that is the change this page records.
+Everything above marked so. **The register maps left this list on
+Wednesday 7 October 2026 and the board document left it on Saturday 24
+October 2026**, so what remains is the per-sensor electrical detail: the
+supply ranges, the absolute maxima, and each interrupt pin's behaviour.
+Those live in the seven sensor datasheets and nowhere else.
+
+A separate schematic is no longer wanted: UM3239 carries four pages of
+it, figures 7 to 10.

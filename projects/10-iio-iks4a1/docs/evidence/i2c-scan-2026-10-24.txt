@@ -1,0 +1,87 @@
+X-NUCLEO-IKS4A1 on the Raspberry Pi 3B+, Saturday 24 October 2026
+=================================================================
+
+The first scan of this shield against a prediction rather than against
+an expectation. Every address below was written down before the board
+was powered, from UM3239 Rev 5 Table 1, and every WHO_AM_I value from
+ST's own register headers read on Wednesday 7 October 2026. The two
+documents had never been checked against each other.
+
+WIRING, five leads, shield to Pi header. UM3239 Table 4 for the shield
+side. Every contact is a Dupont pin in a soldered socket, which is why
+no continuity preliminaries were run: see walkthrough/08-board-bringup
+for the rule and what it exempts.
+
+    CN6 pin 4   3.3 V              Pi pin 1
+    CN5 pin 7   GND                Pi pin 9
+    CN5 pin 9   I2C SDA            Pi pin 3, GPIO2
+    CN5 pin 10  I2C SCL            Pi pin 5, GPIO3
+    CN9 pin 6   LSM6DSV16X INT1    Pi pin 18, GPIO24
+
+The interrupt lead was first put on pin 16, GPIO23, and moved to pin 18
+to match bench-iks4a1-overlay.dts, which asks for <24 4>.
+
+The Nucleo was not involved. The shield was read both stacked on an
+unpowered NUCLEO-H7A3ZI-Q and lifted off it, with identical results,
+and it should be left off: feeding 3.3 V into the connector back-powers
+the Nucleo through its own rail.
+
+THE SCAN
+
+    root@raspberrypi3-64:/# i2cdetect -y 1
+         0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+    00:                         -- -- -- -- -- -- -- --
+    10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- 1e --
+    20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+    30: -- -- -- -- -- -- -- -- 38 -- -- -- -- -- -- --
+    40: -- -- -- -- 44 -- -- -- -- -- -- -- -- -- -- --
+    50: -- -- -- -- -- -- -- -- -- -- -- -- -- 5d -- --
+    60: -- -- -- -- -- -- -- -- -- -- 6a 6b -- -- -- --
+    70: -- -- -- -- -- -- -- --
+
+PREDICTED versus SEEN
+
+    0x19  LIS2DUXS12    ABSENT
+    0x1e  LIS2MDL       seen
+    0x38  STTS22H       seen
+    0x44  SHT40AD1B     seen
+    0x5d  LPS22DF       seen
+    0x6a  an IMU        seen
+    0x6b  the other     seen
+
+Six of seven. Neither 0x18 nor 0x19 answered, so the LIS2DUXS12 is not
+on the bus at all rather than at an unexpected address. UM3239 Table 3
+gives its SDA and SCL as SB22 and SB16, and the Mode 3 block on page 6
+lists SB22, SB19 and SB20 among bridges that are not mounted. Reaching
+it would mean soldering, which this bench cannot do. It costs nothing
+here: iio.cfg configures the IMU, the magnetometer, the pressure sensor
+and the humidity sensor, and not that part.
+
+THE IDENTIFICATION, which is the test that could have failed
+
+    root@raspberrypi3-64:/# printf '0x6a: '; i2cget -y 1 0x6a 0x0f
+    0x6a: 0x22
+    root@raspberrypi3-64:/# printf '0x6b: '; i2cget -y 1 0x6b 0x0f
+    0x6b: 0x70
+
+    0x6a  WHO_AM_I 0x22  ->  LSM6DSO16IS
+    0x6b  WHO_AM_I 0x70  ->  LSM6DSV16X
+
+Read twice, identical. This settles the question docs/hardware.md raised
+on Wednesday 7 October 2026 and said was not knowable from the register
+headers: which IMU is strapped to which address. UM3239 Table 1 predicted
+it, D5h for the LSM6DSO16IS and D7h for the LSM6DSV16X, and the board
+agrees. bench-iks4a1-overlay.dts already declares both at exactly these
+addresses, so no overlay change is needed.
+
+WHAT THIS DOES NOT SHOW
+
+No driver is bound. This card carries the project 5 image, which installs
+the ADXL345 modules and names no kernel-module-st-lsm6dsx package, so
+st_lsm6dsx is compiled, cached and absent from the rootfs. Nothing here
+says the driver works, that the interrupt line is correct, or that any
+sensor produces a sample. The scan and the identification are the bus
+answering, nothing more.
+
+The -121 line for 1-0053 in dmesg on this boot is the project 5 overlay
+looking for an ADXL345 that is no longer wired. Expected, not a fault.
