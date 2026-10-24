@@ -5130,7 +5130,10 @@ to be read off the shield rather than taken from memory, since
 `LSM6DSV16X` and `LSM6DSO16IS` both bind and only one is on the board.
 Whether the IKS4A1 can be strapped to SPI at all is a hardware question
 its user manual answers, and ST serves no PDF to this bench, so that goes
-through GitHub. And whether Project 11 moves with this or stays on the
+through GitHub. **Project 11 moves too, settled by decision 138 the same afternoon**, so
+the question below is closed and is kept only to show what it rested on.
+
+And whether Project 11 moves with this or stays on the
 ADXL345 is a separate decision: the two projects use one part on purpose,
 so that an in-kernel driver and a packaged userspace library can be
 compared on the same sensor, and moving one alone breaks that pairing.
