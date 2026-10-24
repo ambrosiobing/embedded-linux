@@ -3371,3 +3371,135 @@ files than the one being committed.
 There is a note already in this repository's method about saying what a
 check did not look at. `lint.py` does that correctly. The gap was entirely
 in the reading, which is the less comfortable of the two places to find one.
+
+## 58. The drivers bind, and the one that did not took a devicetree property nobody could have guessed
+
+*Saturday 24 October 2026, evening.* `bench-iio-image` reached the board.
+Under the mainline `st_lsm6dsx` from the 6.6.63 tree this repository
+builds, the LSM6DSV16X at `0x6b` probes and registers two IIO devices
+sharing one hardware FIFO. That is the premise the whole project rests on
+and until tonight it was an expectation.
+
+It is worth being precise about why this is new. Every earlier record in
+`docs/evidence/` was taken on eplepi, the Pi 4B, running Raspberry Pi OS
+with four out-of-tree ST drivers compiled on the board against a
+`linux-source-6.18` tree unpacked into `/usr/src` and loaded by `insmod`.
+Nothing in this repository rebuilds that card, which is why
+`scripts/card-archive.sh` exists and treats it as an artefact rather than
+an output. Tonight the same parts were driven by packaged mainline drivers
+from a commit, on a different board, built by a command anyone can run.
+
+Four parts worked on the first boot: `0x6b` and `0x6a`, the pressure
+sensor at `0x5d`, and the SHT40 at `0x44` under hwmon rather than IIO
+exactly as `iio.cfg` warns in capitals. The LPS22DF is the one `iio.cfg`
+predicted was most likely to come back MISSING on an older tree, because
+its entry is a recent addition to `st_pressure`. On 6.6.63 it is there.
+
+And `iio_sysfs_trigger` is in `/sys/bus/iio/devices/` with no package
+behind it, which is the evening's first build failure seen from the
+working side.
+
+### The magnetometer, and three wrong turns on the way to it
+
+`0x1e` was `not-bound`. `iio-probe` says of that state "look at the
+overlay, not the image", and the overlay declares `lis2mdl@1e` in the same
+fragment as two sensors that bound. So the advice was wrong, and noticing
+that was the first useful step.
+
+**The first dmesg could not have shown the cause.** It was filtered
+`-e lsm6 -e st_lsm6dsx -e iio`, which cannot match a line beginning
+`st-magn-i2c`. Widening it produced the whole answer in one line:
+
+    st-magn-i2c: probe of 1-001e failed with error -22
+
+A filter is a question, and that one did not ask about the magnetometer.
+
+**The second wrong turn was an attribution.** The boot log carries
+
+    [    7.600597] iio iio:device0: DRDY on INT2 not available.
+
+and I assigned it to `1-005d`, the pressure sensor, because `iio:device0`
+pointed there in the finished sysfs listing. The timestamps put it inside
+the magnetometer's probe window instead. Rather than argue the point, the
+client was still unbound and so the probe could simply be run again on its
+own:
+
+    echo 1-001e > /sys/bus/i2c/drivers/st-magn-i2c/bind
+
+At 726 seconds of uptime, with nothing else probing, the same five lines
+appeared in the same order. The device was `iio:device5` that time and
+`iio:device0` at boot, for the same part on the same bus, because a failed
+probe frees its number and the number is reused. **An `iio:deviceN` read
+off a final listing is not evidence about a message printed during boot.**
+
+**The third was nearly a conclusion from recall.** The mechanism was
+guessable and the project has already lost an evening to confidently
+reasoned mechanisms, so it was read instead, out of the kernel source in
+the build tree:
+
+    st_magn_core.c:506         .drdy_int_pin = 2
+
+is the driver's default for every magnetometer it handles. The settings
+entry this part shares with the LSM303AGR and the IIS2MDC declares
+
+    .int1 = { .addr = 0x62, .mask = 0x01 },
+
+and no `.int2` member at all. In `st_sensors_set_drdy_int_pin` the escape
+for a sensor with no interrupt support tests `.addr`, while the switch
+tests `.mask`. `int1.addr` is non-zero, so the escape does not fire; `case
+2` finds `int2.mask` zero and returns `-EINVAL`. `int1.mask` is `0x01`, so
+asking for pin 1 passes.
+
+So the fix is `st,drdy-int-pin = <1>` on the node, and no driver work. It
+is bookkeeping rather than wiring: no interrupt is connected to this
+sensor and none is wanted, because it has no FIFO and is therefore the
+device the hrtimer trigger is demonstrated on. The check runs regardless
+of whether an IRQ exists, which is why a node with no `interrupts`
+property was still refused.
+
+### The result, and the precondition that nearly hid it
+
+Overlay rebuilt with `./go bitbake bench-iio -c deploy bench-iks4a1`,
+confirmed to contain `st,drdy-int-pin` before the copy and again on the
+card after it, then copied to `/boot/overlays` and the board rebooted:
+
+    [    7.217864] st-magn-i2c 1-001e: supply vdd not found...
+    [    7.226969] st-magn-i2c 1-001e: supply vddio not found...
+    [    7.235988] st-magn-i2c 1-001e: mounting matrix not found...
+
+Three lines, and the fourth is gone. `0x1e` is `working`, six IIO devices
+where there were five, five of seven parts up, and the hrtimer path
+unblocked.
+
+**The first attempt at that test produced an unchanged board**, and read
+exactly like a failed fix. The `scp` had not run. What gave it away was
+that `dmesg` still carried the 726 second entry from the previous uptime,
+which a reboot cannot preserve. `uptime` is a one-word precondition for
+any of this meaning anything, and it now goes first.
+
+### Two things checked rather than assumed, and one left open
+
+The `UU` reading was confirmed by experiment. `1e` appearing in a scan
+rather than `UU` had been used to argue a client existed with no driver
+bound, on the grounds that the kernel reports an address busy only when a
+driver is attached. With the magnetometer bound, the same scan on the same
+hardware shows `UU` at `1e`.
+
+`iio-probe`'s `not-bound` legend is corrected. That bucket holds two
+different faults, a compatible that never matched and a probe that ran and
+failed, and the table cannot separate them. It now says so and sends the
+reader to `dmesg` first. Its test asserted the old sentence, which would
+have locked the bad advice in; it now asserts the ordering instead.
+
+Left open and written down rather than explained: `0x19` answers a plain
+`i2cdetect` now and did not before, while `iio-probe` still annotates it
+"answers only `i2cdetect -r`". The two scans differ in more than one
+thing. It blocks nothing, since `st_lis2duxs12` is not in the image.
+
+### What this is not
+
+No sample has been read. Every criterion in this project is about numbers
+coming out of these devices, and tonight settled only that the devices are
+there. The FIFO has not been exercised, no trigger has been created, and
+no rate has been measured. What changed is that all of those are now
+attempts rather than blocked.
