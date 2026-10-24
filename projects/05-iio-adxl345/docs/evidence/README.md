@@ -19,6 +19,7 @@ one day.
 | `paths-2026-10-17.csv` and `.md` | the design's three-path comparison, all three arms on one card, the duplicate experiment at 53.2 per cent against a 5.5 floor, and the run that measured the triggered path while reporting the FIFO | Saturday 17 October 2026 |
 | `drivers-ab-2026-10-17.csv` and `.md` | 7, the same part under both drivers, eleven minutes apart, and the 0.141 per cent their scales disagree by | Saturday 17 October 2026 |
 | `triggered-2026-10-17.csv` and `.md` | 11, the triggered buffer, one scan per fire, timestamped by the core | Saturday 17 October 2026, on the first card to carry the corrected probe |
+| `supply-ruled-out-2026-10-24.txt` | no criterion, and it closes the entry below. The harness measured good BEFORE the scan this time, supply and return present at the module's own rows and not the same net, and the part still answered nothing. A seven-sensor shield had answered on the same four header pins twenty minutes earlier, which is the first positive control this bench has had. Sixth `-121`. What remains is the six friction contacts and nothing else | Saturday 24 October 2026 |
 | `supply-fault-2026-10-21.csv` and `.md` | no criterion. Why the part answered nothing on either bus: its `VCC` and `GND` were the same net, at ground. Seventeen GPIO readings taken with no instrument but the Pi's own lines, four of which are marked in the page as having been over-read | Tuesday 21 October 2026 |
 
 ## What is still missing, in criterion order

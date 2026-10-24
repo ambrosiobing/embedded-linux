@@ -1,0 +1,77 @@
+The SEN0032 with its harness measured good, Saturday 24 October 2026
+===================================================================
+
+This closes the thread opened by supply-fault-2026-10-21. That day the
+module's VCC and GND were one net and it took five hours to find. This
+took about ten minutes, because the harness was measured BEFORE the
+scan rather than theorised about after it.
+
+WHAT WAS MEASURED FIRST, probe from GPIO25 on header pin 22, both
+biases at each point, per walkthrough/08-board-bringup.
+
+    probe in mid air          pull-up 1  pull-down 0   floating, so the
+                                                       instrument works
+    module's own VCC row      pull-up 1  pull-down 1   driven high
+    module's own GND row      pull-up 0  pull-down 0   driven low
+
+Different answers at the two rows, which is the whole point: on Tuesday
+both rows would have read 0 0. VCC came straight from header pin 1 and
+GND straight from header pin 9, neither through a breadboard rail.
+
+WIRING, as on Friday 9 October 2026 when this part last answered
+
+    VCC  pin 1      GND  pin 9      SDA  pin 3      SCL  pin 5
+    CS   pin 17 (3V3, I2C mode)     SDO  pin 6 (GND, address 0x53)
+
+THE RESULT
+
+    root@raspberrypi3-64:/# i2cdetect -y 1
+    ... every cell --, no address anywhere on the bus ...
+
+    [7.131172] bench-adxl345-i2c 1-0053: error -EREMOTEIO: cannot read DEVID
+    [7.140159] bench-adxl345-i2c: probe of 1-0053 failed with error -121
+
+The sixth -121. Completely empty, which is an electrically absent part
+rather than a clamping one.
+
+WHY THIS ONE IS CONCLUSIVE AND THE EARLIER ONES WERE NOT
+
+Every external variable is eliminated by measurement rather than by
+argument:
+
+  - the supply and the return are present at the module's own rows, and
+    are not the same net
+  - header pins 1, 9, 3 and 5 carried an X-NUCLEO-IKS4A1 twenty minutes
+    earlier, which answered on six addresses and identified both of its
+    IMUs by WHO_AM_I. See projects/10-iio-iks4a1/docs/evidence/
+    i2c-scan-2026-10-24.txt. That is a positive control on the same four
+    pins, which this bench has never had before
+  - the I2C controller produced a full scan table rather than an error,
+    and GPIO2 and GPIO3 read 3.3 V under both biases on Tuesday
+  - the CS and SDO straps are the arrangement that read DEVID 0xe5 on
+    Friday 9 October 2026
+
+What remains is the male pin against the plated hole wall, six of them,
+and no instrument outside the module can reach one. The inventory has
+said since Tuesday 6 October 2026 that this is a wiring and contact
+question and never a dead-part question, because the part has been read
+successfully before.
+
+WHAT IT COSTS AND WHAT UNBLOCKS IT
+
+Decision 129 chose to replace the wiring rather than retry it, and its
+remedy is a soldering sitting. Decision 135 reopened it because there is
+no iron here. This entry does not reopen anything further: it removes
+the alternatives. A soldering iron and one 8-pin 2.54 mm male header is
+the only route to this part.
+
+Project 5 no longer depends on it: decision 136 moves that driver to the
+IKS4A1's IMU. Project 11 does, and stays, because two of its six
+criteria are already met against this part and its library, packaging
+and symbols file are an ADXL345 library. Criteria 1, 3 and 6 are its
+only open ones and all three need this part to answer.
+
+So the iron is no longer a way to rescue a dead sensor. It is what
+stands between project 11 and its acceptance, and it also restores the
+two-bus seam project 5 loses on the IKS4A1, which carries SPI only for a
+DIL24 sensor.

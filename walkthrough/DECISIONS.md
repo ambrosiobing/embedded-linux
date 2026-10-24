@@ -5195,3 +5195,62 @@ both unreadable and dangerous to connect. It sees only what shares the
 board's ground, which excludes the Nucleo, the modem HATs and the
 isolated side of the CAN board. Its help text says all three, because a
 tool that overstates itself is worse than no tool.
+
+## 138. The SEN0032 leaves the dependency graph, and project 11 follows project 5 onto the ST shields
+
+**Context.** Saturday 24 October 2026, after the measurement that
+settles it. The module's supply and return were verified present at its
+own rows and not the same net, the four header pins it uses had carried
+an X-NUCLEO-IKS4A1 answering on six addresses twenty minutes earlier,
+and the scan was completely empty for the sixth time.
+`projects/05-iio-adxl345/docs/evidence/supply-ruled-out-2026-10-24.txt`
+has the readings. Nothing outside the module remains unmeasured, and
+nothing inside it can be reached without a soldering iron.
+
+**Decision.** No project depends on the SEN0032 from today. Project 5
+targets the IKS4A1's IMU, decided in 136, and **project 11 moves too**.
+
+**This reverses a recommendation made the same afternoon.** Two hours
+earlier the argument here was that project 11 should stay: its criterion
+2 is met against this part with real captures, and its library, symbols
+file and Debian packaging are an ADXL345 library. That argument rested on
+the soldering iron arriving. It has not arrived in the three weeks since
+the inventory first named it, and the part is unreachable until it does.
+A criterion already met is worth less than five criteria that can never
+be attempted.
+
+**What it costs, stated rather than waved away.** Criterion 2 was earned
+on Saturday 3 October 2026 with real captures at 0.960 g and 1.031 g and
+it does not transfer; it has to be taken again on the new part, which is
+minutes on hardware that answers. Criteria 4 and 5, the six exported
+symbols and the Debian packaging, are structural rather than part
+specific, so they are re-run rather than redesigned. Criteria 1, 3 and 6
+become reachable for the first time.
+
+**What the project keeps, which is most of it.** Project 11's subject is
+library hygiene and packaging: i2c-dev and `I2C_RDWR`, soname and hidden
+visibility, pkg-config, bindings, fake-bus tests, udev groups, a hardened
+unit, three Debian packages and a clean `lintian`. None of that is about
+which sensor is on the other end of the bus. The register layer changes
+and the argument does not.
+
+**Rejected: waiting.** The iron plus an 8-pin header is still the only
+route to the SEN0032 and it would still restore project 5's two-bus
+seam, which the IKS4A1 cannot provide because its SPI pins serve only a
+DIL24 sensor. It stays on the purchase list for that reason. It is no
+longer allowed to block anything.
+
+**NOTHING IS DELETED.** The out-of-tree driver, its four overlays, the
+image recipe, every evidence file and decisions 127 through 137 stay
+exactly where they are. The bench keeps the part too. What changes is
+that no plan is written around it. The two sittings it cost are the most
+instructive material in the project: the first spent five hours on three
+conclusions that were later withdrawn, and the second reached a firmer
+conclusion in ten minutes because the harness was measured before the
+experiment rather than theorised about after it. That contrast is the
+argument for decision 137 and it should outlive the part.
+
+**Open, and unchanged by this.** The IKS5A1 is examined by the method
+UM3239 made possible: roster off the board or out of its manual, then
+each part looked up in its driver's compatible table. Its manual has not
+been supplied and `st.com` still refuses this bench.
