@@ -262,11 +262,105 @@ That is bookkeeping rather than wiring. No interrupt is connected to this
 sensor and none is wanted, because it has no FIFO and is therefore the
 device the hrtimer trigger is demonstrated on.
 
-**NOT YET MEASURED.** Everything in this section is source reading. The
-property is in the overlay as of this file's commit and the probe has not
-been re-run with it. Until it has, "the fix is one property" is a
-prediction, and the receipt is st-magn-i2c binding at 1-001e with an entry
-appearing under /sys/bus/iio/devices.
+MEASURED, AND THE PREDICTION HELD
+
+The property was added to the overlay, the overlay rebuilt with
+
+    ./go bitbake bench-iio -c deploy bench-iks4a1
+
+from meta-bench 81ec00f, copied to the board's /boot/overlays and the
+board rebooted. Confirmed present in the compiled blob before the copy and
+again on the card afterwards, because a source change that does not reach
+the device is the commonest way to measure nothing:
+
+    # strings bench-iks4a1.dtbo | grep drdy
+    st,drdy-int-pin
+
+After the reboot, uptime 0 min:
+
+    # dmesg | grep -i -e magn -e lis2mdl
+    [    7.217864] st-magn-i2c 1-001e: supply vdd not found, using dummy regulator
+    [    7.226969] st-magn-i2c 1-001e: supply vddio not found, using dummy regulator
+    [    7.235988] st-magn-i2c 1-001e: mounting matrix not found: using identity...
+
+Three lines, and the fourth is gone. No DRDY message, no -22.
+
+    0x1e    LIS2MDL      st_magn      iio      claimed   loaded     lis2mdl
+            working: magnetometer, no FIFO
+
+Five of the seven parts now work. The hrtimer path, which this sensor is
+the subject of, is unblocked.
+
+Six IIO devices, where there were five:
+
+    # ls -l /sys/bus/iio/devices/
+    iio:device0 -> .../i2c-1/1-001e/iio:device0
+    iio:device1 -> .../i2c-1/1-005d/iio:device1
+    iio:device2 -> .../i2c-1/1-006a/iio:device2
+    iio:device3 -> .../i2c-1/1-006a/iio:device3
+    iio:device4 -> .../i2c-1/1-006b/iio:device4
+    iio:device5 -> .../i2c-1/1-006b/iio:device5
+    iio_sysfs_trigger -> ../../../devices/iio_sysfs_trigger
+
+**And the numbering moved.** iio:device0 was 1-005d before this change and
+is 1-001e after it, because the magnetometer now registers first. That is
+the same trap that produced the wrong attribution earlier in this file,
+seen a second time from a different direction: these numbers are
+allocation order and never identity. Any record that names an iio:deviceN
+without the 1-00XX behind it is worthless the moment a probe succeeds or
+fails differently.
+
+
+THE UU READING, CHECKED BY EXPERIMENT
+
+Earlier in this file, 1e appearing in the scan rather than UU was used to
+argue that a client existed with no driver bound, on the grounds that the
+kernel reports an address busy only when a driver is attached. With the
+magnetometer bound, the same scan on the same hardware:
+
+    10: -- -- -- -- -- -- -- -- -- 19 -- -- -- -- UU --
+    40: -- -- -- -- UU -- -- -- -- -- -- -- -- -- -- --
+    50: -- -- -- -- -- -- -- -- -- -- -- -- -- UU -- --
+    60: -- -- -- -- -- -- -- -- -- -- UU UU -- -- -- --
+
+0x1e is UU. Same address, same client, bound this time. The inference was
+correct and it is now a measurement rather than an argument.
+
+
+AN UNEXPLAINED CHANGE AT 0x19, RECORDED AND NOT ACCOUNTED FOR
+
+0x19 appears in that scan as 19. In the scan taken before this change it
+was absent entirely, and iio-probe annotates the part "answers only
+i2cdetect -r". That annotation is now contradicted by the bus.
+
+No explanation is offered here. The two scans differ in more than one
+thing, since the second follows a reboot with a changed overlay and a
+magnetometer that now probes and writes registers, and a plain i2cdetect
+uses a quick write on this address range where -r uses a read, so the
+change could be in the part's state or in nothing at all. It is written
+down because it was seen, and because the next person to read that
+annotation should re-check it rather than trust it.
+
+It blocks nothing: st_lis2duxs12 is not in the image, so the LIS2DUXS12 is
+unreachable here whatever it answers.
+
+The reboot was checked before the result was read, because the first
+attempt at this test produced an unchanged board that could easily have
+been reported as a failed fix: the dmesg still carried a 726 second entry
+from the previous uptime, which a reboot cannot preserve. uptime is the
+cheap precondition for any of this meaning anything.
+
+
+A DEFECT IN iio-probe, FOUND BY THIS
+
+Its not-bound text reads "look at the overlay, not the image". For this
+failure that was the wrong layer twice over: the overlay declared the node
+correctly, and the fix, when it came, WAS in the overlay but for a reason
+the message could not suggest. A not-bound with a client present and a
+failed probe is the case its own bound-no-device entry describes, "look in
+dmesg for its probe", and that is the advice that would have shortened
+this by the time it took to widen a grep. Worth correcting so the next
+reader is not sent to the one layer that is already right.
 
 
 0x19 LIS2DUXS12 has no driver in the image and no node either. It also

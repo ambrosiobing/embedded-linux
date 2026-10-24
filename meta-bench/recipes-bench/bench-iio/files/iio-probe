@@ -318,6 +318,20 @@ printf '%s\n' "$PARTS" | while IFS='|' read -r addr part driver subsys compat tr
 		# under two different and both wrong names.
 		status="undeclared"
 	else
+		# A client exists and nothing is bound to it. This bucket holds
+		# TWO different faults and cannot separate them, which is why
+		# its legend sends the reader to dmesg before the overlay.
+		#
+		# The legend used to say "driver present, nothing matched it:
+		# look at the overlay, not the image". On Saturday 24 October
+		# 2026 the magnetometer at 0x1e sat here while the overlay was
+		# correct and the driver HAD matched: st-magn-i2c ran and its
+		# probe returned -22, because st_magn defaults every part to
+		# DRDY pin INT2 and the LIS2MDL declares only INT1. The row was
+		# right and the advice sent the reader to the one layer that
+		# was already fine. The fix, st,drdy-int-pin = <1>, did turn
+		# out to be in the overlay, but nothing about "nothing matched
+		# it" could have suggested it; one line of dmesg did.
 		status="not-bound"
 	fi
 
@@ -351,8 +365,12 @@ if [ "$machine_readable" = no ]; then
 	echo
 	note "status meanings"
 	echo "    working             a driver is bound and created devices"
-	echo "    not-bound           driver present, nothing matched it:"
-	echo "                        look at the overlay, not the image"
+	echo "    not-bound           a client exists and no driver is bound"
+	echo "                        to it. Either nothing matched the"
+	echo "                        compatible, or a probe ran and FAILED,"
+	echo "                        and this table cannot tell those apart:"
+	echo "                        read dmesg for this address first, then"
+	echo "                        the overlay"
 	echo "    no-driver-in-image  configured in the kernel is not the same"
 	echo "                        as packaged into the rootfs"
 	echo "    bound-no-device     the driver matched and registered"

@@ -323,8 +323,16 @@ contains "and the iio device list it drew conclusions from" "$out" "iio devices"
 # with no legend sends the reader to the source.
 out=$(run)
 contains "the plain table explains its status words" "$out" "status meanings"
+# The not-bound legend sends the reader to dmesg BEFORE the overlay, and
+# that ordering is the assertion rather than the wording. It used to say
+# "look at the overlay, not the image", which was wrong for the fault that
+# actually turned up in that row on Saturday 24 October 2026: a probe that
+# ran and failed, which this table cannot tell from a compatible that never
+# matched. Asserting the old sentence would have locked in the bad advice.
 contains "including where to look when a driver did not bind" \
-	"$out" "look at the overlay, not the image"
+	"$out" "read dmesg for this address first"
+contains "and it admits the two faults it cannot separate" \
+	"$out" "a probe ran and FAILED"
 
 echo
 echo "$pass passed, $fail failed"
