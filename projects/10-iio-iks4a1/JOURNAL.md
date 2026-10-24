@@ -3327,3 +3327,47 @@ version written into a fragment is a claim about whichever kas file loads it.
 The card has not been flashed. Whether `st_lsm6dsx` binds at `0x6b` and
 produces an IIO device is the question this whole sitting has been trying to
 get to, and every finding above is about the build.
+
+### The commit went red, and the linter had already said why
+
+CI failed on `b373892` at the `Static layer checks` step, which is
+`python3 scripts/lint.py`:
+
+    tests/lint-image-packages-test.sh: has a shebang but is committed as
+    100644, not 100755
+
+Every sibling in `tests/` is 100755. `check_exec_bits` exists for this and
+its docstring names the cause: git on Windows defaults to
+`core.filemode=false`, so a `chmod` on the authoring laptop never reaches
+the commit and the file arrives on Linux as 644, where the symptom is
+"Permission denied" a long way from the cause. One command fixed it,
+`git update-index --chmod=+x`, and the blob did not change.
+
+**The lint run before the push said `lint: clean`, and it was reporting the
+defect at the same time.** `check_exec_bits` reads `git ls-files --stage`,
+so an untracked file is not in its input at all. A new script is therefore
+the one case that rule cannot cover and the only case where the mode is
+likely to be wrong. The file carries a second rule for exactly that,
+`check_untracked_scripts`, written after `tests/common-test.sh` reached CI
+as 644 in the same way, and it had already named the file and printed the
+remedy:
+
+    note: untracked scripts, whose mode is not checked until staged:
+          tests/lint-image-packages-test.sh
+          git add them, then:  git update-index --chmod=+x <file>
+          and run this again. On Windows chmod alone does not do it.
+
+Those are the first four lines of the output. The run was piped through
+`tail -2`, which kept `lint: clean` and threw the rest away.
+
+So nothing in the tree was missing. Two reading habits were wrong, and both
+generalise past this file. **A checker that reports what it could not look
+at prints that before its findings**, which makes the tail the least
+valuable part of its output, the opposite of the usual assumption about
+build logs. And **an index-reading rule has to be run again after `git add`**,
+because before staging it is answering a question about a different set of
+files than the one being committed.
+
+There is a note already in this repository's method about saying what a
+check did not look at. `lint.py` does that correctly. The gap was entirely
+in the reading, which is the less comfortable of the two places to find one.
