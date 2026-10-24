@@ -238,6 +238,18 @@ jobs:
         run: |
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-rt/files/rt-toggle.c -o /tmp/rt-toggle $(pkg-config --libs libgpiod)
 
+      - name: Compile bench-diag
+        # The bench's voltmeter, continuity tester and logic probe.
+        # It is in scripts/host-check.sh too, and this step exists
+        # because this workflow mirrors that script by hand rather than
+        # calling it: a compile added there alone would run on one WSL
+        # machine and never on a push. --help is the only subcommand
+        # that opens no chip, so it is the one a runner can execute.
+        run: |
+          src=meta-bench/recipes-bench/bench-diag/files
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) "$src/bench-diag.c" -o /tmp/bench-diag $(pkg-config --libs libgpiod)
+          /tmp/bench-diag --help > /dev/null
+
       - name: Compile the sensor hub daemon
         # Two libraries at once, and the only check anywhere that looks at
         # the D-Bus interface declaration. proto.c is compiled in here too,
