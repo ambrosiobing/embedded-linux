@@ -196,11 +196,30 @@ check_fragment() {
 	while IFS= read -r line; do
 		case $line in
 		"# consequence:"*)
-			marker=yes
 			# The TEXT, not just the fact of it. The claim is the
 			# thing to be checked, and it cannot be checked if it is
 			# thrown away here.
-			marker_text=${line#\# consequence:}
+			#
+			# ACCUMULATED ACROSS LINES, not replaced by the last one.
+			# This was a plain assignment until Saturday 24 October
+			# 2026, so a claim wrapped over several consequence lines
+			# was silently truncated to its tail, and a path on any
+			# earlier line was thrown away before it could be
+			# matched. The symptom is the mildest one this script
+			# produces, "claim names no Kconfig file", which reads as
+			# a complaint about the comment rather than about the
+			# reader, so it was believed twice before the script was
+			# read. Both markers in adxl345.cfg happened to carry
+			# their path last, which is why this never showed.
+			#
+			# A run starts fresh when the previous line was not one of
+			# these, which is what the marker flag already records.
+			if [ "$marker" = yes ]; then
+				marker_text="$marker_text ${line#\# consequence:}"
+			else
+				marker_text=${line#\# consequence:}
+			fi
+			marker=yes
 			continue
 			;;
 		CONFIG_*)
@@ -352,6 +371,7 @@ check_fragment() {
 			fail=1
 		fi
 		marker=no
+		marker_text=
 	done <"$frag"
 }
 

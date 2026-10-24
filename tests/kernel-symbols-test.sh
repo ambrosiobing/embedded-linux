@@ -69,6 +69,20 @@ contains() {
 	esac
 }
 
+lacks() {
+	case $2 in
+	*"$3"*)
+		echo "FAILED   $1: '$3' is in the output and should not be"
+		echo "$2" | sed 's/^/           /'
+		fail=$((fail + 1))
+		;;
+	*)
+		echo "ok       $1"
+		pass=$((pass + 1))
+		;;
+	esac
+}
+
 # -------------------------------------------------------- a fake kernel
 
 SRC=$WORK/linux
@@ -216,6 +230,46 @@ contains "and is reported as one" "$out" \
 contains "with the selector printed, so the claim can be checked" "$out" \
 	"arch/arm64/Kconfig"
 contains "and it is counted separately" "$out" "1 recorded as consequences"
+
+# ------------------------- a claim wrapped over lines is read whole
+#
+# The path used to have to be on the LAST consequence line, because the
+# script replaced marker_text rather than appending to it, so an earlier
+# line was thrown away before it could be matched. The symptom was the
+# mildest message it produces, "claim names no Kconfig file", which
+# reads as a complaint about the comment rather than about the reader,
+# so it was believed twice before the script itself was read. Both
+# markers in adxl345.cfg carry their path last, which is why the defect
+# never showed there. Saturday 24 October 2026.
+
+cat >"$FRAGS/bench.cfg" <<'EOF'
+# consequence: promptless, selected by arch/arm64/Kconfig, which is
+# consequence: the only architecture this bench builds for
+CONFIG_IRQ_FORCED_THREADING=y
+EOF
+
+rc=0
+out=$(sh "$SUT" "$SRC" 2>&1) || rc=$?
+check "a claim wrapped over two lines passes" "$rc" "0"
+contains "and a path on the FIRST line is still read" "$out" \
+	"claim checks out"
+lacks "so it is not reported as naming no file" "$out" \
+	"names no Kconfig file"
+
+# The other direction, because a rule that cannot fail is not a rule: a
+# wrapped claim naming no path at all is still reported as unchecked.
+
+cat >"$FRAGS/bench.cfg" <<'EOF'
+# consequence: promptless, and selected by something or other that
+# consequence: nobody has bothered to name here
+CONFIG_IRQ_FORCED_THREADING=y
+EOF
+
+rc=0
+out=$(sh "$SUT" "$SRC" 2>&1) || rc=$?
+check "a wrapped claim naming no path still passes" "$rc" "0"
+contains "and is reported as unchecked, not as verified" "$out" \
+	"names no Kconfig file"
 
 # ------------------------------- the marker has to sit directly above it
 
