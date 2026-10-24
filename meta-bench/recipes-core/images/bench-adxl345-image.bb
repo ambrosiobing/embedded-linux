@@ -16,6 +16,8 @@ IMAGE_INSTALL:append = " \
     kernel-module-adxl345-i2c \
     kernel-module-adxl345-spi \
     kernel-module-iio-trig-hrtimer \
+    python3-fcntl \
+    python3-ctypes \
 "
 
 # THE MODULE LINES ARE THE POINT OF THIS FILE.
@@ -71,6 +73,34 @@ IMAGE_INSTALL:append = " \
 # dependency the repository README claims when it says Project 5 writes a
 # driver Project 10 exercises, and installing the tools next to the driver
 # is what turns the claim into something runnable.
+
+# python3-fcntl AND python3-ctypes, THE TWO LINES THAT ARE NOT MODULES.
+#
+# They are here rather than in bench-image.bb because this image already
+# carries an interpreter and most do not. bench-iio names python3-core
+# for iio-decode, and its own comment says only the core, because
+# iio-decode uses struct, re, argparse and pathlib. Adding these two to
+# the base image would pull python3-core into every bench image including
+# the eleven with no Python at all, which is a megabyte-scale cost paid
+# by projects that would never use it. Here the interpreter is already
+# installed and the two packages are a few tens of kilobytes plus libffi.
+#
+# WHY THEY ARE WANTED AT ALL. The OE python3 split puts fcntl and ctypes
+# in their own packages, so python3-core has NEITHER, which was read off
+# the board on Tuesday 21 October 2026 from the contents of
+# /usr/lib/python3.12/lib-dynload/ rather than assumed. Without fcntl
+# there is no ioctl from Python, and SPI_IOC_MESSAGE is an ioctl, so a
+# raw transfer on /dev/spidev0.0 was unavailable in every language on a
+# board with no compiler. spitools in bench-image.bb now covers the
+# ordinary case; these two cover the case where the transfer has to be
+# shaped by hand, which for this part means a multi-byte read with the
+# 0x40 bit set and a dummy byte, and they are what makes the ADXL345's
+# register map reachable without the driver under test being in the path.
+#
+# ctypes travels with fcntl because python3-daqhats and bench-keystore
+# already depend on it, so the package name is established in this layer
+# set, and because a struct-packing ioctl argument is the thing ctypes
+# exists for. Decision 134 has the account.
 
 # The overlay reaches the boot partition rather than the rootfs, because
 # the firmware reads it before there is a rootfs. bench-adxl345-dt deploys

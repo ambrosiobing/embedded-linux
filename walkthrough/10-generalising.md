@@ -117,6 +117,85 @@ Choosing the right subsystem is most of the work. Project 5 writes an IIO
 driver rather than a character device precisely so that Project 10 can use
 the whole IIO ecosystem against it without further work.
 
+### Swapping one sensor for an equivalent one
+
+The section above picks a route for a peripheral nobody has driven yet.
+This answers a narrower question, asked on Tuesday 21 October 2026 when
+the ADXL345 breakout could not be made to work at all and replacing it
+with the IMU on an X-NUCLEO-IKS4A1 became the obvious move: if the new
+part senses the same quantities, how much of the build has to be redone?
+
+Much less than it looks, and the kernel need not move at all.
+
+```
+                      changes                      does not change
+  +--------------------------------+  +----------------------------------+
+  |  the device tree overlay       |  |  MACHINE and the BSP layer       |
+  |  one kernel-module-* line in   |  |  the kernel, IF the driver was   |
+  |    the image recipe            |  |    already configured as =m      |
+  |  one line of config.txt        |  |  the image recipe, otherwise     |
+  |  the out-of-tree driver source |  |  Project 10's IIO tools          |
+  |  sysfs attribute spellings     |  |  systemd units, the SDK, the     |
+  |    inside the tools            |  |    whole testing ladder          |
+  +--------------------------------+  +----------------------------------+
+```
+
+| Layer | Moves | Cost |
+|---|---|---|
+| Kernel configuration | only if the new driver's symbol is not already set | a kernel rebuild, the expensive one |
+| Module package in the image | yes, one line per driver | `do_rootfs` and `do_image`, minutes against sstate |
+| Device tree overlay | yes: compatible, address, interrupt | seconds, these recipes are tiny |
+| `config.txt` | one line | **no build**, it is edited on the card |
+| Userspace tools | no, by design | nothing |
+| An out-of-tree driver for the new part | entirely | the real work, and it is C rather than Yocto |
+
+**The expensive layer is the kernel, and foresight removes it.** A driver
+configured `=m` costs build time and no space on the card until an image
+names its package. `kas/bench-adxl345.yml` sets `BENCH_ADXL345_KERNEL` and
+`BENCH_IIO_KERNEL` together, so that build already compiles mainline's
+ADXL345 drivers **and** `st_lsm6dsx`, `st_magn`, `st_press` and `sht4x`,
+of which that image installs none. Those modules looked like waste when
+the switch was added on Saturday 17 October 2026. They are what makes a
+sensor swap cost no kernel rebuild.
+
+**The cheapest case costs no build at all, and this repository already
+demonstrates it.** `bench-adxl345-image.bb` puts four overlays on one
+card: I2C and SPI, this project's driver and mainline's. Choosing between
+them is one edited line in `config.txt` and a reboot. Extend the pattern
+by one part rather than one bus and the card carries an overlay for each
+sensor, so changing sensor is moving the leads, editing a line, and a
+power cycle. The one-off price is both drivers `=m`, one image line each,
+and one overlay each.
+
+**Axis count is not a build property.** What matters is how many drivers
+and how many IIO devices a part presents. On the IKS4A1, nine axes is not
+one chip: the LSM6DSV16X gives accelerometer and gyroscope as two IIO
+devices sharing one hardware FIFO and one interrupt line through
+`st_lsm6dsx`, while the magnetometer is a separate driver with its own
+node and no FIFO. So nine axes is two drivers, two overlay nodes and two
+module packages. More lines of the same kind, no new mechanism, which is
+why `bench-iio-image.bb` installs nine such packages for four sensors.
+
+**The real cost is in the ABI, not in the capability**, and this is the
+part that surprises people. Two accelerometers reporting the same
+quantities in the same units can still differ in how the attribute is
+spelled. Project 10's `iio-rate` claimed to work on any IIO device
+"without a line of change" until Friday 9 October 2026, when it met the
+ADXL345 and wrote a rate to a file that does not exist on it: that driver,
+like mainline's, declares the sampling frequency shared **by type**, so
+the attribute is `in_accel_sampling_frequency` and not the device-level
+`sampling_frequency` the ST drivers expose. One line changed, in the tool.
+Expect the same class of difference in scale units, FIFO watermark
+semantics and event names, and budget for the tools rather than the build.
+
+**So the rule is to spend the kernel rebuild once, deliberately.**
+Configure every driver you might plausibly want as a module at the point
+you are already rebuilding the kernel for other reasons, name only the
+ones an image needs, and carry an overlay per candidate part. After that a
+sensor change is an afternoon of driver work and no build system work at
+all. Getting this wrong costs a kernel rebuild at exactly the moment the
+bench is already blocked, which is the worst time to pay for it.
+
 ## What transfers from Project 1 to all the others
 
 | Practice | Where it recurs |

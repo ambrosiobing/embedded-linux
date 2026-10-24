@@ -280,6 +280,31 @@ else
 		fail=1
 	fi
 
+	step "compile bench-diag against host libgpiod"
+	# The bench's voltmeter, continuity tester and logic probe, added
+	# Tuesday 21 October 2026 after five hours were spent reading GPIO
+	# lines by hand to find a sensor whose VCC and GND were the same net.
+	#
+	# "--help" is the subcommand to run here because it is the only one
+	# that opens no chip. Every other one takes a line and would either
+	# refuse off-target or, worse on a developer's machine with real GPIO,
+	# read or drive a line nobody asked about.
+	out=$(mktemp -d)/bench-diag
+	diag_src=meta-bench/recipes-bench/bench-diag/files/bench-diag.c
+	# Word splitting on the pkg-config output is intended here too.
+	# shellcheck disable=SC2046
+	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \
+		"$diag_src" -o "$out" $(pkg-config --libs libgpiod); then
+		echo "compiled clean with -Werror"
+		if timeout 5 "$out" --help >/dev/null; then
+			echo "prints its usage and names what it cannot measure"
+		else
+			fail=1
+		fi
+	else
+		fail=1
+	fi
+
 	step "compile the real-time toggler against host libgpiod"
 	# Project 8's instrument. It is the one program here that is
 	# measured rather than merely run, so a warning about a conversion

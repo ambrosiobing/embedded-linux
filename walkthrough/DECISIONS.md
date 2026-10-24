@@ -4254,6 +4254,33 @@ in scope.
 
 ## 126. A companion artefact is found by reading the directory, filtered on the one part of the name that is guaranteed
 
+**WITHDRAWN, Tuesday 21 October 2026. The premise is wrong and the code
+it changed was already right.** The body below is kept in full, because a
+withdrawal that removes its own reasoning cannot be checked.
+
+This entry argued that deriving a manifest's name from the image's name
+was unreliable, and `scripts/archive.sh` grew a directory-reading
+fallback on that argument in `58f78af`. The store says otherwise.
+**Eleven of the twelve archives carry the manifest under exactly the
+derived name.** One does not: `2026-10-17_8d17d9b` has no manifest at
+all, which is a missing file in one build and not a naming rule that
+does not hold.
+
+**How the mistake was made, which is the part worth keeping.** The
+conclusion came from a simplified directory listing in a document rather
+than from the store. A withdrawal takes the same evidence as a claim, so
+the correction was made by reading all twelve archives, and that reading
+is what should have come first. The pattern is the one this file records
+under several numbers already: a structure diagnosed from a summary.
+
+**What follows from it.** The fallback in `archive.sh` solves a problem
+that does not exist as described. It stays in place rather than being
+removed, on the standing instruction that nothing in this repository is
+deleted, and because a fallback that never fires costs a directory read
+per archive and nothing else. What is wrong is the justification, which
+this header now carries. The one archive without a manifest is a
+separate open question: why that build produced none.
+
 **Context.** A real archive on Saturday 17 October 2026 reported `no
 .manifest beside the image` and found the `.bmap` in the same breath.
 The two are not symmetrical, and the asymmetry dates from a fix.
@@ -4864,3 +4891,307 @@ host with it and 36 on the runner without.
 than being skipped with a note", which the skip now contradicts on its
 face. Both are true at once and it says so: installing it is what stops
 the skip from happening on any host that matters.
+
+## 134. The diagnostic tools ship in the base image, because a tool fetched by reflashing destroys the fault it was fetched for
+
+**Context.** Tuesday 21 October 2026. The ADXL345 answered nothing on
+either bus: `i2cdetect -y 1` found no address at all, not even a wrong
+one, the SPI arm read `DEVID` as `0x00`, and reverting to the wiring that
+worked on Saturday 17 October 2026 changed neither. The question worth
+asking was whether the part is being addressed and staying silent or
+never being addressed, and that is one raw transfer away from an answer.
+
+The card could not make one. No `spidev_test`, no compiler, and this
+image's interpreter is `python3-core` alone, installed by `bench-iio`,
+which has neither `fcntl` nor `ctypes`. Read off the board from the
+contents of `/usr/lib/python3.12/lib-dynload/` rather than assumed. So
+there was no `ioctl` from any language on that board, and `SPI_IOC_MESSAGE`
+is an `ioctl`.
+
+**Decision.** `spitools` and `devmem2` go in `bench-image.bb`, the base
+every other image requires. `python3-fcntl` and `python3-ctypes` go in
+`bench-adxl345-image.bb`, which already carries an interpreter.
+
+**Why the base image and not bench-debug-image, which was the first
+instinct.** The state under investigation was six friction contacts on an
+unsoldered breakout, where the inventory's standing rule is that any one
+of them can be open at any moment and a contact that worked a minute ago
+can be open now. Pulling the card to flash a better image disturbs every
+one of them. A diagnostic that can only be obtained by destroying the
+fault is not a diagnostic, and a debug image reached by reflashing is
+exactly that. This is the general form: the tools that answer "why is
+this board silent" have to already be on the silent board.
+
+**What each one buys.** `spi-pipe` does a full-duplex transfer on a
+`/dev/spidevB.C` from stdin to stdout, so writing `0x80` and reading one
+byte back is the `DEVID` register with no driver in the path, which
+separates a bus fault from a binding fault in one command. `spi-config`
+reads mode, bits and speed off the device instead of inferring them from
+the `.dts`. `devmem2` reads a physical address, which on a Pi is how
+`GPFSEL` is read, and `GPFSEL` holds the pin mux: whether a pin is I2C,
+SPI or plain GPIO is a two-bit field that this repository has inferred
+every single time, including on the afternoon this entry was written.
+`gpioinfo` cannot show it.
+
+**Rejected: the two Python modules in the base image too.** They would do
+the same work, shaped by hand, for the case `spi-pipe` cannot express.
+They also pull `python3-core` into eleven images that have no interpreter
+today, which is a megabyte-scale cost paid by projects that would never
+call it. Named by the one image that already has Python instead, which is
+the same rule `bench-iio` applies to itself when it asks for the core and
+not the whole.
+
+**Consequence, and the honest limit.** Neither tool is an instrument.
+There is no voltmeter on this bench and this changes nothing about that.
+What it changes is that the board can answer questions about its own
+buses and registers. On the afternoon this was decided, the question was
+answered instead by reading GPIO23 through libgpiod under two opposite
+bias settings and reasoning about an ESD clamp diode: a pull-up read 1
+and a pull-down read 0, which means nothing drives that line, which given
+the clamp means the `INT1` contact is open rather than the part being
+unpowered. That reasoning is sound and it should not have been the only
+route available.
+
+**The probe that nearly caused a needless recipe change.** This entry was
+first drafted to add `libgpiod-tools` as well, on the evidence of
+
+    command -v gpioget gpioset gpiodetect gpioinfo
+
+printing one path. `command -v` takes ONE operand; everything after the
+first name is passed to it as arguments and never looked up, and BusyBox
+ash honours that exactly. `ls /usr/bin/gpio*` shows all six binaries,
+installed by the `libgpiod-tools` line that `bench-image.bb` has carried
+all along. A four-part question was asked, a one-part answer came back,
+and it was read as four refusals. Decision 125's rule is that a check
+must say what it did not look at, and this was the same defect in the
+same week by the same hand, which is the argument for a rule being
+enforced by something that runs rather than by prose.
+
+## 135. A GPIO input under two opposite biases is the bench's voltmeter, and decision 129's remedy is reopened because it cannot be carried out
+
+**Context.** Tuesday 21 October 2026. The ADXL345 had answered nothing
+since Saturday 17 October 2026: five probe failures with `-121`, empty
+scans, and the SPI arm reading `DEVID` as `0x00`. Joseph said plainly
+that there is no voltmeter on this bench and asked whether there is a
+software route to the same answer.
+
+**Decision.** A GPIO configured as an input is a one-bit voltmeter with a
+threshold near 1.3 V, and libgpiod v2's `--bias` makes it a usable one.
+Read the same line twice, once under `pull-up` and once under
+`pull-down`: agreement means something is driving the line, disagreement
+means it is floating. One reading cannot tell those apart and two can.
+`projects/05-iio-adxl345/docs/evidence/supply-fault-2026-10-21.md`
+carries the method and the seventeen readings it produced.
+
+**What it found.** The module's `VCC` and its `GND` were connected to
+each other. Both went to the breadboard's `+V` rail, and that rail was
+fed from header pin 9, which is a ground. The part had no supply at all,
+through every scan and every one of the five `-121`s. One cause for
+every symptom.
+
+**The rule that made it work, and it is the same rule the inventory
+already carried.** Probe the module's own numbered row, never a
+breadboard power rail. A rail and a row are different conductors unless a
+lead joins them, so a reading in the rail says nothing about the pad the
+part uses. Reading the rail is what hid this fault for an hour, and the
+inventory has said since Tuesday 6 October 2026 that this module's supply
+must come straight from a 3V3 pin because a rail is the one conductor a
+bus-based continuity test cannot check. That sentence was about an
+evening lost to the same arrangement, and it was read this morning and
+not applied until the fault was found by measurement instead.
+
+**The probe needs its own control.** Under `pull-down` an unseated lead
+reads 0 for the same reason a dead rail does, so the probe is tied to a
+known ground pin first and must read 0 before anything else counts. Two of
+the seventeen readings are that same lead unplugged, both reading 1, which
+is what makes the control worth having rather than ceremonial.
+
+**Rejected: adding packages and rebuilding to get a raw transfer.** That
+was the first instinct and it is the wrong order. The state under
+investigation was six friction contacts where any one can open at any
+moment, so pulling the card to flash a better image destroys the fault.
+Decision 134 puts the tools in the base image for next time; the answer
+this time had to come from what was already on the board.
+
+**Three inferences stated as measurements, and all three withdrawn.**
+That `SDA`, `SCL` and `INT1` reading high proved three open contacts: it
+does not, because with `VCC` grounded the `BL8555-30`'s output node
+floats rather than sitting at 0 V, so a conducting contact charges that
+node through the pin's clamp diode and reads high too. That a constant 1
+on GPIO23 proved an open `INT1`: the argument needs the ADXL345 to drive
+that pin low while no interrupt is enabled, which was never read in the
+datasheet, and the part is in standby by default. And that the empty scan
+was a dead-rail clamp dragging the bus down, which the bus readings then
+refuted. Each was written in the same voice as a reading. The evidence
+page marks them in place rather than deleting them.
+
+**Decision 129 is reopened, not satisfied.** It chose to replace the
+wiring rather than retry it, so that the next fault could not hide behind
+a retry. The sitting it anticipated is a soldering sitting, and there is
+no soldering iron on this bench, so the chosen remedy cannot be carried
+out at all. What was done instead is tilt and pressure with a live
+`i2cget` loop as the indicator, which never once returned `0xe5`. That is
+not a fix and it is not a measurement either: the inventory's own rule is
+that on friction contacts the part is reliably present in no condition,
+so a silence is produced by the apparatus and by the hypothesis alike.
+
+**Consequence.** Criteria 2 through 7 of project 5 cannot be re-measured
+until the header is fitted. The purchase has been named since Tuesday 6
+October 2026: a soldering iron and one 8-pin 2.54 mm male header. Every
+conductor outside the module is now measured and correct, which is worth
+having, because it means the next attempt starts from a known-good
+harness and the only remaining variable is the one connection nobody can
+test from outside.
+
+## 136. Project 5 moves to the IKS4A1's IMU, merging with Project 10's harness rather than starting a new one
+
+**Context.** Tuesday 21 October 2026. The SEN0032 cannot be made to
+answer. Decision 135 has the search: every conductor outside the module
+is measured and correct, and `i2cget` once a second through a range of
+tilt and pressure never returned `0xe5`. The I2C path that worked on
+Friday 9 October 2026 is therefore not reproducible, which by its own
+terms makes that evening a single result rather than a repeatable one.
+Criteria 2 through 7 have been unreachable since Saturday 17 October
+2026 for a mechanical reason this bench cannot fix, because there is no
+soldering iron here and the module's header is not soldered.
+
+**Decision.** Project 5's driver targets the IMU on the
+X-NUCLEO-IKS4A1, and the work merges into Project 10's existing harness
+instead of building a parallel one.
+
+**The kernel cost is zero, measured not estimated.** Read out of
+`kernel-build-artifacts/.config` in the build already on the bench:
+
+    CONFIG_IIO_ST_LSM6DSX=m
+    CONFIG_IIO_ST_LSM6DSX_I2C=m
+    CONFIG_IIO_ST_LSM6DSX_SPI=m
+    CONFIG_REGMAP_SPI=y
+    CONFIG_SPI_MASTER=y
+
+Both bus variants are compiled today. `st_lsm6dsx`'s compatible tables
+carry `st,lsm6dsv16x` and `st,lsm6dso16is` on **both** I2C and SPI,
+twenty-three parts in each, so the in-tree control binds on either bus
+with no fragment line and no rebuild. What the switch costs is one
+overlay per bus and one `kernel-module-st-lsm6dsx-spi` line in the image,
+because that module is built, cached and on no card, which is the exact
+pattern `bench-iio-image.bb` and `bench-adxl345-image.bb` both warn
+about and the first time it has been caught before the flash rather than
+after.
+
+**What Project 10 already provides.** The four sensors configured in
+`iio.cfg`, the nine module packages that put them in a rootfs, `libiio`
+with `iiod` and its tools, `lmsensors`, a `bench-iks4a1` recipe, and the
+part-agnostic tooling `iio-probe`, `iio-trigger`, `iio-rate` and
+`iio-decode`. Project 5 brings its own driver and borrows the rest.
+
+**The architecture argument gets stronger, which is the unexpected
+part.** Mainline's `st_lsm6dsx` is a bus-independent core speaking
+`struct regmap *` with one bus file per transport, selecting
+`REGMAP_I2C`, `REGMAP_SPI` and `REGMAP_I3C`. That is the shape Project 5
+argues for, written by mainline, across three buses rather than two. The
+chapter stops demonstrating the pattern alone and starts demonstrating it
+against a driver of the same design. I3C is real in that code and not
+reachable here, because no Raspberry Pi has an I3C controller, so the
+third arm is a code claim and the design must say so rather than leave it
+to be discovered.
+
+**The vendor-prefix trap carries across and is now predictable.** A node
+claiming `bench,lsm6dsv16x` produces a client named `lsm6dsv16x`, which
+matches mainline's own `i2c_device_id` and `spi_device_id` entries, and
+the wrong driver binds. That defect produced `-22` on the SPI arm and the
+same thing on I2C before it. Third occurrence, first time it is known in
+advance.
+
+**What it costs.** The register layer is rewritten, and the scale
+constant with it, so decision 127's derivation becomes a worked example
+about a part no longer used rather than a live constant. Decisions 129
+and 130 and `projects/05-iio-adxl345/docs/DESIGN.md` are superseded in
+their part-specific halves. Nothing is deleted: the SEN0032 work, its
+evidence and its wiring stay in the tree, because the search that failed
+is as much a part of the record as the one that worked.
+
+**Rejected: the IKS5A1 first.** It is the newer board, so its parts are
+newer, which in a kernel a year behind is the wrong direction: a newer
+part is the one more likely to have no driver at all. It is also the
+wrong order, because the IKS4A1 has a working build to compare against,
+so a gap found on the IKS5A1 second will be legible instead of ambiguous.
+The IKS5A1 is examined by the same method afterwards: roster off the
+board, each part looked up in its driver's compatible table.
+
+**Rejected: more bench time on the SEN0032.** The inventory's rule is
+that on friction contacts the part is reliably present in no condition at
+all, so a silence is produced by the apparatus and the hypothesis alike
+and no number of repeats separates them. A soldering iron and one 8-pin
+2.54 mm male header is the purchase that reopens it, named since Tuesday
+6 October 2026.
+
+**Open, and named here so they are not assumed.** The IMU's marking has
+to be read off the shield rather than taken from memory, since
+`LSM6DSV16X` and `LSM6DSO16IS` both bind and only one is on the board.
+Whether the IKS4A1 can be strapped to SPI at all is a hardware question
+its user manual answers, and ST serves no PDF to this bench, so that goes
+through GitHub. And whether Project 11 moves with this or stays on the
+ADXL345 is a separate decision: the two projects use one part on purpose,
+so that an in-kernel driver and a packaged userspace library can be
+compared on the same sensor, and moving one alone breaks that pairing.
+
+## 137. The harness is checked before the experiment, and a mated connector is exempt
+
+**Context.** Tuesday 21 October 2026. Five hours went into why an
+ADXL345 answered nothing, across kernel configuration, bus speed, driver
+binding, overlays and contact theory, before anybody established that its
+supply and its ground were the same net. Decision 135 has the search and
+the three inferences it produced that had to be withdrawn. The search
+started in the middle because the harness was assumed.
+
+**Decision.** Before the planned measurement of any bench sitting, the
+harness is checked and the result written down with its date. The check
+is the supply at the part's own row, the return at the part's own row,
+and continuity on any lead whose state is in doubt. Only then the
+experiment.
+
+**What is exempt, which is what makes the rule affordable.** Count the
+single-conductor friction contacts in the signal path, not the wires. A
+mated multi-way connector is zero of them and is not checked: the 40-pin
+ribbon between two FC-40P connectors, a HAT seated on the header, an
+Arduino shield in its socket strip, a soldered joint. None of those has
+ever been the fault here. What is checked is every Dupont lead into a
+breadboard row or onto a header pin, every screw terminal, and above all
+a male pin in an unsoldered module's plated hole, which cannot be reached
+from outside at all and so is checked up to its boundary and no further.
+
+So a Pi talking to the WS-28164 over a ribbon needs no preliminaries, and
+a sensor on six flying leads needs six checks. That asymmetry is measured
+rather than assumed: the ribbon has never failed, the terminal block
+would not hold two conductors in one position on Monday 19 October 2026,
+and a Dupont lead pushed into that block made contact only while it was
+being moved.
+
+**How.** `bench-diag`, new in `meta-bench/recipes-bench/bench-diag` and
+installed by `bench-image.bb` so it is on every card. One line read under
+both bias settings distinguishes a driven line from a floating one, which
+a single reading cannot, and `watch` repeats it once a second so that
+adjusting hardware becomes a closed loop instead of adjust, run, infer.
+
+**Rejected: buy a multimeter and make it the procedure.** A meter is
+worth having and is cheap, and it belongs on the list. It is not the
+answer to this, for two reasons. It is a thing that can be absent,
+forgotten or broken, while a tool in the image is on every board that
+boots. And the day this rule came from did not fail for want of an
+instrument: it failed because nobody asked for the supply's topology,
+which was a question already written down in the notes for that very
+part. An instrument finds a supply tied to ground in ten seconds only if
+somebody thinks to test for it.
+
+**Rejected: putting the tool in bench-debug-image.** Same argument as
+decision 134. The state under investigation was six friction contacts
+where any one can open at any moment, so pulling the card to flash a
+better image destroys the fault being measured.
+
+**Consequence, and the honest limit.** `bench-diag` reads a threshold
+near 1.3 V and never a value, so a rail at 3.3 V and one drooping to 2 V
+are the same answer. It cannot go above 3.3 V, which makes a 5 V rail
+both unreadable and dangerous to connect. It sees only what shares the
+board's ground, which excludes the Nucleo, the modem HATs and the
+isolated side of the CAN board. Its help text says all three, because a
+tool that overstates itself is worse than no tool.

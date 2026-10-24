@@ -147,6 +147,62 @@ Both are instances of the same habit: before connecting anything, ask what
 voltage appears on each pin in every state, including the states where
 nothing is driving.
 
+### The preliminaries, before the experiment rather than after it
+
+**Check the harness before running the planned measurement, every time.**
+This rule is dated Tuesday 21 October 2026 and it cost the day that
+produced it. A sensor answered nothing on either bus, and five hours went
+into kernel configuration, bus speeds, driver binding, overlays and
+contact theory before anybody established that its supply and its ground
+were the same net. Four of the readings taken during that search were
+read as evidence for things they did not support, which is what happens
+when a search starts in the middle.
+
+**What is checked, and what is exempt.** Count the single-conductor
+friction contacts in the signal path. Each one is a thing that can be
+open right now.
+
+| Connection | Checked | Why |
+|---|---|---|
+| Dupont lead into a breadboard row | **yes** | one conductor held by one spring |
+| Dupont lead onto a header pin | **yes** | same |
+| A male pin in an unsoldered module's plated hole | **yes**, and it cannot be reached from outside, so the check is of everything up to it | the SEN0032's six, where the whole day went |
+| A screw terminal with a bare wire clamped | **yes** | the WS-28164's block holds one conductor per position, measured Monday 19 October 2026 |
+| A Dupont lead pushed into a screw terminal | **yes**, and prefer not to | it made contact only intermittently; the first frames arrived while a wire was being moved |
+| 40-pin ribbon between two FC-40P connectors | no | a mated multi-way connector, and it has never been the fault |
+| A HAT seated on the 40-pin header | no | same |
+| An Arduino shield in its socket strip | no | same, and this is why the IKS4A1 is the better harness |
+| A soldered joint | no | it is either there or visibly not |
+
+So a board talking to a HAT over a ribbon needs no preliminaries at all,
+and a sensor on six flying leads needs six checks. The rule is about the
+number of friction contacts, not about the number of wires.
+
+**How.** `bench-diag` is in every bench image for this. It reads a line
+under both bias settings, which is what tells a driven line from a
+floating one:
+
+```bash
+bench-diag rail       gpiochip0 24    # is the supply at the part's own row
+bench-diag ground     gpiochip0 25    # is the return at the part's own row
+bench-diag continuity gpiochip0 24 25 # does this lead carry a level
+bench-diag watch      gpiochip0 23    # the reading once a second, while
+                                      # you adjust the hardware
+```
+
+**Probe the part's own row, never a breadboard power rail.** A rail and a
+row are different conductors unless a lead joins them, so a reading taken
+in the rail says nothing about the pad the part uses. Reading the rail is
+what hid the fault for an hour on the day this section was written, and
+the bench inventory had already recorded, on Tuesday 6 October 2026, that
+a rail is the one conductor a bus-based continuity test cannot check.
+
+**Then write down that the preliminaries passed**, with the date, in the
+project's evidence directory. An experiment whose harness was never
+checked and an experiment whose harness was checked and passed produce
+the same numbers when they work and are completely different records when
+they do not.
+
 ## Networking, and how credentials reach the board
 
 This bench has no wired network in reach, so the image joins a wireless one.

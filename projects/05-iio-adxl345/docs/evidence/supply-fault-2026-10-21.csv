@@ -1,0 +1,18 @@
+order,point_probed,chip_line,bias,reading,inference
+1,INT1 lead at header pin 16,23,pull-up,1,floating
+2,INT1 lead at header pin 16,23,pull-down,0,floating
+3,SDA at header pin 3,2,pull-up,1,held at 3V3 by the fitted 1.8k
+4,SDA at header pin 3,2,pull-down,1,held at 3V3 by the fitted 1.8k
+5,SCL at header pin 5,3,pull-up,1,held at 3V3 by the fitted 1.8k
+6,SCL at header pin 5,3,pull-down,1,held at 3V3 by the fitted 1.8k
+7,probe lead not yet seated,24,pull-up,1,floating as expected for an open probe
+8,probe lead at header pin 20 a ground,24,pull-up,0,probe lead conducts end to end
+9,breadboard +V rail fed from header pin 9,24,pull-down,0,rail at ground potential or floating
+10,breadboard +V rail fed from header pin 1,24,pull-up,1,ambiguous by construction
+11,breadboard +V rail fed from header pin 1,24,pull-down,1,3V3 present on the rail
+12,module VCC numbered row fed direct from pin 1,24,pull-down,1,3V3 present at the module VCC pin
+13,probe lead unplugged at the breadboard end,24,pull-up,1,floating as expected for an open probe
+14,module GND numbered row with no lead to a ground pin,24,pull-up,1,GND row floating so the module had no return
+15,module GND numbered row with a lead to header pin 9,24,pull-up,0,ground present at the module GND pin
+16,INT1 lead at header pin 16 after the supply was verified,23,pull-up,1,floating
+17,INT1 lead at header pin 16 after the supply was verified,23,pull-down,0,floating
