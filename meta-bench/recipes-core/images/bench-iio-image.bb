@@ -1,6 +1,6 @@
 SUMMARY = "Project 10: IIO in depth with the X-NUCLEO-IKS4A1"
 DESCRIPTION = "The bench image plus four sensor drivers, the software \
-triggers, libiio with its network daemon, and the tools that compare \
+triggers, libiio with its daemon and its command line programs, and the \
 polling, a hrtimer trigger and the IMU's hardware FIFO."
 
 require recipes-core/images/bench-image.bb
@@ -10,7 +10,7 @@ IMAGE_INSTALL:append = " \
     bench-iks4a1 \
     libiio \
     libiio-iiod \
-    libiio-tools \
+    libiio-tests \
     python3-numpy \
     i2c-tools \
     lmsensors-sensors \
@@ -55,8 +55,27 @@ IMAGE_INSTALL:append = " \
 # default baked into an image. docs/BRINGUP.md says how, and why not to do
 # it on anything but the bench LAN.
 #
-# libiio-tools is iio_info, iio_readdev and iio_attr, which are the
+# libiio-TESTS is iio_info, iio_readdev and iio_attr, which are the
 # reference implementations this project's own client is checked against.
+#
+# THE NAME IS THE TRAP AND IT COST A BUILD. This line said libiio-tools
+# until Saturday 24 October 2026, because that is what those three
+# programs are called by everyone including this comment. The recipe
+# disagrees: meta-oe's libiio_0.25.bb declares
+#
+#     PACKAGES =+ "${PN}-iiod ${PN}-tests ${PN}-python3"
+#     FILES:${PN}-tests = "${bindir}"
+#
+# so every binary it builds is swept into a package named after tests,
+# and no package named libiio-tools exists at all. BitBake refused at
+# parse with "Nothing RPROVIDES", which is the good direction: the
+# alternative is an image that builds and has no tools in it.
+#
+# Not one package name in this file had ever been checked against a real
+# build before that run, because the only job that builds an image is
+# workflow_dispatch on a self-hosted runner and never runs on a push.
+# Expect the next name to be wrong too, and expect it to cost forty
+# seconds of parsing rather than a build.
 
 # numpy is on the BOARD and not only on the PC, which is 30 MB of image for
 # one reason: the claim this project makes is that the URI is the only
