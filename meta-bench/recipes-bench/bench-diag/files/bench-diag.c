@@ -217,9 +217,10 @@ static int cmd_level(struct gpiod_chip *chip, unsigned int offset)
 	enum verdict v;
 	int up, down;
 
-	if (line_is_used(chip, offset, &consumer))
+	if (line_is_used(chip, offset, &consumer)) {
 		printf("note     line %u is held by %s\n", offset, consumer);
 		puts("         so this reads a line under someone else's control");
+	}
 
 	v = probe(chip, offset, &up, &down);
 	printf("pull-up %d  pull-down %d  ->  %s\n", up, down, verdict_name(v));
