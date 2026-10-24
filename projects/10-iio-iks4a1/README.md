@@ -104,7 +104,7 @@ The expected addresses are from the specification and are confirmed with
 | `0x5d` | LPS22DF | `st_pressure` | IIO | |
 | `0x44` | SHT40 | `sht4x` | **hwmon** | |
 | `0x3c` | STTS22H | none | | expected unsupported, no mainline driver |
-| `0x19` | LIS2DUXS12 | none | | driver may be absent from 6.12.93 |
+| `0x19` | LIS2DUXS12 | none | | driver may be absent from 6.6.63, which is the tree this project builds |
 
 Two of those rows matter more than they look.
 

@@ -360,7 +360,10 @@ what this project delivers, and the acceptance table has a row for it.
 
 The rule for filling that table: **`./go ksym` against the kernel tree
 before the build, not `modinfo` afterwards and not a web page.** A driver
-that exists upstream is not a driver that exists in 6.12.93, and a symbol
+that exists upstream is not a driver that exists in the tree this project
+builds, which is 6.6.63 and not the 6.12.93 an earlier draft of this
+paragraph named: only `kas/bench-rt.yml` pins a kernel version, and it
+targets a different machine. A symbol
 that exists is not a driver that binds to this part number. Each row gets
 the command that produced it.
 

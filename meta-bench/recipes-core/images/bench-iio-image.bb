@@ -22,7 +22,6 @@ IMAGE_INSTALL:append = " \
     kernel-module-st-pressure-i2c \
     kernel-module-sht4x \
     kernel-module-iio-trig-hrtimer \
-    kernel-module-iio-trig-sysfs \
 "
 
 # THE MODULE LINES ARE THE POINT OF THIS FILE.
@@ -45,9 +44,36 @@ IMAGE_INSTALL:append = " \
 # and iio-probe on the board reports "no-driver-in-image" for anything that
 # did not, which is the same fact seen from the other end.
 #
-# The two trigger modules are the reason bench.cfg is not enough on its
-# own. CONFIG_IIO_SYSFS_TRIGGER is already there, and that is the kernel
-# side; this is the rootfs side of the same symbol.
+# ONE trigger module is listed, not two, and the missing one is the
+# lesson in this file read backwards. The install list above carried a
+# second one, kernel-module-iio-trig-sysfs, until Saturday 24 October
+# 2026, and it failed do_rootfs after the whole kernel had compiled:
+#
+#     No match for argument: kernel-module-iio-trig-sysfs
+#     Error: Unable to find a match: kernel-module-iio-trig-sysfs
+#
+# bench.cfg sets CONFIG_IIO_SYSFS_TRIGGER=y, which is BUILT IN.
+# A built-in symbol produces no .ko, so Yocto has no module to package
+# and no kernel-module-iio-trig-sysfs package exists or ever will. The
+# header above says a module is not a package; this is the other
+# direction, and it is the one that fails loudly rather than silently. A
+# missing module package leaves a driver absent from a booting card with
+# no error; a package that cannot exist stops the build. The second is
+# the cheaper mistake and it is the only one anything checks.
+#
+# The sysfs trigger is still present on the card, built into the kernel,
+# and /sys/bus/iio/devices/iio_sysfs_trigger appears without any package.
+# CONFIG_IIO_HRTIMER_TRIGGER=m in iio.cfg is the real module, and that
+# is the line above.
+#
+# The marker below is what keeps scripts/lint.py from reading the
+# paragraph above as an image that forgot a driver, which is what it is
+# for and what it reported here first. It is checked rather than
+# believed: the linter reads the symbol out of the fragments and
+# contradicts this comment if anything sets it =m.
+# not-a-package: kernel-module-iio-trig-sysfs
+# not-a-package: CONFIG_IIO_SYSFS_TRIGGER is =y in bench.cfg, so it is
+# not-a-package: built into the kernel and produces no .ko to package
 
 # libiio-iiod is the network daemon, and it is installed rather than
 # enabled. iiod exposes every device with no authentication, so starting

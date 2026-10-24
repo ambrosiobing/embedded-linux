@@ -5257,3 +5257,121 @@ argument for decision 137 and it should outlive the part.
 UM3239 made possible: roster off the board or out of its manual, then
 each part looked up in its driver's compatible table. Its manual has not
 been supplied and `st.com` still refuses this bench.
+
+## 139. A built-in symbol is not a module, so its package cannot exist, and the comment saying so is now checkable
+
+**Context.** Saturday 24 October 2026, late. `bench-iio-image` reached
+`do_rootfs` with the kernel, its modules and every recipe compiled, and
+failed on one line:
+
+    No match for argument: kernel-module-iio-trig-sysfs
+    Error: Unable to find a match: kernel-module-iio-trig-sysfs
+
+`bench.cfg` sets `CONFIG_IIO_SYSFS_TRIGGER=y`. A built-in symbol produces
+no `.ko`, Yocto has nothing to package, and that package name has never
+existed and never will. The image asked for it anyway, and so did its
+comment, which described "the two trigger modules" when only
+`CONFIG_IIO_HRTIMER_TRIGGER=m` is one.
+
+**This is the repository's own lesson read backwards.** The header of that
+recipe has said for fourteen projects that **a module is not a package**: a
+driver can be configured, compiled and absent from the card with nothing
+reporting it, which is what project 8 paid a flash and a boot for. The
+mirror had never been written down. **A built-in is not a module**, so
+asking for its package is asking for something that cannot exist.
+
+The two fail in opposite directions and that is the whole reason this one
+is cheap. A missing module package is silent: the image builds, boots, and
+the board reports it by not having the driver. A package that cannot exist
+stops the build. Of the two mistakes available here, this is the one to
+make, and it is the only one anything catches.
+
+**Decision.** `kernel-module-iio-trig-sysfs` comes out of the install list,
+the comment is corrected, and the explanation **stays in the recipe naming
+the package**, because the next person to add that line back has to be able
+to grep for the paragraph that says why it went.
+
+**That explanation then broke a check, and narrowing it was the right
+answer rather than rewording.** `scripts/lint.py` reads a comment naming
+`kernel-module-foo` in an image recipe as a promise that foo belongs on a
+card, because on project 1 that promise was made in three paragraphs and
+kept by no `IMAGE_INSTALL` line, and the board reported it by having no
+network interface. By name alone that defect and this explanation are
+identical, so the rule fired here and it was right to.
+
+Rewording to dodge it would have deleted the lesson, which is the failure
+mode this repository has shipped before: a pattern narrowed until it
+matches nothing. So the rule gained a third case it had no concept of, a
+package that **cannot** exist, behind a marker:
+
+    # not-a-package: kernel-module-iio-trig-sysfs
+    # not-a-package: CONFIG_IIO_SYSFS_TRIGGER is =y in bench.cfg, so it is
+    # not-a-package: built into the kernel and produces no .ko to package
+
+**The marker is checked and not believed, which is the point.** It must
+name the package and the `CONFIG_` symbol behind it; the linter then reads
+that symbol out of the kernel fragments and reports the recipe if a
+fragment sets it `=m`, if no fragment sets it at all, if the marker names
+no symbol, or if some image does install the package after all. Five ways
+to be contradicted. A marker that could only be trusted would be a comment
+with extra punctuation.
+
+That design is taken directly from `iio.cfg`'s `# consequence:` markers and
+from what went wrong with one of them the same afternoon: the marker named
+its Kconfig file the whole time and was reported unchecked twice, because
+`check-kernel-symbols.sh` replaced its record of the claim on every marker
+line instead of appending and truncated a wrapped claim to its tail. So
+this reader **joins** its lines, and the wrapped case with the package on
+the first line and the symbol on the third is the assertion
+`tests/lint-image-packages-test.sh` exists for.
+
+**Proved by breaking it, in both directions, eleven assertions.** The test
+writes a temporary image recipe into the real tree rather than into a copy,
+because `lint.py` finds its own root from its own path and a copy would not
+be the thing under test. The fixture is untracked and removed by a trap, so
+an interrupted run leaves a stray file `check-clean.py` reports instead of
+a mangled tracked recipe. It names a deliberately nonexistent package:
+lint asks whether **any** image installs a name, so a fixture installing
+`kernel-module-iio-trig-sysfs` would have silenced the real finding in
+`bench-iio-image` and the suite would have passed by breaking the thing it
+guards.
+
+It also sources `tests/lib/python.sh`. Four of its assertions are
+assertions of **silence**, and silence is exactly what a Microsoft Store
+python stub produces by running nothing at all, so without that guard this
+suite would report a working check on the authoring laptop whatever the
+rule did. Presence is not the capability, which is decision 128's rule
+applied to a suite written after it.
+
+**A small thing that caught itself.** The first draft of the test ran lint
+as `cd && python || true` piped into grep, and the repository's own linter
+rejected it as SC2015 on the first run. A test of a checker caught by that
+checker is the cheapest possible version of that mistake, and it is in the
+file as a comment so the next person does not rediscover it.
+
+**Not one package name in that image had ever been checked against a real
+build.** `libiio-tools` did not exist either and was corrected to
+`libiio-tests` hours earlier, because the only job that builds an image is
+`workflow_dispatch` on a self-hosted runner and never runs on a push. Both
+names had been read many times and neither had been executed. Expect the
+next one to be wrong too, and expect it to cost forty seconds of parsing
+rather than a build.
+
+**Corrected alongside, because it was repeated several times today before
+it was checked.** `iio.cfg` opened by saying "This repository builds
+6.12.93". It does not. Only `kas/bench-rt.yml` pins a kernel,
+`PREFERRED_VERSION_linux-raspberrypi = "6.12.%"`, and it targets
+`raspberrypi4-64`. Every other configuration takes the meta-raspberrypi
+default, which is 6.6.63 for `raspberrypi3-64`: 20854 symbol declarations
+indexed by `./go ksym` today, matching the figure `adxl345.cfg` recorded
+against the same tree. The same claim was in project 10's `DESIGN.md` and
+in its README's inventory table. A version number written into a fragment
+is a claim about whichever kas file loads it, so the fragment now says to
+run the check instead of naming a number. This is the shape the method file
+already warns about: a claim written when it was true, left standing after
+the thing it described changed, held up by nothing that runs.
+
+**Still open and untouched by any of this.** Whether `st_lsm6dsx` binds at
+`0x6b` and produces an IIO device. Every finding today is about the build;
+the card has not been flashed, and nothing above is evidence about the
+hardware.

@@ -298,15 +298,86 @@ def check_image_packages() -> None:
     for recipe in images:
         anywhere |= installs(recipe, set())
 
+    # A package that CANNOT EXIST is the third case, and this rule had no
+    # concept of it until Saturday 24 October 2026.
+    #
+    # The rule above reads a comment naming kernel-module-foo as a promise
+    # that foo belongs on a card, and that is right when the symbol is =m.
+    # When the symbol is =y the module is built into the kernel, there is
+    # no .ko, Yocto packages nothing, and no such package exists or ever
+    # will. bench-iio-image spent a do_rootfs finding that out. The
+    # explanation then has to live in the recipe, because the next person
+    # to add that line back needs to read why it went, and naming the
+    # package is the only way that paragraph is findable by the reader who
+    # greps for it. Rewording to dodge the rule would delete the lesson.
+    #
+    # So the exemption is a marker and NOT a silence:
+    #
+    #     # not-a-package: kernel-module-iio-trig-sysfs
+    #     # not-a-package: CONFIG_IIO_SYSFS_TRIGGER is =y in bench.cfg
+    #
+    # which must name the package and the CONFIG symbol behind it, and the
+    # symbol is then read out of the fragments. A marker claiming a symbol
+    # is built in when a fragment sets it =m is contradicted and reported,
+    # which is the whole point. iio.cfg's consequence markers are checked
+    # the same way by check-kernel-symbols.sh, and the one thing that
+    # file's own marker proved on this same day is that a claim nothing
+    # can contradict is not a claim, it is a comment.
+    fragments = {}
+    for fragment in tree("*.cfg"):
+        if "recipes-kernel" not in fragment.parts:
+            continue
+        for line in text(fragment).splitlines():
+            match = re.match(r"(CONFIG_[A-Za-z0-9_]+)=([ymn])", line.strip())
+            if match:
+                fragments[match.group(1)] = (match.group(2), fragment.name)
+
+    marker = re.compile(r"^\s*#\s*not-a-package:\s*(.*)$")
+
     for recipe in images:
         body = text(recipe)
         if "IMAGE_INSTALL" not in body:
             continue
+        lines = body.splitlines()
         comments = "\n".join(
-            line for line in body.splitlines() if line.lstrip().startswith("#")
+            line for line in lines if line.lstrip().startswith("#")
         )
+
+        # The marker may wrap, so its lines are JOINED rather than each
+        # one replacing the last. That is the exact defect
+        # check-kernel-symbols.sh was carrying on the same day: it kept
+        # only the final line of a wrapped claim, so a path or a symbol on
+        # any earlier line was discarded before it could be matched, and
+        # the claim was then reported as unchecked while naming its file
+        # the whole time.
+        declared = " ".join(
+            m.group(1).strip()
+            for line in lines
+            for m in [marker.match(line)]
+            if m
+        )
+        excused = set(pattern.findall(declared))
+        symbols = set(re.findall(r"\bCONFIG_[A-Za-z0-9_]+\b", declared))
+
+        for name in sorted(excused):
+            if name in anywhere:
+                fail(recipe, f"not-a-package names {name} and an image "
+                             "installs it, so one of the two is wrong")
+        if excused and not symbols:
+            fail(recipe, "a not-a-package marker names no CONFIG symbol, "
+                         "so nothing can contradict it")
+        for symbol in sorted(symbols):
+            if symbol not in fragments:
+                fail(recipe, f"not-a-package rests on {symbol}, which no "
+                             "kernel fragment here sets")
+            elif fragments[symbol][0] != "y":
+                value, where = fragments[symbol]
+                fail(recipe, f"not-a-package rests on {symbol} being built "
+                             f"in, but {where} sets it ={value}, which does "
+                             "produce a module package")
+
         for name in sorted(set(pattern.findall(comments))):
-            if name not in anywhere:
+            if name not in anywhere and name not in excused:
                 fail(recipe, f"a comment names {name}, which no image "
                              "installs")
 

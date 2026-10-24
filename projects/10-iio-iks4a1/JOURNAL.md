@@ -3219,3 +3219,111 @@ sessions share one working tree, `git add -A` and `git commit -a` cannot tell
 whose work they are taking. Either session's half-finished edit can be
 published under the other's message. Stage by explicit path, every time, which
 is how this paragraph itself was committed.
+
+## 57. A built-in is not a module, and the comment that explains it had to be made contradictable
+
+*Saturday 24 October 2026, late.* The build reached `do_rootfs` with the
+kernel, its modules and every recipe compiled, and failed on one line:
+
+    No match for argument: kernel-module-iio-trig-sysfs
+    Error: Unable to find a match: kernel-module-iio-trig-sysfs
+
+`bench.cfg` sets `CONFIG_IIO_SYSFS_TRIGGER=y`. A built-in symbol produces no
+`.ko`, so Yocto packages nothing and that package name has never existed.
+The image asked for it anyway, and so did the comment above the install
+list, which described "the two trigger modules" when only
+`CONFIG_IIO_HRTIMER_TRIGGER=m` is one.
+
+### This file has carried the opposite warning for fourteen projects
+
+The header of `bench-iio-image.bb` says **a module is not a package**: a
+driver can be configured, compiled, deployed to the sstate feed and absent
+from the card with nothing anywhere reporting it. Project 8 paid a flash and
+a boot for that sentence. What it had never said is the mirror, **a built-in
+is not a module**, so asking for its package is asking for something that
+cannot exist.
+
+The two fail in opposite directions, and that is why this one was cheap. The
+silent version builds, flashes, boots, and the board tells you by not having
+the driver. This version stops the build before the rootfs is assembled. Of
+the two mistakes available in this file, it is the only one anything catches.
+
+### The fix is one line out, and the explanation had to stay
+
+Removing the package is trivial. The part worth recording is that the
+paragraph explaining it has to name `kernel-module-iio-trig-sysfs`, or the
+next person who adds that line back cannot find the text saying why it went.
+
+That paragraph then failed `scripts/lint.py`:
+
+    a comment names kernel-module-iio-trig-sysfs, which no image installs
+
+The rule is a good one. It exists because on project 1 a comment explained
+at length why a WiFi driver and its firmware were needed, an edit was lost,
+`IMAGE_INSTALL` named neither, and the board reported it by having no network
+interface. By name alone that defect and this explanation are the same text.
+
+**Rewording to get past it was the wrong answer and was briefly the
+tempting one.** A pattern narrowed until it matches nothing is a shape this
+repository has already shipped three times. The rule needed a third case it
+had no concept of: not a package that is missing, but one that cannot exist.
+
+### The marker is checked, which is the only reason it is worth having
+
+    # not-a-package: kernel-module-iio-trig-sysfs
+    # not-a-package: CONFIG_IIO_SYSFS_TRIGGER is =y in bench.cfg, so it is
+    # not-a-package: built into the kernel and produces no .ko to package
+
+It must name the package and the symbol. The linter then reads that symbol
+out of the kernel fragments and reports the recipe five ways: a fragment
+setting it `=m`, no fragment setting it at all, a marker naming no symbol, a
+marker excusing a package some image does install, and the ordinary case of a
+comment with no marker. All five were made to fire before the rule was
+trusted, and `tests/lint-image-packages-test.sh` is eleven assertions holding
+them there.
+
+The design is lifted from `iio.cfg`'s `# consequence:` markers, and so is one
+specific detail. Earlier the same afternoon a consequence marker was reported
+unchecked twice while naming its Kconfig file the whole time, because
+`check-kernel-symbols.sh` replaced its record of the claim on every marker
+line instead of appending, truncating a wrapped claim to its tail. So this
+reader joins its lines, and the wrapped case, package on the first line and
+symbol on the third, is the assertion the test was written around.
+
+### Two details of the test that are the actual lesson
+
+The fixture names a package nothing builds. Lint asks whether **any** image
+installs a name, so a fixture that installed `kernel-module-iio-trig-sysfs`
+would have silenced the real finding in this very recipe, and the suite would
+have passed by breaking the thing it guards.
+
+And it sources `tests/lib/python.sh`. Four of its assertions are assertions of
+silence, and silence is what a Microsoft Store python stub produces by running
+nothing at all. Without that guard the suite would report a working check on
+the authoring laptop no matter what the rule did.
+
+A smaller one, kept in the file as a comment: the first draft ran lint as
+`cd && python || true` piped into grep, and the repository's own linter
+rejected it as SC2015 on the first run.
+
+### The version this project has been quoting is wrong
+
+`iio.cfg` opened by saying "This repository builds 6.12.93". It does not, and
+that sentence was repeated several times today before anyone read a kas file.
+Only `kas/bench-rt.yml` pins a kernel, `PREFERRED_VERSION_linux-raspberrypi =
+"6.12.%"`, and it targets `raspberrypi4-64`. Everything else, this project
+included, takes the meta-raspberrypi default: 6.6.63 for `raspberrypi3-64`,
+20854 symbol declarations indexed by `./go ksym` today, matching the figure
+`adxl345.cfg` recorded against the same tree. The claim was also in
+`docs/DESIGN.md` and in the README's inventory table, where it was doing real
+work, since "the driver may be absent from 6.12.93" is a prediction about the
+wrong tree.
+
+The fragment now says to run the check rather than naming a number, because a
+version written into a fragment is a claim about whichever kas file loads it.
+
+### What none of this is evidence about
+
+The card has not been flashed. Whether `st_lsm6dsx` binds at `0x6b` and
+produces an IIO device is the question this whole sitting has been trying to
+get to, and every finding above is about the build.
