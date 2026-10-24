@@ -267,6 +267,52 @@
 			magn: lis2mdl@1e {
 				compatible = "st,lis2mdl";
 				reg = <0x1e>;
+
+				/*
+				 * WITHOUT THIS LINE THE PART DOES NOT PROBE,
+				 * and nothing about the symptom points here.
+				 * Measured Saturday 24 October 2026 on
+				 * bench-iio-image, kernel 6.6.63:
+				 *
+				 *   st-magn-i2c 1-001e: mounting matrix not
+				 *       found: using identity...
+				 *   iio iio:device5: DRDY on INT2 not
+				 *       available.
+				 *   st-magn-i2c: probe of 1-001e failed with
+				 *       error -22
+				 *
+				 * No interrupt is wired to this sensor and
+				 * none is wanted: it has no FIFO, so it is
+				 * the device the HRTIMER trigger is
+				 * demonstrated on. The check runs anyway,
+				 * before and regardless of any IRQ, which is
+				 * why a node with no interrupts property is
+				 * still refused.
+				 *
+				 * st_magn_core.c line 506 sets
+				 * .drdy_int_pin = 2 as the driver's default
+				 * for every magnetometer it handles. The
+				 * settings entry this part shares with the
+				 * LSM303AGR and the IIS2MDC declares only
+				 *
+				 *     .int1 = { .addr = 0x62, .mask = 0x01 }
+				 *
+				 * and no .int2 at all. In
+				 * st_sensors_set_drdy_int_pin the escape for
+				 * a sensor with no interrupt support tests
+				 * .addr, while the switch tests .mask. int1
+				 * has an address, so the escape does not
+				 * fire; case 2 then finds int2.mask zero and
+				 * returns -EINVAL. int1.mask is 0x01, so
+				 * asking for pin 1 passes.
+				 *
+				 * The property is read by
+				 * device_property_read_u32(dev,
+				 * "st,drdy-int-pin", &val) and accepted for
+				 * val <= 2, so the spelling matters and the
+				 * value is a pin number rather than a GPIO.
+				 */
+				st,drdy-int-pin = <1>;
 			};
 
 			/* Pressure. Polled, or driven by the same trigger. */

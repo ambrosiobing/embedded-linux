@@ -1,0 +1,91 @@
+Three states of config.txt, read off the card before it was overwritten
+Saturday 24 October 2026, from the project 5 card in the reader on skyhorizon
+
+
+WHAT THIS IS, AND WHY IT IS HERE RATHER THAN LOST
+
+The card holding project 5's bench-adxl345 image was about to be
+overwritten with project 10's bench-iio-image. Its boot partition carried
+four files with real timestamps rather than the frozen Apr 6 2011 epoch
+that every file written by the wic image carries, which is what marks them
+as hand edits made after flashing:
+
+    wifi.conf                 Tuesday 21 October 2026, 09:53
+    config.txt.i2c-backup     Tuesday 21 October 2026, 10:47
+    config.txt.bak            Tuesday 21 October 2026, 11:23
+    config.txt                Tuesday 21 October 2026, 11:46
+
+The image itself is archived several times over, most recently as
+proj05-bench-adxl345/2026-10-21_697ee2b, so nothing about the build was at
+risk. These four files were in no archive at all. A card archive would
+have held them and none was taken of this card.
+
+wifi.conf was deliberately NOT copied. It holds the SSID and the PSK, it
+belongs in ~/bench/credentials where scripts/flash.sh reads it from, and
+nothing in this repository ever holds one.
+
+
+THE SEQUENCE, WHICH IS THE WHOLE CONTENT
+
+All three config.txt files are 2738 or 2742 bytes and differ from each
+other on line 252 and nowhere else:
+
+    diff config.txt.i2c-backup config.txt.bak
+    252c252
+    < dtoverlay=bench-adxl345
+    ---
+    > dtoverlay=bench-adxl345-spi
+
+    diff config.txt.bak config.txt
+    252c252
+    < dtoverlay=bench-adxl345-spi
+    ---
+    > dtoverlay=bench-adxl345
+
+So, in time order:
+
+    10:47   dtoverlay=bench-adxl345        the I2C arm
+    11:23   dtoverlay=bench-adxl345-spi    the SPI arm
+    11:46   dtoverlay=bench-adxl345        back to the I2C arm
+
+Both arms were selected on the card that morning, 36 minutes apart, and
+the card was left on I2C.
+
+
+WHAT IT CORROBORATES AND WHAT IT DOES NOT
+
+It corroborates that the SPI arm was actually exercised on Tuesday 21
+October 2026 and not merely considered, which matters because that is the
+session where the SPI arm read DEVID as 0x00 and where the cause of both
+arms' silence was found to be the supply: the module's VCC and GND were
+one net at ground, fed from header pin 9. See supply-fault-2026-10-21.csv
+and its .md.
+
+It does NOT show which arm was active during any particular reading. A
+config.txt line selects an overlay for the NEXT boot, so these timestamps
+are edit times, not boot times, and nothing here records when the board
+was power cycled between them. Whether a given scan in that session ran
+under the I2C or the SPI overlay has to come from that session's own
+record and not from this file.
+
+It also does not show what the overlay did, only which one was asked for.
+The four bench-adxl345*.dtbo files were all present in overlays/ on the
+card throughout.
+
+
+HOW IT WAS OBTAINED
+
+    sudo mount -o ro /dev/sde1 /mnt/card
+    cp /mnt/card/config.txt /mnt/card/config.txt.bak \
+       /mnt/card/config.txt.i2c-backup ~/cardcfg/
+    sudo umount /mnt/card
+
+Read only, nothing written to the card. The copies retain no useful
+timestamps of their own, because cp without -p stamps them with the time
+of the copy; the times above were read from the ls -la of the mounted boot
+partition while it was still untouched, and that listing is the only place
+they existed.
+
+That is the reason this file records them as text rather than keeping the
+three files: their contents differ by one line, their value was in their
+modification times, and a copy does not carry those.

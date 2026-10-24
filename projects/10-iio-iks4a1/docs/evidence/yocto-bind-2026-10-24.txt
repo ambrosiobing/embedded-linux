@@ -1,0 +1,291 @@
+st_lsm6dsx binds under the Yocto image, and the sysfs trigger exists
+without a package
+
+Saturday 24 October 2026, Raspberry Pi 3 Model B Plus, bench-iio-image
+built from commit b373892, kernel 6.6.63-v8, X-NUCLEO-IKS4A1 on the 40 pin
+header.
+
+
+WHY THIS FILE EXISTS
+
+Every previous record in this directory was taken on eplepi, the Pi 4B,
+running Raspberry Pi OS with four out-of-tree ST drivers compiled on the
+board against a linux-source-6.18 tree and loaded with insmod. That card
+is an artefact nothing in this repository can rebuild, which is why
+scripts/card-archive.sh exists.
+
+This is the first time the same parts have been driven by MAINLINE drivers
+packaged into a Yocto image built from a commit. The question it answers,
+open since the project began and unanswered through two full sittings, is
+whether st_lsm6dsx in the tree this repository builds binds to the
+LSM6DSV16X at 0x6b and produces IIO devices. It does.
+
+
+THE BUS
+
+    # i2cdetect -y 1
+         0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+    00:                         -- -- -- -- -- -- -- --
+    10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- 1e --
+    20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+    30: -- -- -- -- -- -- -- -- 38 -- -- -- -- -- -- --
+    40: -- -- -- -- UU -- -- -- -- -- -- -- -- -- -- --
+    50: -- -- -- -- -- -- -- -- -- -- -- -- -- UU -- --
+    60: -- -- -- -- -- -- -- -- -- -- UU UU -- -- -- --
+    70: -- -- -- -- -- -- -- --
+
+UU is the kernel saying a driver holds that address. Four are held: 0x44,
+0x5d, 0x6a and 0x6b. Two answer unclaimed: 0x1e and 0x38. 0x19 does not
+appear here at all and answers only to i2cdetect -r.
+
+
+THE PROBE
+
+    # dmesg | grep -i -e lsm6 -e st_lsm6dsx -e iio
+    [    7.548460] st_lsm6dsx_i2c 1-006a: supply vdd not found, using dummy regulator
+    [    7.557004] st_lsm6dsx_i2c 1-006a: supply vddio not found, using dummy regulator
+    [    7.600597] iio iio:device0: DRDY on INT2 not available.
+    [    8.127266] st_lsm6dsx_i2c 1-006a: mounting matrix not found: using identity...
+    [    8.142788] st_lsm6dsx_i2c 1-006b: supply vdd not found, using dummy regulator
+    [    8.151800] st_lsm6dsx_i2c 1-006b: supply vddio not found, using dummy regulator
+    [    8.935286] st_lsm6dsx_i2c 1-006b: mounting matrix not found: using identity...
+
+Both IMUs probe. The three message kinds are all benign and all worth
+naming, because each looks like a fault and is not:
+
+- "supply vdd not found, using dummy regulator" means the devicetree node
+  declares no regulator, so the core substitutes a dummy. The shield's
+  rails come from the Pi's own 3V3 through the shield's LDO; nothing in
+  software switches them.
+- "mounting matrix not found: using identity" means no mount-matrix
+  property, so axes are reported in the sensor's own frame. That is
+  correct here and it matters for any later orientation work: the shield's
+  frame is not the board's.
+- "DRDY on INT2 not available" is NOT from any of the devices above. It
+  belongs to the magnetometer's failing probe, and the paragraph below
+  records how that was established rather than guessed. The first draft of
+  this file attributed it to 1-005d, the pressure sensor, because
+  iio:device0 points there in the finished sysfs listing. That was wrong.
+
+
+THE DEVICES
+
+    # ls -l /sys/bus/iio/devices/
+    iio:device0 -> .../i2c-1/1-005d/iio:device0
+    iio:device1 -> .../i2c-1/1-006a/iio:device1
+    iio:device2 -> .../i2c-1/1-006a/iio:device2
+    iio:device3 -> .../i2c-1/1-006b/iio:device3
+    iio:device4 -> .../i2c-1/1-006b/iio:device4
+    iio_sysfs_trigger -> ../../../devices/iio_sysfs_trigger
+
+0x6b produces TWO devices, iio:device3 and iio:device4, the accelerometer
+and the gyroscope, sharing one hardware FIFO. That pairing is the premise
+of this project's buffered path and it is now measured rather than
+assumed. 0x6a does the same.
+
+
+THE INVENTORY
+
+    # iio-probe
+    ADDRESS PART         DRIVER       SUBSYS   BUS       MODULE     DEVICES
+    0x19    LIS2DUXS12   st_lis2duxs12 iio      present   missing    -
+            no-driver-in-image: answers only i2cdetect -r, no node in the overlay
+    0x1e    LIS2MDL      st_magn      iio      present   loaded     -
+            not-bound: magnetometer, no FIFO
+    0x38    STTS22H      stts22h      iio      present   missing    -
+            out-of-tree: driver is in ST's IIO tree, a node alone will not help
+    0x44    SHT40AD1B    sht4x        hwmon    claimed   loaded     sht4x
+            working: humidity, NOT an IIO device
+    0x5d    LPS22DF      st_pressure  iio      claimed   loaded     lps22df
+            working: pressure, recent driver addition
+    0x6a    LSM6DSO16IS  st_lsm6dsx   iio      claimed   loaded     lsm6dso16is_gyro lsm6dso16is_accel
+            working: ISPU part, compatible confirmed Thursday 1 October 2026
+    0x6b    LSM6DSV16X   st_lsm6dsx   iio      claimed   loaded     lsm6dsv16x_gyro lsm6dsv16x_accel
+            working: IMU, two devices, one hardware FIFO
+
+
+WHAT THIS CONFIRMS
+
+The LPS22DF is working. iio.cfg predicted it was "the symbol most likely to
+come back MISSING on an older tree", because the entry is a recent addition
+to st_pressure. On 6.6.63 it is present and bound.
+
+The SHT40 is under hwmon and not under /sys/bus/iio/devices, which iio.cfg
+warned about in capitals. A program enumerating IIO devices will not find
+it and will not say so. iio-probe says so, which is the point of iio-probe.
+
+iio_sysfs_trigger is present with NO PACKAGE BEHIND IT. That is the working
+side of the failure that cost this evening's first build: the image asked
+for kernel-module-iio-trig-sysfs, do_rootfs refused because no such package
+exists, and the reason is that CONFIG_IIO_SYSFS_TRIGGER is =y in bench.cfg
+and built into the kernel. A built-in produces no .ko and therefore no
+package, and the trigger is on the card anyway. Decision 139.
+
+
+WHAT IS NOT WORKING, AND WHICH LAYER EACH BELONGS TO
+
+0x1e LIS2MDL is NOT-BOUND, and it is the actionable one. It matters more
+than a missing sensor usually would, because the magnetometer is the
+device the hrtimer trigger was to be demonstrated on, chosen precisely
+because it has no FIFO of its own. See the comment above
+CONFIG_IIO_ST_MAGN_3AXIS in iio.cfg. The middle of this project's three
+paths is blocked behind it.
+
+**iio-probe's hint is wrong here and the file says so rather than
+repeating it.** Its not-bound text reads "look at the overlay, not the
+image", and the overlay is not the problem: bench-iks4a1-overlay.dts
+declares
+
+    magn: lis2mdl@1e {
+            compatible = "st,lis2mdl";
+            reg = <0x1e>;
+    };
+
+in the same fragment@0 as lps22df@5d and sht4x@44, both of which bound.
+The fragment therefore applied.
+
+What the scan shows is consistent with the client existing and no driver
+binding to it, NOT with a missing node. i2cdetect prints UU only when a
+driver is bound: i2cdev_check returns -EBUSY only if dev->driver is set,
+so a registered client with no driver bound is probed normally and prints
+its address. So 1e in that table says "client present, driver absent", and
+the hint sends the reader to the one layer that is already correct.
+
+THE DMESG FILTER HID IT. The first grep was "-e lsm6 -e st_lsm6dsx -e iio"
+and cannot match a single st-magn message. Widening it:
+
+    # dmesg | grep -i -e magn -e lis2mdl
+    [    7.575858] st-magn-i2c 1-001e: supply vdd not found, using dummy regulator
+    [    7.584407] st-magn-i2c 1-001e: supply vddio not found, using dummy regulator
+    [    7.592679] st-magn-i2c 1-001e: mounting matrix not found: using identity...
+    [    7.607365] st-magn-i2c: probe of 1-001e failed with error -22
+
+    # ls -l /sys/bus/i2c/devices/ | grep 1-001e
+    1-001e -> ../../../devices/platform/soc/3f804000.i2c/i2c-1/1-001e
+
+So the client exists, the driver matched the compatible, and the PROBE
+FAILED with -22, EINVAL. The overlay was never the problem.
+
+
+THE ATTRIBUTION, ESTABLISHED RATHER THAN INFERRED
+
+In the boot log the DRDY line sits between the magnetometer's third
+message and its failure, 8 ms apart:
+
+    [    7.592679] st-magn-i2c 1-001e: mounting matrix not found
+    [    7.600597] iio iio:device0: DRDY on INT2 not available.
+    [    7.607365] st-magn-i2c: probe of 1-001e failed with error -22
+
+Adjacency is suggestive and is not proof, because three drivers were
+probing in that window. The client was left unbound, so the probe can be
+re-run on its own:
+
+    # echo 1-001e > /sys/bus/i2c/drivers/st-magn-i2c/bind
+    sh: write error: Invalid argument
+    [  726.694658] st-magn-i2c 1-001e: supply vdd not found, using dummy regulator
+    [  726.702289] st-magn-i2c 1-001e: supply vddio not found, using dummy regulator
+    [  726.710227] st-magn-i2c 1-001e: mounting matrix not found: using identity...
+    [  726.717692] iio iio:device5: DRDY on INT2 not available.
+    [  726.723614] st-magn-i2c: probe of 1-001e failed with error -22
+
+726 seconds into uptime, nothing else probing, the same five lines in the
+same order. The DRDY message is the magnetometer's and it is the reason
+for the -22.
+
+**And the device number proves the first attribution was wrong rather than
+merely unproven.** It is iio:device0 at boot and iio:device5 here, for the
+same device on the same bus. A probe that fails frees its IIO device
+number and the number is reused, so reading iio:device0 off the finished
+sysfs listing and concluding "that is 1-005d, the pressure sensor"
+compared a transient name against a final one. The write error is the bind
+returning the probe's own EINVAL.
+
+
+THE CAUSE, READ OUT OF THE 6.6.63 SOURCE
+
+The node declares no interrupts. The only interrupts property in
+bench-iks4a1-overlay.dts is on lsm6dsv16x@6b. So this is not trigger
+allocation, which runs only when the client has an IRQ. It is the
+platform-data check, which runs unconditionally.
+
+drivers/iio/common/st_sensors/st_sensors_core.c, st_sensors_set_drdy_int_pin:
+
+    /* Sensor does not support interrupts */
+    if (!sdata->sensor_settings->drdy_irq.int1.addr &&
+        !sdata->sensor_settings->drdy_irq.int2.addr) {
+            ...
+            return 0;
+    }
+
+    switch (pdata->drdy_int_pin) {
+    case 1:
+            if (!sdata->sensor_settings->drdy_irq.int1.mask) {
+                    dev_err(..., "DRDY on INT1 not available.\n");
+                    return -EINVAL;
+    case 2:
+            if (!sdata->sensor_settings->drdy_irq.int2.mask) {
+                    dev_err(..., "DRDY on INT2 not available.\n");
+                    return -EINVAL;
+
+and where the pin number comes from, same file:
+
+    if (!device_property_read_u32(dev, "st,drdy-int-pin", &val) && (val <= 2))
+            pdata->drdy_int_pin = (u8) val;
+    else
+            pdata->drdy_int_pin = defdata ? defdata->drdy_int_pin : 0;
+
+drivers/iio/magnetometer/st_magn_core.c line 506 is ".drdy_int_pin = 2",
+the driver's default for every magnetometer it handles. The settings entry
+this part shares with the LSM303AGR and the IIS2MDC, WAI 0x40 at 0x4f,
+declares only
+
+    .drdy_irq = {
+            .int1 = { .addr = 0x62, .mask = 0x01, },
+            .stat_drdy = { .addr = 0x67, .mask = 0x07, },
+    },
+
+with no .int2 member at all.
+
+So the trace is complete and every step is read rather than assumed. The
+node has no st,drdy-int-pin, so the pin defaults to 2. The escape for a
+sensor with no interrupt support tests .addr; int1.addr is 0x62, so it
+does not fire. case 2 tests .mask; int2.mask is zero, so it returns
+-EINVAL. The asymmetry between testing .addr in the escape and .mask in
+the switch is what lets a part reach a check it cannot pass.
+
+int1.mask is 0x01, so asking for pin 1 passes. The fix is one property on
+the overlay node and no driver work:
+
+    st,drdy-int-pin = <1>;
+
+That is bookkeeping rather than wiring. No interrupt is connected to this
+sensor and none is wanted, because it has no FIFO and is therefore the
+device the hrtimer trigger is demonstrated on.
+
+**NOT YET MEASURED.** Everything in this section is source reading. The
+property is in the overlay as of this file's commit and the probe has not
+been re-run with it. Until it has, "the fix is one property" is a
+prediction, and the receipt is st-magn-i2c binding at 1-001e with an entry
+appearing under /sys/bus/iio/devices.
+
+
+0x19 LIS2DUXS12 has no driver in the image and no node either. It also
+does not answer a plain i2cdetect, only i2cdetect -r.
+
+0x38 STTS22H is out of tree: its driver is in ST's own IIO tree and not in
+mainline 6.6.63, so adding a node would bind nothing and report nothing.
+The README's inventory table predicted an unsupported part here and that
+prediction holds.
+
+
+WHAT THIS IS NOT EVIDENCE ABOUT
+
+No sample has been read. This file records that drivers bound and devices
+appeared, and nothing about whether the numbers coming out of them are
+right. The FIFO has not been exercised, no trigger has been created, and
+no rate has been measured. Those are criteria of their own and they need
+their own files.
+
+The board was powered from the Pi's own 3V3 through the shield, with the
+Nucleo H7 underneath unpowered, which is the configuration that answered
+on six addresses earlier the same day.

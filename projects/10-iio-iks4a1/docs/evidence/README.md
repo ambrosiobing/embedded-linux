@@ -20,6 +20,7 @@ those two are the only ones that do not need this folder.
 
 | File | What it settles |
 |---|---|
+| `yocto-bind-2026-10-24.txt` | **The question the project opened with, answered.** `st_lsm6dsx` from the tree this repository builds binds at `0x6b` and produces two IIO devices sharing one hardware FIFO, under `bench-iio-image` from commit `b373892` on kernel 6.6.63-v8. Four of seven parts working, every previous record in this directory having been taken on eplepi with out-of-tree drivers loaded by `insmod`. It also records `iio_sysfs_trigger` present with no package behind it, which is the working side of the `do_rootfs` failure in decision 139. **No sample has been read**: this settles binding and nothing about the numbers. The actionable gap it found is `0x1e`, the magnetometer, `not-bound`, which blocks the hrtimer path. The overlay declares that node in the same fragment as two sensors that did bind, so `iio-probe`'s "look at the overlay" hint is wrong here, and the `dmesg` filter used that evening could not have matched an `st_magn` message. Open, with the command to settle it named in the file |
 | `i2c-scan-2026-10-24.txt` | The shield on the Pi 3B+ on five leads. Six of the seven predicted addresses answered, and the two IMUs identified by `WHO_AM_I`: `0x6a` is the LSM6DSO16IS and `0x6b` the LSM6DSV16X, which is the question `docs/hardware.md` raised on Wednesday 7 October 2026. The LIS2DUXS12 at `0x19` is absent and the file says why. **No driver is bound**, because this card carries the project 5 image |
 
 | File | How to produce it |
