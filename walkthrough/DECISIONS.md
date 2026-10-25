@@ -5375,3 +5375,70 @@ the thing it described changed, held up by nothing that runs.
 `0x6b` and produces an IIO device. Every finding today is about the build;
 the card has not been flashed, and nothing above is evidence about the
 hardware.
+
+## 140. Criterion 4's interrupt threshold is unreachable as written, and it is not being reworded yet
+
+**Context.** Saturday 24 October 2026. Criteria 3 and 4 were re-taken
+under `bench-iio-image` with mainline drivers on the Raspberry Pi 3 Model
+B Plus, having been met on Thursday 1 October 2026 on eplepi with
+out-of-tree drivers. Criterion 4 asks for **fewer than 8 interrupts per
+second** at 480 Hz with a watermark of 64. This bench measured **11.60**.
+Reader CPU passed at 0.40 per cent against a limit of 3, and the contrast
+clause passed at 40.5x against a requirement of 5x.
+
+**The threshold cannot be met in that configuration on this driver.**
+`st_lsm6dsx` batches a timestamp entry alongside each sample: in
+`st_lsm6dsx_buffer.c`, `hw->sip` is `sip + ts_sip`, and with one sensor
+enabled both are 1. The FIFO pattern is one sample then one timestamp,
+`th_wl` is 1 for this part so the threshold counts entries, and the
+interrupt therefore arrives after about **W/2** samples. At 480 Hz with a
+watermark of 64 that is 15 interrupts per second before any other effect.
+Under 8 is not available there whatever the hardware does.
+
+**Decision. The criterion is not reworded, the measurement is not
+adjusted, and neither is quietly dropped.** The failing clause is recorded
+as failing, with the reason it is unreachable stated beside it, in
+`docs/evidence/rates-2026-10-24.md` and in the README's acceptance row.
+
+**Rejected: raising the watermark until the number fits.** A watermark of
+128 gives 5.80 per second and would pass. That is choosing the
+configuration that produces an acceptable figure rather than measuring the
+one the criterion names, and this project has already restated one clause
+of this same criterion for the opposite reason, on Thursday 1 October
+2026, when the contrast was satisfiable only by a configuration that had
+just been shown to be broken. A criterion bent to fit the bench in front
+of it measures the bench.
+
+**Rejected, for now: rewording the threshold to 16 per second.** It would
+be defensible arithmetic and it would be premature, because of the
+following.
+
+**THE TWO BENCHES DISAGREE BY FIVE TIMES AND THAT COMES FIRST.** The
+October run recorded 2.30 interrupts per second at the same nominal 480 Hz
+and watermark 64, which is 208 samples per interrupt. The pattern above
+forbids anything much beyond W/2 plus drain, and 208 from a watermark of
+64 is far outside it. So one of the two figures is measuring something
+other than what the criterion assumes, and a threshold rewritten now would
+be fitted to whichever of them happened to be in front of us.
+
+Four things differ between those runs: the board, the kernel, the driver
+provenance and probably the I2C clock. That is more than one variable, so
+no conclusion is drawn about which is right. The way at it is the October
+configuration re-run on eplepi beside this one, changing one thing at a
+time.
+
+**What this decision is not.** It is not a claim that the FIFO path
+underperforms. The same runs show forty times fewer interrupts than a
+watermark of 1 at identical throughput, and 0.40 per cent reader CPU,
+which is the property the path exists for. It is a claim about one
+numeric threshold in one clause.
+
+**A tooling consequence, taken immediately.** `iio-rate` printed `R/W` as
+"expected" and a ratio against it, so every correct batched run that
+evening reported a 1.2x to 1.8x discrepancy and invited a hunt for a fault
+that was not there. It now prints `R/W` as a floor and `2R/W` as a
+ceiling, says which assumption each rests on, and states that neither is a
+target. Its two FAIL guards are unchanged: "ratio above 2" was already
+exactly "above the ceiling", so they were calibrated correctly and only
+the labels were wrong. The upper guard no longer cites criterion 4's
+"fewer than 8 per second" as the thing to aim at.

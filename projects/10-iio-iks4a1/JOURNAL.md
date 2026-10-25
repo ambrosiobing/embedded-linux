@@ -3503,3 +3503,152 @@ coming out of these devices, and tonight settled only that the devices are
 there. The FIFO has not been exercised, no trigger has been created, and
 no rate has been measured. What changed is that all of those are now
 attempts rather than blocked.
+
+## 59. The three paths measured, and the tool was wrong about two of them
+
+*Saturday 24 October 2026, late evening.* With five of seven sensors bound
+under a Yocto image, the project could finally do the thing it exists for.
+Nine five-second runs, and the comparison it was built to make:
+
+| Path | samples/s | interrupts/s | reader CPU |
+|---|---|---|---|
+| poll, 960 Hz | 61 | 0 | 58.8 % |
+| hrtimer trigger, 100 Hz | 100 | 0 | 0.4 % |
+| FIFO, 480 Hz, watermark 64 | 460 | 11.60 | 0.4 % |
+| FIFO, 480 Hz, watermark 1 | 468 | 469.60 | 1.2 % |
+
+Seven and a half times the samples for one hundred and fiftieth of the
+CPU, and forty times fewer interrupts for the same throughput. Those are
+the numbers the three-path design was written around.
+
+### The poll path's ceiling is the driver, not the bus
+
+The first run returned **2 samples per second** at 3.4 per cent CPU. A
+sysfs read loop should manage hundreds, and 3.4 per cent says the reader
+was asleep rather than working.
+
+`st_lsm6dsx` serves a raw sysfs read as a one-shot: power up, wait for the
+part to settle at its configured rate, read, power down. At the boot
+default of 7.5 Hz one sample period is 133 ms, so a wait of a few periods
+lands near the 500 ms per read observed.
+
+**Stated as a prediction before the test, so it could fail:** raising the
+rate to 960 Hz should raise samples per second by something like two
+orders of magnitude, and should raise CPU with it as sleeping becomes
+working. Measured: 61 samples per second at 58.8 per cent. A factor of
+thirty, in the predicted direction, with the predicted CPU signature.
+
+It does not explain the remaining 16.4 ms per read, and that is open.
+
+### The FIFO watermark behaved, and the tool said it did not
+
+Every batched run printed a ratio above 1.0 of measured interrupts over
+expected, as though something were wrong. Holding 480 Hz and sweeping the
+watermark gave a clean relationship rather than an anomaly: samples per
+interrupt came out at about 0.62 times the watermark across 32, 64 and
+128, while a watermark of 1 was exact.
+
+**A hypothesis, killed by its own check.** The LSM6DSV16X shares one FIFO
+between accelerometer and gyroscope, so the gyro might be stealing slots.
+`iio:device4/buffer/enable` reads `0`. It is not in the FIFO at all. That
+explanation is dead and the reading that killed it took one command.
+
+**The driver, read rather than recalled.** In
+`st_lsm6dsx_buffer.c`, `hw->sip` is `sip + ts_sip`, and with one sensor
+enabled both are 1. The FIFO pattern is one sample followed by one
+timestamp entry, and `th_wl` is 1 for this part, so the threshold counts
+entries and the interrupt arrives after **W/2** samples. That is a factor
+of two the tool never knew about.
+
+**But W/2 is a floor, and the measurements sat above it.** So: the
+interrupt fires at the threshold and the handler then drains whatever is
+present, while the FIFO keeps filling during the I2C read. That predicts
+the ratio should move with the output data rate, which no fixed factor
+can do.
+
+| ODR, watermark 64 | samples per interrupt |
+|---|---|
+| 120 Hz | 32.0 |
+| 480 Hz | 39.7 |
+| 960 Hz | 52.4 |
+
+It rises. Deriving `S = (W/2)/(1 - k*ODR)` and fitting k from one run gives
+about 405 us per sample drained; it then predicts 52.3 against 52.36
+measured at 960 Hz, and 79.4 against 79.45 at a watermark of 128. The
+120 Hz point sits at exactly 32.0, the bare floor with no surplus, which
+is also where the run reports 17 interrupts for 512 samples: 512 over 16
+is 32.0 exactly, and one interrupt at the window edge moves a
+seventeen-interrupt run by six per cent.
+
+k is fitted from one point. It is not a property of the driver until a
+different bus speed moves it, and the evidence file says so.
+
+### I declared two criteria met without reading either
+
+The evidence file was written, linted, committed and pushed with the
+headings "criterion 3 MET" and "criterion 4 MET". Both were wrong.
+
+**They had been met three weeks earlier**, on Thursday 1 October 2026, on
+eplepi with out-of-tree drivers. The acceptance table in this project's
+own README has said so since. Writing the new runs up as a first pass
+would have erased that.
+
+**And criterion 4 does not pass.** It wants fewer than 8 interrupts per
+second at 480 Hz with watermark 64. This bench measured 11.60. The other
+two clauses pass comfortably, which is exactly why a glance at the
+headline figures felt like success.
+
+The correction is the interesting part: under 8 is **unreachable** in that
+configuration. One sample paired with one timestamp entry puts about 32
+samples per interrupt, which at 480 Hz is 15 per second before any drain
+effect. A criterion that cannot be satisfied as written is a finding to
+state with its reason, not a number to reach by raising the watermark
+until it looks acceptable.
+
+### And the October bench disagrees by five times
+
+That run recorded 2.30 interrupts per second at the same nominal 480 Hz
+and watermark 64, which is 208 samples per interrupt. The pattern that
+explains tonight forbids anything above W/2 plus drain. One of the two
+figures is measuring something other than what the criterion assumes.
+
+Four things differ between the benches: board, kernel, driver provenance
+and probably the I2C clock. That is more than one variable, so nothing is
+concluded. It is written down as open, and the cheapest way at it is the
+October configuration re-run on eplepi beside tonight's.
+
+### Four defects, all ours
+
+The tool, not the driver, was wrong about this.
+
+`R/W` was printed as "expected" when it is a floor; `2R/W` is the ceiling
+and the measured value falls between them. The two FAIL guards turned out
+to be **correctly calibrated already**, because "ratio above 2" is exactly
+"above the ceiling". The guard was right and its caption was wrong, and I
+nearly changed the threshold to make a wrong caption agree with itself.
+
+The CSV recorded outcomes without conditions: three rows identical in
+every column but `irqs`, with nothing saying which watermark produced
+which. `odr_hz` and `watermark` are columns now, and a file with an older
+header is moved aside rather than appended to.
+
+The interrupt line is matched by a pattern that falls back to `lsm6`,
+which is right for the IMU and wrong for anything else that reaches it;
+the `lis2mdl` run was reading the IMU's line and got 0 by luck.
+
+And `docs/DESIGN.md` asked for 416 Hz, which this part cannot produce.
+
+**Four of the test's assertions pinned the old wording**, which is what
+keeps wrong wording wrong. That is the second time in one evening, after
+`iio-probe`'s `not-bound` legend. When a message is wrong its test is
+usually wrong in the same direction, because both came from the same
+misunderstanding.
+
+### What none of this touched
+
+No sample value has been checked. Every run here counts samples and
+interrupts and measures CPU and timestamp spread. Gravity has not been
+measured, no axis has been identified, and the `mounting matrix not found`
+line in `dmesg` means axes are reported in the sensor's own frame rather
+than the board's. That is the next thing, and it is a different kind of
+measurement from anything done tonight.
