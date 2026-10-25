@@ -228,9 +228,27 @@ itself.
 So the sound comparisons are:
 
 - **interrupt rate and CPU load**, across all three paths. These are real,
-  directly measurable, and they are the reason the FIFO exists: at 416 Hz
-  with a watermark of 64 the driver is woken about 6.5 times a second
-  instead of 416.
+  directly measurable, and they are the reason the FIFO exists: at 480 Hz
+  with a watermark of 64 the driver is woken a few times a second instead
+  of 480.
+
+  **This paragraph said 416 Hz until Saturday 24 October 2026 and the
+  LSM6DSV16X cannot produce it.** Its ladder is 7.5, 15, 30, 60, 120, 240,
+  480 and 960, read from `sampling_frequency_available` on the board. 416
+  came from a different part. Acceptance criterion 4 already says "416 Hz
+  or 480 Hz, whichever the part under test offers", so the criterion was
+  never wrong; this prose and the command in the README were.
+
+  **And "about 6.5 times a second" was wrong in a more interesting way.**
+  Rate over watermark assumes every FIFO entry is a sample. `st_lsm6dsx`
+  pairs each sample with a timestamp entry, so the threshold is reached
+  after half as many samples and the interrupt rate doubles; then the
+  handler drains whatever is present while the FIFO keeps filling, which
+  pushes it back down as the rate rises. Measured at a watermark of 64:
+  3.40 per second at 120 Hz, 11.60 at 480, 17.60 at 960. The arithmetic
+  gives a range, not a figure, and
+  [docs/evidence/rates-2026-10-24.md](evidence/rates-2026-10-24.md) derives
+  it.
 - **timestamp regularity within the hrtimer path**, against the rate it was
   asked for. This measures the kernel.
 - **sample count over a fixed interval**, across all three paths, against

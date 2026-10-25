@@ -348,6 +348,38 @@ contains "and refuse to be called a latency measurement" \
 check "a row is written to the results file" \
 	"$(grep -c '^20\|^19' "$WORK/results/rates.csv" 2>/dev/null || echo 0)" "1"
 
+# ---------------- the settings that produced a row, which were missing
+#
+# On Saturday 24 October 2026 nine rows were taken and three were
+# identical in every column except irqs: same path, same device, same
+# samples. Nothing said which watermark produced which, and neither poll
+# row said its output data rate. The conditions lived only in the
+# scrollback of the session that typed them. A results file that carries
+# outcomes without conditions is not something a second person can check,
+# so the two independent variables are columns now.
+contains "the header names the output data rate" \
+	"$(head -n 1 "$WORK/results/rates.csv")" "odr_hz"
+contains "and the watermark" \
+	"$(head -n 1 "$WORK/results/rates.csv")" "watermark"
+check "and the row carries the rate it was asked for" \
+	"$(awk -F, '$2 == "fifo" { print $12 }' "$WORK/results/rates.csv" | tail -n 1)" "480"
+check "and the watermark it was asked for" \
+	"$(awk -F, '$2 == "fifo" { print $13 }' "$WORK/results/rates.csv" | tail -n 1)" "64"
+
+# A card written before that change holds the old header. Appending wider
+# rows under it would make one file whose columns mean different things at
+# different line numbers. The old file is moved aside, never deleted, and
+# the run says where it went.
+printf 'timestamp,path,device\n2026-01-01T00:00:00+0000,fifo,old\n' \
+	>"$WORK/results/rates.csv"
+out=$(run_fifo 480 64 || true)
+contains "an older header is reported rather than appended to" \
+	"$out" "rates.csv had an older header"
+check "the new file starts with the current header" \
+	"$(head -n 1 "$WORK/results/rates.csv" | grep -c 'odr_hz,watermark')" "1"
+check "and the old rows survive in the file it names" \
+	"$(cat "$WORK"/results/rates-*.csv 2>/dev/null | grep -c ',fifo,old')" "1"
+
 # ------------------------- criterion 4 is arithmetic, so it is checked here
 #
 # A hardware FIFO at rate R with watermark W interrupts R/W times a second.
@@ -356,10 +388,23 @@ check "a row is written to the results file" \
 # apart: 7.5 per second expected at 480 Hz over a watermark of 64, and
 # 225.60 measured.
 
+# R/W IS A FLOOR AND THE OLD WORDING CALLED IT AN EXPECTATION, corrected
+# Saturday 24 October 2026. These assertions used to pin the sentence
+# "expected 7.50/s ...", which is the arithmetic for a FIFO whose every
+# entry is a sample. st_lsm6dsx pairs each sample with a timestamp entry,
+# so the real range runs from R/W up to 2R/W, and a correct run spent an
+# evening being reported as 1.5x "measured over expected". A test that
+# asserts the wrong sentence is what keeps it wrong, so what is pinned
+# now is that BOTH bounds are printed and that neither is called a
+# target.
 out=$(run_fifo 480 64 || true)
-contains "the expected interrupt rate is printed, not left to the reader" \
-	"$out" "expected   7.50/s from 480 Hz over a watermark of 64"
-contains "and the ratio beside it" "$out" "ratio      "
+contains "the floor is printed, not left to the reader" \
+	"$out" "irq floor  7.50/s at 480 Hz over a watermark of 64"
+contains "and the ceiling beside it" "$out" "irq ceil   15.00/s"
+contains "and it says the ceiling is the timestamp-paired case" \
+	"$out" "timestamp entry"
+contains "and that neither bound is a target" "$out" "neither is a target"
+contains "and the measured position against the floor" "$out" "position   "
 
 # THE QUIET FIXTURE WAS THE BUG, NOT THE PASSING CASE.
 #
@@ -409,7 +454,7 @@ wait "$healthy" 2>/dev/null || true
 
 check "a working FIFO, interrupting as its watermark predicts, exits zero" \
 	"$status" "0"
-contains "and its ratio is printed" "$out" "ratio      "
+contains "and its position against the floor is printed" "$out" "position   "
 
 # And the shape that fooled a real bench: samples arriving with no
 # interrupts. The quiet fixture reproduces it exactly, because nothing
@@ -481,7 +526,7 @@ kill "$bumper" 2>/dev/null || true
 wait "$bumper" 2>/dev/null || true
 
 contains "a storm is named as a failure rather than printed as a number" \
-	"$out" "FAIL  the interrupt rate is more than twice"
+	"$out" "FAIL  the interrupt rate is above the ceiling"
 contains "and it says what a healthy line reads" "$out" "0.00 and no"
 check "and the run exits non-zero" "$status" "3"
 

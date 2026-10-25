@@ -432,6 +432,21 @@ capture() {
 		fi
 	fi
 	note "irq line   matching \"$irq_match\" in /proc/interrupts"
+	# AND SAY WHEN THAT PATTERN IS NOT THIS DEVICE'S, added Saturday 24
+	# October 2026. The lsm6 fallback is right for lsm6dsv16x_accel,
+	# whose driver names its line lsm6dsx, and wrong for anything else
+	# that reaches it: the lis2mdl trigger run printed a count taken
+	# from the IMU's line. It read 0.00 because the IMU's FIFO was idle,
+	# which is luck rather than correctness, and a concurrent FIFO run
+	# would have been reported as the magnetometer's interrupts.
+	if [ "$irq_match" = lsm6 ] && [ "${name#lsm6}" = "$name" ]; then
+		note "           WARNING: that is st_lsm6dsx's line and NOT"
+		note "           $name's. This device has no line of its own in"
+		note "           /proc/interrupts, so a non-zero count here"
+		note "           belongs to another device. Pass BENCH_IIO_IRQ"
+		note "           to name the right line, or read 0 as the only"
+		note "           trustworthy value."
+	fi
 	irq_before=$(irq_count_of "$irq_match")
 	raw=$(mktemp)
 	CLEAN_DEV=$dev
@@ -523,15 +538,36 @@ emit() {
 
 	mkdir -p "$RESULTS"
 	csv=$RESULTS/rates.csv
+
+	# odr_hz AND watermark ARE THE INDEPENDENT VARIABLES AND WERE MISSING
+	# until Saturday 24 October 2026. Nine rows were taken that evening
+	# and three of them were identical in every column except irqs: same
+	# path, same device, same 460 samples per second, same 2304 samples.
+	# Nothing in the file said one was watermark 64, one 32 and one 128,
+	# and neither poll row said which output data rate it ran at. The
+	# settings existed only in the scrollback of the session that typed
+	# them, which makes a results file nobody else can check.
+	_header="timestamp,path,device,samples_per_s,samples,seconds,irqs,irqs_per_s,cpu_pct,ts_sd_us,ts_source,odr_hz,watermark"
 	if [ ! -f "$csv" ]; then
-		echo "timestamp,path,device,samples_per_s,samples,seconds,irqs,irqs_per_s,cpu_pct,ts_sd_us,ts_source" >"$csv"
+		echo "$_header" >"$csv"
+	elif [ "$(head -n 1 "$csv")" != "$_header" ]; then
+		# A card carried from before that change holds the old header.
+		# Appending wider rows under it would make one file whose
+		# columns mean different things at different line numbers,
+		# which is harder to notice and worse to read than two files.
+		# The old one is moved aside and never deleted.
+		_aside=$RESULTS/rates-$(date +%Y%m%d%H%M%S).csv
+		mv "$csv" "$_aside"
+		echo "$_header" >"$csv"
+		note "note       rates.csv had an older header, so it was moved"
+		note "           to $_aside and a new one started."
 	fi
 	irq_rate=$(awk -v i="$irqs" -v s="$seconds" \
 		'BEGIN { printf "%.2f", (s > 0) ? i / s : 0 }')
-	printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+	printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
 		"$(date +%Y-%m-%dT%H:%M:%S%z)" "$path" "$device" "$rate" "$samples" \
 		"$seconds" "$irqs" "$irq_rate" "${cpu_pct:-}" "$ts_sd" \
-		"$ts_source" >>"$csv"
+		"$ts_source" "${hz:-}" "${watermark:-}" >>"$csv"
 
 	echo
 	note "samples/s  $rate  ($samples in ${seconds}s)"
@@ -565,6 +601,31 @@ emit() {
 	# extra edges are real and arrive down the wire rather than being picked
 	# up by the GPIO.
 	#
+	# R/W IS A FLOOR AND NOT AN EXPECTATION, corrected Saturday 24 October
+	# 2026 after this program spent an evening reporting 1.2x to 1.8x
+	# "measured over expected" on runs that were behaving correctly, and
+	# inviting the reader to go looking for a fault that was not there.
+	#
+	# R/W assumes every FIFO entry is a sample. st_lsm6dsx batches a
+	# timestamp entry alongside them: in st_lsm6dsx_buffer.c, hw->sip is
+	# sip + ts_sip, and with one sensor enabled both are 1, so the pattern
+	# is one sample then one timestamp and the threshold is reached after
+	# W/2 samples. That DOUBLES the interrupts, to 2R/W.
+	#
+	# And 2R/W is itself a ceiling rather than a second expectation,
+	# because the interrupt fires at the threshold and the handler then
+	# drains whatever is present while the FIFO keeps filling during the
+	# I2C read. The surplus samples per interrupt grow with the rate, so
+	# the measured figure falls back toward the floor as R rises. Measured
+	# on this bench at a watermark of 64: 32.0 samples per interrupt at
+	# 120 Hz, 39.7 at 480, 52.4 at 960. See
+	# projects/10-iio-iks4a1/docs/evidence/rates-2026-10-24.md.
+	#
+	# So anything between R/W and 2R/W is ordinary. The two guards below
+	# are unchanged and were already calibrated to that without saying so:
+	# "ratio above 2" is exactly "above the ceiling", which is the ringing
+	# line this was written for. Only the labels were wrong.
+	#
 	# A ratio above 2 exits non-zero. Two is loose on purpose: the point is
 	# to catch a wire that rings, not to fail a run that batched slightly
 	# differently, and the one fault this has ever seen is a factor of
@@ -575,8 +636,15 @@ emit() {
 	if [ "$path" = fifo ] && [ -n "${watermark:-}" ] && [ -z "${irq_void:-}" ]; then
 		_expected=$(awk -v h="$hz" -v w="$watermark" 			'BEGIN { printf "%.2f", (w > 0) ? h / w : 0 }')
 		_ratio=$(awk -v m="$irq_rate" -v e="$_expected" 			'BEGIN { printf "%.1f", (e > 0) ? m / e : 0 }')
-		note "expected   ${_expected}/s from ${hz} Hz over a watermark of $watermark"
-		note "ratio      ${_ratio}x measured over expected"
+		_ceiling=$(awk -v e="$_expected" 'BEGIN { printf "%.2f", e * 2 }')
+		note "irq floor  ${_expected}/s at ${hz} Hz over a watermark of $watermark,"
+		note "           if every FIFO entry is a sample"
+		note "irq ceil   ${_ceiling}/s if the driver pairs each sample with"
+		note "           a timestamp entry, which st_lsm6dsx does. Drain"
+		note "           time pushes the measured rate back toward the"
+		note "           floor as the rate rises, so anything between"
+		note "           these two is ordinary and neither is a target."
+		note "position   ${_ratio}x the floor"
 		# THE OTHER END OF THE SAME GUARD, added Saturday 17 October
 		# 2026. This asked only whether the line was carrying too
 		# many edges. A run that carried NONE printed "ratio 0.0x"
@@ -590,8 +658,8 @@ emit() {
 		# the row says.
 		if [ "${samples:-0}" -gt 0 ] &&
 			[ "$(awk -v r="$_ratio" 'BEGIN { print (r < 0.5) ? 1 : 0 }')" = 1 ]; then
-			note "FAIL  samples arrived and the interrupt rate is less"
-			note "      than half what the watermark predicts, so they"
+			note "FAIL  samples arrived and the interrupt rate is below"
+			note "      half the floor above, so they"
 			note "      did not come from the hardware FIFO. The usual"
 			note "      cause is a trigger attached to the device: the"
 			note "      core then takes the triggered path and the"
@@ -601,10 +669,11 @@ emit() {
 		fi
 
 		if [ "$(awk -v r="$_ratio" 'BEGIN { print (r > 2) ? 1 : 0 }')" = 1 ]; then
-			note "FAIL  the interrupt rate is more than twice what the"
-			note "      watermark predicts, so the line is carrying edges"
-			note "      the FIFO did not ask for. Criterion 4 wants fewer"
-			note "      than 8 per second. Unplug the wire at the shield"
+			note "FAIL  the interrupt rate is above the ceiling above,"
+			note "      so the line is carrying edges the FIFO did not"
+			note "      ask for. A sample paired with a timestamp entry"
+			note "      is the most a correct FIFO can produce, and this"
+			note "      is past it. Unplug the wire at the shield"
 			note "      and run again: a healthy line gives 0.00 and no"
 			note "      samples, which is how the edges were shown to be"
 			note "      real rather than GPIO pickup."
