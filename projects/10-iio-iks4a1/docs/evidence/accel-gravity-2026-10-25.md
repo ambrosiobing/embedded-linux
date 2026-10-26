@@ -4,6 +4,14 @@ Sunday 25 October 2026, Raspberry Pi 3 Model B Plus, `bench-iio-image`
 from commit `8ae1ada`, kernel 6.6.63-v8, X-NUCLEO-IKS4A1, LSM6DSV16X at
 `0x6b` reporting as `lsm6dsv16x_accel`.
 
+**SUPERSEDED IN PART on Monday 26 October 2026** by
+[`accel-sixposition-2026-10-26.md`](accel-sixposition-2026-10-26.md), which
+measures all three axes from six positions and validates the result against
+this session. Nothing below is withdrawn: the Z figures here agree with the
+six-position fit to 0.022 per cent. What changes is the method. This file
+resolves each pose's tilt from its own components, which uses the offsets it
+is trying to measure; the six-position fit needs no orientation at all.
+
 **This is the first measurement in this project that asks whether a number
 is correct.** Every earlier run counted samples, interrupts and CPU, and
 none of them would have noticed a sensor returning plausible nonsense.
