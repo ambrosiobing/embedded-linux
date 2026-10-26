@@ -16,7 +16,7 @@ October 2026 and could say nothing about X or Y.
 | Y | 16403.2 LSB/g = 9.8125 m/s2 | +0.060 % | +86.5 LSB = +5.28 mg |
 | Z | 16350.5 LSB/g = 9.7809 m/s2 | -0.262 % | +153.1 LSB = +9.34 mg |
 
-Sixteen orientations whose measured magnitudes spanned **1.90 per cent**
+Seventeen orientations whose measured magnitudes spanned **1.90 per cent**
 agree to **0.038 per cent** once those six numbers are applied.
 
 The part is specified for roughly +-20 mg of zero-g offset, so all three
@@ -40,7 +40,41 @@ the obvious alternative, resolving each pose's tilt from its own
 components, uses the offsets it is trying to measure. The earlier file
 does exactly that and says so; this does not.
 
-Fitted by least squares on the residual `|(m - b)/s| - 1` over all poses.
+## Reproducing it
+
+The pose means are in
+[`accel-poses-2026-10-26.csv`](accel-poses-2026-10-26.csv) and
+[`accel-poses-2026-10-25.csv`](accel-poses-2026-10-25.csv), and the fit is
+`scripts/accel-fit.py`:
+
+    python3 scripts/accel-fit.py \
+        projects/10-iio-iks4a1/docs/evidence/accel-poses-2026-10-26.csv \
+        --scale 0.000598205 \
+        --holdout projects/10-iio-iks4a1/docs/evidence/accel-poses-2026-10-25.csv
+
+Concatenate the two CSVs to get the seventeen-pose figures in the table
+above. The program refuses rather than returning a number when the poses
+cannot determine one, which covers fewer than six orientations, an axis
+that never points both ways, and a set that is nominally large but all
+pointing nearly the same way. Each of those otherwise yields
+ordinary-looking output.
+
+**Two independent implementations agree.** The numbers above were first
+obtained with a SciPy least squares on the geometric residual
+`|(m - b)/s| - 1`, and the committed script uses a closed-form algebraic
+solve instead, with no iteration and no starting guess. They agree to the
+fourth decimal on every sensitivity and to 0.1 LSB on every offset. That
+is worth something because the two make different arithmetic mistakes;
+writing the second one found a real one.
+
+**The second implementation shipped with a sign error and the test caught
+it.** The algebraic solve returns sensitivities a factor `sqrt(1 - k)` too
+small, where `k` is about 6e-5, and the correction multiplied by that
+factor instead of dividing. It doubled a 0.51 LSB bias to 1.03 rather than
+removing it. No bench measurement could resolve 30 parts per million, so
+nothing here would ever have shown it; `tests/accel-fit-test.sh` generates
+poses from chosen constants and asks whether the program recovers numbers
+it was never told, with a tolerance of 0.2 LSB. The recovery is now exact.
 
 ## The six positions
 
