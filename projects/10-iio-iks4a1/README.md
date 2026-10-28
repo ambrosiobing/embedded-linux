@@ -86,6 +86,17 @@ withdrawn conclusion in the order it happened, timed by commit rather than
 by memory. The [journal](JOURNAL.md) holds the reasoning; the timeline
 holds the sequence, and what the day cost at each stage.
 
+[docs/gyro-method.md](docs/gyro-method.md) is the only document here
+written **before** its measurement rather than after it, on Monday
+26 October 2026. The accelerometer had gravity as a standing reference and
+needed no jig; the gyroscope has no equivalent, because nothing on this
+bench turns at a known rate. So the reference has to be built out of the
+accelerometer that was just calibrated, the error budget is computable in
+advance, and the ceiling it fixes is 0.035 per cent whatever care is taken
+downstream. It also names what cannot be reached this way. No gyroscope
+sample has been read yet, and the acceptance table stays blank until one
+has been.
+
 ## The sensor inventory
 
 The specification asks for an honest list of which sensors of the shield

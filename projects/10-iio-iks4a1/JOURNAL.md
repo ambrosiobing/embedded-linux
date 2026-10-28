@@ -3652,3 +3652,320 @@ measured, no axis has been identified, and the `mounting matrix not found`
 line in `dmesg` means axes are reported in the sensor's own frame rather
 than the board's. That is the next thing, and it is a different kind of
 measurement from anything done tonight.
+
+## 60. The gyroscope has no standing reference, so the method was written first, and writing it found four defects before the hardware could
+
+**What happened.** The accelerometer work closed on Monday 26 October 2026
+with every axis characterised and cross-validated across two sessions. The
+obvious next part is the gyroscope, and it is not the same kind of problem
+at all.
+
+Every accelerometer measurement in this project rests on one free fact: a
+stationary board reads `g` whichever way it points. That is a standing
+reference. It wants no jig, no known orientation and no second instrument,
+and it is what let seventeen poses spanning 1.90 per cent agree to 0.038
+per cent with nobody knowing how the board was held.
+
+There is no such fact for rotation rate. A board at rest on this bench is
+turning, with the Earth, at
+
+    360 degrees / 86164.1 s = 0.0041781 degrees/s = 15.041 degrees/hour
+
+and that is some two orders of magnitude under what this part can resolve.
+Nothing else here turns at a known rate either. A turntable at 33 1/3 rpm
+would be 200.0 degrees/s exactly, and there is no turntable.
+
+So the reference had to be built, and the method written down before any
+sample was taken rather than after. That is
+[docs/gyro-method.md](docs/gyro-method.md), and decision 141 records why.
+The short version: rate has no standing reference but its integral does,
+because gravity's direction in the body frame is an angle and the
+accelerometer now measures it to a known accuracy. A rotation between two
+static poses gets measured twice.
+
+**Two things in that document are worth more than the result will be.**
+
+The first is the ceiling, computed before any sample existed. Per-reading
+accelerometer noise of 0.30 mg fixes gravity's direction to 0.017 degrees,
+the post-calibration systematic residual contributes 0.022, and two
+endpoints in quadrature give about 0.03 degrees, which on a quarter turn
+is 0.035 per cent. No care downstream improves that, and knowing it in
+advance is what makes the rest of the design decisions decidable.
+
+The second is that the dominant confound is a hundred times larger than
+the reference and cannot be fixed by arithmetic. The accelerometer
+measures the angle between two endpoints; the gyroscope integrates the
+path actually travelled. A rotation that wanders two degrees off axis and
+comes back adds about four degrees of path to ninety, which is 4.4 per
+cent. The answer is mechanical: turn the board about an edge resting on
+the bench. That is a choice about how to hold the board, and it cannot be
+made after the data exists.
+
+**What was done.** `scripts/gyro-fit.py`, `tests/gyro-fit-test.sh` with
+twenty-eight assertions, and no hardware touched yet. The unit of
+measurement is a there-and-back pair, not a single rotation, for exactly
+the reason the flat-and-inverted pair was needed for the accelerometer:
+
+    outward    = (1+e)(+T) + b*t1
+    return     = (1+e)(-T) + b*t2
+    sum        = b*(t1+t2)             the residual bias
+    difference = 2(1+e)T + b*(t1-t2)   the scale, bias free
+
+which also means the bias is recovered twice, from the still intervals and
+from the reversal sum, and the two must agree. That is the check that can
+fail.
+
+**Four defects, and the fixtures found all of them before the board
+could.**
+
+*The truncation, which is the one that matters.* The first version
+integrated exactly the run of samples above its still threshold. A fixture
+built from a chosen 1.5000 per cent scale error came back as
+
+    the gyroscope reads +1.3262 per cent against the accelerometer
+
+A hand rotation starts and ends gradually, so its first and last samples
+sit below any threshold able to reject bias and noise. On that fixture the
+tails below the threshold carried 0.055 degrees at each end of each
+rotation, and the observed deficit was 0.1186 degrees, which matches.
+Truncation is one-sided and always reads low. That is 0.17 per cent, five
+times the reference's own accuracy, and no measurement on this bench could
+have shown it was wrong.
+
+The fix is not a lower threshold, which only shrinks it. The window is
+padded into the still region beyond the edge of the motion, where the bias
+has already been subtracted and a sample contributes zero in expectation.
+A systematic deficit traded for a random term about forty times smaller.
+Recovery is then exact.
+
+*A comment that asserted something false about its own check.* The program
+printed both a trapezoidal and a rectangular integral and called their
+difference a test of whether the sample rate had resolved the motion. It
+is not one. The difference telescopes:
+
+    trap - rect = sum 0.5 (a[i+1] - a[i]) dt = 0.5 dt (a[last] - a[first])
+
+so it depends on the two endpoint values and on nothing in between. No
+curvature, nothing about the shape of the rotation. What it actually tests
+is whether the window begins and ends at rest, which is worth knowing, so
+it is now checked under that name. Sample-rate adequacy needed a different
+question and got one: integrate the same window on every second sample,
+which is a Richardson estimate because the trapezoid error falls as dt
+squared.
+
+*Segmentation thresholded the raw rate magnitude.* A part whose zero-rate
+offset exceeds the threshold is then never still at any point in the
+capture, and the whole recording reads as one long rotation. A gentle
+rotation makes this certain rather than possible, because the threshold is
+a fraction of the peak and the peak is small. The provisional bias now
+comes from the median of each axis, which works because the still
+intervals are deliberately much longer than the rotations.
+
+*A short run at the start of a capture was trusted as the still interval.*
+The merge rule absorbed a too-short run backwards into its predecessor,
+and a run at the very start has no predecessor. A capture beginning part
+way into a rotation therefore opened with a handful of samples below the
+threshold, and the bias was read from those. The program did refuse that
+capture, which is why this nearly went unnoticed: it refused for the wrong
+reason, reporting a residual bias of 10.6 per cent instead of saying there
+was no still interval at one end.
+
+**And a fifth, found by the clean fixture rather than a broken one.** The
+guard comparing the two bias routes had no resolution floor, so on a
+noiseless capture it compared two quantities that were both zero to
+floating-point noise and refused:
+
+    gyro-fit: the two bias routes differ by 0.00000 degrees/s, more than
+           five times the 0.00000 drift between the still intervals.
+
+It now requires agreement within what either route could resolve, from the
+drift, the still noise and an absolute floor.
+
+**Why that and not the alternative.** The tolerance on the recovery
+assertions is four decimal places on a percentage, about half a part per
+million of the angle, which is far tighter than anything this bench can
+measure. That is deliberate and it is the lesson from `accel-fit.py` two
+hours earlier, where a 20 LSB bound on a noiseless fixture accepted a sign
+error happily. A generated fixture tests arithmetic, not hardware, so its
+bound belongs near machine precision. The truncation defect is exactly
+what a comfortable bound would have passed.
+
+**The mutation run, which is the only evidence the test does anything.**
+Each fix reverted in turn, suite re-run:
+
+    no padding or edge extension (the truncation)   13 passed, 15 failed
+    raw-magnitude segmentation                      26 passed,  2 failed
+    short leading run not absorbed forwards         27 passed,  1 failed
+    bias routes compared with no resolution floor   23 passed,  5 failed
+    restored                                        28 passed,  0 failed
+
+Two of those are caught by only one or two assertions, which is thinner
+than it looks comfortable to say. They are real failures and not
+coincidences, but a single assertion standing between a defect and a green
+suite is worth recording as such.
+
+**What has not happened.** No gyroscope sample has been read. The
+acceptance table stays blank, the method document's prediction that this
+part cannot see the Earth's rotation is still unrefuted, and nothing here
+says the measurement will work.
+
+## 61. The gyroscope's path, where the broken thing was the tool and not the sensor, and three wrong theories in the order I held them
+
+**What happened.** With `gyro-method.md` and `gyro-fit.py` written, the
+first capture on the board failed:
+
+    # iio-stream -d lsm6dsv16x_gyro -r 960 -b 256 -n 225 > gyro-still.csv
+    rate set to 960 Hz
+    WARNING: High-speed mode not enabled
+    refill failed: Connection timed out
+    1 gyro-still.csv
+
+One line in the file, the header, and `/proc/interrupts` still reading
+zero on the `lsm6dsx` line. Everything after that is the diagnosis, and
+it is worth recording because I was wrong three times and each wrong
+theory was wrong in a different way.
+
+**Theory one: the INT1 lead.** The accelerometer calibration took
+seventeen poses over two days, picking the board up and turning it over
+each time, and every one of those readings came from raw sysfs
+attributes, which never touch the interrupt line. So the lead on header
+pin 18 had gone two days and seventeen handlings without being
+exercised, and it was the one thing whose failure nothing since Saturday
+would have noticed. That reasoning was sound and the conclusion was
+wrong.
+
+It was also a theory this project has paid for before. For four days in
+October it recommended a shorter jumper or series resistance for
+criterion 4, and the wire was never the fault; the fix was one word in
+the devicetree. So the rule was already written: do not blame the wire
+first.
+
+**What settled it was reading the old evidence rather than the board.**
+All nine FIFO rows in `rates-2026-10-24.csv` are `lsm6dsv16x_accel`. The
+gyroscope's buffer had never been enabled on this board at all. So the
+failing run differed from the last known-good one in four ways at once:
+the device, the tool, the watermark and two days of handling. That is the
+error project 8 nearly made with a 6.12 kernel against a 6.6 one, and the
+answer is the same: restore the known-good configuration, then change one
+thing.
+
+    # iio-rate fifo lsm6dsv16x_accel 480 64 -d 5
+    --- samples/s  460  (2304 in 5s)
+    --- interrupts 59  (11.80/s)
+
+    # cd /proc && grep -i lsm6 interrupts
+    185:         18         11         13         17  pinctrl-bcm2835  24 Level     lsm6dsx
+
+18 + 11 + 13 + 17 = 59, exactly the 59 reported. **The lead is good**, and
+that is the first positive evidence for it since Saturday.
+
+**A finding that came free with that run.** 11.80 interrupts per second
+against Saturday's 11.60, so the Pi 3B+ figure reproduces to 1.7 per cent
+across two days and two boots. The open 5x disagreement with eplepi's
+2.30 now has one side of it measured twice, which makes the October
+figure the one standing alone rather than the one in dispute.
+
+**Theory two: the watermark.** `iio-stream` never sets one, so the buffer
+ran at the IIO default of 1. In `st_lsm6dsx` the FIFO carries a timestamp
+entry beside each sample, so `hw->sip` is 2 with one sensor enabled, and
+I reasoned that a watermark of 1 gives a hardware threshold of 1 divided
+by 2, which is 0 in integer arithmetic, and a threshold of zero never
+fires. It is a tidy mechanism and it is contradicted by this project's
+own data: Saturday's watermark-1 run on the accelerometer worked and
+produced the 40.5x contrast. Setting the watermark by hand changed
+nothing:
+
+    # echo 64 > buffer/watermark && cat buffer/watermark buffer/length
+    64
+    256
+    # iio-stream -d lsm6dsv16x_gyro -r 480 -b 256 -n 113 > gyro-still.csv
+    refill failed: Connection timed out
+
+**Worse, the test I proposed for it could not have isolated it.** I
+called the `iio-rate fifo lsm6dsv16x_gyro 480 64` run a one-variable
+change, and it changed three things from the failing run: the tool, the
+watermark and the ODR. What it actually established, which was worth
+having, is that the gyroscope's FIFO works: 448 samples/s and 59
+interrupts, within 2.6 per cent of the accelerometer on the same line.
+
+**What was done.** Filled in the missing cell of the matrix, which is the
+thing I should have done first, because `iio-rate` drives sysfs and the
+chardev while `iio-stream` goes through libiio:
+
+                        sysfs and chardev        libiio
+    lsm6dsv16x_accel    works, 460/s, 59 irq     refill timed out
+    lsm6dsv16x_gyro     works, 448/s, 59 irq     refill timed out
+
+**`iio-stream` is broken on this image for both devices.** The kernel,
+the driver, the FIFO, the lead and both parts are all good. The
+gyroscope was never the problem; it was the device that happened to be
+under test when a tool fault surfaced. The cause of the timeout is not
+established.
+
+**And it exits 0 while failing.** `rc=0` after `refill failed`, with one
+header line in the output file. That is the same defect class this
+repository has already shipped three times, where a refusal or a failure
+is reported as a pass, and it needs no further diagnosis to be wrong.
+
+**This puts a question mark against criterion 5**, which is a `diff` of
+`iio-stream` run locally against the same program over `ip:`. It was
+marked met on Thursday 1 October 2026 on eplepi with out-of-tree drivers
+and has not been re-taken under Yocto, where the tool cannot read a
+buffer at all. Not changed in the acceptance table yet, because what the
+table needs is a measurement on the configuration the criterion names,
+not an inference from this one.
+
+**Theory three, and this one was mine about the sensor rather than the
+tool.** Eight sysfs reads of the motionless board, one second apart:
+
+    -1181 -2309  -992        -1112  1103  2738
+    -1286 -2036  2629         -989  4219 -4884
+    -1192  2365 -2355         -517 -1665   311
+    -1072 -1999  -879         -591  1901   958
+
+At 35 mdps/LSB that is tens to 170 degrees per second, on a board whose
+true rate is 0.0042. I had been about to read the first single triple,
+`-411 -835 616`, as a large zero-rate offset. **One reading cannot tell a
+bias from somebody leaning on the bench, and eight of them show it is
+neither: it is a part that has not settled.** The inference, untested, is
+that `st_lsm6dsx`'s one-shot read powers the sensor, waits one sample
+period and reads, and 2 ms at 480 Hz is nowhere near a MEMS gyroscope's
+turn-on settling time. The test is a buffered mean, which keeps the part
+powered.
+
+It went unnoticed because every sysfs reading this project has ever taken
+was from the accelerometer, the seventeen calibration poses included.
+Nothing before today read the gyroscope through that path, so there was
+nothing to disagree with.
+
+**It costs the method nothing.** `gyro-method.md` already required the
+buffered path because integration needs real timestamps and the poll path
+costs 16.4 ms per read at 960 Hz. There are now two independent reasons
+for the same decision, which is a better position than having one.
+
+**A sixth defect in `gyro-fit.py`, found by this.** With `iio-stream`
+unusable, the capture route is the chardev plus `iio-decode`, and
+`iio-decode` prints raw counts for this device: it looks for a per-axis
+`in_anglvel_x_scale` and `st_lsm6dsx` publishes one shared
+`in_anglvel_scale`. The two tools' CSVs are indistinguishable and differ
+by a factor of about sixteen thousand. So the program takes `--scale` and
+**guards both directions rather than trusting the flag**: a peak above
+5000 degrees/s is faster than any part here can report, and a peak below
+5 is not a rotation at all. Two more assertions each way, and the
+tolerance on the two bias routes had to grow a quantisation term, because
+a raw-count capture cannot know its bias better than one LSB and the
+old floor refused every correct one.
+
+Thirty-one assertions now. Mutation run, each fix reverted in turn:
+
+    truncation                                      15 passed, 16 failed
+    raw-magnitude segmentation                      29 passed,  2 failed
+    short leading run not absorbed forwards         30 passed,  1 failed
+    bias routes with no resolution floor            25 passed,  6 failed
+    unit guard removed                              30 passed,  1 failed
+    --scale ignored                                 29 passed,  2 failed
+    restored                                        31 passed,  0 failed
+
+**What has not happened.** Still no gyroscope sample worth a number. The
+capture path is now known rather than assumed, which is what this entry
+bought, and that is less than it sounds and more than nothing.

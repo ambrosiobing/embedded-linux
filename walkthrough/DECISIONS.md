@@ -5442,3 +5442,70 @@ target. Its two FAIL guards are unchanged: "ratio above 2" was already
 exactly "above the ceiling", so they were calibrated correctly and only
 the labels were wrong. The upper guard no longer cites criterion 4's
 "fewer than 8 per second" as the thing to aim at.
+
+## 141. A measurement with no standing reference gets its method written and committed before its first sample
+
+**Context.** Monday 26 October 2026. The accelerometer had just been
+calibrated on all three axes against gravity, which is a standing
+reference: a stationary board reads g whichever way it points, so no jig,
+no known orientation and no second instrument are needed. The gyroscope
+has no such fact available. A board at rest on this bench is turning with
+the Earth at 0.0041781 degrees/s, which is some two orders of magnitude
+below what a consumer MEMS part can resolve, and nothing else on the bench
+turns at a known rate.
+
+**Decision.** Build the reference out of the integral rather than the
+rate. Gravity's direction in the body frame is an angle, and the
+accelerometer now measures it to a known accuracy, so a rotation between
+two static poses is measured twice: once by integrating rate and once from
+its two endpoints. Write the method, the error budget, the confounds and
+the refusals into the tree in `projects/10-iio-iks4a1/docs/gyro-method.md`
+**before** any sample is read, and implement them in
+`scripts/gyro-fit.py` with `tests/gyro-fit-test.sh` behind it.
+
+**Rejected.** Two alternatives, both named in the document. Taking a
+capture first and working out afterwards what it could support, which lets
+the numbers choose the method. And waiting for a known rate source: a
+turntable at 33 1/3 rpm is 200.0 degrees/s exactly and would measure rate
+directly with no integration and no accelerometer, which is the method
+this project would use if one more object were on the bench.
+
+**Why.** Everything that decides whether this measurement is worth
+anything is computable in advance, and most of it constrains the physical
+arrangement rather than the arithmetic. The reference is worth about 0.03
+degrees, so 0.035 per cent of a quarter turn, and that is a ceiling no
+care downstream improves. The dominant confound is more than a hundred
+times that: the accelerometer measures the angle between two endpoints
+while the gyroscope integrates the path actually travelled, and a rotation
+that wanders two degrees off axis and back adds 4.4 per cent. It has to be
+held down mechanically, by turning the board about an edge resting on the
+bench, which is a choice about how to hold the board and cannot be made
+after the data exists. The usable speed band falls out of the same
+algebra, and it is counterintuitive: the bias term is drift divided by
+mean rate, so a brisk rotation is wanted and a careful slow one is where
+bias wins.
+
+**Consequence.** Four things, and the first is a cost.
+
+The gyroscope figure can never be better than the accelerometer's, because
+its errors are now inside this measurement's reference. Chaining is the
+price of having a reference at all, and it is only honest because the
+first instrument's error was characterised first, on Monday 26 October
+2026 and not before.
+
+Three starting poses are needed rather than one, because a rotation about
+gravity itself is invisible to the reference: turning the board about a
+vertical axis leaves gravity unchanged in the body frame, so the
+accelerometer sees nothing while the gyroscope sees the whole rotation.
+
+The document is a claim the measurement can contradict, which is the
+point. Its prediction that this part cannot see the Earth's rotation is
+written down so the first still capture can refute it.
+
+And writing the program before the hardware found four defects in it that
+the hardware would have hidden. The one that matters: integrating exactly
+the samples above the still threshold cut the gradual start and end off
+every rotation, and a fixture built from a known 1.5000 per cent scale
+error came back as 1.3262. Truncation is one-sided and always reads low.
+That is 0.17 per cent, five times the reference's own accuracy, and no
+measurement on this bench would have shown it was wrong.

@@ -1,0 +1,127 @@
+The driver's timestamps are not real time, by 15.7 per cent
+===========================================================
+
+Monday 26 October 2026, Raspberry Pi 3 Model B Plus, bench-iio-image from
+commit 8ae1ada, kernel 6.6.63-v8, LSM6DSV16X at 0x6b read through
+st_lsm6dsx. Four buffered captures.
+
+WHAT THIS SETTLES. The timestamps IIO delivers for this part are longer
+than real time by a constant factor near 1.156, independent of the output
+data rate. It is a scale error and not a drift. Any measurement that
+integrates against them, which is what the gyroscope method does, is
+wrong by that factor and cannot separate it from the quantity being
+measured.
+
+WHAT IT DOES NOT SETTLE. The mechanism. The arithmetic below is
+consistent with one wrong constant in the driver, and neither the driver
+source nor the part's datasheet has been read here. That is an inference
+and is marked as one throughout.
+
+
+1. THE PROOF, WHICH NEEDS NO ARITHMETIC
+---------------------------------------
+
+A capture of 28800 scans was bracketed by the board's own clock:
+
+    # echo 1 > buffer/enable && date +%s && dd if=/dev/iio:device4 \
+          of=g2.bin bs=1024 count=450 && date +%s
+    1793045554
+    450+0 records in
+    450+0 records out
+    1793045616
+
+Its first and last timestamps:
+
+    first    1793045554.903     date before dd  1793045554    +0.903
+    last     1793045626.094     date after  dd  1793045616   +10.094
+
+THE LAST SAMPLE IS STAMPED TEN SECONDS AFTER THE READ THAT RETURNED IT
+FINISHED. No clock can do that. Nothing else in this file is needed to
+know the timestamps are wrong; the rest is needed only to say by how
+much and in what shape.
+
+
+2. THE SHAPE: A CONSTANT FACTOR, NOT A DRIFT
+--------------------------------------------
+
+Four captures, two output data rates. Wall clock from /proc/uptime at
+10 ms resolution except g2, which used `date` at 1 s and is the weaker
+measurement because of it.
+
+    file      nominal   samples   wall clock   ts interval   ts rate
+    g2.csv    480 Hz     28800    62.00 s      0.002472 s    404.543 Hz
+    g3.csv    240 Hz     14400    61.63 s      0.004944 s    202.262 Hz
+    gr2.csv   480 Hz     28800    61.52 s      0.002472 s    404.543 Hz
+
+The interval at 240 Hz is 0.004944 s against 0.002472 at 480, EXACTLY
+double. So the error is proportional to the sample interval and carries
+no dependence on the rate itself.
+
+Taken against the nominal interval rather than against real time, the
+factor is the same number twice over:
+
+    480 Hz:  0.0024719 / (1/480)  =  1.186521
+    240 Hz:  0.0049438 / (1/240)  =  1.186558
+
+Five significant figures apart. **The driver assigns each sample an
+interval 1.18654 times the nominal one.**
+
+The stretch against REAL time is that factor divided by the part's own
+oscillator error, which is why it is not quite identical between runs:
+
+    file      driver/nominal   true/nominal   stretch vs real time
+    g3.csv    1.186558         1.027250       1.15508
+    gr2.csv   1.186521         1.025400       1.15713
+
+So the part runs 2.5 to 2.7 per cent slow of nominal, which is ordinary
+MEMS oscillator tolerance, and the driver is wrong by 18.65 per cent.
+Those two compose to the 15.5 to 15.7 per cent seen against the clock.
+
+
+3. WHAT IT IS CONSISTENT WITH, WHICH IS NOT THE SAME AS WHAT IT IS
+------------------------------------------------------------------
+
+A FIFO timestamp counter scaled by the wrong constant produces exactly
+this shape: proportional to the interval, independent of the rate, and
+unaffected by oscillator error, since a slow oscillator lengthens the
+tick and the sample interval together and the ticks-per-sample ratio is
+unchanged.
+
+On that reading the assumed tick is too long by 1.18654, so against an
+assumed 25 us the actual would be 25 / 1.18654 = 21.07 us.
+
+A FIRST GUESS AT THIS WAS WRONG AND IS RECORDED BECAUSE IT WAS WRONG IN
+A USEFUL WAY. The guess was 25 us assumed against 21.75 us actual, a
+ratio of 1.14943, and it was made from the 1.1482 that the one-second
+`date` resolution allowed. The /proc/uptime measurement is 1.15508, which
+is 0.49 per cent away and twelve times its own error bar. The shape of
+the explanation survived the better measurement and the specific constant
+did not. 21.07 us is what the data says; whether the part specifies that
+or something else has not been checked here.
+
+
+4. WHY IT MATTERS MORE THAN ITS SIZE
+------------------------------------
+
+The gyroscope method integrates rate against time. A constant error in
+dt is the same constant error in every angle, so a 15.7 per cent error in
+the time base is a 15.7 per cent error in the scale factor, against a
+reference accuracy of 0.035 per cent. That is four hundred times.
+
+Worse, it is not separable. The product of the gyroscope's gain and the
+timestamp scale is what the integral returns, and nothing inside the
+capture distinguishes them. A measurement taken this way would have
+reported a part 15.7 per cent out of specification, with every internal
+consistency check passing.
+
+THE FIX. The time base is the duration of the read, measured on the board
+around it, and the timestamps are used only for ordering and for finding
+gaps. /proc/uptime at 10 ms over a 60 second capture is 0.017 per cent,
+which is below the reference's own accuracy. `date` at 1 s is 1.6 per
+cent and is not good enough, which is why the first attempt could not
+settle the question it was asked.
+
+scripts/gyro-fit.py refuses to integrate without either --duration or an
+explicit --trust-timestamps, and tests/gyro-fit-test.sh drives a fixture
+carrying a 1.1551 stretch: trusted, it reads 17.24 per cent where the
+truth is 1.50, and with the measured duration it reads 1.5000.

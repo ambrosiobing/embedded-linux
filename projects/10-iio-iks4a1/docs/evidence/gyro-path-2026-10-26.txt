@@ -1,0 +1,223 @@
+The gyroscope's capture path, and two things that turned out broken
+===================================================================
+
+Monday 26 October 2026, Raspberry Pi 3 Model B Plus, bench-iio-image from
+commit 8ae1ada, kernel 6.6.63-v8, LSM6DSV16X at 0x6b. Wiring unchanged
+since docs/figures/wiring-2026-10-24.md, five leads, INT1 on header pin 18
+and GPIO24.
+
+WHAT THIS SETTLES. The gyroscope's hardware FIFO path works and the INT1
+lead is good, both measured today. iio-stream cannot refill a buffer on
+this image for EITHER device, and it exits 0 while failing. Single-shot
+sysfs reads of this gyroscope return values a stationary board cannot
+produce.
+
+WHAT IT DOES NOT SETTLE. The cause of the iio-stream timeout. The
+mechanism behind the sysfs scatter is inferred and is marked as such
+below.
+
+
+1. THE PART IS CONFIGURED, AND THE RANGES ARE EXACT ST SENSITIVITIES
+--------------------------------------------------------------------
+
+    # cd /sys/bus/iio/devices && d=$(grep -l lsm6dsv16x_gyro */name|cut -d/ -f1) && echo "$d" && cat $d/in_anglvel_scale_available
+    iio:device4
+    0.000152716 0.000305432 0.000610865 0.001221729
+
+    # cat $d/sampling_frequency_available $d/buffer/length
+    7.500 15.000 30.000 60.000 120.000 240.000 480.000 960.000
+    2
+
+Each scale is an exact ST sensitivity, so the ranges are determined:
+
+    0.000152716 rad/s/LSB  =  8.75 mdps/LSB  =  +-250 dps
+    0.000305432            = 17.50           =  +-500
+    0.000610865            = 35.00           =  +-1000
+    0.001221729            = 70.00           =  +-2000
+
+Note that the 16-bit field has headroom past the specified range:
+8.75 mdps times 32768 is 286.7 dps, not 250. The specified range is the
+conservative figure and the one a clipping guard should use. The driver
+offers four ranges, not the six the part is documented to have.
+
+iio:device4 is this boot only. IIO numbers are allocation order and a
+failed probe frees its number for reuse, so every program here resolves a
+device by its name.
+
+
+2. THE INT1 LEAD IS GOOD, MEASURED TODAY FOR THE FIRST TIME SINCE SATURDAY
+--------------------------------------------------------------------------
+
+Everything done on Sunday 25 and Monday 26 October 2026 for the
+accelerometer calibration read raw sysfs attributes, which never touch
+INT1. So the lead went two days and seventeen handlings without being
+exercised. Before any buffer was armed:
+
+    # cd /proc && grep -i lsm6 interrupts
+    185:          0          0          0          0  pinctrl-bcm2835  24 Level     lsm6dsx
+
+ZERO IS NOT EVIDENCE OF A FAULT HERE and was briefly read as such. The
+FIFO threshold interrupt only fires while a buffer is armed, and nothing
+had armed one this boot. What the line does establish is that the overlay
+reached the kernel and the driver claimed it: pinctrl-bcm2835 24 Level
+is exactly the interrupts = <24 4> the overlay declares.
+
+After one five-second FIFO run:
+
+    185:         18         11         13         17  pinctrl-bcm2835  24 Level     lsm6dsx
+
+18 + 11 + 13 + 17 = 59, which is exactly the 59 interrupts iio-rate
+reported. The lead is good.
+
+
+3. THE FOUR-CELL MATRIX, WHICH IS WHAT ISOLATED THE FAULT
+---------------------------------------------------------
+
+The first attempt used iio-stream on the gyroscope and failed. That run
+differed from the last known-good run in four ways at once: the device,
+the tool, the watermark and two days of handling. Filling in the matrix
+cost two commands and settled it.
+
+    # iio-rate fifo lsm6dsv16x_accel 480 64 -d 5
+    --- samples/s  460  (2304 in 5s)
+    --- interrupts 59  (11.80/s)
+    --- reader cpu 0.40%
+
+    # iio-rate fifo lsm6dsv16x_gyro 480 64 -d 5
+    --- device     lsm6dsv16x_gyro at iio:device4
+    --- channels  in_anglvel_x in_anglvel_y in_anglvel_z in_timestamp
+    --- samples/s  448  (2240 in 5s)
+    --- interrupts 59  (11.80/s)
+    --- reader cpu 0.40%
+
+    # iio-stream -d lsm6dsv16x_gyro -r 960 -b 256 -n 225 > gyro-still.csv
+    rate set to 960 Hz
+    WARNING: High-speed mode not enabled
+    refill failed: Connection timed out
+
+    # iio-stream -d lsm6dsv16x_accel -r 960 -b 256 -n 10 > /dev/null; echo rc=$?
+    rate set to 960 Hz
+    WARNING: High-speed mode not enabled
+    refill failed: Connection timed out
+    rc=0
+
+                        sysfs and chardev        libiio
+    lsm6dsv16x_accel    works, 460/s, 59 irq     refill timed out
+    lsm6dsv16x_gyro     works, 448/s, 59 irq     refill timed out
+
+So the kernel, the driver, the FIFO, the INT1 lead and both devices are
+good, and the broken thing is iio-stream. The gyroscope was never the
+problem; it was simply the device that happened to be under test when a
+tool fault surfaced.
+
+THE WATERMARK IS NOT INVOLVED, and a first guess that it was is recorded
+here because it was wrong in an instructive way. The guess was that
+st_lsm6dsx pairs each sample with a timestamp entry, so hw->sip is 2 and
+a watermark of 1 gives a hardware threshold of 1/2 = 0, which never
+fires. Saturday's own data contradicts it: watermark 1 on the
+accelerometer worked and produced the 40.5x contrast. Setting the
+watermark explicitly changed nothing:
+
+    # echo 64 > buffer/watermark && cat buffer/watermark buffer/length
+    64
+    256
+    # iio-stream -d lsm6dsv16x_gyro -r 480 -b 256 -n 113 > gyro-still.csv
+    refill failed: Connection timed out
+
+TWO DEFECTS IN iio-stream, THEN. It cannot refill on this image, cause
+unknown, and separately IT EXITS 0 AFTER FAILING. One header line in the
+output file and rc=0 is the same defect class this project has shipped
+three times before, where a failure is reported as a pass.
+
+This also puts a question mark against criterion 5, which is a diff of
+iio-stream run locally against iio-stream run over ip:. That criterion
+was marked met on Thursday 1 October 2026 on eplepi with out-of-tree
+drivers. It has not been re-taken under Yocto and on this image the tool
+cannot read a buffer at all.
+
+
+4. buffer/length REVERTS TO 2, SO WATERMARK BEFORE LENGTH IS EINVAL
+-------------------------------------------------------------------
+
+Arming the buffer by hand failed on the first attempt:
+
+    # echo 480 > sampling_frequency && echo 64 > buffer/watermark && echo 1 > buffer/enable
+    sh: write error: Invalid argument
+
+The && chain stopped at the first failure and nothing said which write it
+was. Reading the state settled it:
+
+    # cat buffer/length buffer/watermark buffer/enable sampling_frequency
+    2
+    1
+    0
+    480.000000
+
+buffer/length was 2 and the watermark 1. The IIO core's watermark store
+returns -EINVAL when the value exceeds buffer/length, so writing 64
+against a length of 2 could not succeed. In the corrected order it does:
+
+    # echo 512 > buffer/length && echo 64 > buffer/watermark && echo 480 > sampling_frequency
+    512
+    64
+    480.000000
+
+WHAT IS WORTH KEEPING HERE. The length had been 256 an hour earlier,
+set by libiio during the iio-stream attempts, and it was back to its
+default of 2 by the time the buffer was armed by hand. So this is not a
+once-off state to be cleaned up, it is the state every hand-driven
+capture starts from, and length must be written before watermark every
+time.
+
+tests/conventions already warn that a watermark larger than
+buffer/length passes in a synthetic sysfs fixture and fails on a board,
+because no ordinary file refuses a write. That is exactly what happened
+here, in the direction the note predicted.
+
+
+5. SINGLE-SHOT SYSFS READS OF THIS GYROSCOPE ARE NOT USABLE
+-----------------------------------------------------------
+
+Eight reads one second apart, board at rest on the bench, nothing
+touching it, at the +-1000 dps range so 35 mdps/LSB:
+
+    # for i in 1 2 3 4 5 6 7 8; do echo "$(cat in_anglvel_x_raw) $(cat in_anglvel_y_raw) $(cat in_anglvel_z_raw)"; sleep 1; done
+    -1181 -2309  -992
+    -1286 -2036  2629
+    -1192  2365 -2355
+    -1072 -1999  -879
+    -1112  1103  2738
+     -989  4219 -4884
+     -517 -1665   311
+     -591  1901   958
+
+In degrees per second:
+
+      X      Y       Z           X      Y       Z
+    -41.3  -80.8  -34.7       -38.9   38.6    95.8
+    -45.0  -71.3   92.0       -34.6  147.7 -170.9
+    -41.7   82.8  -82.4       -18.1  -58.3   10.9
+    -37.5  -70.0  -30.8       -20.7   66.5   33.5
+
+A stationary board turns at 0.0042 degrees/s, the rotation of the Earth.
+These scatter over hundreds of degrees per second, with Y and Z swinging
++-170 while X stays consistently negative. MEASURED: this path cannot be
+used to characterise this gyroscope.
+
+INFERRED, and not established here: that the cause is turn-on settling
+time. st_lsm6dsx's one-shot read powers the sensor, waits one sample
+period, reads, and powers it down, and one period at 480 Hz is about
+2 ms. A MEMS gyroscope needs far longer than that to stabilise, much
+longer than an accelerometer does. That would explain the pattern but it
+has not been tested, and the test is simply to compare these against the
+mean of a buffered capture, which keeps the part continuously powered.
+
+WHY THIS WENT UNNOTICED UNTIL NOW. Every sysfs reading this project has
+ever taken was from the accelerometer, including all seventeen
+calibration poses. Nothing before today read the gyroscope through this
+path, so there was nothing to disagree with.
+
+It costs this project nothing, because gyro-method.md already requires
+the buffered path for an unrelated reason: integration needs real
+timestamps, and the poll path costs 16.4 ms per read at 960 Hz. There are
+now two independent reasons for the same decision.
