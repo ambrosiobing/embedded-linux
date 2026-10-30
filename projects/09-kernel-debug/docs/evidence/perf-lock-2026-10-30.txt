@@ -1,0 +1,79 @@
+root@raspberrypi3-64:/tmp# cd /tmp && perf record -a -g -o lock.data -- sh -c 'echo lock > /sys/kernel/debug/buggy/trigger' 2>&1 | tail -n 6
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.830 MB lock.data (4000 samples) ]
+
+root@raspberrypi3-64:/tmp# cd /tmp && perf evlist -i lock.data
+cycles:P
+dummy:u
+
+So the PMU is live and this is a hardware profile, not an hrtimer
+fallback. 4000 samples, 0 lost.
+
+root@raspberrypi3-64:/tmp# cd /tmp && perf report -i lock.data --stdio --no-children --sort symbol 2>/dev/null | head -n 25
+# Samples: 4K of event 'cycles:P'
+# Event count (approx.): 650934840
+#
+# Overhead  Symbol
+# ........  ...........................................
+#
+    18.06%  [k] _raw_spin_unlock_irqrestore              -      -
+     9.24%  [k] default_idle_call                        -      -
+     4.25%  [k] _raw_spin_unlock_irq                     -      -
+
+Neither fault_lock nor __delay appears in the listing. The only "delay"
+matches in the whole report are queue_delayed_work_on and
+mod_delayed_work_on, unrelated workqueue functions.
+
+LEAF SYMBOLS AGAINST CALLCHAIN ENTRIES, which is the distinction that
+reconciles two readings of the same data.
+
+root@raspberrypi3-64:/tmp# perf script -i lock.data | grep -cE "fault_lock|__delay"
+3
+root@raspberrypi3-64:/tmp# perf script -i lock.data | grep -c "cycles:P"
+4000
+root@raspberrypi3-64:/tmp# perf script -i lock.data -F cpu,time,sym | grep -E "fault_lock|__delay"
+root@raspberrypi3-64:/tmp#
+
+Three mentions in 4000 samples, and ZERO when only each sample's leaf
+symbol is printed. So no sample's program counter lies inside the fault.
+The three are callchain entries: samples taken at the moment the
+interrupt mask lifts, whose stack passes through fault_lock, which is
+also why _raw_spin_unlock_irqrestore tops the profile.
+
+THE MECHANISM, MEASURED. Largest gap between consecutive samples, per CPU:
+
+root@raspberrypi3-64:/tmp# cd /tmp && perf script -i lock.data -F cpu,time 2>/dev/null | awk '{c=$1; t=$2+0; if (p[c]!="") {d=t-p[c]; if (d>m[c]) m[c]=d} p[c]=t} END{for (k in m) printf "%s largest gap %.3f s\n", k, m[k]}'
+[000] largest gap 0.024 s
+[001] largest gap 0.028 s
+[002] largest gap 0.036 s
+[003] largest gap 3.004 s
+
+Sampling on CPU 3 stopped for 3.004 s while the other three carried on at
+a few tens of milliseconds. On a Cortex-A53 the PMU interrupt is an
+ordinary interrupt rather than an NMI, fault_lock holds
+spin_lock_irqsave for the whole window, and an interrupt that cannot be
+taken cannot carry a sample. The fault disables the mechanism the
+instrument needs in order to observe it.
+
+THREE INSTRUMENTS, ONE NUMBER, which is what makes this quotable:
+
+  irqsoff tracer      3.000307 s   tracing_max_latency
+  buggy's own printk  3.008756 s   1361.706056 minus 1358.697300
+  perf's silence      3.004   s    the sampling gap on CPU 3
+
+WHAT THE CRITERION ASKED AND WHY IT CANNOT BE MET. It asks that perf
+report attribute most lock-fault samples to fault_lock or __delay. Zero
+samples can be attributed there, because none can be taken. The criterion
+is not defective in its intent, it is unreachable on this architecture
+for this fault, and the thing it was reaching for is better shown by the
+3.004 s gap above.
+
+A MEASUREMENT ERROR OF MINE, recorded rather than cleaned up. The first
+recording used perf record -a across all four CPUs, three of which were
+idle, so default_idle_call holds 9.24 per cent and idle entries litter
+the listing. The intended fix was to pin the trigger with taskset and
+record one CPU, and taskset is not on this image, joining timeout, ip -br
+and partprobe among the BusyBox gaps. The per-CPU gap analysis above
+answered the question better than the pinned recording would have, since
+restricting the CPUs cannot manufacture samples that were never
+delivered.

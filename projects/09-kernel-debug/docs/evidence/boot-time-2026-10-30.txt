@@ -1,0 +1,24 @@
+root@raspberrypi3-64:/# cd / && journalctl -b | grep -i "startup finished"
+Jun 26 08:44:29 raspberrypi3-64 systemd[1]: Startup finished in 7.252s (kernel) + 17.035s (userspace) = 24.287s.
+root@raspberrypi3-64:/# cd / && journalctl -b -o short-monotonic | grep -E "Reached target|Startup finished|Started.*getty|Started.*Login" | tail -20
+[   11.523863] raspberrypi3-64 systemd[1]: Reached target Slice Units.
+[   11.532549] raspberrypi3-64 systemd[1]: Reached target Swaps.
+[   13.394613] raspberrypi3-64 systemd[1]: Reached target Preparation for Network.
+[   15.132790] raspberrypi3-64 systemd[1]: Reached target Preparation for Local File Systems.
+[   16.743203] raspberrypi3-64 systemd[1]: Reached target Local File Systems.
+[   19.572970] raspberrypi3-64 systemd[1]: Reached target System Time Set.
+[   20.290906] raspberrypi3-64 systemd[1]: Reached target Host and Network Name Lookups.
+[   20.358424] raspberrypi3-64 systemd[1]: Reached target System Initialization.
+[   20.377758] raspberrypi3-64 systemd[1]: Reached target Timer Units.
+[   20.578905] raspberrypi3-64 systemd[1]: Reached target Socket Units.
+[   20.583139] raspberrypi3-64 systemd[1]: Reached target Basic System.
+[   21.338760] raspberrypi3-64 kernel[229]: [   11.505855] systemd[1]: Reached target Path Units.
+[   21.339353] raspberrypi3-64 kernel[229]: [   11.514446] systemd[1]: Reached target Remote File Systems.
+[   21.339873] raspberrypi3-64 kernel[229]: [   11.523863] systemd[1]: Reached target Slice Units.
+[   21.342100] raspberrypi3-64 kernel[229]: [   11.532549] systemd[1]: Reached target Swaps.
+[   21.552171] raspberrypi3-64 systemd[1]: Reached target Login Prompts.
+[   22.499391] raspberrypi3-64 systemd[1]: Started User Login Management.
+[   22.504488] raspberrypi3-64 systemd[1]: Reached target Multi-User System.
+[   22.791529] raspberrypi3-64 systemd[1]: Reached target Network.
+[   24.288637] raspberrypi3-64 systemd[1]: Startup finished in 7.252s (kernel) + 17.035s (userspace) = 24.287s.
+root@raspberrypi3-64:/#

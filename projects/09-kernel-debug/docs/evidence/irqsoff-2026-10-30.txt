@@ -1,0 +1,94 @@
+THE FIRST ATTEMPT, which failed, and the reason is the finding
+
+root@raspberrypi3-64:/# cd /sys/kernel/debug/tracing && echo 0 > tracing_on; echo nop > current_tracer; echo irqsoff > current_tracer; echo 0 > tracing_max_latency; echo 1 > tracing_on; echo lock > /sys/kernel/debug/buggy/trigger; sleep 1; echo 0 > tracing_on; echo "--- tracing_max_latency (microseconds):"; cat tracing_max_latency
+--- tracing_max_latency (microseconds):
+2025
+
+# tracer: irqsoff
+#
+# irqsoff latency trace v1.1.5 on 6.6.63-v8
+# --------------------------------------------------------------------
+# latency: 2025 us, #110/110, CPU#3 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:4)
+#    -----------------
+#    | task: klogd-229 (uid:0 nice:0 policy:0 rt_prio:0)
+#    -----------------
+#  => started at: enter_from_kernel_mode
+#  => ended at:   console_unlock
+
+2025 us in klogd, ending in console_unlock. That is the kernel log being
+flushed to the console, which on this image is the dwc_otg storm recorded
+in module-cycle-2026-10-30.txt, and not the fault at all. Two
+milliseconds of interrupts-off from logging is worth knowing on its own
+account.
+
+THE ONE THING CHANGED, and the second attempt
+
+The irqsoff tracer does function tracing underneath by default. A three
+second window at that granularity overruns the per-CPU buffer, so the
+longest window it managed to keep was the 2 ms one above. options
+/function-trace turns the function tracing off and leaves the latency
+measurement intact, which is what that knob is for. Nothing else
+differed.
+
+root@raspberrypi3-64:/sys/kernel/debug/tracing# cd /sys/kernel/debug/tracing && echo "--- module:"; lsmod | grep buggy; echo "--- tracer:"; cat current_tracer; echo 0 > options/function-trace; echo 0 > tracing_max_latency; echo 1 > tracing_on; dmesg -c > /dev/null; echo lock > /sys/kernel/debug/buggy/trigger; echo "--- buggy says:"; dmesg | grep -i buggy; echo "--- max latency us:"; cat tracing_max_latency
+--- module:
+buggy                  12288  0
+--- tracer:
+irqsoff
+--- buggy says:
+[ 1358.692846] buggy: triggering lock
+[ 1358.697300] buggy: holding a spinlock with interrupts off for 3000 ms
+[ 1361.706056] buggy: released, and nothing was reported
+--- max latency us:
+3000307
+
+root@raspberrypi3-64:/sys/kernel/debug/tracing# cd /sys/kernel/debug/tracing && head -n 30 trace
+# tracer: irqsoff
+#
+# irqsoff latency trace v1.1.5 on 6.6.63-v8
+# --------------------------------------------------------------------
+# latency: 3000307 us, #4/4, CPU#3 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:4)
+#    -----------------
+#    | task: sh-325 (uid:0 nice:0 policy:0 rt_prio:0)
+#    -----------------
+#  => started at: _raw_spin_lock_irqsave
+#  => ended at:   fault_lock
+#
+#
+#                    _------=> CPU#
+#                   / _-----=> irqs-off/BH-disabled
+#                  | / _----=> need-resched
+#                  || / _---=> hardirq/softirq
+#                  ||| / _--=> preempt-depth
+#                  |||| / _-=> migrate-disable
+#                  ||||| /     delay
+#  cmd     pid     |||||| time  |   caller
+#     \   /        ||||||  \    |    /
+      sh-325       3d....    0us$: trace_hardirqs_off <-_raw_spin_lock_irqsave
+      sh-325       3d..1. 3000307us : _raw_spin_unlock_irqrestore <-fault_lock
+      sh-325       3d..1. 3000310us : tracer_hardirqs_on <-fault_lock
+      sh-325       3d..1. 3000313us : <stack trace>
+ => fault_lock
+ => trigger_write
+ => full_proxy_write
+ => vfs_write
+ => ksys_write
+root@raspberrypi3-64:/sys/kernel/debug/tracing#
+
+BOTH CLAUSES, against the criterion as written
+
+  within 5 per cent of 3 s   3000307 us, so within 0.01 per cent, against
+                             a band of 2850000 to 3150000. LOCK_HOLD_MS in
+                             buggy.c is 3000.
+  fault_lock in the stack    named three times: "ended at: fault_lock",
+                             "_raw_spin_unlock_irqrestore <-fault_lock",
+                             and the head of the stack trace.
+
+AN INDEPENDENT WITNESS, which is why the number is quotable rather than
+merely read. buggy's own log lines sit at 1358.697300 and 1361.706056, a
+gap of 3.008756 s, agreeing with the tracer's 3.000307 to within the
+printk overhead at each end. Two instruments, one number.
+
+The task is sh-325, the same pid that owns the 64 leaked objects in
+kmemleak-2026-10-30.txt, so the two measurements are visibly from one
+shell session on one boot.

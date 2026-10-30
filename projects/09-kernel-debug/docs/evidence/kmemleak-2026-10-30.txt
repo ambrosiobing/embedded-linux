@@ -1,0 +1,49 @@
+root@raspberrypi3-64:/# cd / && modprobe buggy; echo leak > /sys/kernel/debug/buggy/trigger; sleep 12; echo scan > /sys/kernel/debug/kmemleak; sleep 8; echo scan > /sys/kernel/debug/kmemleak; echo "two scans done"
+two scans done
+root@raspberrypi3-64:/# cd / && echo "--- total unreferenced:"; grep -c "^unreferenced object" /sys/kernel/debug/kmemleak; echo "--- of size 256:"; grep -c "size 256" /sys/kernel/debug/kmemleak; echo "--- one of them in full:"; grep -A12 "size 256" /sys/kernel/debug/kmemleak | head -n 16
+--- total unreferenced:
+64
+--- of size 256:
+64
+--- one of them in full:
+unreferenced object 0xffffff80052abf00 (size 256):
+  comm "sh", pid 325, jiffies 4295185530 (age 32.428s)
+  hex dump (first 32 bytes):
+    a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5  ................
+    a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5 a5  ................
+  backtrace:
+    [<0000000065422e25>] __kmem_cache_alloc_node+0x1fc/0x328
+    [<00000000ee0df5ff>] kmalloc_trace+0x40/0x88
+    [<0000000033a7e11c>] fault_leak+0x38/0x80 [buggy]
+    [<000000002d966990>] trigger_write+0x16c/0x190 [buggy]
+    [<00000000703a0f66>] full_proxy_write+0x68/0xc8
+    [<00000000236d2dd6>] vfs_write+0xd0/0x320
+    [<000000007a94206c>] ksys_write+0x7c/0x120
+--
+unreferenced object 0xffffff80052abe00 (size 256):
+  comm "sh", pid 325, jiffies 4295185530 (age 32.428s)
+root@raspberrypi3-64:/#
+
+WHY TWO SCANS WITH A WAIT, rather than one scan straight after the
+trigger. kmemleak does not report an object younger than its minimum age,
+and the first scan after an allocation commonly only marks candidates, so
+a single immediate scan returning nothing would be a false negative and
+not a result. buggy's own init message says the same thing: it tells the
+reader to echo scan to see them.
+
+FOUR INDEPENDENT CONFIRMATIONS that these are the objects the criterion
+names, rather than any leak that happened to be present:
+
+  the count     64, which is LEAK_OBJECTS in buggy.c
+  the size      256, which is LEAK_OBJECT_SZ
+  the contents  a5 repeated, because fault_leak memsets each block to 0xa5
+  the stack     fault_leak and trigger_write, both in [buggy]
+
+EXACTLY 64, NOT A MULTIPLE OF IT. The module had already been loaded and
+unloaded ten times for criterion 9 before this run. Had its exit path
+leaked, the count here would have been a multiple of 64. It is not, so
+criterion 9's clean verdict is confirmed from a second direction.
+
+This criterion is also the one unaffected by the dwc_otg log flood
+recorded in module-cycle-2026-10-30.txt, because kmemleak is read from
+debugfs rather than from the kernel ring buffer.

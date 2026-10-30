@@ -1436,3 +1436,220 @@ ask the source whether it is actually driving before asking the wire
 whether it is carrying. The source can be asked in one command and
 answers in writing. The wire cannot answer at all without an instrument
 this bench does not have.
+
+## 28. Friday 30 October 2026: getting the card onto the board, and four things that each looked like a different failure
+
+**What happened.** The card had to come off project 10 and take
+`bench-debug-image` from the archive. The flash itself took 20.7 s and
+wrote 200.6 MiB of 728.8 through the bmap with no error. Everything
+around it went wrong, four times, and each one presented as something
+other than what it was.
+
+**One. The archive looked empty.** `./go archive list` reported `nothing
+archived yet. Store would be /home/bing/bench/images.` That is not an
+empty archive, it is the wrong store: `archive.sh` takes
+`${BENCH_IMAGE_DIR:-$BENCH_WORK/images}` and the variable was not set in
+that shell. With `BENCH_IMAGE_DIR=/mnt/d/bench-images` it listed 35
+archives including six of this project. **The script named the path it
+had looked at**, which is the only reason this took one message instead
+of an evening, and is the argument for that rule in one line.
+
+**Two. The Extreme Pro looked like a failing disk.** `/mnt/d` gave
+`Input/output error` on a file that was there. It was a stale drvfs
+mount from a previous session pointing at a device instance that no
+longer existed. The remount failed in turn with
+`UtilConnectVsock: connect port 50002 failed` inside `MountPlan9Share`,
+which is WSL's own 9P service refusing, and by then `/mnt/c` was broken
+too. `wsl --shutdown` and a new terminal fixed both. **A reflex worth
+naming: the instinct was to pass the disk through with `usbipd`, and
+that is the one thing that must not be done to the drive holding the
+only copies of every card image.** `usbipd bind` had already been run on
+it earlier in the evening; it was unbound before anything was attached.
+
+**Three. The rootfs would not mount, and then the boot partition looked
+empty.** `./go flash` reported `could not mount both partitions, so the
+credential files on this card were NOT written or checked`. That is the
+stale partition table: `bmaptool` had rewritten the card and the kernel
+still held the old geometry, so the new 592.8 MB ext4 would not fit
+through the old 478.4 MB window. The boot partition mounted fine, which
+is why the script got as far as reading `config.txt` and counting 69
+`.dtbo` files. Later the same mounts showed an empty FAT dated 1970 with
+a link count of 3, and an I/O error on the other, because `bmaptool` had
+written underneath them and the kernel had marked one `shutdown`.
+**Both were views, not contents.** `blockdev --flushbufs`, a lazy
+unmount and a remount showed a complete boot partition.
+
+**Four, and the one that would have shipped a wrong result. The
+credentials store held the wrong network.** Joseph asked whether the
+hotspot `3TubeA1B7Z9` was in use. It was not: `~/bench/credentials/wifi.conf`
+named a different SSID, and `08_Home_Infrastructure/PiHole_Unbound_Pi3Bplus/board_access_matrix_2026-10-25.md`
+in the catalogue confirms `3TubeA1B7Z9` is the one the bench runs, with
+10.42.0.69 reserved for this board. The store was backed up with `cp -n`
+and rewritten with the PBKDF2 form, so the file carries 64 hex rather
+than a reusable password and nothing was echoed.
+
+**Then `credentials.sh` refused.** It reported `wifi.conf already on the
+card` and skipped, because an earlier run of the mount-and-copy block had
+already got through while the store was still stale. **That refusal is
+defensible on a card somebody has hand-edited and it means the script
+cannot correct a stale network, which is the commonest reason to want
+it.** The copy went by hand.
+
+**Why that and not the alternative.** Every one of the four had a
+plausible wrong diagnosis sitting in front of it: an empty archive, a
+dying drive, a bad flash, a missing file. Three of the four were
+diagnosed correctly only because a tool said which path it had used, and
+the fourth only because Joseph asked a question about the network
+instead of trusting the store. The record of this evening is mostly a
+record of tools that name their inputs.
+
+
+## 29. Friday 30 October 2026: five criteria, and the one that cannot be met is the sharpest result
+
+**What happened.** Criteria 8, 9, 7, 4 and 5 taken in one sitting on
+`bench-debug-image` from `proj09-bench-debug/2026-10-18_9429c89`, kernel
+6.6.63-v8, Raspberry Pi 3B+ over the `3TubeA1B7Z9` hotspot. Four met,
+one unreachable with the mechanism measured.
+
+**Criterion 8, boot time, 24.287 s against a limit of 40**: 7.252 s
+kernel plus 17.035 s userspace. `systemd-analyze` is not in this image,
+which is worth noting for a project whose subject is debugging tools, so
+the figure came from systemd's own `Startup finished` journal line, which
+is the number that tool reads. The monotonic timeline gave the
+criterion's own wording directly: `Reached target Login Prompts` at
+21.552 s. The wall clock on that line reads June because this board has
+no RTC and `System Time Set` came at 19.573 s, after most of the boot.
+
+**Criterion 9, ten load and unload cycles**: no failure, nothing left in
+`lsmod`, and 15 warning lines in the window. **A count is not a verdict,
+so they were read**, and every one was `dwc_otg`, which is entry 30. The
+control is what made excluding them legitimate: clearing the log and
+touching nothing for twenty seconds gave 60 such lines, a higher rate
+than the cycling window held, so the module produced none of them.
+
+**Criterion 7, kmemleak, 64 objects at 256 bytes, exactly.** Four
+independent confirmations that these were the criterion's objects rather
+than any leak that happened to be present: the count, the size, the
+`0xa5` contents that `fault_leak` memsets, and `fault_leak` in the
+backtrace. Two scans with a wait between them, because kmemleak will not
+report an object below its minimum age and a single immediate scan
+returning nothing would have been a false negative. **Exactly 64 and not
+a multiple of it**, after the module had already been cycled ten times,
+which confirms criterion 9's clean exit path from a second direction.
+
+**Criterion 4 took two attempts and the first failure is the finding.**
+The tracer reported 2025 us in `klogd` ending in `console_unlock`: the
+log flush, not the fault. One knob changed, `options/function-trace` off,
+and it reported **3000307 us** with `fault_lock` named three times in the
+output. The irqsoff tracer does function tracing underneath by default,
+and a three second window at that granularity overruns the per-CPU
+buffer. **The tool made for this fault needs configuring for the fault's
+magnitude**, which is this project's own thesis arriving in practice
+rather than in its README.
+
+**Criterion 5 cannot be met, and that is the result.** It asks that
+`perf report` attribute most lock-fault samples to `fault_lock` or
+`__delay`. Zero of 4000 `cycles:P` samples have a program counter in
+either. Three mention `fault_lock` in a callchain, at the moment the
+interrupt mask lifts, which is also why `_raw_spin_unlock_irqrestore`
+tops the profile at 18.06 per cent.
+
+**The mechanism was measured rather than argued, and that distinction is
+the whole value of the row.** The largest gap between consecutive samples
+per CPU:
+
+    [000] 0.024 s    [001] 0.028 s    [002] 0.036 s    [003] 3.004 s
+
+Sampling on CPU 3 stopped for the duration of the fault. On a Cortex-A53
+the PMU interrupt is an ordinary interrupt rather than an NMI,
+`fault_lock` holds `spin_lock_irqsave` throughout, and an interrupt that
+cannot be taken cannot carry a sample. **The fault disables the
+mechanism the instrument needs in order to observe it.**
+
+**Three instruments, one number**, which is what makes the figure
+quotable: the tracer's 3.000307 s, `buggy`'s own printk gap of
+3.008756 s, and perf's 3.004 s of silence.
+
+**Two errors of mine in that sequence, both recorded rather than tidied
+away.** I said "zero samples" when `perf script` found three, then found
+that the three were callchain entries and the leaf count really was
+zero, so the first statement was right for the wrong reason and had to be
+corrected twice. And the first recording used `perf record -a` across
+four CPUs, three of them idle, which is why `default_idle_call` holds
+9.24 per cent of a profile that was supposed to be about one CPU. The
+intended fix was to pin the trigger with `taskset`, which is not on this
+image, and the per-CPU gap analysis answered the question better than the
+pinned recording would have.
+
+**Why a restatement is proposed and not applied.** Criterion 5 is not
+defective in its intent and the thing it reaches for is real. What it
+cannot have is samples inside an interrupts-off window. The sampling gap
+on the affected CPU shows the same thing and is measurable, so that is
+the proposed wording. Changing an acceptance criterion is Joseph's
+decision and the row keeps both the original and the reason.
+
+
+## 30. Friday 30 October 2026: the defect this project found was not one of the four it built
+
+**What happened.** Criterion 9's ten module cycles left 15 warning lines
+in a freshly cleared log. Reading them rather than counting them gave
+this, repeated about once a second:
+
+    BUG: sleeping function called from invalid context at /kernel/irq/manage.c:737
+    in_atomic(): 1, irqs_disabled(): 1, non_block: 0, pid: 0, name: swapper/1
+    1 lock held by swapper/1/0:
+     #0: ffffff8004d46f58 ((spinlock_t *)hcd->lock){-.-.}-{2:2}, at: DWC_SPINLOCK+0x18/0x30
+    ...
+     __might_resched
+     __might_sleep
+     disable_irq
+     local_fiq_disable
+     dwc_otg_handle_common_intr
+     dwc_otg_common_irq
+     __handle_irq_event_percpu
+     handle_level_irq
+
+The task is `swapper`, the idle task, not `modprobe`. The lock held is
+`hcd->lock`. **This is the Raspberry Pi's downstream `dwc_otg` USB driver
+calling `disable_irq()` from hard interrupt context**, and this kernel's
+atomic-sleep checking reports it. Nothing in this project caused it and
+nothing in this project can fix it.
+
+**It turned up three times in one evening, in three different
+criteria.** That is what makes it worth an entry rather than a footnote.
+
+**In criterion 9**, as 15 warnings that had to be excluded, and the
+exclusion needed a control at 60 in twenty seconds to be honest rather
+than convenient.
+
+**In criterion 4**, as the actual answer. With function tracing on, the
+longest interrupts-off window the tracer kept was 2025 us in `klogd`
+ending in `console_unlock`, which is this storm being flushed to the
+console. Two milliseconds of interrupts-off from logging is the kind of
+figure project 8 measures for a living.
+
+**In the log buffer, where it cost evidence.** At roughly thirty lines a
+second the ring buffer turns over in under a minute. `buggy` prints a
+line on every load, so twenty-odd lines existed after the ten cycles and
+`dmesg | grep -i buggy` came back empty minutes later. **The messages
+were not absent, they were overwritten**, and the second run had to clear
+the log immediately before the trigger and read it immediately after.
+
+**What was done.** Recorded in
+`docs/evidence/module-cycle-2026-10-30.txt` with the full trace, the
+control, and the empty grep that proved the eviction. Nothing was changed
+in the image: this is a defect in a driver this project does not own.
+
+**Why that and not the alternative.** The alternative was to silence it,
+and two ways were available: raise the log level, or unbind the USB host
+controller, which on this board also carries Ethernet. Both would have
+removed the evidence of a real kernel defect from a project whose entire
+subject is finding real kernel defects. **The storm is a better
+demonstration of the debug kernel working than any of the four
+deliberate faults**, because nobody planted it.
+
+**What it costs, and it is not free.** Criterion 6 wants a KASAN report,
+which is a long `dmesg` dump, and a log that turns over in under a minute
+can evict one before it is read. The fix is `log_buf_len` on the kernel
+command line, which belongs in the recipe rather than hand-edited onto a
+card, and is in scope when criterion 6 is attempted rather than now.

@@ -9,6 +9,47 @@ entry [05](../../notebook/05-pstore.md) came from a single trailing space.
 So the header lives here, one section per capture, and the files stay
 untouched.
 
+## The five captures of Friday 30 October 2026
+
+**These five carry their own headers, unlike the pstore records above, and
+the difference is the reason rather than an inconsistency.** The rule at
+the top of this file exists because those four are raw kernel records
+whose exact bytes are the evidence, down to a trailing space. These five
+are terminal transcripts: the command, its output, and the reasoning that
+made the output mean something. Splitting that across two files would
+make each half harder to check.
+
+**What was run.** `bench-debug-image` flashed from the archive at
+`proj09-bench-debug/2026-10-18_9429c89`, on the Raspberry Pi 3 Model B
+Plus, kernel 6.6.63-v8, reached over the `3TubeA1B7Z9` hotspot. One boot,
+one shell session: the same `sh-325` appears in both the kmemleak and the
+irqsoff captures.
+
+| File | Criterion | What it settles |
+|---|---|---|
+| `boot-time-2026-10-30.txt` | 8 | **met**, 24.287 s against 40, and `Reached target Login Prompts` at 21.552 s, which is the criterion's own wording. `systemd-analyze` is absent from this image so the figure is systemd's own journal line |
+| `module-cycle-2026-10-30.txt` | 9 | **met**, ten clean cycles. Also the `dwc_otg` finding, its control at 60 lines in twenty seconds, and the empty `grep` that proved the log had evicted the module's own messages |
+| `kmemleak-2026-10-30.txt` | 7 | **met**, 64 objects at 256 bytes, with the `0xa5` contents and `fault_leak` in the backtrace as two further confirmations, and exactly 64 rather than a multiple of it |
+| `irqsoff-2026-10-30.txt` | 4 | **met**, 3000307 us with `fault_lock` named three times. Carries the failed first attempt, because the one knob that fixed it is the finding |
+| `perf-lock-2026-10-30.txt` | 5 | **unreachable**, with the mechanism measured: a 3.004 s sampling gap on CPU 3 against 0.024 to 0.036 s on the others |
+
+**Three instruments agree on one number**, which is what makes the lock
+fault's duration quotable rather than merely recorded: the irqsoff
+tracer's 3.000307 s, `buggy`'s own printk gap of 3.008756 s, and perf's
+3.004 s of silence on the affected CPU.
+
+**A claim in the section below may now be stale, and I have not tested
+it.** It says the serial console on this image has never worked because
+`disable-bt` blanks `uart0_pins` and the firmware does not fill it. The
+`config.txt` on this card carries
+`dtoverlay=uart0,txd0_pin=14,rxd0_pin=15,pin_func=4` explicitly beside
+`disable-bt`, with `enable_uart=1`, and `cmdline.txt` has
+`console=serial0,115200`, `kgdboc=ttyAMA0,115200` and `nokaslr`. That is
+kgdb pre-armed and it reads as the fix for exactly the fault described.
+Whether the console physically answers is a measurement nobody has taken
+on this image, so the claim stands as written until criterion 3 is
+attempted with the USB/TTL adapter.
+
 ## pstore records, Tuesday 6 October 2026
 
 **What was run.** Nothing, for the first three. They are the records
