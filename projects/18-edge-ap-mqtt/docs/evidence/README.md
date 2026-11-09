@@ -22,8 +22,24 @@ The first three need no board. The last two need one boot each.
 **Half answered on Monday 9 November 2026.** mosquitto: yes, and
 [mosquitto-packageconfig-2026-11-09.txt](mosquitto-packageconfig-2026-11-09.txt)
 carries the value, the layer revision it belongs to, and the cmake flags
-that are the stronger evidence, `WITH_TLS=ON` among them. **hostapd is
-still unread**, and so is question 1b below.
+that are the stronger evidence, `WITH_TLS=ON` among them.
+
+**hostapd was read the same day and the question was wrong for it.**
+[hostapd-and-chrony-2026-11-09.txt](hostapd-and-chrony-2026-11-09.txt)
+has it: eighteen matching lines and not one a `PACKAGECONFIG=`
+assignment, with `PACKAGECONFIG_CONFARGS=""` empty. No feature in that
+recipe reaches the build through a configure argument. `SRC_URI` fetches
+`file://defconfig`, so hostapd is configured by symbols in a file the way
+a kernel is.
+
+That is not a defect in the question. Both halves were written before
+either could be read, and the analogy with mosquitto was reasonable until
+the first reading broke it. **The restated question is below as 1c.**
+
+The same reading recorded what the pinned revision carries, because this
+project is a security boundary: hostapd 2.10 plus 17 patches covering four
+distinct CVEs, so the version number alone would mislead a reader about
+its age.
 
 Two things came with the answer. This project's own
 `PACKAGECONFIG:append:pn-mosquitto = " ssl"` in `kas/bench-ap.yml` is
@@ -48,8 +64,10 @@ and the same for `hostapd`. Paste both lines here with the layer revision
 they came from, because a `PACKAGECONFIG` is a property of a pinned layer
 rather than of a package name.
 
-**1b. Which layer provides chrony.** Same class of unknown as the one
-above and answered by the same shell. The access point serves time to its
+**1b. Which layer provides chrony. ANSWERED Monday 9 November 2026:
+meta-networking 4.5**, which `kas/bench-ap.yml` already pins, so the
+expectation held and no kas change was needed. It was the same class of
+unknown as the one above and the same shell answered it. The access point serves time to its
 clients, because a station with no clock powers up in 1970 and refuses the
 broker's certificate as not yet valid; see decision 113. `chrony` is
 expected to be in meta-networking, which `kas/bench-ap.yml` already pins,
@@ -61,6 +79,14 @@ bitbake-layers show-recipes chrony
 
 If it is elsewhere, the fix is a layer line in the kas file and nothing
 else.
+
+**1c. Which symbols are in hostapd's defconfig.** This replaces the
+hostapd half of question 1, which asked about a mechanism that recipe does
+not use. The two that matter here are the **nl80211 driver**, which is how
+hostapd reaches a Linux radio at all, and the **WPA2 path** the access point
+is configured for. A configuration file in this repository cannot answer
+it, which was the whole reason question 1 existed. Unread as of Monday
+9 November 2026.
 
 **2. The CA's notBefore against the image build timestamp.** Not a
 measurement, a rule, and the reason is in `docs/DESIGN.md` under the clock.

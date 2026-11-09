@@ -1,0 +1,76 @@
+What:   The rest of question 1 of this directory's README: what hostapd's
+        PACKAGECONFIG says, and which layer provides chrony, which is 1b.
+On:     JPTOUPM678, inside ./go shell bench-ap, kas 5.1, BitBake 2.8.1
+When:   Monday 9 November 2026, 12:36
+Proves: no acceptance criterion. It closes 1b and it RESTATES the hostapd
+        half of question 1, which was asking the wrong thing.
+
+Chrony, question 1b: answered
+
+  bitbake-layers show-recipes chrony
+
+    chrony:
+      meta-networking      4.5
+
+  meta-networking is already pinned by kas/bench-ap.yml for hostapd and
+  mosquitto, so the expectation in bench-ap_0.1.bb held and no kas change
+  was needed.
+
+Hostapd: PACKAGECONFIG is the wrong question for this recipe
+
+  bitbake -e hostapd | grep -n PACKAGECONFIG
+
+  returned eighteen matching lines and **not one of them was a
+  PACKAGECONFIG= assignment.** What it did show:
+
+    # $PACKAGECONFIG [2 operations]
+    # $PACKAGECONFIG_CONFARGS
+    PACKAGECONFIG_CONFARGS=""
+
+  An empty CONFARGS is the fact that settles it: no feature in this recipe
+  reaches the build through a configure argument. Compare mosquitto on the
+  same day, where CONFARGS carried WITH_TLS=ON and seven more.
+
+  The mechanism is a kernel-style configuration file instead:
+
+    bitbake -e hostapd | grep -n ^SRC_URI
+
+    SRC_URI=" http://w1.fi/releases/hostapd-2.10.tar.gz
+              file://defconfig
+              file://init
+              file://hostapd.service
+              ... 17 patch files ...  "
+
+  file://defconfig is the answer. hostapd is configured by the symbols in
+  that file, the way a kernel is, and the recipe installs it as .config.
+
+  So question 1 asked hostapd the wrong thing, by analogy with mosquitto.
+  It is not a defect in the question: both halves were written before
+  either could be read, and the analogy was reasonable until the first
+  reading broke it. The restated question is in this directory's README.
+
+What the pinned revision carries, which matters for this project
+
+  hostapd 2.10 upstream plus 17 patch files. Four distinct CVEs:
+
+    CVE-2022-37660
+    CVE-2023-52160
+    CVE-2024-3596
+    CVE-2025-24912
+
+  and two hardening patches for SAE rejected-groups handling that carry no
+  CVE number.
+
+  Recorded because this project's subject is a security boundary. The PKI
+  work protects the broker; hostapd is the boundary itself, and what it has
+  been patched against is a property of the pinned layer revision rather
+  than of the version number 2.10. A reader who sees "hostapd 2.10" and
+  stops there would draw the wrong conclusion about its age.
+
+Still unread, and now the real hostapd question
+
+  Which symbols are in that defconfig. The ones this project depends on are
+  the nl80211 driver, which is how hostapd reaches a Linux radio at all,
+  and the WPA2 path the access point is configured for. Neither has been
+  read, and the configuration file in this repository cannot answer it:
+  that was the whole reason question 1 exists.

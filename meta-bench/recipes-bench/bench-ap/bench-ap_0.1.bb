@@ -103,16 +103,13 @@ CONFFILES:${PN} = "\
 # clients, an ESP32 and an ESP8266, are in exactly that position. See
 # files/chrony.conf and decision 111.
 #
-# NOT CONFIRMED: which layer provides chrony on the pinned revision. It is
-# expected to be meta-networking, which kas/bench-ap.yml already pins for
-# hostapd and mosquitto, but that has not been read on this laptop because
-# the layers live on the WSL laptop. One command settles it:
-#
-#   ./go shell bench-ap
-#   bitbake-layers show-recipes chrony
-#
-# If it turns out to be elsewhere, the fix is a layer line in the kas file
-# rather than anything here.
+# CONFIRMED Monday 9 November 2026: chrony is meta-networking 4.5, which
+# kas/bench-ap.yml already pins for hostapd and mosquitto. The expectation
+# held, so no kas change was needed, and the reading is recorded in
+# projects/18-edge-ap-mqtt/docs/evidence/ beside the mosquitto one. Read
+# with bitbake-layers show-recipes chrony inside ./go shell bench-ap on
+# JPTOUPM678, because the layers live there and not on the authoring
+# laptop.
 RDEPENDS:${PN} += "\
     hostapd \
     dnsmasq \
