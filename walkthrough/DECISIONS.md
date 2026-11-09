@@ -5509,3 +5509,58 @@ every rotation, and a fixture built from a known 1.5000 per cent scale
 error came back as 1.3262. Truncation is one-sided and always reads low.
 That is 0.17 per cent, five times the reference's own accuracy, and no
 measurement on this bench would have shown it was wrong.
+
+## 142. A criterion row carries the full date of the record that establishes it, and a row that is not a verdict carries none
+
+Monday 9 November 2026. Projects 02, 08 and 15 claimed complete, measured
+and running on the board while every tally in this repository read them as
+having **zero** dated criteria between them. The tally was right and the
+rows were wrong: a criterion row is read as having a verdict only if it
+carries a weekday and a year, because the vocabulary differs between
+projects and counting the word "met" counts prose as well.
+
+Sixteen rows now carry a date. Each date came from the record that
+establishes the row, never from a commit date and never from memory:
+
+- Project 02, seven rows, Saturday 19 September 2026. `JOURNAL.md` sets
+  Friday 18 September 2026 as its default day and marks entries 15, 17 and
+  18 as the next day. Entry 15 is the card boot, entry 17 is criterion 4,
+  entry 18 is criteria 5 and 6. Both committed boot logs and both cited
+  commits agree.
+- Project 08, four rows, Thursday 17 September 2026, which is the
+  `timestamp` column of all 18 rows of `results/results.csv`. That is the
+  run itself. Two further rows, Wednesday 16 September 2026, from the
+  "When:" line of the kconfig evidence files, 09:20 to 09:22 and 06:56.
+- Project 15, three rows, Tuesday 15 September 2026, from
+  `docs/evidence/first-bearer.txt` line 2.
+
+**The rows left undated are the point of the rule.** Project 02's criterion
+8 is met by construction and its 9 by an off-board test. Project 08's 1 is a
+defective criterion, because the file it asks for did not survive the merge
+into mainline, and its 6 is proven in the code and unproven on a board.
+Project 15's 2, 3 and 5 record findings rather than verdicts, "unblocked"
+and "was impossible and nobody knew", and its 8, 9 and 10 are assertions in
+the test suites. Dating any of those would turn a tally that is honest into
+one that flatters, which is the fault this rule exists to remove rather
+than to hide.
+
+**Two things were found by doing it.** Project 02's criterion 5 said only
+the off-board half was met, while journal entry 18 records the second run
+reprovisioning the eMMC completely with `fsck reports clean`, on the board,
+that same Saturday. The row had been stale since. And the criterion's
+second clause cannot hold at all: it asks that a second boot log differ
+only in timestamps, and the provisioner repartitions by design, so the
+PARTUUIDs change every run. That is marked defective rather than unmet, and
+restating it is Joseph's decision, so the original wording stays.
+
+**Eight dates elsewhere in those READMEs had no weekday**, including one
+short form, `16 Sep 2026`, which no tally can read. The front page's row
+for project 02 also still said "All six criteria met on hardware" after the
+table had grown to nine.
+
+**What this does not fix.** Project 01 reports zero criteria to every tally
+while holding eleven, each met with evidence, because its table is headed
+`| Criterion | Check | Status |` with no number column and the anchor needs
+`| # | Criterion`. Giving it one would make it countable and would still
+leave it undated, since its rows carry no dates either. That is its own
+change.

@@ -35,7 +35,7 @@ first to change the kernel itself.
 
 ## State
 
-**The matrix is measured on both arms.** On 17 September 2026 between
+**The matrix is measured on both arms.** On Thursday 17 September 2026 between
 12:49 and 15:23 the Pi 4 ran one image with the MCC 118 on the header and
 produced the 18 rows in [results/results.csv](results/results.csv): eight
 on the generic kernel and ten on PREEMPT_RT, matched configuration by
@@ -64,14 +64,14 @@ The earlier generic-only matrix is preserved at
 is superseded and it is not wrong: it is the generic arm alone, taken
 before the card was reflashed, and it was never paired.
 
-`bench-rt-image` was built on 16 September 2026, 78 MB compressed, with
+`bench-rt-image` was built on Wednesday 16 September 2026, 78 MB compressed, with
 `CONFIG_PREEMPT_RT=y` verified in the `.config` before the compile began.
 That settles everything a build host can settle, including the four things
 that had never executed until then: the vendor library's `do_install`, the
 `-tools` package split, `python3-daqhats` through `setuptools3`, and the
 image assembly, which is where a missing `RDEPENDS` would have surfaced.
 
-What changed on 16 September 2026 is the riskiest part of the project, and
+What changed on Wednesday 16 September 2026 is the riskiest part of the project, and
 it was settled before the compile rather than after it: the 6.12 kernel is
 in place, every line of both fragments names a real symbol, and every one
 of them reached the `.config` that kconfig produced, `CONFIG_PREEMPT_RT=y`
@@ -94,7 +94,7 @@ What is proven today, on a laptop and in CI:
 | Every symbol in `rt.cfg` and `bench.cfg` is real, and two are promptless | `./go ksym -f rt-common -f rt` against the unpacked 6.12.93 tree, 21484 declarations indexed. **Run before the 17 Sep fragment split; the symbols are the same and the grouping is not, so it needs repeating** |
 | The version pin took: the tree is 6.12.93, not the BSP default 6.6 | the kernel's own `Makefile`, read after `kernel_configme` |
 | **Every option of both fragments reached the `.config`, `CONFIG_PREEMPT_RT=y` included** | `./go kconfig -f rt-common -f rt`, evidence for [the Pi 4](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [the Pi 3B](docs/evidence/kconfig-check-raspberrypi3-64.txt). **Both captures are of the real-time arm only, and predate the split; the control was never checked, which is how it came to have no fragment at all** |
-| The image builds: 6258 tasks, all succeeded, 78 MB | `./go rt`, 16 Sep 2026 |
+| The image builds: 6258 tasks, all succeeded, 78 MB | `./go rt`, Wednesday 16 September 2026 |
 | The vendor library cross-compiles, packages and installs | the same build, after three defects only building could find |
 
 What that does not prove is any latency number whatsoever. See
@@ -124,7 +124,7 @@ the places where this departs from the original scope on purpose.
 `.gitignore` excludes `*.wic*` on purpose.
 
 **What the board produced is published.** The generic half of the matrix
-ran on 17 September 2026 and its eight rows, twenty-four histograms,
+ran on Thursday 17 September 2026 and its eight rows, twenty-four histograms,
 figures and provenance are in
 [results/2026-09-17_5ec99fd-dirty/](results/2026-09-17_5ec99fd-dirty).
 The figures regenerate from those histograms with `./go plot`, so nothing
@@ -282,13 +282,13 @@ each, and where that stands today.
 | # | Criterion | Evidence | State |
 |---|---|---|---|
 | 1 | `/sys/kernel/realtime` reads 1 on the RT kernel and is absent on the generic one | the `realtime` column of every row, and `uname -v` beside it | **superseded, and the criterion as worded cannot be met.** That file came from the out-of-tree RT patches and did not survive the merge into mainline for 6.12, so it is absent on **both** kernels here. `uname -v` is the authority instead, per decision 74, and the `realtime` column is derived from it: 10 rows `yes`, 8 rows `no` |
-| 2 | A 60 s capture at 100 kS/s with zero overruns, and 30000 +/- 1 rising edges | `ext_edges` in the row; `rt-capture` voids the run on any overrun | **measured, and the tolerance is not met.** No run was voided, so the overrun half holds across all 18 rows. `ext_edges` never reaches 30000: the 16 sound rows run 29984 to 29997, and two rows are genuinely short at 28941 and 29124 and both have repeats. A tolerance of +/- 1 was never achievable on this instrument and no cause is offered for the 3 to 16 edge shortfall, because none was investigated |
-| 3 | The external histogram reproduces the internal one in shape: spread a factor of sqrt(2) larger, maxima agreeing, and any excess reported as write-path variation | `rt-compare` per run, which `rt-run` calls at the end of one | **measured**, `rt-compare` ran at the end of every run and the ratio is discussed across the matrix in [results/README.md](results/README.md). One row, `rt-iso-aff-performance`, returns a ratio of 12.430 and a write-path figure of 7.653 us that are arithmetically correct and not usable, because its standard deviation is carried by a handful of excursions rather than by a distribution. That is recorded as a gap in `rt-compare` |
-| 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **measured, and not met on any of its three clauses.** RT `ext_p999_us` is 71.084 and 63.916 against a target below 50. `ext_max_us` is 1054.020 and 989.682 against a target below 150, and no row in the file is under 150 because of the unattributed pin excursion. The generic counterpart is 99.316, which is 1.4 times worse rather than five. The improvement PREEMPT_RT does deliver on this pair is a third, and the criterion set a bar this bench has not reached |
-| 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **columns present in all 18 rows, agreement not assessed.** The second clause is criterion 3 and is measured there. The first clause, `cyc_max_us` against `int_max_us`, is not evaluated anywhere in [results/README.md](results/README.md), and the two disagree substantially in the rows spot-checked. Whether that is instrument disagreement or the ordinary instability of a maximum is an open question and needs the series RC that criterion 5 already calls for |
+| 2 | A 60 s capture at 100 kS/s with zero overruns, and 30000 +/- 1 rising edges | `ext_edges` in the row; `rt-capture` voids the run on any overrun | **measured Thursday 17 September 2026, and the tolerance is not met.** That date is the `timestamp` column of all 18 rows of `results/results.csv`, which is the run itself rather than a commit. No run was voided, so the overrun half holds across all 18 rows. `ext_edges` never reaches 30000: the 16 sound rows run 29984 to 29997, and two rows are genuinely short at 28941 and 29124 and both have repeats. A tolerance of +/- 1 was never achievable on this instrument and no cause is offered for the 3 to 16 edge shortfall, because none was investigated |
+| 3 | The external histogram reproduces the internal one in shape: spread a factor of sqrt(2) larger, maxima agreeing, and any excess reported as write-path variation | `rt-compare` per run, which `rt-run` calls at the end of one | **measured Thursday 17 September 2026**, `rt-compare` ran at the end of every run and the ratio is discussed across the matrix in [results/README.md](results/README.md). One row, `rt-iso-aff-performance`, returns a ratio of 12.430 and a write-path figure of 7.653 us that are arithmetically correct and not usable, because its standard deviation is carried by a handful of excursions rather than by a distribution. That is recorded as a gap in `rt-compare` |
+| 4 | RT, isolated, affinity, under load: external p99.9 below 50 us and maximum below 150 us; the generic kernel at least five times worse | two rows of `results.csv` | **measured Thursday 17 September 2026, and not met on any of its three clauses.** RT `ext_p999_us` is 71.084 and 63.916 against a target below 50. `ext_max_us` is 1054.020 and 989.682 against a target below 150, and no row in the file is under 150 because of the unattributed pin excursion. The generic counterpart is 99.316, which is 1.4 times worse rather than five. The improvement PREEMPT_RT does deliver on this pair is a third, and the criterion set a bar this bench has not reached |
+| 5 | cyclictest agrees with the toggler's own histogram, and both agree with the wire by the sqrt(2) relationship | the `cyc_*`, `int_*` and `ext_*` columns of one row, and `rt-compare`'s ratio | **columns present in all 18 rows of the Thursday 17 September 2026 run, agreement not assessed.** The second clause is criterion 3 and is measured there. The first clause, `cyc_max_us` against `int_max_us`, is not evaluated anywhere in [results/README.md](results/README.md), and the two disagree substantially in the rows spot-checked. Whether that is instrument disagreement or the ordinary instability of a maximum is an open question and needs the series RC that criterion 5 already calls for |
 | 6 | Every row names kernel, isolation, affinity, governor, load and the throttle status before and after | the CSV header has 27 columns and `rt-run` fills all of them | **met in the code**, proven by `tests/rt-run-test.sh`, unproven on a board |
-| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt-common -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host for both machines**, 16 Sep 2026: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them and the other three members of its choice block excluded. Evidence for [`raspberrypi4-64`](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [`raspberrypi3-64`](docs/evidence/kconfig-check-raspberrypi3-64.txt), each named for the machine it was captured on. Not yet confirmed against a running kernel. **Both captures are of the real-time arm and predate the 17 Sep fragment split. The control was never checked at all, which is how it came to receive no fragment, and re-running this criterion against both arms is part of the next cycle** |
-| 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt-common -f rt` | **met**, against the real `rpi-6.12.y` Kconfig text: 31 symbols, all declared, 2 promptless and recorded as such |
+| 7 | The kernel fragment actually reached the kernel | `./go kconfig -f rt-common -f rt` against the `.config` kconfig produced, and later against `/proc/config.gz` from the running board | **met on the build host for both machines** Wednesday 16 September 2026, 09:20 to 09:22 for the Pi 3 and 06:56 for the Pi 4: all 31 options of both fragments present in the 6.12.93 `.config`, `CONFIG_PREEMPT_RT=y` among them and the other three members of its choice block excluded. Evidence for [`raspberrypi4-64`](docs/evidence/kconfig-check-raspberrypi4-64.txt) and [`raspberrypi3-64`](docs/evidence/kconfig-check-raspberrypi3-64.txt), each named for the machine it was captured on. Not yet confirmed against a running kernel. **Both captures are of the real-time arm and predate the 17 Sep fragment split. The control was never checked at all, which is how it came to receive no fragment, and re-running this criterion against both arms is part of the next cycle** |
+| 8 | Every fragment line is a symbol this kernel has | `./go ksym -f rt-common -f rt` | **met** Wednesday 16 September 2026, against the real `rpi-6.12.y` Kconfig text, in the same evidence file as criterion 7, whose own "Proves" line names only that one: 31 symbols, all declared, 2 promptless and recorded as such |
 
 Criterion 4 is the one with a caveat attached, and it is in
 [METHOD.md](docs/METHOD.md): a 150 us threshold measured through an
@@ -299,7 +299,7 @@ cost, which is criterion 5. Criterion 5 needs the series RC.
 ## Results
 
 All 18 rows are measured, eight generic and ten PREEMPT_RT, taken in one
-session on 17 September 2026 and living in
+session on Thursday 17 September 2026 and living in
 [results/results.csv](results/results.csv). The full reading of them, the
 `ext_p999_us` comparison table, the two short rows, the one row where the
 standard deviation is not a summary, and the two rows deliberately not
