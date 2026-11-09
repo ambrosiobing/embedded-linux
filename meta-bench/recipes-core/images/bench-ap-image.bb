@@ -28,7 +28,7 @@ IMAGE_INSTALL:append = " \
     bench-broker \
 "
 
-# bench-ap pulls hostapd, dnsmasq, iw and wireless-regdb; bench-broker
+# bench-ap pulls hostapd, dnsmasq, iw and wireless-regdb-static; bench-broker
 # pulls mosquitto, mosquitto-clients and openssl-bin. Both recipes say in
 # their own comments why each one is there, which is where a reader looking
 # at a package will go.

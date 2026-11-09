@@ -83,8 +83,11 @@ The part that compliance depends on is in software, and this repository
 already handles it properly:
 `meta-bench/recipes-bench/bench-ap/files/hostapd.conf.in` sets
 `country_code`, the setup script refuses a country code that is not two
-capital letters, and the recipe's own comment explains that `wireless-regdb`
-and `iw` are what give a regulatory request something to resolve against.
+capital letters, and the recipe's own comment explains that
+`wireless-regdb-static` and `iw` are what give a regulatory request
+something to resolve against. The suffix matters: poky splits the
+database out of the recipe own package, and the plain name holds no
+database at all.
 `DESIGN.md`'s design is careful here and the datasheet reading does not
 improve on it.
 

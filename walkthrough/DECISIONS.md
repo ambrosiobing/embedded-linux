@@ -5564,3 +5564,41 @@ while holding eleven, each met with evidence, because its table is headed
 `| # | Criterion`. Giving it one would make it countable and would still
 leave it undated, since its rows carry no dates either. That is its own
 change.
+
+## 143. The layer uses the split package, and a check derived from the tree now enforces it
+
+Monday 9 November 2026, after two failed builds of `bench-ap-image` on the
+same line.
+
+poky declares `PACKAGES = "${PN}-static ${PN}"` for `wireless-regdb`, and
+only `FILES:${PN}-static` holds `regulatory.db`. `bench-image.bb` has
+carried a paragraph saying so since Project 1, headed "THE PACKAGE IS NOT
+NAMED AFTER THE RECIPE". `bench-ap` asked for the bare name anyway.
+
+The consequence was worse than the empty package that paragraph warns
+about. The base image installs the `-static` package, the two RCONFLICT,
+and `dnf` refused the entire rootfs. The first build reached 94 per cent
+and 49 minutes before failing; the second, with a resident `tmp` and a 99
+per cent sstate match, failed on the same line in 34 seconds.
+
+**Nothing before `do_rootfs` can see it.** Parsing succeeds, every recipe
+builds, sstate is warm, and the conflict exists only once dnf resolves the
+image's package list against the recipes' own RDEPENDS. So the cost is a
+full build every time, and the fix is one word.
+
+`scripts/lint.py` now carries `check_split_package_names`. It is derived
+from the tree rather than hardcoded: an RDEPENDS entry `X` is flagged only
+when some image in this layer installs `X-static` and no image installs a
+bare `X`. That combination means the layer has already decided which split
+it uses. A layer that legitimately installed both is not flagged, because
+then there is a genuine choice and a linter has no business making it.
+
+Proved in both directions before being trusted: clean with the fix, the
+defect reintroduced and caught with the recipe and the reason named, then
+clean again on restore.
+
+**The second lesson is not about packaging.** The fix was written on the
+authoring laptop and the rebuild was handed over in the same breath, so it
+ran against a clone that did not have it. That clone was thirteen commits
+behind. A fix for a build on JPTOUPM678 is not a fix until it is committed,
+pushed and pulled there, and the hand-over has to say so in that order.

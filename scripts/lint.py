@@ -654,6 +654,54 @@ def check_busybox_compat() -> None:
                            f"extension; BusyBox on the board needs -n")
 
 
+def check_split_package_names() -> None:
+    """A recipe must not RDEPEND on a name whose split package the layer uses.
+
+    Written from a defect that cost two builds on Monday 9 November 2026.
+    poky declares PACKAGES = "${PN}-static ${PN}" for wireless-regdb and
+    only FILES:${PN}-static holds regulatory.db, so the bare name installs a
+    package with no database. bench-image.bb has carried a paragraph saying
+    so since Project 1. bench-ap asked for the bare name anyway, and because
+    the two packages RCONFLICT, dnf refused the whole rootfs rather than
+    quietly shipping an empty one.
+
+    Nothing before do_rootfs can see it. The first build reached 94 per cent
+    and 49 minutes before failing, and the second failed on the same line.
+
+    The rule is derived from the tree rather than hardcoded: flag an RDEPENDS
+    entry X only when some image in this layer installs X-static and no image
+    installs a bare X. That combination means the layer has already decided
+    which split it uses, so the bare name in an RDEPENDS is the mistake. A
+    layer that legitimately installed both would not be flagged, because then
+    there is a choice to make and this check has no business making it.
+    """
+    installed: set[str] = set()
+    for recipe in tree("*.bb"):
+        body = text(recipe)
+        for match in re.finditer(r"IMAGE_INSTALL[^=]*=\s*(\"(?:[^\"]*)\")",
+                                 body, re.S):
+            installed.update(match.group(1).strip('"').split())
+
+    decided = {name[: -len("-static")] for name in installed
+               if name.endswith("-static")}
+    decided -= installed
+
+    if not decided:
+        return
+
+    for recipe in list(tree("*.bb")) + list(tree("*.bbappend")):
+        body = text(recipe)
+        for match in re.finditer(r"RDEPENDS[^=]*=\s*(\"(?:[^\"]*)\")",
+                                 body, re.S):
+            for name in match.group(1).strip('"').split():
+                if name in decided:
+                    fail(recipe,
+                         f"RDEPENDS names {name}, but this layer installs "
+                         f"{name}-static and never a bare {name}. The split "
+                         "package is the one holding the files, and the two "
+                         "usually RCONFLICT, so do_rootfs fails rather than "
+                         "shipping an empty package")
+
 def check_license_headers() -> None:
     for path in list(tree("*.c")) + list(tree("*.sh")):
         if ".git" in path.parts:
@@ -1210,6 +1258,7 @@ def main() -> int:
         check_systemd_units,
         check_pkgconfig_inherit,
         check_module_rprovides,
+        check_split_package_names,
         check_license_headers,
         check_kas,
         check_kas_shared_overrides,

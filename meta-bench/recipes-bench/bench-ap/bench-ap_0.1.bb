@@ -79,9 +79,22 @@ CONFFILES:${PN} = "\
 # and `iw list` is how that question gets asked. A board that cannot ask it
 # is a board where the answer is guessed.
 #
-# wireless-regdb and iw between them also decide whether the country code
-# in the configuration means anything: without the database, hostapd's
+# wireless-regdb-static and iw between them also decide whether the country
+# code in the configuration means anything: without the database, hostapd's
 # regulatory request has nothing to resolve against.
+#
+# THE PACKAGE IS NOT NAMED AFTER THE RECIPE, and this recipe asked for the
+# recipe name until Monday 9 November 2026. poky declares
+# PACKAGES = "${PN}-static ${PN}" and only FILES:${PN}-static holds
+# regulatory.db, so the plain name installs a package with no database.
+# bench-image.bb has carried that paragraph since Project 1 and this recipe
+# did not read it.
+#
+# Here it was worse than useless rather than merely empty: the base image
+# installs wireless-regdb-static, the two packages RCONFLICT, and dnf
+# refused the whole rootfs after 49 minutes of a build that was 94 per cent
+# complete. Nothing before do_rootfs can see it, which is why the next
+# reader gets this paragraph rather than a one word fix.
 #
 # chrony is here for certificates rather than for timekeeping, which is
 # unusual enough to say twice. A station with no real-time clock powers up
@@ -104,7 +117,7 @@ RDEPENDS:${PN} += "\
     hostapd \
     dnsmasq \
     iw \
-    wireless-regdb \
+    wireless-regdb-static \
     chrony \
 "
 
