@@ -49,11 +49,22 @@ local_conf_header:
     # asking for something absent is the difference between this project
     # working and not.
     #
-    # Read it anyway, once, and record it:
-    #   ./go shell bench-ap
-    #   bitbake -e mosquitto | grep '^PACKAGECONFIG='
-    # into projects/18-edge-ap-mqtt/docs/evidence/, because a PACKAGECONFIG
-    # is a property of a pinned layer revision rather than of a name.
+    # READ ON MONDAY 9 NOVEMBER 2026. The answer is in
+    # projects/18-edge-ap-mqtt/docs/evidence/ as
+    # mosquitto-packageconfig-2026-11-09.txt, with the layer revision it
+    # belongs to, because a PACKAGECONFIG is a property of a pinned
+    # revision rather than of a name.
+    #
+    # meta-openembedded at b5874ea already defaults to ssl, so this append
+    # is redundant today. It stays as insurance: if a later revision drops
+    # ssl from the default, this project loses TLS silently and this line
+    # is the only thing that would prevent it. Known to be insurance now
+    # rather than assumed to be load bearing.
+    #
+    # The same shell showed websockets on from the layer default, which
+    # nothing here uses: the broker configuration declares one listener,
+    # 8883. A PACKAGECONFIG:remove would shed the unused half, at the
+    # cost of a rebuild.
     PACKAGECONFIG:append:pn-mosquitto = " ssl"
 
     # NO KERNEL FRAGMENT IS TURNED ON HERE, AND THAT IS NOT AN OMISSION.

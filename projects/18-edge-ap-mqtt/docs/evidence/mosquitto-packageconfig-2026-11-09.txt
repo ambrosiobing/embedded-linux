@@ -1,0 +1,66 @@
+What:   Whether ssl is in mosquitto's PACKAGECONFIG for the layer revision
+        this project pins. Question 1 of this directory's README, and the
+        first thing blocking criteria 3 to 8.
+On:     JPTOUPM678, inside ./go shell bench-ap, kas 5.1, BitBake 2.8.1
+When:   Monday 9 November 2026, 12:21
+Proves: no acceptance criterion. It removes a blocker: the broker binary
+        can do TLS, so the 8883-only design is buildable rather than
+        hoped for. Criterion 3 still needs a board.
+
+The layer revision this is a property of
+
+  meta-openembedded scarthgap:b5874ea07d69919d9b40d59f2c2f0bbd24bc3259
+
+A PACKAGECONFIG belongs to a pinned revision rather than to a package
+name, which is why the revision is recorded beside the answer.
+
+The answer, from bitbake -e mosquitto
+
+  # $PACKAGECONFIG [9 operations]
+  PACKAGECONFIG="ssl websockets                   systemd                    ssl"
+
+  # $PACKAGECONFIG_CONFARGS [2 operations]
+  PACKAGECONFIG_CONFARGS=" -DWITH_DLT=OFF -DWITH_SRV=OFF -DDOCUMENTATION=OFF
+  -DWITH_TLS=ON -DWITH_TLS_PSK=ON -DWITH_EC=ON -DWITH_SYSTEMD=ON
+  -DWITH_WEBSOCKETS=ON"
+
+ssl is present, and the CONFARGS are the stronger evidence
+
+  The PACKAGECONFIG line says what was asked for. The CONFARGS line says
+  what reached cmake: WITH_TLS=ON, WITH_TLS_PSK=ON and WITH_EC=ON. A
+  feature can be named in a PACKAGECONFIG and still not be compiled if its
+  flag never arrives; here it did.
+
+Two findings beside the answer
+
+  1. ssl appears TWICE, so this project's own append is redundant.
+     kas/bench-ap.yml line 57 carries
+
+       PACKAGECONFIG:append:pn-mosquitto = " ssl"
+
+     and meta-openembedded's recipe already defaults to it at this
+     revision. The append is harmless, because the value behaves as a set,
+     and it is worth keeping rather than deleting: if a later revision of
+     that layer drops ssl from the default, this project loses TLS
+     silently and the append is the only thing that would prevent it. It is
+     insurance that is now known to be insurance rather than assumed to be
+     load bearing.
+
+  2. websockets is ON and this project never opens one. It comes from the
+     layer default, not from here; the only append this repository makes is
+     ssl. meta-bench/recipes-bench/bench-broker/files/mosquitto.conf
+     declares exactly one listener:
+
+       listener 8883 10.18.0.1
+
+     So the binary carries websockets support that the configuration does
+     not use. Not a defect and not a plaintext listener: nothing is
+     listening on 9001 because nothing configures it. It is image size and
+     attack surface for a feature this project has no use for, and a
+     PACKAGECONFIG:remove would shed both. That is a change with a rebuild
+     behind it and it is not made here.
+
+Still unread, and from the same shell
+
+  hostapd's PACKAGECONFIG, which question 1 also asks for.
+  Which layer provides chrony, which is question 1b.

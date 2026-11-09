@@ -19,11 +19,26 @@ absent directory, which reads as an oversight.
 The first three need no board. The last two need one boot each.
 
 **1. Is `ssl` in mosquitto's PACKAGECONFIG, and what does hostapd's say.**
-The whole project rests on this and it is unread, because `poky` and
+**Half answered on Monday 9 November 2026.** mosquitto: yes, and
+[mosquitto-packageconfig-2026-11-09.txt](mosquitto-packageconfig-2026-11-09.txt)
+carries the value, the layer revision it belongs to, and the cmake flags
+that are the stronger evidence, `WITH_TLS=ON` among them. **hostapd is
+still unread**, and so is question 1b below.
+
+Two things came with the answer. This project's own
+`PACKAGECONFIG:append:pn-mosquitto = " ssl"` in `kas/bench-ap.yml` is
+redundant at this layer revision, and worth keeping as insurance rather
+than deleting. And `websockets` is on from the layer default while the
+broker configuration declares one listener, 8883, so the binary carries a
+feature nothing here uses.
+
+The reasoning that made this question first still stands for hostapd: a
+configuration file proves nothing about whether a feature is in the
+binary, and Project 15 lost a build to exactly that. `poky` and
 `meta-openembedded` live in `~/bench` on the WSL laptop and not on the
-authoring laptop. A configuration file proves nothing about whether a
-feature is in the binary; Project 15 lost a build to exactly that. On the
-WSL laptop, `./go shell bench-ble`, then:
+authoring laptop. On the WSL laptop, `./go shell bench-ap`, which is this
+project's configuration and not `bench-ble` as this paragraph said until
+Monday 9 November 2026, then:
 
 ```sh
 bitbake -e mosquitto | grep '^PACKAGECONFIG='
