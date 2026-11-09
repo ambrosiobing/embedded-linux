@@ -27,6 +27,11 @@ Image
 
   bench-tracker-image-raspberrypi3-64.rootfs-20261109140019.wic.bz2
   55 MB, in /home/bing/bench/build/tmp/deploy/images/raspberrypi3-64/
+  59 MB as archived, at
+  /mnt/d/bench-images/proj16-bench-tracker/2026-11-09_afc1989 on the
+  Extreme Pro, with its PROVENANCE.txt. Archived the same day, because the
+  build tree is deleted to reclaim virtual disk space and the store is the
+  copy that lasts. The stamp's commit is the commit that built it.
 
   The stamp 20261109140019 reads as Monday 9 November 2026 at 14:00:19 UTC,
   which is 15:00:19 local, inside the build window above.

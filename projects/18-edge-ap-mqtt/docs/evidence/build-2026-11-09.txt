@@ -11,6 +11,18 @@ Proves: no acceptance criterion. Project 18's table has thirteen criteria
         configuration parses, every recipe builds and an image assembles,
         which is what the rung claims and all it claims.
 
+Where the image is now
+
+  /mnt/d/bench-images/proj18-bench-ap/2026-11-09_343a741 on the Extreme
+  Pro, 56 MB, archived on Monday 9 November 2026 with its PROVENANCE.txt.
+
+  The stamp says 343a741 and the clone was at afc1989 when it was
+  archived. That is deliberate. scripts/archive.sh takes the commit from
+  git rev-parse HEAD, so archiving from the checked-out tree would have
+  recorded four documentation commits that did not produce this image. The
+  archive was taken from a detached checkout of 343a741 instead, which is
+  the commit named in the layer revisions above. Walkthrough decision 144.
+
 Layer revisions
 
   meta-bench        main:343a741a8cecaf4abd68174c904e185790a6c468

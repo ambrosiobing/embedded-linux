@@ -5602,3 +5602,47 @@ authoring laptop and the rebuild was handed over in the same breath, so it
 ran against a clone that did not have it. That clone was thirteen commits
 behind. A fix for a build on JPTOUPM678 is not a fix until it is committed,
 pushed and pulled there, and the hand-over has to say so in that order.
+
+## 144. An image is archived from the commit that built it, not from whatever is checked out
+
+**Monday 9 November 2026.** Both of the day's images went to the store on
+the Extreme Pro, and the second one needed a detached checkout to be
+recorded truthfully.
+
+`scripts/archive.sh` takes the commit from `git rev-parse --short HEAD` at
+archive time. That is right whenever the image was built from the current
+tree, which is the common case, and wrong in a way nothing detects when it
+was not. `bench-ap-image` was built at `343a741`; four documentation
+commits later the clone was at `afc1989`, and archiving there would have
+written `commit afc1989` into `PROVENANCE.txt` and named the stamp
+directory after it. The tracker image archived correctly in the same hour
+only because its build and HEAD happened to coincide.
+
+So the rule is: **establish which commit built the image, check that out,
+archive, come back.** The building commit is recoverable from the build
+record, and a pull's own `Updating 343a741..afc1989` line names it exactly.
+The clone must be clean before the checkout.
+
+**Why this matters more here than in most repositories.** The build tree is
+disposable by design and gets deleted to reclaim virtual disk space, so the
+archive is frequently the only copy of an image. The script's own header
+argues that an image with no record of its inputs is a mystery card that
+boots while saying nothing about which commit or layer revisions produced
+it. A record naming the wrong commit is worse than an absent one, because a
+reader has no reason to doubt it, and the layer revisions beside it would
+be read from the same checkout and agree with each other.
+
+**Two guards that already work, both met today, both worth keeping as
+models.** `./go archive CFG` refused when newest-wins offered an image
+belonging to a different configuration on the same MACHINE, and it printed
+the configuration, the image it found and the reason that mistake is worse
+than a wrong-board one: it flashes and boots with only the label wrong.
+Then `BENCH_IMAGE` refused a value holding two paths, because the glob had
+matched the `.rootfs.wic.bz2` symlink as well as the timestamped file, and
+it printed both. Neither refusal needed arguing with, which is what a guard
+that names what it matched buys.
+
+**What is not built.** A check comparing the image's own timestamp against
+HEAD's commit date, refusing when the image is the older of the two, would
+turn this decision into something that runs. It is not written, so this
+entry is a convention and the convention is all it is.
