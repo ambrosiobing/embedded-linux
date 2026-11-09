@@ -44,11 +44,27 @@ the programs, the tests and the evidence.
 
 **If the software is what interests you, no hardware is required.** Two
 suites run on any machine in seconds, 96 assertions between them:
+`sh tests/explorer-verify-test.sh`, 45 assertions, which runs
 `explorer-verify` against a tree of directories shaped like sysfs,
 including all six ways this board fails that look identical from a
-distance; and the overlay against the pin map, the kernel fragment and the
-image recipe, which is where a document and the thing it describes are
-stopped from drifting apart.
+distance; and `sh tests/explorer-overlay-test.sh`, 51 assertions, which
+reads the overlay against the pin map, the kernel fragment and the image
+recipe, which is where a document and the thing it describes are stopped
+from drifting apart. Both ran clean on Monday 9 November 2026. They were
+unnamed here until that day, which `./go check` made harmless, since it
+runs every suite in `tests/` by glob.
+
+**The overlay now compiles, and that is a separate fact from the rung.**
+DTC 1.7.2 turned those 557 lines into a 5452 byte `.dtbo` on Monday
+9 November 2026 with no error and no warning, recorded in
+[docs/evidence/dtc-compile-2026-11-09.txt](docs/evidence/dtc-compile-2026-11-09.txt).
+That was the first time anything had compiled it: the overlay suite says in
+its own header that it needs no `dtc` and checks structure by counting
+braces, and the only `dtc` in CI belongs to project 7's suite. **No
+criterion moves and neither does the rung**, because BitBake has still
+never parsed these recipes. What it removes is one way this project could
+have been wrong: a syntax error or an unbalanced brace would otherwise have
+waited for the first build to appear.
 
 **If you want to run it, you need the HAT.** An RB-Explorer700 or a
 Waveshare Explorer 700, a Pi 3, a USB cable for the CP2102 and any IR

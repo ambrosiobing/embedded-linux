@@ -1,0 +1,68 @@
+What:   The first compile of bench-explorer700-overlay.dts by dtc. Not a
+        build of anything, not a boot, and not a reading from the HAT.
+On:     JPTOUPM678, Ubuntu 26.04 under WSL2, DTC 1.7.2
+When:   Monday 9 November 2026, 15:36 local
+Proves: no acceptance criterion. All eight of this project's criteria need
+        the HAT powered, including criterion 7, because confirming a GPIO
+        means observing it or tracing continuity and neither can be done by
+        a compiler. What this proves is that the 557 line overlay is
+        structurally valid device tree source, which until today nothing in
+        this repository had checked.
+
+Command and result
+
+  dtc -@ -I dts -O dtb -o /tmp/explorer.dtbo \
+      meta-bench/recipes-bench/bench-explorer700/files/bench-explorer700-overlay.dts
+
+  5452 bytes written. dtc printed nothing: no error, and no warning
+  either.
+
+  The silence is worth one sentence, because an empty output has already
+  been misread three times on this bench in one day. It is trustworthy here
+  only because the artefact exists: a 5452 byte .dtbo in the place the -o
+  named. dtc ran, produced its output and had nothing to say about it.
+
+Not even the warnings that were expected
+
+  An overlay compiled with no base tree has nothing to resolve its
+  target phandles against, so unresolved-reference notes were the
+  prediction. None appeared. With -@, dtc records each &symbol in
+  __fixups__ and leaves resolution to whoever applies the overlay, which
+  is the firmware here, so an overlay that references i2c1, spi0 and
+  gpio by label is complete source on its own terms.
+
+Why nothing had done this before
+
+  Three things look like they would have and none does.
+
+  tests/explorer-overlay-test.sh says so in its own header: "Nothing here
+  needs dtc, a kernel or a board." It reads the .dts as text against the
+  pin map, the kernel fragment and the image recipe, 51 assertions, and it
+  checks structure by counting braces, with a comment at line 310 saying
+  that is because there is no dtc on the authoring laptop.
+
+  scripts/check-overlays.sh is a different check entirely, despite the
+  name: it takes a mounted boot partition and asks whether every
+  dtoverlay= line in config.txt has its .dtbo on the card. It compiles
+  nothing.
+
+  CI does install dtc, and runs it, but only through
+  tests/lcd35a-overlay-test.sh, which is project 7's overlay. That suite
+  skips its dtc assertion where dtc is absent, which is why the same suite
+  reports 49 passed and 1 skipped on the Windows authoring laptop.
+
+  So "dtc has never compiled its overlay", which
+  projects/03-boot-energy/README.md gave as half the reason project 6 sits
+  a rung below it, was accurate when written and is false as of this file.
+  The other half stands: BitBake has still never parsed these recipes, and
+  that is what the rung is about.
+
+What this does not say
+
+  Nothing here is evidence about the RB-Explorer700. Every pin number in
+  that overlay came from the vendor manual rather than a schematic or a
+  measurement, and a compiler cannot tell a correct BCM number from a
+  wrong one. An overlay that binds the joystick's four directions to the
+  wrong four lines compiles exactly as cleanly as one that does not.
+
+  The pin map's Confirmed column still says no on every row.

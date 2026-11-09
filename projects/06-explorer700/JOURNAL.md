@@ -315,3 +315,52 @@ Each of those is a parameter or a one-line change, which was the point of
 making the pin numbers parameters in the first place: every one of them
 came from a manual rather than from a net list, so a wrong guess should
 cost a `config.txt` edit and not a build.
+
+## 9. The overlay compiles, and three things that look like they had checked it had not
+
+Monday 9 November 2026, on JPTOUPM678 under WSL2. NO BOARD, no HAT, no
+build, and no criterion moved.
+
+**What was done.** `dtc -@` turned the 557 line overlay into a 5452 byte
+`.dtbo` and said nothing: no error and no warning. Recorded in
+[docs/evidence/dtc-compile-2026-11-09.txt](docs/evidence/dtc-compile-2026-11-09.txt).
+Section 8 above still holds in full: nothing has been on hardware and no
+build has been run, because a compiled overlay is neither.
+
+**Why this was worth a command.** It came out of a sweep for claims of
+absence rather than out of this project. `projects/03-boot-energy/README.md`
+explained why project 3 sits a rung above this one: BitBake has never
+parsed these recipes and `dtc` has never compiled this overlay. The second
+half was testable in seconds on the laptop that has `dtc`, and the first
+half is what the rung actually rests on, so the sentence was carrying a
+clause it did not need and could lose.
+
+Three things look like they had already compiled it and none had.
+`tests/explorer-overlay-test.sh` says in its own header that it needs no
+`dtc`, and checks structure by counting braces, with a comment giving the
+reason: there is no `dtc` on the Windows authoring laptop.
+`scripts/check-overlays.sh` compiles nothing at all despite the name; it
+takes a mounted boot partition and asks whether every `dtoverlay=` line in
+`config.txt` has its `.dtbo` on the card. And CI does install `dtc` and run
+it, but only through project 7's suite, which skips that assertion wherever
+`dtc` is absent.
+
+**Why that and not the alternative.** The tempting conclusion from a clean
+compile is that the overlay is right. It is not what a compiler can say.
+Every pin number in that file came from the vendor manual rather than a
+schematic or a measurement, and an overlay binding the joystick's four
+directions to the wrong four lines compiles exactly as cleanly as one that
+does not. This project's whole stated risk is the accuracy of about twenty
+numbers, and none of them was checked today. The pin map's Confirmed
+column still says no on every row.
+
+What the compile does remove is one way to be wrong: a syntax error or an
+unbalanced brace would have waited for the first build to appear, and the
+brace counting in the suite is a stand-in for a parser rather than a
+parser.
+
+**One small thing fixed in passing.** The README said "two suites under
+`tests/`" and "96 assertions between them" without naming either file. The
+count is right, 45 and 51, both verified the same day. `./go check` runs
+every suite in `tests/` by glob, so nobody was blocked, but a reader
+wanting to run one of the two had to go looking. They are named now.

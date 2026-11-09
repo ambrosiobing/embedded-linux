@@ -47,9 +47,15 @@ could have ended the method, the logic-level self-test, which passed.
 
 **This is Software complete on the repository's ladder**, and the
 distinction from Project 6 is worth stating because the two look alike from
-outside. Project 6 sits a rung lower because BitBake has never parsed its
-recipes and `dtc` has never compiled its overlay: there is a build step
-there and it has never run. This project has no build step. Its programs
+outside. Project 6 sits a rung lower because **BitBake has never parsed its
+recipes**: there is a build step there and it has never run. This sentence
+also said `dtc` had never compiled that overlay, which was true when
+written and false from Monday 9 November 2026, when it compiled on the WSL
+laptop with no error and no warning, recorded in
+[project 6's evidence](../06-explorer700/docs/evidence/dtc-compile-2026-11-09.txt).
+The rung does not move for that, because a compiled overlay is neither a
+parsed recipe nor a built image, and the distinction drawn here rests on
+the half that still holds. This project has no build step. Its programs
 have been executed, by 49 assertions, on a machine with no board attached,
 which is exactly what that rung means.
 
