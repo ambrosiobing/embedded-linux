@@ -1,6 +1,13 @@
 # Evidence, Project 16
 
-Empty on purpose, on Monday 21 September 2026.
+**One file, and it is not about the modem.** This directory said "empty on
+purpose, on Monday 21 September 2026" until the image was built.
+
+- [build-2026-11-09.txt](build-2026-11-09.txt), the first build of
+  `bench-tracker-image`, Monday 9 November 2026, 3 min 55 s at a 94 percent
+  sstate match. It proves **no criterion**: none of the eleven is "the image
+  builds". Its own `Proves:` line says so, and its last section says what it
+  is not evidence about.
 
 Nothing has been powered. No modem has attached, no PSM value has been
 granted, and no current has been measured. The acceptance table in this

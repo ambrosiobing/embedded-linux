@@ -14,22 +14,39 @@ That makes the instrument part of the design rather than an appendix, and
 
 ## State
 
-**Written and tested on a laptop, not yet built, not yet powered, as of
-Monday 21 September 2026.**
+**Software complete on Monday 9 November 2026: built, not yet powered.**
+
+It said "Written and tested on a laptop, not yet built, not yet powered, as
+of Monday 21 September 2026" until the build ran. `bench-tracker-image` is
+55 MB and took 3 min 55 s at a 94 percent sstate match, recorded in
+[docs/evidence/build-2026-11-09.txt](docs/evidence/build-2026-11-09.txt).
+The 24 sstate misses are this project's own recipe and what only it pulls
+in; the kernel is not among them, because this project turns on no kernel
+fragment, which is why four minutes was enough.
 
 The state machine, the GPIO tool, the recipe, the image, the kas
 configuration, the charge arithmetic and three test suites exist.
 `python scripts/lint.py` passes. `sh tests/tracker-at-test.sh` passes with
 75 assertions and `sh tests/tracker-budget-test.sh` with 24, both on this
 laptop.
-`sh tests/tracker-state-test.sh` has **never run anywhere**: it needs a
-pseudo-terminal, the Windows authoring laptop has none, and it skips there
-rather than failing. It runs on the WSL laptop and in CI, and until one of
-those has run it, it is a suite that has been written rather than a suite
-that passes.
+`sh tests/tracker-state-test.sh` **passes with 29 assertions**, run on
+JPTOUPM678 on Monday 9 November 2026. It needs a pseudo-terminal, the
+Windows authoring laptop has none, and it skips there rather than failing,
+which is why this paragraph said it had "never run anywhere" for seven
+weeks. That was also wrong about CI, which runs every `tests/*.sh`
+(`.github/workflows/ci.yml:366`) on a host whose `import pty, termios`
+succeeds, so it had been running there all along and nothing here recorded
+it. A suite nobody has watched run is not the same as a suite that has
+never run, and the sentence claimed the second.
 
-No BitBake build has been attempted and no board has been powered, so every
-acceptance criterion below is still open.
+So the off-board total is **128 assertions**: 75, 24 and 29.
+
+The build has now been attempted and succeeded; **no board has been
+powered**, so every acceptance criterion below is still open. That is not a
+disappointing result, it is the arithmetic of the table: nine criteria need
+the modem, criterion 10 was already met off the board, and criterion 11
+needs a real AT transcript, which is the one thing a build can never
+produce. A build moves the rung and no row.
 
 Two parts of the design are deliberately unwritten rather than merely
 unfinished, and both wait on the board rather than on effort:
@@ -66,7 +83,7 @@ generic kernel against a real-time one.
 | `kas/bench-tracker.yml` | `./go tracker` | written |
 | `tests/tracker-at-test.py` and `.sh` | Parsers, timer octets, CoAP, and the state machine in process | **passing**, 75 assertions |
 | `tests/fake-modem.py` | A pty that answers AT from a table of scenarios | written |
-| `tests/tracker-state-test.sh` | The same scenarios through a real serial port | written, **never run** |
+| `tests/tracker-state-test.sh` | The same scenarios through a real serial port | **29 passing** on JPTOUPM678, Monday 9 November 2026 |
 | `meta-bench/recipes-kernel/linux/files/tracker.cfg` | The USB serial drivers this modem needs | **not written**, and not until `lsusb` has been read on the board |
 | `projects/16-nbiot-tracker/measure/budget.py` | Charge per report from a capture, with the refusals that stop a dishonest number being printed | **passing**, 24 assertions |
 | `tests/tracker-budget-test.py` and `.sh` | Synthesised traces whose answers were worked out before the program ran | **passing** |
@@ -158,7 +175,7 @@ for:
 | Check | Command | Covers | State |
 |---|---|---|---|
 | Parsers, timer octets, CoAP, and the machine | `sh tests/tracker-at-test.sh` | The `+CEREG`, `+CSQ`, `+CPSMS` and `+CARECV` parsers including their refusal paths, both 3GPP timer tables, RFC 7252 message construction byte for byte, the configuration reader's three Windows traps, and every transition against the scenario tables in process | **75 passing** |
-| The same scenarios through a serial port | `sh tests/tracker-state-test.sh` | All of the above plus the transport: a real `open`, `termios`, timed reads, the send prompt, and `tracker-gpio` reached through PATH | **never run**; needs a pty |
+| The same scenarios through a serial port | `sh tests/tracker-state-test.sh` | All of the above plus the transport: a real `open`, `termios`, timed reads, the send prompt, and `tracker-gpio` reached through PATH | **29 passing**, Monday 9 November 2026; needs a pty, so it skips on Windows |
 | The budget arithmetic | `sh tests/tracker-budget-test.sh` | Charge, duration, mean, peak and idle current from traces whose answers were worked out before the program ran, plus every refusal: a clipped sample, a dropped-sample gap, a missing marker, a channel that is not there, a wrong header, a one-sample file and a truncated one | **24 passing** |
 
 Two of the assertions were proven by breaking what they check and watching

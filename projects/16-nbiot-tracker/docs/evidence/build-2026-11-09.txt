@@ -1,0 +1,91 @@
+What:   The first build of bench-tracker-image. The image exists; no modem
+        and no board have been powered, so this is the Software complete
+        rung and not a measurement of anything.
+On:     JPTOUPM678, Ubuntu 26.04 build host under WSL2, kas 5.1,
+        BitBake 2.8.1, poky scarthgap, DISTRO_VERSION 5.0.20,
+        MACHINE raspberrypi3-64, TUNE_FEATURES aarch64 crc cortexa53
+When:   Monday 9 November 2026, 14:58:53 to 15:02 local, 3 min 55 s
+Proves: no acceptance criterion. Project 16's table has eleven criteria and
+        none of them is "the image builds". Nine need the modem, criterion
+        10 was already met off the board, and criterion 11 needs a real AT
+        transcript, which is the one thing a build cannot produce. This
+        file records that the configuration parses, every recipe builds and
+        an image assembles, which is what the rung claims and all it
+        claims.
+
+Command
+
+  cd ~/src/embedded-linux-bench && git pull && ./go tracker
+
+  The git pull is part of the record rather than housekeeping. Earlier on
+  the same day a rebuild of project 18 ran against a clone 13 commits
+  behind and cost 49 minutes before failing on a defect that had already
+  been fixed upstream. This clone was at 343a741 and the pull brought it to
+  afc1989, 13 files and 655 insertions.
+
+Image
+
+  bench-tracker-image-raspberrypi3-64.rootfs-20261109140019.wic.bz2
+  55 MB, in /home/bing/bench/build/tmp/deploy/images/raspberrypi3-64/
+
+  The stamp 20261109140019 reads as Monday 9 November 2026 at 14:00:19 UTC,
+  which is 15:00:19 local, inside the build window above.
+
+Layer revisions
+
+  meta-bench        main:afc1989e20088d1bbc3446757964f806ac14c170
+  poky              scarthgap:77d1feb37e280733684ae8a9449fb031d5d7ff40
+  meta-openembedded scarthgap:b5874ea07d69919d9b40d59f2c2f0bbd24bc3259
+  meta-raspberrypi  scarthgap:6ca1f75017cc5d5acdb8bb05634c4bc01fa049fd
+
+Shared state and tasks
+
+  Sstate summary: Wanted 468 Local 444 Mirrors 0 Missed 24 Current 1958
+  (94% match, 99% complete)
+
+  Tasks Summary: Attempted 5309 tasks of which 4952 didn't need to be
+  rerun and all succeeded.
+
+  Parsing of 1969 .bb files complete, 0 cached, 1969 parsed. 3321 targets,
+  128 skipped, 0 masked, 0 errors. Nothing was cached because this
+  configuration had never been parsed on this host.
+
+  94 per cent, against 98 for project 18 four hours earlier on the same
+  machine and the same tune. The 24 misses are this project's own recipe
+  and what only it pulls in; the kernel is not among them, because
+  kas/bench-tracker.yml turns on no kernel fragment at all. That is why
+  this build was four minutes rather than the 25 GB and the hour a kernel
+  rebuild costs, and it is the reason this project was chosen as the next
+  rung to move rather than 06, 07, 13 or 14, each of which does carry a
+  fragment.
+
+Disk
+
+  13.74 GB free on the Windows drive, read with Get-PSDrive rather than
+  df, because df inside WSL reports the virtual disk maximum and has read
+  925 GB free while C: had 28. build/tmp was resident, so build.sh applied
+  its 5 GB floor rather than the 25 GB one.
+
+One suite's first recorded run, on the same host the same hour
+
+  sh tests/tracker-state-test.sh    29 passed, 0 failed
+
+  This is the suite that drives the state machine through a pseudo-terminal
+  rather than in process. The project README said it had "never run
+  anywhere" from Monday 21 September 2026 until this reading, and that was
+  false in a way worth keeping: CI runs every tests/*.sh
+  (.github/workflows/ci.yml:366) on a host whose import of pty and termios
+  succeeds, so it had been passing on every green run for seven weeks with
+  nothing in the repository recording it. A suite nobody has watched run
+  reads the same as a suite that has never run, and only one of those was
+  true. The off-board total is 128 assertions: 75, 24 and 29.
+
+What this does not say
+
+  Nothing here is evidence about the SIM7070G. No modem was attached, no
+  AT command was sent, and the kernel fragment this project will eventually
+  need is still deliberately unwritten, because nothing in this repository
+  records how that part enumerates on USB and a fragment written from a
+  guess is how project 1 lost two rounds on wlan0.
+
+  The image was not flashed and no card was written.

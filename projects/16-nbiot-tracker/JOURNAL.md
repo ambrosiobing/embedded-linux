@@ -445,3 +445,55 @@ Copying a pattern carries its defects along with its correctness, and the
 cost of a defect is a property of where it lands rather than of the code.
 The same loop is a nuisance in a daemon and a falsified measurement in an
 instrument.
+
+## 12. The image builds, and the suite that had "never run" had been running all along
+
+Monday 9 November 2026 on JPTOUPM678 under WSL2. NO BOARD, no modem, and
+no criterion moved.
+
+**What was done.** `./go tracker` built `bench-tracker-image` in 3 min 55 s
+at a 94 percent sstate match, 55 MB, stamp `20261109140019`, recorded in
+[docs/evidence/build-2026-11-09.txt](docs/evidence/build-2026-11-09.txt).
+The rung moves to Software complete here and on the front page.
+
+This project was chosen for the next build out of the five that sat at
+Written, not yet built, and the reason is in its own kas file: it turns on
+**no kernel fragment**. The other four, 06, 07, 13 and 14, each carry one,
+and a kernel rebuild is the 25 GB and the hour that `scripts/build.sh`
+guards on, against 5 GB for a warm image. The disk had 13.74 GB free. So
+the cheapest rung available was the one taken, and the 24 sstate misses
+confirm the prediction afterwards: this project's own recipe and what only
+it pulls in, with the kernel not among them.
+
+**The more useful finding was not the build.** This project's README said
+`tests/tracker-state-test.sh` had **never run anywhere**, and listed CI as
+one of the two places it would run. Both halves cannot be true. CI runs
+every `tests/*.sh` by glob (`.github/workflows/ci.yml:366`), and the suite
+skips only when `import pty, termios` fails, which does not happen on a
+Linux runner. It had been passing on every green run since Monday
+21 September 2026 and nothing in the repository recorded it.
+
+Run on JPTOUPM678 it prints **29 passed, 0 failed**. So the off-board total
+is 128 assertions rather than 75, and four places that said otherwise are
+corrected: the state paragraph, two test tables and the front page.
+
+**Why that and not the alternative.** The tempting move was to fix the
+sentence from the inference, since reading the workflow is conclusive about
+what CI runs. It is not conclusive about what the suite did there: a suite
+can run and skip, and the skip exits 0 and would look identical in a green
+check. One command on the machine that has a pseudo-terminal cost seconds
+and produced a count, and a count is what the README now carries.
+
+The shape is worth naming because it is the opposite of the usual one here.
+The usual stale claim is a verdict that was true and went false. This was a
+**claim of absence that was never true**, written in good faith about a
+suite nobody had watched run, and it survived seven weeks because an
+unrun suite and an unwatched suite read exactly alike from the repository.
+Project 18's clock rule on the same day was the mirror image: a correct
+verdict standing on a reason that had gone false.
+
+**What this build is not.** No modem was attached and no AT command was
+sent. Nine criteria need the modem, criterion 10 was already met off the
+board, and criterion 11 needs a real transcript, which is the one thing a
+build can never produce. The kernel fragment stays unwritten on purpose
+until `lsusb` has been read on the board.
