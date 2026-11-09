@@ -80,7 +80,20 @@ bitbake-layers show-recipes chrony
 If it is elsewhere, the fix is a layer line in the kas file and nothing
 else.
 
-**1c. Which symbols are in hostapd's defconfig.** This replaces the
+**1c. Which symbols are in hostapd's defconfig. ANSWERED Monday
+9 November 2026**, in
+[hostapd-defconfig-2026-11-09.txt](hostapd-defconfig-2026-11-09.txt).
+`CONFIG_DRIVER_NL80211=y` and `CONFIG_LIBNL32=y` are present, so hostapd
+can reach the radio, and WPA2 needs no symbol. A suspected defect was
+cleared rather than confirmed: the defconfig comments out
+`CONFIG_IEEE80211W` while `hostapd.conf.in` sets `ieee80211w=1`, which
+would stop hostapd starting if the symbol still gated anything. It does
+not. meta-oe ships a defconfig whose own comment calls 802.11w an
+unfinalised draft, and that standard was finalised in 2009; upstream
+2.10 has no such option in 412 lines, so protected management frames are
+unconditional. Nothing was changed.
+
+It replaced the
 hostapd half of question 1, which asked about a mechanism that recipe does
 not use. The two that matter here are the **nl80211 driver**, which is how
 hostapd reaches a Linux radio at all, and the **WPA2 path** the access point

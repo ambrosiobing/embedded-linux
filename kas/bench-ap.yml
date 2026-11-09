@@ -13,9 +13,16 @@ header:
 target: bench-ap-image
 
 repos:
-  # hostapd, dnsmasq and mosquitto are all in meta-networking. It is a
-  # second layer from the repository that bench-rpi3.yml already pins, so
-  # the branch is pinned there and this file only names the layer.
+  # mosquitto and dnsmasq are in meta-networking; hostapd is in meta-oe.
+  # This comment said all three were meta-networking until Monday
+  # 9 November 2026, when the paths were read:
+  #   hostapd    meta-oe/recipes-connectivity/hostapd
+  #   mosquitto  meta-networking/recipes-connectivity/mosquitto
+  #   dnsmasq    meta-networking/recipes-support/dnsmasq
+  # Nothing was broken by it, because all three layers are named below
+  # and the image builds. They come from the repository bench-rpi3.yml
+  # already pins, so the branch is pinned there and this file only names
+  # the layers.
   #
   # Two other configurations in this repository already do exactly this,
   # kas/bench-router.yml and kas/bench-ble.yml, and bench-ble-image already

@@ -448,7 +448,7 @@ things in this repository already want to configure `wlan0`.**
 | `projects/18-edge-ap-mqtt/pki/` | The CA tooling. **Runs on the laptop, never on the board**, and openssl 3.5.5 is present there, so it and its tests are exercisable with no hardware |
 | `meta-bench/recipes-kernel/linux/files/ap.cfg` | Whatever access point mode needs that the shared kernel does not already have, behind an opt-in switch. **Not written until the board has been read** |
 | `meta-bench/recipes-core/images/bench-ap-image.bb` | The image, with `bench-net-wifi` removed |
-| `kas/bench-ap.yml` | `./go ap`, including `bench-rpi3.yml` and pinning `meta-networking` for `hostapd` and `mosquitto` |
+| `kas/bench-ap.yml` | `./go ap`, including `bench-rpi3.yml` and pinning `meta-oe` for `hostapd` and `meta-networking` for `mosquitto` and `dnsmasq` |
 | `tests/` | The PKI end to end, the ACL, the configuration files, and the clock ordering rule |
 
 `meta-networking` is already pinned by two other configurations in this

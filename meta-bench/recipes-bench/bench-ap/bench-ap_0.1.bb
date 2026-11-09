@@ -104,8 +104,11 @@ CONFFILES:${PN} = "\
 # files/chrony.conf and decision 111.
 #
 # CONFIRMED Monday 9 November 2026: chrony is meta-networking 4.5, which
-# kas/bench-ap.yml already pins for hostapd and mosquitto. The expectation
-# held, so no kas change was needed, and the reading is recorded in
+# kas/bench-ap.yml already pins for mosquitto and dnsmasq. Not for
+# hostapd: that one is in meta-oe, which the same file also pins. This
+# sentence said hostapd until the paths were read an hour later. The
+# expectation about chrony held, so no kas change was needed, and the
+# reading is recorded in
 # projects/18-edge-ap-mqtt/docs/evidence/ beside the mosquitto one. Read
 # with bitbake-layers show-recipes chrony inside ./go shell bench-ap on
 # JPTOUPM678, because the layers live there and not on the authoring

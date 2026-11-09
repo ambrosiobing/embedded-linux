@@ -1,0 +1,93 @@
+What:   Question 1c: which symbols are in hostapd's defconfig, and whether
+        the access point's own hostapd.conf asks for anything the binary
+        does not have.
+On:     JPTOUPM678, the layer tree kas cloned into ~/bench, plus upstream
+        hostap at tag hostap_2_10 read over the network
+When:   Monday 9 November 2026, 12:50
+Proves: no acceptance criterion. It closes 1c and it clears a suspected
+        defect rather than confirming one.
+
+Where the file is
+
+  meta-openembedded/meta-oe/recipes-connectivity/hostapd/hostapd/defconfig
+
+  Note the sub-layer: hostapd is in meta-oe, not meta-networking. The
+  recipe installs this file as .config, which is how hostapd selects
+  features. It has no PACKAGECONFIG; see hostapd-and-chrony-2026-11-09.txt.
+
+What this project needs, and has
+
+  CONFIG_DRIVER_NL80211=y   line 26, how hostapd reaches a Linux radio
+  CONFIG_LIBNL32=y          line 27
+  CONFIG_IEEE80211N=y       line 140
+  CONFIG_IEEE80211AC=y      line 143
+
+  WPA2 needs no symbol. RSN is unconditional, and the configuration's
+  wpa=2, wpa_key_mgmt=WPA-PSK, rsn_pairwise=CCMP need nothing enabled here.
+
+THE SUSPECTED DEFECT, AND WHY IT IS NOT ONE
+
+  Line 56 of that defconfig reads
+
+    #CONFIG_IEEE80211W=y
+
+  commented out, and line 41 of
+  meta-bench/recipes-bench/bench-ap/files/hostapd.conf.in reads
+
+    ieee80211w=1
+
+  which looks like a configuration asking for a feature the build did not
+  enable. If that were true, hostapd would reject the line as an unknown
+  configuration item and refuse to start, and this project's access point
+  could not come up at all.
+
+  It is not true, and the defconfig's own comment is what gives it away:
+
+    # IEEE 802.11w (management frame protection)
+    # This version is an experimental implementation based on IEEE
+    # 802.11w/D1.0 draft and is subject to change since the standard has
+    # not yet been finalized.
+
+  IEEE 802.11w was finalised in 2009. That paragraph is from roughly the
+  hostapd 0.6 era, so meta-oe is shipping a defconfig older than the
+  standard against a 2.10 source tree from 2022.
+
+  Upstream settles it. hostap at tag hostap_2_10, hostapd/defconfig, is 412
+  lines with 86 CONFIG options and contains NO CONFIG_IEEE80211W option at
+  all. Its only mention of the name is inside the PASN block at line 403,
+  "This requires CONFIG_IEEE80211W=y to be enabled, too", which is itself a
+  leftover referring to a symbol that no longer exists. There is no 802.11w
+  or management-frame-protection option anywhere in the file.
+
+  So protected management frames are built unconditionally in 2.10, the
+  commented line in meta-oe's defconfig does nothing, and ieee80211w=1 is
+  valid. No change is needed and none was made.
+
+Three observations that are not defects
+
+  1. meta-oe's defconfig is a pre-2009 subset of upstream's. Upstream 2.10
+     has 86 CONFIG options; this one is far smaller. Everything this
+     project needs is present, but anything a future criterion wants may
+     not be, and the file to check is this one rather than the version
+     number.
+
+  2. CONFIG_WPS=y at line 111, CONFIG_RADIUS_SERVER=y at 127 and
+     CONFIG_DRIVER_RADIUS_ACL=y at 137 are compiled in and this project
+     uses none of them. Nothing in hostapd.conf.in enables WPS, so nothing
+     is listening for it, but for an island nobody should join by accident
+     it is surface in the binary and worth knowing it is there.
+
+  3. No test asserts ieee80211w. tests/ap-config-test.sh has 64 assertions
+     and none mentions it, nor WPS. A configuration assertion would guard
+     the line against deletion; it could not have answered the question
+     above, which is the whole lesson of question 1.
+
+The sub-layers, read the same minute
+
+  hostapd    meta-oe/recipes-connectivity/hostapd
+  mosquitto  meta-networking/recipes-connectivity/mosquitto
+  dnsmasq    meta-networking/recipes-support/dnsmasq
+
+  kas/bench-ap.yml pins meta-oe, meta-networking and meta-python, so all
+  three resolve. Its own comment said all three recipes were in
+  meta-networking, which is wrong about hostapd and is corrected.
