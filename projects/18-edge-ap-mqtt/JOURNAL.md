@@ -784,3 +784,65 @@ a board.
 **What would have caught SC1007 earlier and for free.** Reading the two
 sibling test files for their idiom rather than only for their structure.
 Both were open on this screen the day before.
+
+---
+
+## 20. The image exists, on the third attempt, and the first two failed on one word
+
+*Monday 9 November 2026.*
+
+**What happened.** `bench-ap-image` built for the first time. 52 MB, 1 min
+41 s, a 98 per cent sstate match, 5465 tasks of which 5446 needed no rerun.
+cortexa53 was already warm from projects 5, 8, 9 and 10, so what was
+actually compiled was this image's own recipes.
+
+It took three attempts and the first two were the same defect.
+
+`bench-ap` declared `RDEPENDS` on `wireless-regdb`. poky declares
+`PACKAGES = "${PN}-static ${PN}"` for that recipe and only
+`FILES:${PN}-static` holds `regulatory.db`, so the bare name is a package
+with no database in it. `bench-image.bb` has carried a paragraph saying
+exactly that since Project 1, headed "THE PACKAGE IS NOT NAMED AFTER THE
+RECIPE", and this recipe did not read it.
+
+Worse than the empty package that paragraph warns about: the base image
+installs the `-static` package, the two RCONFLICT, and `dnf` refused the
+whole rootfs. The first attempt reached 94 per cent and failed after 49
+minutes.
+
+**The second attempt failed on the same line in 34 seconds, and that one
+was mine.** The fix was written on the authoring laptop and the rebuild was
+handed over in the same breath, so it ran against this clone, which was
+thirteen commits behind and did not have it. A fix for a build on
+JPTOUPM678 is not a fix until it is committed, pushed and pulled there.
+
+**What was done.** The `RDEPENDS` names the split package. The recipe
+carries the reason rather than a one word change, because nothing before
+`do_rootfs` can see this class of defect: parsing succeeds, every recipe
+builds, sstate is warm, and `dnf` is the first thing that resolves the
+image's package list against the recipes' own `RDEPENDS`.
+
+`scripts/lint.py` gained `check_split_package_names`, derived from the tree
+rather than hardcoded: it flags an `RDEPENDS` entry `X` only when some
+image in the layer installs `X-static` and no image installs a bare `X`.
+Proved in both directions before being trusted. Two seconds against a
+build. Decision 143.
+
+The rung moved from "Written, not yet built, as of Tuesday 22 September
+2026" to **Software complete**, here and on the front page, with the build
+recorded in
+[docs/evidence/build-2026-11-09.txt](docs/evidence/build-2026-11-09.txt).
+
+**Why that and not the alternative.** The tempting claim is progress on the
+acceptance table. There is none. This project has thirteen criteria and
+**not one of them is "the image builds"**: eleven need a board and two were
+already met off it. So the build changed the rung and no row, and the
+evidence file says so in its own `Proves:` line rather than leaving a
+reader to infer it.
+
+The alternative for the linter rule was to hardcode `wireless-regdb`. It
+would have caught this one case and taught nothing. Deriving it from what
+the layer's own images install means the next split package is covered
+without anybody remembering this day, and a layer that legitimately
+installs both halves is left alone, because then there is a real choice and
+a linter has no business making it.

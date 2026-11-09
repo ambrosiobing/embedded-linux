@@ -1,11 +1,15 @@
 # Evidence, Project 18
 
-Empty on purpose, on Monday 21 September 2026.
+**No longer empty, as of Monday 9 November 2026.** One file:
+[build-2026-11-09.txt](build-2026-11-09.txt), the first build of
+`bench-ap-image`.
 
-Nothing has been built and nothing has been powered. No access point has
-carried a station, no certificate has been presented to anything, and no
-client has connected. The acceptance table in this project's README marks
-every criterion accordingly.
+It was empty on purpose from Monday 21 September 2026 until then, and the
+paragraph that said so is kept here because the reasoning still holds for
+everything else: **nothing has been powered.** No access point has carried
+a station, no certificate has been presented to anything, and no client has
+connected. Eleven of the thirteen criteria still read "Not started" and the
+build changed none of them, because none of them is "the image builds".
 
 A directory with a file explaining why it is empty is more honest than an
 absent directory, which reads as an oversight.

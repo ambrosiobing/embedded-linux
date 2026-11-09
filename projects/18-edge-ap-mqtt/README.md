@@ -16,7 +16,21 @@ certificate is not the same thing as one that knows who is publishing.
 
 ## State
 
-**Written, not yet built, as of Tuesday 22 September 2026.**
+**Software complete, as of Monday 9 November 2026.** The image builds and
+the suites pass on a machine with no board attached. **Nothing has been
+powered on**, so eleven of the thirteen criteria are untouched by this and
+still read "Not started".
+
+`./go ap` produced
+`bench-ap-image-raspberrypi3-64.rootfs-20261109104528.wic.bz2`, 52 MB, in
+1 min 41 s at a 98 per cent sstate match, 5465 tasks of which 5446 needed
+no rerun. Recorded in
+[docs/evidence/build-2026-11-09.txt](docs/evidence/build-2026-11-09.txt)
+with the two failures that preceded it, both of them one defect in
+`bench-ap`'s RDEPENDS that nothing before `do_rootfs` can see.
+
+It said "Written, not yet built, as of Tuesday 22 September 2026" until
+the build ran.
 
 The certificate authority, both recipes, the image, the kas configuration
 and four test suites exist, and **197 assertions pass** on the authoring

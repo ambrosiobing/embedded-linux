@@ -1,0 +1,67 @@
+What:   The first build of bench-ap-image. The image exists; no board has
+        been powered on, so this is the Software complete rung and not a
+        measurement of anything.
+On:     JPTOUPM678, Ubuntu 26.04 build host under WSL2, kas 5.1,
+        BitBake 2.8.1, poky scarthgap, DISTRO_VERSION 5.0.20,
+        MACHINE raspberrypi3-64, TUNE_FEATURES aarch64 crc cortexa53
+When:   Monday 9 November 2026, 11:45:24 to 11:47 local, 1 min 41 s
+Proves: no acceptance criterion. Project 18's table has thirteen criteria
+        and none of them is "the image builds". Eleven need a board and two
+        are already met off the board. This file records that the
+        configuration parses, every recipe builds and an image assembles,
+        which is what the rung claims and all it claims.
+
+Layer revisions
+
+  meta-bench        main:343a741a8cecaf4abd68174c904e185790a6c468
+  poky              scarthgap:77d1feb37e280733684ae8a9449fb031d5d7ff40
+  meta-openembedded scarthgap:b5874ea07d69919d9b40d59f2c2f0bbd24bc3259
+  meta-raspberrypi  scarthgap:6ca1f75017cc5d5acdb8bb05634c4bc01fa049fd
+
+Shared state and tasks
+
+  Sstate summary: Wanted 456 Local 447 Mirrors 0 Missed 9 Current 2047
+  (98% match, 99% complete)
+
+  Tasks Summary: Attempted 5465 tasks of which 5446 didn't need to be
+  rerun and all succeeded.
+
+  The 98 per cent match is why this took under two minutes. cortexa53 was
+  already warm from projects 5, 8, 9 and 10, so what was actually built was
+  this image's own recipes and nothing else.
+
+The image
+
+  bench-ap-image-raspberrypi3-64.rootfs-20261109104528.wic.bz2   52 MB
+
+  The stamp is UTC; the build ran at 11:45 local. The symlink
+  bench-ap-image-raspberrypi3-64.rootfs.wic.bz2 points at it.
+
+Two failures before it, both the same defect
+
+  The first attempt, Monday 9 November 2026 at 10:13, reached 94 per cent
+  and failed after 49 minutes at do_rootfs:
+
+    package wireless-regdb conflicts with wireless-regdb-static
+      - package bench-ap requires wireless-regdb, but none of the
+        providers can be installed
+
+  bench-ap's RDEPENDS named the recipe rather than the split package that
+  holds regulatory.db. bench-image.bb has carried a paragraph about exactly
+  that since Project 1.
+
+  The second attempt, at 11:17, failed on the same line in 34 seconds. The
+  fix existed only on the authoring laptop and this clone was thirteen
+  commits behind, so the build read the old recipe. Commit 343a741 carries
+  both the fix and a linter rule that now refuses the bare name.
+
+  Nothing before do_rootfs can see this class of defect: parsing succeeds,
+  every recipe builds, sstate is warm, and dnf is the first thing that
+  resolves the image's package list against the recipes' own RDEPENDS.
+
+One warning, not this project's
+
+  WARNING: Host distribution "ubuntu-26.04" has not been validated with
+  this version of the build system.
+
+  Every build on this host says it. poky scarthgap predates Ubuntu 26.04.
