@@ -101,7 +101,14 @@ is configured for. A configuration file in this repository cannot answer
 it, which was the whole reason question 1 existed. Unread as of Monday
 9 November 2026.
 
-**2. The CA's notBefore against the image build timestamp.** Not a
+**2. The CA's notBefore against the image build timestamp. HALF ANSWERED Monday 9 November 2026**, in
+[clock-rule-2026-11-09.txt](clock-rule-2026-11-09.txt). The image is `20261109104528`;
+no CA exists on either laptop. So the order is fixed: **the CA first, then rebuild**,
+because a CA made now would be newer than the image and `clock-rule` would refuse
+it. Neither step is taken, since `init` mints a key that never leaves the laptop
+it is made on.
+
+The rule itself, unchanged: not a
 measurement, a rule, and the reason is in `docs/DESIGN.md` under the clock.
 This board has no real-time clock and no uplink, so at boot the clock is
 moved forward to roughly the image build time and no further. A CA created

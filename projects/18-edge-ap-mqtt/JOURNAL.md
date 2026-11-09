@@ -846,3 +846,63 @@ the layer's own images install means the next split package is covered
 without anybody remembering this day, and a layer that legitimately
 installs both halves is left alone, because then there is a real choice and
 a linter has no business making it.
+
+## 21. Four questions the image could answer, and one of them was the wrong question
+
+Monday 9 November 2026, on win11 aquamarine and inside `./go shell bench-ap`
+on JPTOUPM678. NO BOARD, and no criterion moved.
+
+**What was done.** The evidence index had four questions standing that
+needed a build and no board. The build of entry 20 made them askable, so
+they were asked, in order, and each answer went into a dated evidence file
+rather than into prose that would be unverifiable a week later.
+
+Question 1, whether `PACKAGECONFIG` carried TLS and the AP features, split
+in half. Mosquitto answered it: `PACKAGECONFIG_CONFARGS` carried
+`WITH_TLS=ON` and seven more, which is the stronger evidence because it
+proves the flags reached cmake rather than that a variable was set.
+**hostapd refused the question.** Eighteen matching lines, not one of them
+a `PACKAGECONFIG=` assignment, and `PACKAGECONFIG_CONFARGS=""` empty. That
+recipe fetches `file://defconfig` and installs it as `.config`, so it is
+configured the way a kernel is and no feature of it reaches the build
+through a configure argument.
+
+Question 1b, chrony's layer, held as written: meta-networking 4.5, already
+pinned. Question 1c, the restated hostapd question, read the defconfig:
+`CONFIG_DRIVER_NL80211=y` and `CONFIG_LIBNL32=y` present, and WPA2 needing
+no symbol at all because RSN is unconditional.
+
+Question 2, the clock rule, came back half answered and useful anyway. The
+image stamp is `20261109104528`. **No CA exists on either laptop**, so what
+is decided is the order of the next two steps rather than the criterion: a
+CA created now would be newer than the image, `clock-rule` would refuse it
+correctly, and every certificate would read as not yet valid on a board
+that comes up at roughly the image build time. The CA first, then the
+rebuild. `docs/BRINGUP.md` said the CA comes first and was right; it now
+also says that the image already standing predates any CA and must be
+rebuilt, which is the part a reader following it today would have hit.
+
+**Why that and not the alternative.** Two things were tempting and both
+would have been wrong.
+
+The first was to confirm a defect. 1c found that the defconfig comments out
+`CONFIG_IEEE80211W` while this project's `hostapd.conf.in` sets
+`ieee80211w=1`, which would stop hostapd starting at all if the symbol
+still gated anything. It does not. The defconfig's own comment calls 802.11w
+an unfinalised draft and that standard was finalised in 2009; upstream at
+`hostap_2_10` has no such option in 412 lines. So the finding is that
+meta-oe ships a pre-2009 subset of upstream's defconfig, and the right
+record of a suspected defect that turns out not to exist is the chain that
+cleared it, because the next reader will suspect the same thing.
+
+The second was to create the CA while the shell was open. It mints a
+private key that the script says never leaves the laptop it is made on, and
+which machine owns that key is not a build decision. It stays with Joseph.
+
+One thing this session got wrong is worth keeping. The chrony sentence
+committed an hour earlier said kas pins meta-networking "for hostapd and
+mosquitto". hostapd is in meta-oe. Nothing was broken, because
+`kas/bench-ap.yml` pins both layers and the image builds, but the same
+error sat in three files: that sentence, the kas comment it came from, and
+`docs/DESIGN.md`. Only a grep of the whole tree found the third. A wrong
+fact does not stay in the file where it was written.

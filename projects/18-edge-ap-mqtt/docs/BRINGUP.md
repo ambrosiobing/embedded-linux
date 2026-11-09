@@ -54,6 +54,16 @@ projects/18-edge-ap-mqtt/pki/bench-pki.sh clock-rule "$(cat /etc/timestamp)"
 taking `/etc/timestamp` from the built image. It prints both dates and
 refuses with an explanation if the CA is the newer of the two.
 
+**The first image was built before any CA existed, on Monday 9 November
+2026.** Its stamp is `20261109104528`, and no CA exists on either laptop,
+which was read the same day and recorded in
+[clock-rule-2026-11-09.txt](evidence/clock-rule-2026-11-09.txt). So this
+section's order is not a choice any more: `init` now, and `clock-rule`
+against that image would refuse, correctly, because the CA would be the
+newer of the two. **The image is rebuilt after the CA is created**, and the
+rebuild is cheap, 1 min 41 s at a 98 percent sstate match, which is why
+building the image first cost nothing except the need for this paragraph.
+
 ## 2. Issue the certificates, on the laptop
 
 The CA private key never goes near the board. Only four files travel.

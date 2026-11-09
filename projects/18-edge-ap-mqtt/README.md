@@ -43,19 +43,34 @@ laptop with no board, no network and no broker:
 | `sh tests/broker-config-test.sh` | 43 passing |
 | `sh tests/broker-setup-test.sh` | 28 passing |
 
-`python scripts/lint.py` is clean. **BitBake has never parsed these
-recipes**, nothing has been built, and nothing has been powered, so this is
-a rung below Software complete on purpose.
+`python scripts/lint.py` is clean. BitBake has now parsed these recipes and
+built the image, so the only thing left between here and Measured is a
+board: **nothing has been powered**. This paragraph said "BitBake has never
+parsed these recipes" and called the project a rung below Software complete
+on purpose, which was true until Monday 9 November 2026.
 
-One blocker was removed rather than waited on. Whether scarthgap's
-mosquitto already builds with `ssl` is still unread, but `kas/bench-ap.yml`
-now appends it: `PACKAGECONFIG` is a space separated list, so asking for
-something already present costs nothing and asking for something absent is
-the difference between this project working and not.
+One blocker was removed rather than waited on, and the reading that would
+have settled it came three weeks later. `kas/bench-ap.yml` appends `ssl`
+without knowing whether scarthgap's mosquitto already had it, because
+`PACKAGECONFIG` is a space separated list: asking for something already
+present costs nothing and asking for something absent is the difference
+between this project working and not. **It was already present.** Read on
+Monday 9 November 2026 in
+[mosquitto-packageconfig-2026-11-09.txt](docs/evidence/mosquitto-packageconfig-2026-11-09.txt):
+`PACKAGECONFIG_CONFARGS` carries `WITH_TLS=ON` and seven more, which proves
+the flags reached cmake rather than that a variable was set. The append was
+redundant and cost nothing, which is what it was chosen for.
 
 Two questions still need the board, and `docs/evidence/README.md` carries
 the command for each: which radio firmware this Pi wants, and whether its
-FullMAC firmware will run an access point at all.
+FullMAC firmware will run an access point at all. The four that needed only
+the build are closed, the last of them on Monday 9 November 2026.
+**One of those answers decides an order:** no certificate authority exists
+on either laptop, and the image standing in the deploy directory is older
+than any CA could now be, so the CA is created first and the image rebuilt
+after it, or every certificate reads as not yet valid on a board with no
+clock. See [clock-rule-2026-11-09.txt](docs/evidence/clock-rule-2026-11-09.txt)
+and section 1 of [docs/BRINGUP.md](docs/BRINGUP.md).
 
 ## This project is not greenfield, and that is the most useful fact about it
 
@@ -120,7 +135,7 @@ this table is measured on Tuesday 22 September 2026.
 | 8 | A revoked certificate is refused after the CRL is regenerated | a connection that worked, then the same one refused | **Not started.** The criterion most likely to be skipped, and the only one that proves the CA is doing work rather than decorating |
 | 9 | Project 17's gateway publishes to this broker from its own board, replacing its localhost fixture | both boards' logs, with timestamps | **Not started.** This is the criterion that closes the sibling project's own open item |
 | 10 | The board is reachable only through its own access point and the serial console | an ssh session over `wlan0`, and no other path | **Not started.** Exercised every time anyone logs in, which is the nice property of making the AP the access path |
-| 11 | The clock rule holds: the CA's `notBefore` is earlier than the image build timestamp | both timestamps, recorded together | **Not started**, because no image has been built and there is no timestamp to compare against. The check itself exists and is tested in both directions: `bench-pki.sh clock-rule` |
+| 11 | The clock rule holds: the CA's `notBefore` is earlier than the image build timestamp | both timestamps, recorded together | **Not started, and the reason changed on Monday 9 November 2026.** The image half is now known: `20261109104528`, Monday 9 November 2026 at 10:45:28 UTC. What is missing is the CA, which exists on neither laptop. That fixes the order of the next two steps: a CA created now would be newer than the image and `clock-rule` would refuse it, so the CA comes first and the image is rebuilt after it. This row said "no image has been built and there is no timestamp to compare against" until the build ran. The check itself exists and is tested in both directions: `bench-pki.sh clock-rule`. See [clock-rule-2026-11-09.txt](docs/evidence/clock-rule-2026-11-09.txt) |
 
 Two criteria this repository asserts that the theme does not ask for:
 

@@ -1,0 +1,65 @@
+What:   Question 2 and criterion 11: the CA's notBefore against the image
+        build timestamp. Half answered, and the half that is answered
+        determines the order of the next two steps.
+On:     JPTOUPM678 for the image and the second CA check, the win11
+        aquamarine authoring laptop for the first
+When:   Monday 9 November 2026, 13:05
+Proves: no acceptance criterion. Criterion 11 cannot be met yet and the
+        reason has changed, which is why this file exists.
+
+The image timestamp: KNOWN
+
+  20261109104528
+
+  Monday 9 November 2026 at 10:45:28 UTC, from the deploy name
+
+    bench-ap-image-raspberrypi3-64.rootfs-20261109104528.testdata.json
+
+  which carries BitBake's DATETIME, the same value written into
+  /etc/timestamp in the rootfs. bench-pki.sh clock-rule takes exactly this
+  format.
+
+The CA: DOES NOT EXIST, on either laptop
+
+  win11 aquamarine authoring laptop   no ~/.bench-pki directory at all
+  JPTOUPM678                          no .bench-pki/ca.crt
+
+  Both checked with test, not with ls, because an empty ls through a pipe
+  cannot be told from a missing directory: the pipeline's exit status
+  belongs to the last command in it. That mistake was made twice earlier
+  the same day and is the reason this line says which tool answered.
+
+SO THE ORDER OF THE NEXT TWO STEPS IS DETERMINED, AND IT IS NOT OBVIOUS
+
+  bench-pki.sh clock-rule requires CA notBefore < image build time. A CA
+  created now gets a notBefore later than 10:45:28 UTC today, so the rule
+  would be broken the moment the CA exists, and the script would say so:
+
+    CLOCK RULE BROKEN: the CA is newer than the image.
+
+  The board has no real-time clock and no uplink, so at boot its clock is
+  moved forward to roughly the image build time and no further. A CA newer
+  than the image means every certificate on the bench reads as not yet
+  valid, and every client fails with an error naming the certificate rather
+  than the clock. That is the failure this project documented in advance,
+  in docs/DESIGN.md under the clock, before any of it was built.
+
+  So: create the CA FIRST, then rebuild the image. In that order the
+  rebuild stamps /etc/timestamp later than the CA and the rule holds. The
+  rebuild costs 1 min 41 s at the current sstate match, so the whole cost
+  of doing it in the right order is under two minutes. The wrong order
+  costs a board that comes up with nothing valid.
+
+  Neither step is taken here. bench-pki.sh init mints a private key, the
+  script's own header says that key never leaves the laptop, and which
+  machine owns it is Joseph's decision rather than this file's.
+
+What criterion 11 said until today
+
+  "Not started, because no image has been built and there is no timestamp
+  to compare against."
+
+  The verdict was right and the reason is now false: the image exists and
+  the timestamp is above. The row is rewritten to say what is actually
+  missing, which is the CA, and in which order the two halves have to
+  happen.
