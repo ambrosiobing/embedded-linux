@@ -35,16 +35,14 @@ md5=0835ade698e0bcf8506ecda2f7b4f302"
 # So this recipe fetches its own LVGL, exactly the way oe-core's own
 # lvgl-demo-fb recipe fetches lv_port_linux_frame_buffer plus lvgl as two
 # repositories. meta-oe's lvgl is left untouched.
-FILESEXTRAPATHS:prepend := "${BENCH_REPO_ROOT}/src/hmi:"
-
 SRC_URI = "\
     git://github.com/lvgl/lvgl;protocol=https;branch=master;name=lvgl;destsuffix=lvgl \
-    file://CMakeLists.txt \
-    file://main.c \
-    file://dashboard.c \
-    file://dashboard.h \
-    file://metrics.c \
-    file://metrics.h \
+    file://${BENCH_REPO_ROOT}/src/hmi/CMakeLists.txt \
+    file://${BENCH_REPO_ROOT}/src/hmi/main.c \
+    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.c \
+    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.h \
+    file://${BENCH_REPO_ROOT}/src/hmi/metrics.c \
+    file://${BENCH_REPO_ROOT}/src/hmi/metrics.h \
 "
 
 # v9.3.0. The license file changed between 9.1.0 and 9.3.0, so meta-oe's
@@ -57,7 +55,7 @@ md5=4570b6241b4fced1d1d18eb691a0e083"
 
 # scarthgap still unpacks into WORKDIR. On walnascar and later this becomes
 # S = "${UNPACKDIR}"; it is the only line in the layer that has to move.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/hmi"
 
 # wayland-native is for wayland-scanner, which runs on the BUILD machine
 # to turn xdg-shell.xml into C. wayland-protocols supplies that xml.
@@ -74,6 +72,7 @@ REQUIRED_DISTRO_FEATURES = "wayland"
 # Same mechanism meta-oe uses: start from the upstream template and set
 # the handful of options that differ. The difference is the last block.
 do_configure:prepend() {
+    ln -sfn "${WORKDIR}/lvgl" "${S}/lvgl"
     cp -f "${WORKDIR}/lvgl/lv_conf_template.h" "${S}/lv_conf.h"
 
     # Upstream's template ships every option inside an "#if 0" block.
