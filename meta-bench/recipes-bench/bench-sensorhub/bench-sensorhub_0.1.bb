@@ -12,10 +12,10 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "\
-    file://proto.c \
-    file://proto.h \
-    file://sensorhubd.c \
-    file://hubctl \
+    file://${BENCH_REPO_ROOT}/src/sensorhub/proto.c \
+    file://${BENCH_REPO_ROOT}/src/sensorhub/proto.h \
+    file://${BENCH_REPO_ROOT}/src/sensorhub/sensorhubd.c \
+    file://${BENCH_REPO_ROOT}/src/sensorhub/hubctl \
     file://org.bench.SensorHub1.conf \
     file://org.bench.SensorHub1.service \
     file://org.bench.sensorhub.policy \
@@ -44,7 +44,7 @@ REQUIRED_DISTRO_FEATURES = "systemd polkit"
 # scarthgap still unpacks into WORKDIR. On walnascar and later this
 # becomes S = "${UNPACKDIR}", the same one line every other bench recipe
 # has to move.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/sensorhub"
 
 CFLAGS:append = " -Wall -Wextra"
 
@@ -62,27 +62,27 @@ do_install() {
     # The bus policy goes in ${datadir}, not ${sysconfdir}. A package
     # ships its policy; /etc/dbus-1/system.d is where an administrator
     # overrides it, and nothing in this repository is the administrator.
-    install -Dm0644 ${S}/org.bench.SensorHub1.conf \
+    install -Dm0644 ${WORKDIR}/org.bench.SensorHub1.conf \
         ${D}${datadir}/dbus-1/system.d/org.bench.SensorHub1.conf
 
     # The activation file: a client call starts the daemon.
-    install -Dm0644 ${S}/org.bench.SensorHub1.service \
+    install -Dm0644 ${WORKDIR}/org.bench.SensorHub1.service \
         ${D}${datadir}/dbus-1/system-services/org.bench.SensorHub1.service
 
-    install -Dm0644 ${S}/org.bench.sensorhub.policy \
+    install -Dm0644 ${WORKDIR}/org.bench.sensorhub.policy \
         ${D}${datadir}/polkit-1/actions/org.bench.sensorhub.policy
 
     # The rules directory was created and chowned by the .inc's
     # do_install:prepend. The rule itself is 0644: it is read by polkitd,
     # and the 0700 that matters is on the directory.
-    install -m0644 ${S}/50-sensorhub.rules \
+    install -m0644 ${WORKDIR}/50-sensorhub.rules \
         ${D}${sysconfdir}/polkit-1/rules.d/50-sensorhub.rules
 
     # The other activation path: a device plug starts the daemon.
-    install -Dm0644 ${S}/80-sensorhub.rules \
+    install -Dm0644 ${WORKDIR}/80-sensorhub.rules \
         ${D}${sysconfdir}/udev/rules.d/80-sensorhub.rules
 
-    install -Dm0644 ${S}/sensorhubd.service \
+    install -Dm0644 ${WORKDIR}/sensorhubd.service \
         ${D}${systemd_system_unitdir}/sensorhubd.service
 }
 

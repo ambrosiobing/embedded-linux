@@ -342,7 +342,7 @@ else
 		fail=1
 	else
 		out=$(mktemp -d)/sensorhubd
-		hub_src=meta-bench/recipes-bench/bench-sensorhub/files
+		hub_src=src/sensorhub
 		hub_cflags=$(pkg-config --cflags libsystemd libcbor)
 		hub_libs=$(pkg-config --libs libsystemd libcbor)
 		# Word splitting on the pkg-config output is intended here too.

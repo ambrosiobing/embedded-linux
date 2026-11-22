@@ -46,6 +46,7 @@ import xml.etree.ElementTree as ET
 ROOT = os.environ["BENCH_ROOT"]
 FILES = os.path.join(ROOT, "meta-bench", "recipes-bench", "bench-sensorhub",
                      "files")
+SRC = os.path.join(ROOT, "src", "sensorhub")
 RECIPE = os.path.join(ROOT, "meta-bench", "recipes-bench", "bench-sensorhub",
                       "bench-sensorhub_0.1.bb")
 
@@ -74,7 +75,7 @@ def define(source, name):
     return match.group(1) if match else None
 
 
-daemon = read("sensorhubd.c")
+daemon = open(os.path.join(SRC, "sensorhubd.c"), encoding="utf-8").read()
 recipe = open(RECIPE, encoding="utf-8").read()
 
 IFACE = define(daemon, "IFACE")
@@ -255,7 +256,7 @@ check("because activation is the point", 'SYSTEMD_SERVICE:${PN} = '
 # and forgotten in do_install is a file that exists in the build and not on
 # the board, which is the failure that looks like a bug in the daemon.
 src_uri = re.search(r'SRC_URI = "(.*?)"', recipe, re.S).group(1)
-fetched = re.findall(r"file://(\S+)", src_uri)
+fetched = [os.path.basename(u) for u in re.findall(r"file://(\S+)", src_uri)]
 install = recipe.split("do_install()", 1)[1]
 compiled = {"proto.c", "proto.h", "sensorhubd.c"}
 missing = [name for name in fetched

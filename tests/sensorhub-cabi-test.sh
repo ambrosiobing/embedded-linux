@@ -29,7 +29,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SRC=$ROOT/meta-bench/recipes-bench/bench-sensorhub/files
+SRC=$ROOT/src/sensorhub
 . "$ROOT/tests/lib/python.sh"
 CC=${CC:-cc}
 
