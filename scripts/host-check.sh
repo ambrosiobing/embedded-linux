@@ -220,7 +220,7 @@ else
 	# shellcheck disable=SC2046
 	if gcc -Wall -Wextra -Werror -O2 \
 		$(pkg-config --cflags libgpiod) \
-		meta-bench/recipes-bench/bench-status/files/bench-status.c \
+		src/status/bench-status.c \
 		-o "$out" $(pkg-config --libs libgpiod); then
 		echo "compiled clean with -Werror"
 		# No GPIO chip on most build hosts, so exit 1 is correct here.

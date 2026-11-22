@@ -139,7 +139,7 @@ jobs:
             exit 1
             ;;
           esac
-          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-status/files/bench-status.c -o /tmp/bench-status $(pkg-config --libs libgpiod)
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) src/status/bench-status.c -o /tmp/bench-status $(pkg-config --libs libgpiod)
 
       - name: Compile the libiio client
         # Project 10's iio-stream, and until Thursday 1 October 2026 NOTHING

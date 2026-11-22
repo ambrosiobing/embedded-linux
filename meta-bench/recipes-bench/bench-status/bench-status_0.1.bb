@@ -10,8 +10,8 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "\
-    file://bench-status.c \
-    file://bench-state \
+    file://${BENCH_REPO_ROOT}/src/status/bench-status.c \
+    file://${BENCH_REPO_ROOT}/src/status/bench-state \
     file://bench-status.service \
     file://bench-state.service \
     file://bench-state.timer \
@@ -30,7 +30,7 @@ REQUIRED_DISTRO_FEATURES = "systemd"
 
 # scarthgap still unpacks into WORKDIR. On walnascar and later this becomes
 # S = "${UNPACKDIR}"; it is the only line in the layer that has to move.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/status"
 
 # -Werror is enforced in CI, not here: a toolchain upgrade should fail a
 # pull request, not an image build on someone else's machine.
@@ -46,25 +46,25 @@ do_install() {
     install -Dm0755 bench-status ${D}${bindir}/bench-status
     install -Dm0755 ${S}/bench-state ${D}${bindir}/bench-state
 
-    install -Dm0644 ${S}/bench-status.service \
+    install -Dm0644 ${WORKDIR}/bench-status.service \
         ${D}${systemd_system_unitdir}/bench-status.service
-    install -Dm0644 ${S}/bench-state.service \
+    install -Dm0644 ${WORKDIR}/bench-state.service \
         ${D}${systemd_system_unitdir}/bench-state.service
-    install -Dm0644 ${S}/bench-state.timer \
+    install -Dm0644 ${WORKDIR}/bench-state.timer \
         ${D}${systemd_system_unitdir}/bench-state.timer
-    install -Dm0644 ${S}/bench-state-failed@.service \
+    install -Dm0644 ${WORKDIR}/bench-state-failed@.service \
         ${D}${systemd_system_unitdir}/bench-state-failed@.service
 
     # A vendor drop-in, so it lives next to the unit it extends rather than
     # in /etc where the administrator's own overrides belong.
-    install -Dm0644 ${S}/bench-onfailure.conf \
+    install -Dm0644 ${WORKDIR}/bench-onfailure.conf \
         ${D}${systemd_system_unitdir}/sshd.socket.d/10-bench-onfailure.conf
 
-    install -Dm0644 ${S}/bench-status.tmpfiles.conf \
+    install -Dm0644 ${WORKDIR}/bench-status.tmpfiles.conf \
         ${D}${nonarch_libdir}/tmpfiles.d/bench-status.conf
 
-    install -Dm0644 ${S}/watch.conf ${D}${sysconfdir}/bench/watch.conf
-    install -Dm0644 ${S}/leds.conf ${D}${sysconfdir}/bench/leds.conf
+    install -Dm0644 ${WORKDIR}/watch.conf ${D}${sysconfdir}/bench/watch.conf
+    install -Dm0644 ${WORKDIR}/leds.conf ${D}${sysconfdir}/bench/leds.conf
 }
 
 FILES:${PN} += "\
