@@ -35,7 +35,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SUT=$ROOT/meta-bench/recipes-bench/bench-rt/files/rt-compare
+SUT=$ROOT/src/rt/rt-compare
 . "$ROOT/tests/lib/python.sh"
 bench_python "the comparison was NOT checked and"
 

@@ -12,12 +12,12 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "\
-    file://rt-toggle.c \
-    file://rt-capture \
-    file://rt-analyze \
-    file://rt-compare \
-    file://rt-run \
-    file://rt-irq-affinity \
+    file://${BENCH_REPO_ROOT}/src/rt/rt-toggle.c \
+    file://${BENCH_REPO_ROOT}/src/rt/rt-capture \
+    file://${BENCH_REPO_ROOT}/src/rt/rt-analyze \
+    file://${BENCH_REPO_ROOT}/src/rt/rt-compare \
+    file://${BENCH_REPO_ROOT}/src/rt/rt-run \
+    file://${BENCH_REPO_ROOT}/src/rt/rt-irq-affinity \
     file://rt.conf \
     file://rt.tmpfiles.conf \
 "
@@ -28,7 +28,7 @@ inherit pkgconfig
 
 # scarthgap still unpacks into WORKDIR. On walnascar and later this becomes
 # S = "${UNPACKDIR}", the same one line bench-status and bench-lte move.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/rt"
 
 # -Werror is not here, and that is deliberate rather than an oversight. A
 # toolchain upgrade inside a three-hour image build is the worst place to
@@ -50,8 +50,8 @@ do_install() {
     install -Dm0755 ${S}/rt-run ${D}${bindir}/rt-run
     install -Dm0755 ${S}/rt-irq-affinity ${D}${bindir}/rt-irq-affinity
 
-    install -Dm0644 ${S}/rt.conf ${D}${sysconfdir}/bench/rt.conf
-    install -Dm0644 ${S}/rt.tmpfiles.conf \
+    install -Dm0644 ${WORKDIR}/rt.conf ${D}${sysconfdir}/bench/rt.conf
+    install -Dm0644 ${WORKDIR}/rt.tmpfiles.conf \
         ${D}${nonarch_libdir}/tmpfiles.d/bench-rt.conf
 }
 

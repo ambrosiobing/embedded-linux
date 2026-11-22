@@ -25,7 +25,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SUT=$ROOT/meta-bench/recipes-bench/bench-rt/files/rt-irq-affinity
+SUT=$ROOT/src/rt/rt-irq-affinity
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

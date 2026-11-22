@@ -24,7 +24,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SUT=$ROOT/meta-bench/recipes-bench/bench-rt/files/rt-analyze
+SUT=$ROOT/src/rt/rt-analyze
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT

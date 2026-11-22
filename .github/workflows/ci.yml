@@ -236,7 +236,7 @@ jobs:
         # should come from a program that compiles without a warning about
         # a conversion or an uninitialised variable.
         run: |
-          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-rt/files/rt-toggle.c -o /tmp/rt-toggle $(pkg-config --libs libgpiod)
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) src/rt/rt-toggle.c -o /tmp/rt-toggle $(pkg-config --libs libgpiod)
 
       - name: Compile bench-diag
         # The bench's voltmeter, continuity tester and logic probe.

@@ -311,7 +311,7 @@ else
 	# or an uninitialised variable is a warning about a number that
 	# ends up in a results table.
 	out=$(mktemp -d)/rt-toggle
-	rt_src=meta-bench/recipes-bench/bench-rt/files/rt-toggle.c
+	rt_src=src/rt/rt-toggle.c
 	# Word splitting on the pkg-config output is intended here too.
 	# shellcheck disable=SC2046
 	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \
