@@ -35,14 +35,16 @@ md5=0835ade698e0bcf8506ecda2f7b4f302"
 # So this recipe fetches its own LVGL, exactly the way oe-core's own
 # lvgl-demo-fb recipe fetches lv_port_linux_frame_buffer plus lvgl as two
 # repositories. meta-oe's lvgl is left untouched.
+FILESEXTRAPATHS:prepend := "${BENCH_REPO_ROOT}/src/hmi:"
+
 SRC_URI = "\
     git://github.com/lvgl/lvgl;protocol=https;branch=master;name=lvgl;destsuffix=lvgl \
-    file://${BENCH_REPO_ROOT}/src/hmi/CMakeLists.txt;subdir=. \
-    file://${BENCH_REPO_ROOT}/src/hmi/main.c;subdir=. \
-    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.c;subdir=. \
-    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.h;subdir=. \
-    file://${BENCH_REPO_ROOT}/src/hmi/metrics.c;subdir=. \
-    file://${BENCH_REPO_ROOT}/src/hmi/metrics.h;subdir=. \
+    file://CMakeLists.txt \
+    file://main.c \
+    file://dashboard.c \
+    file://dashboard.h \
+    file://metrics.c \
+    file://metrics.h \
 "
 
 # v9.3.0. The license file changed between 9.1.0 and 9.3.0, so meta-oe's
