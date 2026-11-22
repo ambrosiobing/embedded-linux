@@ -9,7 +9,7 @@
 header:
   version: 14
   includes:
-    - bench-rpi4.yml
+    - kas/bench-rpi4.yml
 
 target: bench-router-image
 

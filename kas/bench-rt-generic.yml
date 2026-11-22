@@ -53,7 +53,7 @@
 header:
   version: 14
   includes:
-    - bench-rt.yml
+    - kas/bench-rt.yml
 
 # BENCH_RT_LAB stays at the "1" that bench-rt.yml sets, so rt-common.cfg is
 # applied here too: the 6.12 kernel, SPI for the HAT, meta-python for numpy,

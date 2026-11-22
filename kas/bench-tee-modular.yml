@@ -23,7 +23,7 @@
 header:
   version: 14
   includes:
-    - bench-tee.yml
+    - kas/bench-tee.yml
 
 target: bench-tee-modular-image
 

@@ -13,7 +13,7 @@
 header:
   version: 14
   includes:
-    - bench-rpi3.yml
+    - kas/bench-rpi3.yml
 
 target: bench-tee-image
 

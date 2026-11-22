@@ -18,6 +18,6 @@
 header:
   version: 14
   includes:
-    - bench-rpi3-ab.yml
+    - kas/bench-rpi3-ab.yml
 
 target: bench-bundle

@@ -20,7 +20,7 @@
 header:
   version: 14
   includes:
-    - bench-rpi4.yml
+    - kas/bench-rpi4.yml
 
 machine: raspberrypi3-64
 target: bench-ab-image
