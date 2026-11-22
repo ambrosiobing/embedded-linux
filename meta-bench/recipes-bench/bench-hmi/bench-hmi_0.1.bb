@@ -37,12 +37,12 @@ md5=0835ade698e0bcf8506ecda2f7b4f302"
 # repositories. meta-oe's lvgl is left untouched.
 SRC_URI = "\
     git://github.com/lvgl/lvgl;protocol=https;branch=master;name=lvgl;destsuffix=lvgl \
-    file://${BENCH_REPO_ROOT}/src/hmi/CMakeLists.txt \
-    file://${BENCH_REPO_ROOT}/src/hmi/main.c \
-    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.c \
-    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.h \
-    file://${BENCH_REPO_ROOT}/src/hmi/metrics.c \
-    file://${BENCH_REPO_ROOT}/src/hmi/metrics.h \
+    file://${BENCH_REPO_ROOT}/src/hmi/CMakeLists.txt;subdir=. \
+    file://${BENCH_REPO_ROOT}/src/hmi/main.c;subdir=. \
+    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.c;subdir=. \
+    file://${BENCH_REPO_ROOT}/src/hmi/dashboard.h;subdir=. \
+    file://${BENCH_REPO_ROOT}/src/hmi/metrics.c;subdir=. \
+    file://${BENCH_REPO_ROOT}/src/hmi/metrics.h;subdir=. \
 "
 
 # v9.3.0. The license file changed between 9.1.0 and 9.3.0, so meta-oe's
