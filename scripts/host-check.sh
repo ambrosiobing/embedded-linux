@@ -425,7 +425,7 @@ elif ! pkg-config --exists libevdev; then
 else
 	echo "libevdev $(pkg-config --modversion libevdev)"
 	out=$(mktemp -d)/kbd-bridge
-	kbd_src=meta-bench/recipes-bench/bench-kbd-bridge/files
+	kbd_src=src/kbd-bridge
 	# Word splitting on the pkg-config output is intended: it returns a
 	# list of flags, not one argument.
 	# shellcheck disable=SC2046

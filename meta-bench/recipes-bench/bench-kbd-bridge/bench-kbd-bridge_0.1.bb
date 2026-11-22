@@ -11,16 +11,16 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "\
-    file://kbd_bridge.c \
-    file://usage_table.h \
-    file://gen-usage-table.py \
+    file://${BENCH_REPO_ROOT}/src/kbd-bridge/kbd_bridge.c \
+    file://${BENCH_REPO_ROOT}/src/kbd-bridge/usage_table.h \
+    file://${BENCH_REPO_ROOT}/src/kbd-bridge/gen-usage-table.py \
     file://kbd-bridge.service \
     file://80-bench-kbd.rules \
 "
 
 # scarthgap still unpacks into WORKDIR. On walnascar and later this becomes
 # S = "${UNPACKDIR}"; it is the only line in the layer that has to move.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/kbd-bridge"
 
 DEPENDS = "libevdev"
 
@@ -50,10 +50,10 @@ do_compile() {
 do_install() {
     install -Dm0755 kbd-bridge ${D}${bindir}/kbd-bridge
 
-    install -Dm0644 ${S}/kbd-bridge.service \
+    install -Dm0644 ${WORKDIR}/kbd-bridge.service \
         ${D}${systemd_system_unitdir}/kbd-bridge.service
 
-    install -Dm0644 ${S}/80-bench-kbd.rules \
+    install -Dm0644 ${WORKDIR}/80-bench-kbd.rules \
         ${D}${nonarch_base_libdir}/udev/rules.d/80-bench-kbd.rules
 
     # The generator is installed beside nothing and used by nobody at
