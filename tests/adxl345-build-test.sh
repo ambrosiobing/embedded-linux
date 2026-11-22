@@ -26,7 +26,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SRC=$ROOT/meta-bench/recipes-bench/libadxl345/files/adxl345-linux
+SRC=$ROOT/src/libadxl345
 
 pass=0
 fail=0

@@ -34,7 +34,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SRC=$ROOT/meta-bench/recipes-bench/libadxl345/files/adxl345-linux
+SRC=$ROOT/src/libadxl345
 PROVER=$ROOT/scripts/adxl345-install-purge.sh
 BASE_BUILD=debian:trixie
 BASE_RUN=debian:trixie-slim
