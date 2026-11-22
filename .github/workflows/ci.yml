@@ -255,7 +255,7 @@ jobs:
         # the D-Bus interface declaration. proto.c is compiled in here too,
         # which is the same file the firmware compiles.
         run: |
-          src=meta-bench/recipes-bench/bench-sensorhub/files
+          src=src/sensorhub
           gcc -Wall -Wextra -Werror -O2 -I"$src" $(pkg-config --cflags libsystemd libcbor) "$src/sensorhubd.c" "$src/proto.c" -o /tmp/sensorhubd $(pkg-config --libs libsystemd libcbor)
 
       - name: Python programs compile
