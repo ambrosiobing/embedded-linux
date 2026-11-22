@@ -198,7 +198,7 @@ jobs:
         # whose package drags ModemManager and NetworkManager into any
         # image installing it, and a tracker installs neither.
         run: |
-          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-tracker/files/tracker-gpio.c -o /tmp/tracker-gpio $(pkg-config --libs libgpiod)
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) src/tracker/tracker-gpio.c -o /tmp/tracker-gpio $(pkg-config --libs libgpiod)
 
       - name: tracker-gpio reports its state and refuses an unset pin
         # Both directions, because a guard that has never refused is

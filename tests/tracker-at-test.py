@@ -46,8 +46,7 @@ def load(path, name):
     return module
 
 
-T = load(os.path.join(ROOT, "meta-bench", "recipes-bench", "bench-tracker",
-                      "files", "tracker"), "tracker_prog")
+T = load(os.path.join(ROOT, "src", "tracker", "tracker"), "tracker_prog")
 F = load(os.path.join(HERE, "fake-modem.py"), "fake_modem")
 
 PASS = []

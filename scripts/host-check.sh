@@ -265,7 +265,7 @@ else
 	# offset in the configuration, which is correct on a board and would be
 	# a confusing non-zero exit in a check.
 	out=$(mktemp -d)/tracker-gpio
-	tracker_src=meta-bench/recipes-bench/bench-tracker/files/tracker-gpio.c
+	tracker_src=src/tracker/tracker-gpio.c
 	# Word splitting on the pkg-config output is intended here too.
 	# shellcheck disable=SC2046
 	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \

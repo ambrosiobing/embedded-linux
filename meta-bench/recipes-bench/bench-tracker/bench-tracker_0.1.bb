@@ -12,8 +12,8 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "\
-    file://tracker \
-    file://tracker-gpio.c \
+    file://${BENCH_REPO_ROOT}/src/tracker/tracker \
+    file://${BENCH_REPO_ROOT}/src/tracker/tracker-gpio.c \
     file://tracker.conf \
     file://78-sim7070.rules \
     file://tracker.service \
@@ -29,7 +29,7 @@ REQUIRED_DISTRO_FEATURES = "systemd"
 # scarthgap still unpacks into WORKDIR. On walnascar and later this becomes
 # S = "${UNPACKDIR}", the same one line bench-status and bench-lte have to
 # move when this repository moves release.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/tracker"
 
 CFLAGS:append = " -Wall -Wextra"
 
@@ -43,14 +43,14 @@ do_install() {
     install -Dm0755 tracker-gpio ${D}${bindir}/tracker-gpio
     install -Dm0755 ${S}/tracker ${D}${bindir}/tracker
 
-    install -Dm0644 ${S}/tracker.conf ${D}${sysconfdir}/bench/tracker.conf
+    install -Dm0644 ${WORKDIR}/tracker.conf ${D}${sysconfdir}/bench/tracker.conf
 
-    install -Dm0644 ${S}/78-sim7070.rules \
+    install -Dm0644 ${WORKDIR}/78-sim7070.rules \
         ${D}${nonarch_base_libdir}/udev/rules.d/78-sim7070.rules
 
-    install -Dm0644 ${S}/tracker.service \
+    install -Dm0644 ${WORKDIR}/tracker.service \
         ${D}${systemd_system_unitdir}/tracker.service
-    install -Dm0644 ${S}/tracker.timer \
+    install -Dm0644 ${WORKDIR}/tracker.timer \
         ${D}${systemd_system_unitdir}/tracker.timer
 }
 

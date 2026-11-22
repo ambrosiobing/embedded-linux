@@ -23,7 +23,7 @@
 set -eu
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-tracker="$root/meta-bench/recipes-bench/bench-tracker/files/tracker"
+tracker="$root/src/tracker/tracker"
 fake="$root/tests/fake-modem.py"
 
 python=${PYTHON:-python3}
