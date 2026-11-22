@@ -443,11 +443,22 @@ save() {
 	# The locked layer revisions, which are what make the image
 	# rebuildable rather than merely re-flashable. Absent kas is not a
 	# failure: the image is still worth keeping, and the file says so.
-	if command -v kas >/dev/null 2>&1; then
-		kas dump --lock "$kasfile" >"$dest/$config.lock.yml" 2>/dev/null ||
-			note "kas dump --lock failed, layer revisions not recorded"
+	if [ "${BENCH_NO_KAS_DUMP:-0}" = 1 ]; then
+	        note "kas dump skipped (BENCH_NO_KAS_DUMP=1), layer revisions not recorded"
+	elif command -v kas >/dev/null 2>&1; then
+	        _ref=${KAS_REPO_REF_DIR:-}
+	        if [ -z "$_ref" ]; then
+	                for _cand in "$HOME/bench-work" "$REPO_DIR/build"; do
+	                        if [ -d "$_cand/poky" ]; then
+	                                _ref=$_cand
+	                                break
+	                        fi
+	                done
+	        fi
+	        KAS_REPO_REF_DIR=$_ref kas dump --lock "$kasfile" >"$dest/$config.lock.yml" 2>/dev/null ||
+	                note "kas dump --lock failed, layer revisions not recorded"
 	else
-		note "kas absent, layer revisions not recorded"
+	        note "kas absent, layer revisions not recorded"
 	fi
 
 	# "$real" and not "$image". The copy above stores the file under
