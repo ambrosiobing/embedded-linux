@@ -13,9 +13,9 @@ md5=0835ade698e0bcf8506ecda2f7b4f302"
 # complete CMake project that also builds outside Yocto, which is the
 # point: a developer runs cmake on it, debhelper runs cmake on it, and
 # this recipe runs cmake on it. Three consumers, one build definition.
-SRC_URI = "file://adxl345-linux"
+SRC_URI = "file://${BENCH_REPO_ROOT}/src/libadxl345"
 
-S = "${WORKDIR}/adxl345-linux"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/libadxl345"
 
 DEPENDS = "libgpiod"
 
