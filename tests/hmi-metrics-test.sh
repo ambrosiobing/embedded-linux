@@ -35,7 +35,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SRC=$ROOT/meta-bench/recipes-bench/bench-hmi/files
+SRC=$ROOT/src/hmi
 HARNESS=$ROOT/tests/hmi-metrics-harness.c
 
 pass=0
