@@ -322,7 +322,7 @@ jobs:
         # because the recipe builds with -Wall -Wextra, and a warning here
         # is one a reader of this repository would have to account for.
         run: |
-          src=meta-bench/recipes-bench/bench-kbd-bridge/files
+          src=src/kbd-bridge
           gcc -Wall -Wextra -Werror -O2 -I"$src" $(pkg-config --cflags libevdev) "$src/kbd_bridge.c" -o /tmp/kbd-bridge $(pkg-config --libs libevdev)
 
       - name: kbd-bridge refuses without a keyboard on a runner

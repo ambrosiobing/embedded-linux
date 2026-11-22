@@ -284,7 +284,8 @@ check "it ends with End Collection" "$last" "c0"
 # So the specification's file list is ticked off directly. These are the
 # artefacts it names that are not recipes or figures, mapped onto where
 # this repository puts them.
-BRIDGE=$ROOT/meta-bench/recipes-bench/bench-kbd-bridge/files
+BRIDGE=$ROOT/src/kbd-bridge
+BRIDGE_PKG=$ROOT/meta-bench/recipes-bench/bench-kbd-bridge/files
 GADGET=$ROOT/meta-bench/recipes-bench/bench-gadget/files
 HOST=$ROOT/projects/14-usb-gadget/host
 
@@ -294,8 +295,8 @@ for spec_file in \
 	"$GADGET/hid-keyboard.desc" \
 	"$BRIDGE/kbd_bridge.c" \
 	"$BRIDGE/usage_table.h" \
-	"$BRIDGE/kbd-bridge.service" \
-	"$BRIDGE/80-bench-kbd.rules" \
+	"$BRIDGE_PKG/kbd-bridge.service" \
+	"$BRIDGE_PKG/80-bench-kbd.rules" \
 	"$HOST/linux/70-pi-gadget.rules" \
 	"$HOST/linux/nm-pi-gadget.nmconnection" \
 	"$HOST/windows/README.md" \
