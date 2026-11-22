@@ -11,9 +11,9 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
 SRC_URI = "\
-    file://lte-gpio.c \
-    file://lte-watchdog \
-    file://lte-exporter \
+    file://${BENCH_REPO_ROOT}/src/lte/lte-gpio.c \
+    file://${BENCH_REPO_ROOT}/src/lte/lte-watchdog \
+    file://${BENCH_REPO_ROOT}/src/lte/lte-exporter \
     file://lte.conf \
     file://lte-metrics.conf \
     file://lte.tmpfiles.conf \
@@ -32,7 +32,7 @@ REQUIRED_DISTRO_FEATURES = "systemd"
 
 # scarthgap still unpacks into WORKDIR. On walnascar and later this becomes
 # S = "${UNPACKDIR}", the same one line bench-status has to move.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/lte"
 
 CFLAGS:append = " -Wall -Wextra"
 
@@ -47,16 +47,16 @@ do_install() {
     install -Dm0755 ${S}/lte-watchdog ${D}${bindir}/lte-watchdog
     install -Dm0755 ${S}/lte-exporter ${D}${bindir}/lte-exporter
 
-    install -Dm0644 ${S}/lte.conf ${D}${sysconfdir}/bench/lte.conf
-    install -Dm0644 ${S}/lte-metrics.conf \
+    install -Dm0644 ${WORKDIR}/lte.conf ${D}${sysconfdir}/bench/lte.conf
+    install -Dm0644 ${WORKDIR}/lte-metrics.conf \
         ${D}${sysconfdir}/bench/lte-metrics.conf
 
-    install -Dm0644 ${S}/lte.tmpfiles.conf \
+    install -Dm0644 ${WORKDIR}/lte.tmpfiles.conf \
         ${D}${nonarch_libdir}/tmpfiles.d/lte.conf
 
     for unit in lte-watchdog.service lte-flight.service \
             lte-exporter.service lte-exporter.timer lte-metrics.service; do
-        install -Dm0644 ${S}/$unit ${D}${systemd_system_unitdir}/$unit
+        install -Dm0644 ${WORKDIR}/$unit ${D}${systemd_system_unitdir}/$unit
     done
 }
 

@@ -190,7 +190,7 @@ jobs:
         # toolchain upgrade should fail here rather than in someone's
         # three-hour image build.
         run: |
-          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) meta-bench/recipes-bench/bench-lte/files/lte-gpio.c -o /tmp/lte-gpio $(pkg-config --libs libgpiod)
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) src/lte/lte-gpio.c -o /tmp/lte-gpio $(pkg-config --libs libgpiod)
 
       - name: Compile the tracker control tool
         # Project 16's power key and instrument marker. A separate binary

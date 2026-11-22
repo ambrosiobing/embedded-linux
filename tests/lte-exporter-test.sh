@@ -20,7 +20,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SUT=$ROOT/meta-bench/recipes-bench/bench-lte/files/lte-exporter
+SUT=$ROOT/src/lte/lte-exporter
 . "$ROOT/tests/lib/python.sh"
 bench_python "the exporter was NOT exercised and"
 

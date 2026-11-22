@@ -24,7 +24,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SUT=$ROOT/meta-bench/recipes-bench/bench-lte/files/lte-watchdog
+SUT=$ROOT/src/lte/lte-watchdog
 . "$ROOT/tests/lib/python.sh"
 bench_python "the escalation ladder was NOT exercised and"
 

@@ -238,7 +238,7 @@ else
 	# compiler is the only thing on this host that can say anything about
 	# it, so it says it with -Werror.
 	out=$(mktemp -d)/lte-gpio
-	lte_src=meta-bench/recipes-bench/bench-lte/files/lte-gpio.c
+	lte_src=src/lte/lte-gpio.c
 	# Word splitting on the pkg-config output is intended here too.
 	# shellcheck disable=SC2046
 	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \
