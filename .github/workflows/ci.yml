@@ -246,7 +246,7 @@ jobs:
         # machine and never on a push. --help is the only subcommand
         # that opens no chip, so it is the one a runner can execute.
         run: |
-          src=meta-bench/recipes-bench/bench-diag/files
+          src=src/diag
           gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) "$src/bench-diag.c" -o /tmp/bench-diag $(pkg-config --libs libgpiod)
           /tmp/bench-diag --help > /dev/null
 

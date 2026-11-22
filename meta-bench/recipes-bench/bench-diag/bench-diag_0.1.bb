@@ -10,7 +10,7 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_URI = "file://bench-diag.c"
+SRC_URI = "file://${BENCH_REPO_ROOT}/src/diag/bench-diag.c"
 
 DEPENDS = "libgpiod"
 
@@ -26,7 +26,7 @@ inherit pkgconfig
 
 # scarthgap still unpacks into WORKDIR. On walnascar and later this
 # becomes S = "${UNPACKDIR}"; the same line moves in bench-status.
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/diag"
 
 # -Werror is enforced in CI, not here, matching bench-status: a toolchain
 # upgrade should fail a pull request rather than someone else's image

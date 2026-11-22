@@ -290,7 +290,7 @@ else
 	# refuse off-target or, worse on a developer's machine with real GPIO,
 	# read or drive a line nobody asked about.
 	out=$(mktemp -d)/bench-diag
-	diag_src=meta-bench/recipes-bench/bench-diag/files/bench-diag.c
+	diag_src=src/diag/bench-diag.c
 	# Word splitting on the pkg-config output is intended here too.
 	# shellcheck disable=SC2046
 	if gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libgpiod) \
