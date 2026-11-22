@@ -13,6 +13,7 @@
 # SPDX-License-Identifier: MIT
 
 set -eu
+export BENCH_NO_KAS_DUMP=1
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)
