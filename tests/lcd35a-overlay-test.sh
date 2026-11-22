@@ -32,8 +32,8 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DTS=$ROOT/meta-bench/recipes-bench/bench-lcd35a-overlay/files/bench-lcd35a-overlay.dts
 CFG=$ROOT/meta-bench/recipes-kernel/linux/files/lcd35a.cfg
 IMG=$ROOT/meta-bench/recipes-core/images/bench-lcd35a-image.bb
-FILL=$ROOT/meta-bench/recipes-bench/bench-lcd35a/files/drmfill.c
-VERIFY=$ROOT/meta-bench/recipes-bench/bench-lcd35a/files/lcd35a-verify
+FILL=$ROOT/src/lcd35a/drmfill.c
+VERIFY=$ROOT/src/lcd35a/lcd35a-verify
 KAS=$ROOT/kas/bench-lcd35a.yml
 DESIGN=$ROOT/projects/07-lcd35-drm/docs/DESIGN.md
 

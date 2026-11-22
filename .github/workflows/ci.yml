@@ -289,7 +289,7 @@ jobs:
         # for a step that does not exist is worse than an absent
         # dependency, because it reads as done in every later diff.
         run: |
-          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libdrm) meta-bench/recipes-bench/bench-lcd35a/files/drmfill.c -o /tmp/drmfill $(pkg-config --libs libdrm)
+          gcc -Wall -Wextra -Werror -O2 $(pkg-config --cflags libdrm) src/lcd35a/drmfill.c -o /tmp/drmfill $(pkg-config --libs libdrm)
 
       - name: drmfill finds no panel on a runner
         # The card-walking path, which replaced a hard-coded

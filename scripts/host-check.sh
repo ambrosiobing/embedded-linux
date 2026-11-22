@@ -385,7 +385,7 @@ elif ! pkg-config --exists libdrm; then
 else
 	echo "libdrm $(pkg-config --modversion libdrm)"
 	out=$(mktemp -d)/drmfill
-	drm_src=meta-bench/recipes-bench/bench-lcd35a/files/drmfill.c
+	drm_src=src/lcd35a/drmfill.c
 	# Word splitting on the pkg-config output is intended: it returns a
 	# list of flags, not one argument.
 	# shellcheck disable=SC2046

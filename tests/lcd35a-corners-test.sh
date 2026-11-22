@@ -20,7 +20,7 @@
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-SCRIPT=$ROOT/meta-bench/recipes-bench/bench-lcd35a/files/lcd35a-corners
+SCRIPT=$ROOT/src/lcd35a/lcd35a-corners
 
 pass=0
 fail=0

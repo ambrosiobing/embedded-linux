@@ -11,11 +11,11 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;\
 md5=0835ade698e0bcf8506ecda2f7b4f302"
 
-SRC_URI = "file://drmfill.c \
-           file://lcd35a-corners \
-           file://lcd35a-verify"
+SRC_URI = "file://${BENCH_REPO_ROOT}/src/lcd35a/drmfill.c \
+           file://${BENCH_REPO_ROOT}/src/lcd35a/lcd35a-corners \
+           file://${BENCH_REPO_ROOT}/src/lcd35a/lcd35a-verify"
 
-S = "${WORKDIR}"
+S = "${WORKDIR}${BENCH_REPO_ROOT}/src/lcd35a"
 
 # libdrm and nothing else. This program deliberately uses only public
 # libdrm and ioctl interfaces: it exists to show what a compositor does,
